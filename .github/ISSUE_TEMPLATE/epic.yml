@@ -26,7 +26,13 @@ body:
     id: additional-information
     attributes:
       label: Additional Information
-      description: Links to relevant resources, documentation of other issues, UX sketches, technical architecture/requirements
+      description: Links to relevant resources, documentation of other issues, UX sketches, technical architecture/requirements.
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Add tasks that are considered user story candidates.
 
   - type: markdown
     attributes:
