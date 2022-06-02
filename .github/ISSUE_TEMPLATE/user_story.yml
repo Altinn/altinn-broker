@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         * Please make sure this user story hasn't been already submitted by someone by looking through other open/closed user stories.
-        * Consider starting with the format As a [who] I want to [what] so that [why]
+        * Consider starting with the format As a **[who]** I want to **[what]** so that **[why]**
         * Consider the [INVEST](https://www.pivotaltracker.com/blog/how-to-invest-in-your-user-stories) qualities when writing the story
           
   - type: textarea
