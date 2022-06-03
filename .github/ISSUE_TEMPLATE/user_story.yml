@@ -22,7 +22,13 @@ body:
     attributes:
       label: Additional Information
       description: Add more details as need like links, screenshots, etc.
-      
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Add tasks to be done as part of this story.
+
   - type: textarea
     id: acceptance-criterias
     attributes:
