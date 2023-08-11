@@ -21,7 +21,7 @@ body:
     id: additional-information
     attributes:
       label: Additional Information
-      description: Add more details as need like links, screenshots, etc.
+      description: Add more details as needed, like links, screenshots, etc.
 
   - type: textarea
     id: tasks
@@ -39,4 +39,4 @@ body:
     attributes:
       value: |
         * Check the [Definition of Ready](https://docs.altinn.studio/community/devops/definition-of-ready/) if you need hints on what to include.
-        * Remember to add the correct labels (status/*, team/*, org/*)
+        * Remember to add the correct labels (status/*, org/*, ...)
