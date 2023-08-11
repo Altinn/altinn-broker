@@ -1,5 +1,5 @@
 name: Question ❓
-description: Ask a question related to Altinn.
+description: Ask a question related to this product.
 labels: ["kind/question", "status/triage"]
 body:
   - type: markdown
