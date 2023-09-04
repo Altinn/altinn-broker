@@ -1,38 +1,58 @@
 name: Epic 💎
 description: Create a new epic based on user and vendor views
-labels: ["type/epic", "status/draft"]
+labels: ["kind/epic", "status/draft"]
 body:          
+  - type: markdown
+    attributes:
+      value: "## Users View"
+
   - type: textarea
     id: users-view
     attributes:
-      label: Users View
+      label: Title, User role(s), and Users value statement(s)
       description: Provide the title, user role(s), and value statement(s) from the user's perspective.
     validations:
       required: true
 
+  - type: markdown
+    attributes:
+      value: "## Vendors View"
+
   - type: textarea
     id: vendors-view-description
     attributes:
-      label: Vendors View - Description
-      description: High-level features and additional information from the vendor's perspective.
+      label: Description
+      description: High level features (capabilities) and additional information from the vendor's perspective.
+
+  - type: markdown
+    attributes:
+      value: "```[tasklist]\n### Features"
 
   - type: textarea
     id: tasklist-features
     attributes:
-      label: Tasklist - Features
-      description: List of features to be considered for this epic.
+      label: List of Features
+      description: Provide the list of features to be considered for this epic.
+
+  - type: markdown
+    attributes:
+      value: "```[tasklist]\n### Work items"
 
   - type: textarea
     id: work-items-tasklist
     attributes:
-      label: Tasklist - Work Items
-      description: List of work items to be considered for this epic.
+      label: List of Work Items
+      description: Provide the list of work items to be considered for this epic.
+
+  - type: markdown
+    attributes:
+      value: "## Item Attributes"
 
   - type: textarea
     id: item-attributes
     attributes:
-      label: Item Attributes
-      description: Automatically updated properties, not intended for change.
+      label: Automatically updated properties
+      description: Provide the automatically updated properties related to this epic.
 
   - type: markdown
     attributes:
