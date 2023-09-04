@@ -1,5 +1,5 @@
 name: Epic 💎
-description: Create a new epic based on user and vendor views
+description: Create a new epic
 labels: ["kind/epic", "status/draft"]
 body:          
   - type: textarea
