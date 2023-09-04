@@ -9,10 +9,9 @@ assignees: ''
 
 ## Users view
 
-Title: **Velge mottakskanal for forsendelser og varsler**
 User role(s): Mottaker
 Users value statement(s): 
-TBD
+* Bullet list
 
 ## Vendors view
 ### Description
