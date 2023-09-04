@@ -1,5 +1,5 @@
 ---
-name: Custom issue template
+name: Epic (new template)
 about: Testing template creation
 title: ''
 labels: kind/epic, role/sender, status/draft
@@ -16,21 +16,17 @@ Users value statement(s):
 ## Vendors view
 ### Description
 #### High level features (capabilities):
- * Støtte for valg av mottakskanal for forsendelser og varsler
+ * Bullet list
 #### Additional information
 TBD
 
 ```[tasklist]
 ### Features 
-- [ ] Støtte for valg av mottakskanal per forsendelse
-- [ ] Støtte for kanaler SMS, e-post, events, API, ..
-- [ ] GUI for selvbetjent oppsett
-- [ ] Valg mellom ulike meldingsløsninger?
+- [ ] Example feature
 ```
 
 ```[tasklist]
 ### Work items
-
 ```
 
 ## Item attributes
@@ -39,7 +35,7 @@ TBD
 _Note: Automatically updated properties, not intended for change by you;)_
 
 _Issue type: epic_
-_Concept no: 30_
-_Stage: Operation_
-_ArchiConceptID: id-b21304770c554a349df6afdf90cdc2c5_
-_GithubIssueID: I_kwDOIwEQMM5vYMyU_
+_Concept no: _
+_Stage: E.g. Operation_
+_ArchiConceptID: _
+_GithubIssueID: _
