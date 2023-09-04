@@ -1,6 +1,6 @@
 name: Epic 💎
 description: Create a new epic based on user and vendor views
-labels: ["Epic", "status/draft"]
+labels: ["kind/epic", "status/draft"]
 body:          
   - type: textarea
     id: users-view
