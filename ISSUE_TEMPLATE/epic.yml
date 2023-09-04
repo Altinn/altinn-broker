@@ -1,0 +1,41 @@
+name: Epic 💎
+description: Create a new epic based on user and vendor views
+labels: ["Epic", "status/draft"]
+body:          
+  - type: textarea
+    id: users-view
+    attributes:
+      label: Users View
+      description: Provide the title, user role(s), and value statement(s) from the user's perspective.
+    validations:
+      required: true
+
+  - type: textarea
+    id: vendors-view-description
+    attributes:
+      label: Vendors View - Description
+      description: High-level features and additional information from the vendor's perspective.
+
+  - type: textarea
+    id: tasklist-features
+    attributes:
+      label: Tasklist - Features
+      description: List of features to be considered for this epic.
+
+  - type: textarea
+    id: work-items-tasklist
+    attributes:
+      label: Tasklist - Work Items
+      description: List of work items to be considered for this epic.
+
+  - type: textarea
+    id: item-attributes
+    attributes:
+      label: Item Attributes
+      description: Automatically updated properties, not intended for change.
+
+  - type: markdown
+    attributes:
+      value: |
+        * Check the [Definition of Ready](https://docs.altinn.studio/community/devops/definition-of-ready/) if you need hints on what to include.
+        * Remember to link all relevant issues (bugs, user stories, chores)
