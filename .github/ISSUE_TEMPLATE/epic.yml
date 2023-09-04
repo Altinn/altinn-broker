@@ -26,13 +26,7 @@ body:
 
   - type: markdown
     attributes:
-      value: "```[tasklist]\n### Features"
-
-  - type: textarea
-    id: tasklist-features
-    attributes:
-      label: List of Features
-      description: Provide the list of features to be considered for this epic.
+      value: "```[tasklist]\n### Features\n```"
 
   - type: markdown
     attributes:
