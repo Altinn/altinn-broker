@@ -1,0 +1,28 @@
+version: '3.4'
+
+volumes:
+    broker-storage:
+
+networks:
+  altinnplatform_network:
+    external: false
+
+services:
+  altinn_platform_broker:
+    container_name: altinn-platform-broker
+    image: altinnplatformbroker:latest
+    restart: always
+    networks:
+      - altinnplatform_network
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:2525
+      - PlatformStorageSettings:ApiEndPoint=http://altinn-platform-broker:2525/api/v1
+      - PlatformStorageSettings:ApiEndPointHost=http://altinn-platform-broker:2525/
+    volumes:
+      - broker-storage:/mnt/storage
+    ports:
+      - "2525:2525"
+    build:
+      context: .
+      dockerfile: Dockerfile

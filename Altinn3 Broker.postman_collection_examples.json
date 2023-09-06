@@ -1,0 +1,174 @@
+{
+	"info": {
+		"_postman_id": "1448ba30-c676-4d52-8909-d42ee4d2a04d",
+		"name": "Altinn3 Broker",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "19092204"
+	},
+	"item": [
+		{
+			"name": "UploadFile",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "",
+						"value": "",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "file",
+					"file": {
+						"src": "/C:/Temp/Postman-win64-Setup.exe"
+					}
+				},
+				"url": {
+					"raw": "https://localhost:7241/broker/api/v1/shipment/a6b17cae-4ea7-4485-88d2-c879c097f1b5?sendersFileReference=sendersRef123&fileName=input.txt",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "7241",
+					"path": [
+						"broker",
+						"api",
+						"v1",
+						"shipment",
+						"a6b17cae-4ea7-4485-88d2-c879c097f1b5"
+					],
+					"query": [
+						{
+							"key": "sendersFileReference",
+							"value": "sendersRef123"
+						},
+						{
+							"key": "fileName",
+							"value": "input.txt"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UploadFile Docker",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "",
+						"value": "",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "file",
+					"file": {
+						"src": "/C:/Temp/Postman-win64-Setup.exe"
+					}
+				},
+				"url": {
+					"raw": "https://localhost:7241/broker/api/v1/shipment/a6b17cae-4ea7-4485-88d2-c879c097f1b5?sendersFileReference=sendersRef123&fileName=input.txt",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "7241",
+					"path": [
+						"broker",
+						"api",
+						"v1",
+						"shipment",
+						"a6b17cae-4ea7-4485-88d2-c879c097f1b5"
+					],
+					"query": [
+						{
+							"key": "sendersFileReference",
+							"value": "sendersRef123"
+						},
+						{
+							"key": "fileName",
+							"value": "input.txt"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateShipment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"serviceCode\": \"test1\",\r\n    \"serviceEditioinCode\": 1,\r\n    \"recipients\": [\r\n        \"rep1\", \"rep2\"\r\n    ],\r\n    \"sendersReference\": \"testsendersREF\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:7241/broker/api/v1/shipment",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "7241",
+					"path": [
+						"broker",
+						"api",
+						"v1",
+						"shipment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateShipment Docker",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"serviceCode\": \"test1\",\r\n    \"serviceEditioinCode\": 1,\r\n    \"recipients\": [\r\n        \"rep1\", \"rep2\"\r\n    ],\r\n    \"sendersReference\": \"testsendersREF\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:7241/broker/api/v1/shipment",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "7241",
+					"path": [
+						"broker",
+						"api",
+						"v1",
+						"shipment"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
