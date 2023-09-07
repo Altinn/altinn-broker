@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Dockerfile = Dockerfile
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Altinn.Broker.Tests", "Test\Altinn.Broker.Tests\Altinn.Broker.Tests.csproj", "{DDFFAD18-D87F-459C-9CEF-9F11B541C627}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{1564B7BA-42FB-4A35-96AD-3731BCEBE5BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1564B7BA-42FB-4A35-96AD-3731BCEBE5BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1564B7BA-42FB-4A35-96AD-3731BCEBE5BB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DDFFAD18-D87F-459C-9CEF-9F11B541C627}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DDFFAD18-D87F-459C-9CEF-9F11B541C627}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DDFFAD18-D87F-459C-9CEF-9F11B541C627}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DDFFAD18-D87F-459C-9CEF-9F11B541C627}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
