@@ -24,8 +24,8 @@ jobs:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis      
       - name: Build & Test
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any          
-        run:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+        run: |
           dotnet build Altinn.Broker.sln -v q
 
           dotnet test Altinn.Broker.sln \
