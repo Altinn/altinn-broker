@@ -12,6 +12,8 @@ services:
     container_name: altinn-platform-broker
     image: altinnplatformbroker:latest
     restart: always
+    depends_on:
+      - azurite
     networks:
       - altinnplatform_network
     environment:
@@ -26,3 +28,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"

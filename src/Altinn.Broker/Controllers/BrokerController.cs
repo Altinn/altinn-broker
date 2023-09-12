@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Core.Services.Interfaces;
+using Altinn.Broker.Persistence;
 
 namespace Altinn.Broker.Controllers
 {    
@@ -15,12 +16,14 @@ namespace Altinn.Broker.Controllers
     public class BrokerController : ControllerBase
     {
         private IShipmentService _shipmentService;
+        private IFileStore _fileStore;
         [AllowNull]
         private static DataStore store;
-        public BrokerController(IShipmentService shipmentService)
+        public BrokerController(IShipmentService shipmentService, IFileStore fileStore)
         {
             store = DataStore.Instance;
             _shipmentService = shipmentService;
+            _fileStore = fileStore;
 
         }
 
@@ -78,7 +81,7 @@ namespace Altinn.Broker.Controllers
 
             var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
             string status = $"fileReference {brokerFileMetadata.GetId()} created for sendersref: {brokerFileMetadata.SendersFileReference}, fileName: {brokerFileMetadata.FileName}";
-            await Altinn.Broker.Persistence.FileStore.UploadFile(Request.Body, shipmentId.ToString(), brokerFileMetadata.GetId());
+            await _fileStore.UploadFile(Request.Body, shipmentId.ToString(), brokerFileMetadata.GetId());
             brokerFileMetadata.FileStatus = "file uploaded";
             shipmentInternal.Status = "file uploaded";
             shipmentInternal.FileList.Add(brokerFileMetadata);
