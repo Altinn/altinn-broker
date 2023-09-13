@@ -11,7 +11,7 @@ public class BlobStore : IFileStore
 
     private static string? ConnectionString => Environment.GetEnvironmentVariable("BlobStorageConnectionString");
     
-    public async Task UploadFile(Stream filestream, string shipmentId, string fileReference)
+    public async Task<string> UploadFile(Stream filestream, string shipmentId, string fileReference)
     {   
         if (ConnectionString is null){
             throw new Exception("No BlobStorageConnectionString was was configured in appsettings.");
@@ -20,6 +20,8 @@ public class BlobStore : IFileStore
         await containerClient.CreateIfNotExistsAsync();
         BlobClient blobClient = containerClient.GetBlobClient(fileReference);
         await blobClient.UploadAsync(filestream, true);
+        var sasUri = blobClient.GenerateSasUri(Azure.Storage.Sas.BlobSasPermissions.Read, DateTime.Now.AddHours(1));
+        return sasUri.OriginalString;
     }
 }
 
