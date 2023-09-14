@@ -15,8 +15,8 @@ namespace Altinn.Broker.Controllers
     [Route("broker/api/v1/shipment")]
     public class BrokerController : ControllerBase
     {
-        private IShipmentService _shipmentService;
-        private IFileStore _fileStore;
+        private readonly IShipmentService _shipmentService;
+        private readonly IFileStore _fileStore;
         public BrokerController(IShipmentService shipmentService, IFileStore fileStore)
         {
             _shipmentService = shipmentService;
@@ -76,10 +76,9 @@ namespace Altinn.Broker.Controllers
             };
 
             var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
-            string status = $"fileReference {brokerFileMetadata.GetId()} created for sendersref: {brokerFileMetadata.SendersFileReference}, fileName: {brokerFileMetadata.FileName}";
             await _fileStore.UploadFile(Request.Body, shipmentId.ToString(), brokerFileMetadata.GetId());
             brokerFileMetadata.FileStatus = "file uploaded";
-            shipmentInternal.Status = "file uploaded";
+            shipmentInternal.Status = $"fileReference {brokerFileMetadata.GetId()} created for sendersref: {brokerFileMetadata.SendersFileReference}, fileName: {brokerFileMetadata.FileName}";
             shipmentInternal.FileList.Add(brokerFileMetadata);
             return Accepted(brokerFileMetadata);
         }
