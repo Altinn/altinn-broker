@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Extensions;
+using Altinn.Broker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,7 @@ if (app.Environment.IsDevelopment())
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddCoreServices(config);
+    services.AddSingleton<IFileStore, FileStore>();
 }
 
 app.UseHttpsRedirection();

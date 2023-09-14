@@ -20,7 +20,7 @@
 				"body": {
 					"mode": "file",
 					"file": {
-						"src": "/C:/Temp/Postman-win64-Setup.exe"
+						"src": "C:/Windows/System32/cmd.exe"
 					}
 				},
 				"url": {

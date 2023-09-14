@@ -13,3 +13,9 @@ docker-compose up -d --build
 ```
 
 Example requests using postman can be found in [Altinn3 Broker.postman_collection_examples.json](Altinn3 Broker.postman_collection_examples.json). 
+
+## Local Development
+
+### Azurite
+
+When running tests or when running locally, we use the Azurite storage emulator to emulate an Azure Storage account locally. You can use Azure Storage Explorer to inspect the blob contents.
