@@ -36,6 +36,9 @@ jobs:
       - name: Install SonarCloud scanners
         run: |
           dotnet tool install --global dotnet-sonarscanner
+      - name: Start dependencies for tests (docker-compose)
+        run: |
+          docker-compose up -d
       - name: Build & Test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
