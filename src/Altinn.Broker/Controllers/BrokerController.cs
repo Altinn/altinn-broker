@@ -21,7 +21,6 @@ namespace Altinn.Broker.Controllers
         {
             _shipmentService = shipmentService;
             _fileStore = fileStore;
-
         }
 
         [HttpPost]        
