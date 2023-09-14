@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:7.0.400-alpine3.18 AS build
+FROM mcr.microsoft.com/dotnet/sdk:7.0.401-alpine3.18 AS build
 WORKDIR /app
 
 # Copy csproj and restore as distinct layers
@@ -13,7 +13,7 @@ COPY src ./src
 RUN dotnet publish -c Release -o out ./src/Altinn.Broker/Altinn.Broker.csproj
 
 # Build runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:7.0.10-alpine3.18 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:7.0.11-alpine3.18 AS final
 WORKDIR /app
 EXPOSE 2525
 
