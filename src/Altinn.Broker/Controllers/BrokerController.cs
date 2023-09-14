@@ -17,11 +17,8 @@ namespace Altinn.Broker.Controllers
     {
         private IShipmentService _shipmentService;
         private IFileStore _fileStore;
-        [AllowNull]
-        private static DataStore store;
         public BrokerController(IShipmentService shipmentService, IFileStore fileStore)
         {
-            store = DataStore.Instance;
             _shipmentService = shipmentService;
             _fileStore = fileStore;
 
@@ -47,12 +44,12 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult<BrokerShipmentResponseExt>> PutFinalizeBrokerShipmentUpload(Guid shipmentId)
         {
             // This method should allow enduser to "finalize" file upload, which should tell altinn that the file package is now fully uploaded. (Should this be necessary)
-            if(!store.BrokerShipStore.ContainsKey(shipmentId))
+
+            var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
+            if(shipmentInternal is null)
             {
                 return StatusCode(404, "shipmentId is not valid");
             }
-
-            var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
             shipmentInternal.Status = "upload finalized";
             await _shipmentService.UpdateBrokerShipment(shipmentInternal);
 
