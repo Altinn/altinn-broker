@@ -6,7 +6,6 @@ public class FileStore : IFileStore
     {
     }
 
-
     private static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")?.ToLower() == "true";
     public async Task UploadFile(Stream filestream, string shipmentId, string fileReference)
     {   
