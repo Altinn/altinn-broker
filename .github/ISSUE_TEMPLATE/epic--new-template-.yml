@@ -1,0 +1,30 @@
+name: Epic (new template)
+description: Testing template creation
+labels: ["kind/epic", "role/sender", "status/draft"]
+body:          
+  - type: markdown
+    attributes:
+      value: "## Users View"
+  - type: textarea
+    id: users-view
+    attributes:
+      label: User role(s): Mottaker
+      description: Users value statement(s)
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: "## Vendors view"
+  - type: textarea
+    id: vendors-view
+    attributes:
+      label: High level features (capabilities)
+    validations:
+      required: true
+  - type: textarea
+    id: vendors-view
+    attributes:
+      label: Additional information
+    validations:
+      required: true
