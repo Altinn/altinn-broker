@@ -28,16 +28,16 @@ CREATE TABLE broker.shipment (
     uploader_actor_id_fk bigint NOT NULL,
     initiated timestamp without time zone NOT NULL,
     shipment_status_id_fk integer NOT NULL,
-    FOREIGN KEY (uploader_actor_id) REFERENCES broker.actor (actor_id) ON DELETE CASCADE,
-    FOREIGN KEY (shipment_status_id) REFERENCES broker.shipment_status (shipment_status_id)
+    FOREIGN KEY (uploader_actor_id_fk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
+    FOREIGN KEY (shipment_status_id_fk) REFERENCES broker.shipment_status (shipment_status_id_pk)
 );
 
 CREATE TABLE broker.shipment_metadata (
-    metadata_id bigserial PRIMARY KEY,
+    metadata_id_pk bigserial PRIMARY KEY,
     shipment_id_fk uuid NOT NULL,
     key character varying(50) NOT NULL,
     value character varying(300) NOT NULL,
-    FOREIGN KEY (shipment_id) REFERENCES broker.shipment (shipment_id) ON DELETE CASCADE
+    FOREIGN KEY (shipment_id_fk) REFERENCES broker.shipment (shipment_id_pk) ON DELETE CASCADE
 );
 
 CREATE TABLE broker.file (
@@ -48,9 +48,9 @@ CREATE TABLE broker.file (
     last_status_update timestamp without time zone,
     uploaded timestamp without time zone NOT NULL,
     storage_reference_id_fk bigint NOT NULL,
-    FOREIGN KEY (file_status_id) REFERENCES broker.file_status (file_status_id),
-    FOREIGN KEY (shipment_id) REFERENCES broker.shipment (shipment_id),
-    FOREIGN KEY (storage_reference_id) REFERENCES broker.storage_reference (storage_reference_id)
+    FOREIGN KEY (file_status_id_fk) REFERENCES broker.file_status (file_status_id_pk),
+    FOREIGN KEY (shipment_id_fk) REFERENCES broker.shipment (shipment_id_pk),
+    FOREIGN KEY (storage_reference_id_fk) REFERENCES broker.storage_reference (storage_reference_id_pk)
 );
 
 CREATE TABLE broker.actor_file_status_description (
@@ -63,10 +63,10 @@ CREATE TABLE broker.actor_file_status (
     file_id_fk_pk uuid NOT NULL,
     actor_file_status_id_fk integer NOT NULL,
     actor_file_status_date timestamp without time zone NOT NULL,
-    PRIMARY KEY (actor_id, file_id),
-    FOREIGN KEY (actor_id) REFERENCES broker.actor (actor_id) ON DELETE CASCADE,
-    FOREIGN KEY (actor_file_status_id) REFERENCES broker.actor_file_status_description (actor_file_status_id),
-    FOREIGN KEY (file_id) REFERENCES broker.file (file_id)
+    PRIMARY KEY (actor_id_fk_pk, file_id_fk_pk),
+    FOREIGN KEY (actor_id_fk_pk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
+    FOREIGN KEY (actor_file_status_id_fk) REFERENCES broker.actor_file_status_description (actor_file_status_id_pk),
+    FOREIGN KEY (file_id_fk_pk) REFERENCES broker.file (file_id_pk)
 );
 
 CREATE TABLE broker.actor_shipment_status_description (
@@ -79,10 +79,10 @@ CREATE TABLE broker.actor_shipment_status (
     shipment_id_fk_pk uuid NOT NULL,
     actor_shipment_status_id_fk integer NOT NULL,
     actor_shipment_status_date timestamp without time zone NOT NULL,
-    PRIMARY KEY (actor_id, shipment_id),
-    FOREIGN KEY (actor_id) REFERENCES broker.actor (actor_id) ON DELETE CASCADE,
-    FOREIGN KEY (actor_shipment_status_id) REFERENCES broker.actor_shipment_status_description (actor_shipment_status_id),
-    FOREIGN KEY (shipment_id) REFERENCES broker.shipment (shipment_id)
+    PRIMARY KEY (actor_id_fk_pk, shipment_id_fk_pk),
+    FOREIGN KEY (actor_id_fk_pk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
+    FOREIGN KEY (actor_shipment_status_id_fk) REFERENCES broker.actor_shipment_status_description (actor_shipment_status_id_pk),
+    FOREIGN KEY (shipment_id_fk_pk) REFERENCES broker.shipment (shipment_id_pk)
 );
 
 -- Create indexes
