@@ -14,6 +14,7 @@ services:
     restart: always
     depends_on:
       - azurite
+      - database
     networks:
       - altinnplatform_network
     environment:
@@ -33,3 +34,22 @@ services:
     ports:
       - "10000:10000"
       - "10001:10001"
+  database:
+    image: 'postgres:latest'
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: broker
+  broker-flyway-local:
+    image: flyway/flyway@sha256:1a8f569686bed896d6653a0d6d21bbc6a827ff7d1394eb51d100d4b960c9ada9
+    command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
+    volumes:
+      - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
+    depends_on:
+      - database
+    entrypoint:
+      [
+        "flyway",
+      ]
