@@ -8,27 +8,6 @@ networks:
     external: false
 
 services:
-  altinn_platform_broker:
-    container_name: altinn-platform-broker
-    image: altinnplatformbroker:latest
-    restart: always
-    depends_on:
-      - azurite
-      - database
-    networks:
-      - altinnplatform_network
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:2525
-      - PlatformStorageSettings:ApiEndPoint=http://altinn-platform-broker:2525/api/v1
-      - PlatformStorageSettings:ApiEndPointHost=http://altinn-platform-broker:2525/
-    volumes:
-      - broker-storage:/mnt/storage
-    ports:
-      - "2525:2525"
-    build:
-      context: .
-      dockerfile: Dockerfile
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     ports:

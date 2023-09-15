@@ -19,6 +19,9 @@ Example requests using postman can be found in [Altinn3 Broker.postman_collectio
 The services required to support local development are run using docker compose:
 ```docker compose up -d```
 
+To support features like hot reload etc, the app itself is run directly. Either in IDE like Visual Studio or by running:
+```dotnet watch --project ./src/Altinn.Broker/Altinn.Broker.csproj```
+
 ### Azurite
 
 When running tests or when running locally, we use the Azurite storage emulator to emulate an Azure Storage account locally. You can use Azure Storage Explorer to inspect the blob contents.
