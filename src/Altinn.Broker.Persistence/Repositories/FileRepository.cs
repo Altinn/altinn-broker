@@ -2,10 +2,11 @@
 using Altinn.Broker.Core.Domain;
 using File = Altinn.Broker.Core.Domain.File;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Repositories;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class FileRepository
+public class FileRepository : IFileRepository
 {
     private readonly string _connectionString;
 

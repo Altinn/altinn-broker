@@ -1,9 +1,10 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Repositories;
 
 using Npgsql;
 
-public class ShipmentRepository
+public class ShipmentRepository : IShipmentRepository
 {
     private readonly string _connectionString;
     private const string SHIPMENT_SQL = "SELECT *, ass.actor_id_fk_pk, a.actor_external_id, ass.actor_shipment_status_id_fk, ass.actor_shipment_status_date FROM broker.shipment " +
@@ -69,12 +70,12 @@ public class ShipmentRepository
         connection.Open();
 
         using var command = new NpgsqlCommand(
-            SHIPMENT_SQL + 
+            SHIPMENT_SQL +
             " WHERE shipment_id_pk = @shipmentId",
             connection);
 
         command.Parameters.AddWithValue("@shipmentId", shipmentId);
-        
+
         using NpgsqlDataReader reader = command.ExecuteReader();
 
         Shipment? shipment = null;
@@ -112,7 +113,7 @@ public class ShipmentRepository
 
         return shipment;
     }
-    
+
     public void AddShipment(Shipment shipment)
     {
         using var connection = new NpgsqlConnection(_connectionString);
@@ -120,7 +121,7 @@ public class ShipmentRepository
 
         NpgsqlCommand command = new NpgsqlCommand(
                 "INSERT INTO broker.shipment (shipment_id_pk, external_shipment_reference, uploader_actor_id_fk, initiated, shipment_status_id_fk) " +
-                "VALUES (@shipmentId, @externalShipmentReference, @uploaderActorId, @initiated, @shipmentStatusId)", 
+                "VALUES (@shipmentId, @externalShipmentReference, @uploaderActorId, @initiated, @shipmentStatusId)",
                 connection);
 
         command.Parameters.AddWithValue("@shipmentId", shipment.ShipmentId);

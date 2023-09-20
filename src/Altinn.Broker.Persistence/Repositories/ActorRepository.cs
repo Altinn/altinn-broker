@@ -1,10 +1,11 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Repositories;
 
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class ActorRepository
+public class ActorRepository : IActorRepository
 {
     private readonly string _connectionString;
 
@@ -44,7 +45,7 @@ public class ActorRepository
     {
         using var connection = new NpgsqlConnection(_connectionString);
         connection.Open();
-        
+
         NpgsqlCommand command = new NpgsqlCommand(
                     "INSERT INTO broker.actor (actor_id_pk, actor_external_id) " +
                     "VALUES (@actorId, @actorExternalId)",

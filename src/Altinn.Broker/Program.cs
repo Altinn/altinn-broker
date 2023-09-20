@@ -1,5 +1,7 @@
 using Altinn.Broker.Core.Extensions;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence;
+using Altinn.Broker.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddCoreServices(config);
     services.AddSingleton<IFileStore, FileStore>();
+    services.AddSingleton<IShipmentRepository, ShipmentRepository>();
+    services.AddSingleton<IActorRepository, ActorRepository>();
+    services.AddSingleton<IFileRepository, FileRepository>();
 }
 
 app.UseHttpsRedirection();
