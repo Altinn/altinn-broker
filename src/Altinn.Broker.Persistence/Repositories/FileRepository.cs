@@ -3,6 +3,8 @@ using Altinn.Broker.Core.Domain;
 using File = Altinn.Broker.Core.Domain.File;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Options;
+using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
@@ -10,9 +12,9 @@ public class FileRepository : IFileRepository
 {
     private readonly string _connectionString;
 
-    public FileRepository(string connectionString)
+    public FileRepository(IOptions<DatabaseOptions> databaseOptions)
     {
-        _connectionString = connectionString;
+        _connectionString = databaseOptions.Value.ConnectionString;
     }
 
     public File? GetFile(Guid fileId)

@@ -1,5 +1,8 @@
 ﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Options;
+
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -9,9 +12,9 @@ public class ActorRepository : IActorRepository
 {
     private readonly string _connectionString;
 
-    public ActorRepository(string connectionString)
+    public ActorRepository(IOptions<DatabaseOptions> databaseOptions)
     {
-        _connectionString = connectionString;
+        _connectionString = databaseOptions.Value.ConnectionString;
     }
 
     public Actor? GetActor(long actorId)

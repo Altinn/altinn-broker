@@ -1,6 +1,9 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Options;
+
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -11,9 +14,9 @@ public class ShipmentRepository : IShipmentRepository
             "LEFT JOIN broker.actor_shipment_status ass on ass.shipment_id_fk_pk = shipment_id_pk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = ass.actor_id_fk_pk";
 
-    public ShipmentRepository(string connectionString)
+    public ShipmentRepository(IOptions<DatabaseOptions> databaseOptions)
     {
-        _connectionString = connectionString;
+        _connectionString = databaseOptions.Value.ConnectionString;
     }
 
     public List<Shipment> GetAllShipments()

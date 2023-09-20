@@ -1,6 +1,7 @@
 using Altinn.Broker.Core.Extensions;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence;
+using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestBodySize = long.MaxValue;
 });
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
 ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
@@ -30,6 +34,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddCoreServices(config);
     services.AddSingleton<IFileStore, FileStore>();
+
+    services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
+
     services.AddSingleton<IShipmentRepository, ShipmentRepository>();
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
