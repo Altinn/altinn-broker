@@ -6,6 +6,9 @@ using Npgsql;
 public class ShipmentRepository
 {
     private readonly string _connectionString;
+    private const string SHIPMENT_SQL = "SELECT *, ass.actor_id_fk_pk, a.actor_external_id, ass.actor_shipment_status_id_fk, ass.actor_shipment_status_date FROM broker.shipment " +
+            "LEFT JOIN broker.actor_shipment_status ass on ass.shipment_id_fk_pk = shipment_id_pk " +
+            "LEFT JOIN broker.actor a on a.actor_id_pk = ass.actor_id_fk_pk";
 
     public ShipmentRepository(string connectionString)
     {
@@ -18,9 +21,7 @@ public class ShipmentRepository
         connection.Open();
 
         using var command = new NpgsqlCommand(
-            "SELECT * FROM broker.shipment, ass.actor_id_fk_pk, a.actor_external_id, ass.actor_shipment_status_id_fk, ass.actor_shipment_status_date " +
-            "LEFT JOIN broker.actor_shipment_status ass on ass.shipment_id_fk_pk = shipment_id_pk " +
-            "INNER JOIN broker.actor a on a.actor_id_pk = ass.actor_id_fk_pk",
+            SHIPMENT_SQL,
             connection);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
@@ -68,11 +69,10 @@ public class ShipmentRepository
         connection.Open();
 
         using var command = new NpgsqlCommand(
-            "SELECT s.* " +
-            "FROM broker.shipment s " +
-            "WHERE s.shipment_id_pk = @shipmentId", 
+            SHIPMENT_SQL + 
+            " WHERE shipment_id_pk = @shipmentId",
             connection);
-        
+
         command.Parameters.AddWithValue("@shipmentId", shipmentId);
         
         using NpgsqlDataReader reader = command.ExecuteReader();
@@ -89,7 +89,7 @@ public class ShipmentRepository
                 Initiated = reader.GetDateTime(reader.GetOrdinal("initiated")),
                 ShipmentStatus = (ShipmentStatus)reader.GetInt32(reader.GetOrdinal("shipment_status_id_fk"))
             };
-            if (reader.GetInt64(reader.GetOrdinal("actor_id_fk_pk")) > 0)
+            if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk_pk")))
             {
                 var receipts = new List<ShipmentReceipt>();
                 do
@@ -113,44 +113,22 @@ public class ShipmentRepository
         return shipment;
     }
     
-    public void SaveShipment(Shipment shipment)
+    public void AddShipment(Shipment shipment)
     {
         using var connection = new NpgsqlConnection(_connectionString);
         connection.Open();
 
-        // Here's a simple method to determine if the Shipment exists based on its primary key
-        using (var checkCommand = new NpgsqlCommand("SELECT COUNT(*) FROM broker.shipment WHERE shipment_id_pk = @shipmentId", connection))
-        {
-            checkCommand.Parameters.AddWithValue("@shipmentId", shipment.ShipmentId);
-            long existingCount = (long)checkCommand.ExecuteScalar();
+        NpgsqlCommand command = new NpgsqlCommand(
+                "INSERT INTO broker.shipment (shipment_id_pk, external_shipment_reference, uploader_actor_id_fk, initiated, shipment_status_id_fk) " +
+                "VALUES (@shipmentId, @externalShipmentReference, @uploaderActorId, @initiated, @shipmentStatusId)", 
+                connection);
 
-            NpgsqlCommand command;
+        command.Parameters.AddWithValue("@shipmentId", shipment.ShipmentId);
+        command.Parameters.AddWithValue("@externalShipmentReference", shipment.ExternalShipmentReference);
+        command.Parameters.AddWithValue("@uploaderActorId", shipment.UploaderActorId);
+        command.Parameters.AddWithValue("@initiated", shipment.Initiated);
+        command.Parameters.AddWithValue("@shipmentStatusId", (int)shipment.ShipmentStatus);
 
-            if (existingCount == 0)
-            {
-                // Insert new Shipment
-                command = new NpgsqlCommand(
-                    "INSERT INTO broker.shipment (shipment_id_pk, external_shipment_reference, uploader_actor_id_fk, initiated, shipment_status_id_fk) " +
-                    "VALUES (@shipmentId, @externalShipmentReference, @uploaderActorId, @initiated, @shipmentStatusId)", 
-                    connection);
-            }
-            else
-            {
-                // Update existing Shipment
-                command = new NpgsqlCommand(
-                    "UPDATE broker.shipment " +
-                    "SET external_shipment_reference = @externalShipmentReference, uploader_actor_id_fk = @uploaderActorId, initiated = @initiated, shipment_status_id_fk = @shipmentStatusId " +
-                    "WHERE shipment_id_pk = @shipmentId", 
-                    connection);
-            }
-
-            command.Parameters.AddWithValue("@shipmentId", shipment.ShipmentId);
-            command.Parameters.AddWithValue("@externalShipmentReference", shipment.ExternalShipmentReference);
-            command.Parameters.AddWithValue("@uploaderActorId", shipment.UploaderActorId);
-            command.Parameters.AddWithValue("@initiated", shipment.Initiated);
-            command.Parameters.AddWithValue("@shipmentStatusId", shipment.ShipmentStatusId);
-
-            command.ExecuteNonQuery();
-        }
+        command.ExecuteNonQuery();
     }
 }

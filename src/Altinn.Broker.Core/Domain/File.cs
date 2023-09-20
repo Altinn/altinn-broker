@@ -10,7 +10,6 @@ public class File
     public FileStatus FileStatus { get; set; } // Joined in
     public DateTimeOffset? LastStatusUpdate { get; set; }
     public DateTimeOffset Uploaded { get; set; }
-    public string StorageReferenceId { get; set; }
     public string FileLocation { get; set; } // Joined in
     public List<FileReceipt> Receipts { get; set; } // Joined in
 }

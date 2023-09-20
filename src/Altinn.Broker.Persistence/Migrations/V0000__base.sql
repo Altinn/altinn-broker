@@ -1,9 +1,10 @@
 -- Create schema
 CREATE SCHEMA broker;
+CREATE EXTENSION "uuid-ossp";
 
 -- Create tables
 CREATE TABLE broker.actor (
-    actor_id_pk serial PRIMARY KEY,
+    actor_id_pk bigserial PRIMARY KEY,
     actor_external_id character varying(500) NOT NULL
 );
 
@@ -13,7 +14,7 @@ CREATE TABLE broker.file_status (
 );
 
 CREATE TABLE broker.storage_reference (
-    storage_reference_id_pk bigint PRIMARY KEY,
+    storage_reference_id_pk bigserial PRIMARY KEY,
     file_location character varying(600) NOT NULL
 );
 

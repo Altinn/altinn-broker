@@ -20,10 +20,10 @@ public class FileRepository
         connection.Open();
 
         using var command = new NpgsqlCommand(
-            "SELECT * FROM broker.file, sr.file_location, afs.actor_id_fk_pk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date " +
-            "INNER JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
+            "SELECT *, sr.file_location, afs.actor_id_fk_pk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date FROM broker.file " +
+            "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk_pk = file_id_pk " +
-            "INNER JOIN broker.actor a on actor.actor_id_pk = afs.actor_id_fk_pk " +
+            "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk_pk " +
             "WHERE file_id_pk = @fileId",
             connection);
 
@@ -32,7 +32,7 @@ public class FileRepository
         using NpgsqlDataReader reader = command.ExecuteReader();
 
 
-        if (reader.Read()) 
+        if (reader.Read())
         {
             var file = new File
             {
@@ -42,10 +42,10 @@ public class FileRepository
                 FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_id_fk")),
                 LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
                 Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
-                StorageReferenceId = reader.GetString(reader.GetOrdinal("storage_reference_id_fk")),
                 FileLocation = reader.GetString(reader.GetOrdinal("file_location"))
             };
-            if (reader.GetInt64(reader.GetOrdinal("actor_id_fk_pk")) > 0) { 
+            if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk_pk")))
+            {
                 var receipts = new List<FileReceipt>();
                 do
                 {
@@ -64,7 +64,7 @@ public class FileRepository
                 file.Receipts = receipts;
             }
             return file;
-        } 
+        }
         else
         {
             return null;
@@ -77,9 +77,8 @@ public class FileRepository
         connection.Open();
 
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " + 
-            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW()) " + 
-            "RETURNING storage_reference_id_pk", connection))
+            "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " +
+            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())", connection))
         {
             command.Parameters.AddWithValue("@actorId", receipt.Actor.ActorId);
             command.Parameters.AddWithValue("@fileId", receipt.FileId);
@@ -88,66 +87,42 @@ public class FileRepository
         }
     }
 
-    public void SaveFile(File file)
+    public void AddFile(File file)
     {
         using var connection = new NpgsqlConnection(_connectionString);
         connection.Open();
 
-        using (var checkCommand = new NpgsqlCommand("SELECT COUNT(*) FROM broker.file WHERE file_id_pk = @fileId", connection))
-        {
-            checkCommand.Parameters.AddWithValue("@fileId", file.FileId);
-            long existingCount = (long)checkCommand.ExecuteScalar();
+        NpgsqlCommand command = new NpgsqlCommand(
+            "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
+            "VALUES (@fileId, @externalFileReference, @shipmentId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
+            connection);
+        long storageReference = AddFileStorageReference(file.FileLocation);
 
-            NpgsqlCommand command;
+        command.Parameters.AddWithValue("@fileId", file.FileId);
+        command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
+        command.Parameters.AddWithValue("@shipmentId", file.ShipmentId);
+        command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
+        command.Parameters.AddWithValue("@lastStatusUpdate", file.LastStatusUpdate);
+        command.Parameters.AddWithValue("@uploaded", file.Uploaded);
+        command.Parameters.AddWithValue("@storageReferenceId", storageReference);
 
-            if (existingCount == 0)
-            {
-                command = new NpgsqlCommand(
-                    "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
-                    "VALUES (@fileId, @externalFileReference, @shipmentId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
-                    connection);
-            }
-            else
-            {
-                command = new NpgsqlCommand(
-                    "UPDATE broker.file " +
-                    "SET external_file_reference = @externalFileReference, shipment_id_fk = @shipmentId, file_status_id_fk = @fileStatusId, last_status_update = @lastStatusUpdate, uploaded = @uploaded, storage_reference_id_fk = @storageReferenceId " +
-                    "WHERE file_id_pk = @fileId",
-                    connection);
-            }
-
-            command.Parameters.AddWithValue("@fileId", file.FileId);
-            command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
-            command.Parameters.AddWithValue("@shipmentId", file.ShipmentId);
-            command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
-            command.Parameters.AddWithValue("@lastStatusUpdate", file.LastStatusUpdate);
-            command.Parameters.AddWithValue("@uploaded", file.Uploaded);
-            command.Parameters.AddWithValue("@storageReferenceId", file.StorageReferenceId);
-
-            command.ExecuteNonQuery();
-        }
+        command.ExecuteNonQuery();
     }
 
-    public void AddFileStorageReference(Guid fileId, string fileLocation)
+    private long AddFileStorageReference(string fileLocation)
     {
         using var connection = new NpgsqlConnection(_connectionString);
         connection.Open();
 
-        Guid? storageReferenceId;
+        long? storageReferenceId;
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.storage_reference (storage_reference_id_pk, file_location) " + 
-            "VALUES (uuid_generate_v4(), @fileLocation) " + 
+            "INSERT INTO broker.storage_reference (storage_reference_id_pk, file_location) " +
+            "VALUES (DEFAULT, @fileLocation) " +
             "RETURNING storage_reference_id_pk", connection))
         {
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
-            storageReferenceId = (Guid)command.ExecuteScalar();
-        }
-
-        using (var command = new NpgsqlCommand("UPDATE broker.file SET storage_reference_id_fk = @storageReferenceId WHERE file_id_pk = @fileId", connection))
-        {
-            command.Parameters.AddWithValue("@fileId", fileId);
-            command.Parameters.AddWithValue("@storageReferenceId", storageReferenceId);
-            command.ExecuteNonQuery();
+            storageReferenceId = (long)command.ExecuteScalar();
+            return (long)storageReferenceId;
         }
     }
 }
