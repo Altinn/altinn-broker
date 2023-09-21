@@ -43,7 +43,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: broker
   broker-flyway-local:
-    image: flyway/flyway@sha256:1a8f569686bed896d6653a0d6d21bbc6a827ff7d1394eb51d100d4b960c9ada9
+    image: flyway/flyway@sha256:b3d6807dab8292f733e32f9e6bd347c8001e26724f5f406f72320c50710a7ee1
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
     volumes:
       - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
