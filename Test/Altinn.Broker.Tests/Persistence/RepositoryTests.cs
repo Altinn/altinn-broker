@@ -1,7 +1,9 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Tests.Persistence;
 
@@ -14,9 +16,14 @@ public class RepositoryTests
 
     public RepositoryTests()
     {
-        _fileRepository = new FileRepository(DATABASE_CONNECTION_STRING);
-        _actorRepository = new ActorRepository(DATABASE_CONNECTION_STRING);
-        _shipmentRepository = new ShipmentRepository(DATABASE_CONNECTION_STRING);
+        IOptions<DatabaseOptions> databaseOptions = Options.Create<DatabaseOptions>(new DatabaseOptions()
+        {
+            ConnectionString = DATABASE_CONNECTION_STRING
+        });
+
+        _fileRepository = new FileRepository(databaseOptions);
+        _actorRepository = new ActorRepository(databaseOptions);
+        _shipmentRepository = new ShipmentRepository(databaseOptions);
     }
 
     [Fact]
