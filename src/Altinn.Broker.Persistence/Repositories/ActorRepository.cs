@@ -1,8 +1,5 @@
 ﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Persistence.Options;
-
-using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -10,17 +7,16 @@ namespace Altinn.Broker.Persistence.Repositories;
 
 public class ActorRepository : IActorRepository
 {
-    private readonly string _connectionString;
+    private DatabaseConnectionProvider _connectionProvider;
 
-    public ActorRepository(IOptions<DatabaseOptions> databaseOptions)
+    public ActorRepository(DatabaseConnectionProvider connectionProvider)
     {
-        _connectionString = databaseOptions.Value.ConnectionString;
+        _connectionProvider = connectionProvider;
     }
 
     public Actor? GetActor(long actorId)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         using var command = new NpgsqlCommand(
             "SELECT * FROM broker.actor WHERE actor_id_pk = @actorId",
@@ -46,8 +42,7 @@ public class ActorRepository : IActorRepository
 
     public void AddActor(Actor actor)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         NpgsqlCommand command = new NpgsqlCommand(
                     "INSERT INTO broker.actor (actor_id_pk, actor_external_id) " +

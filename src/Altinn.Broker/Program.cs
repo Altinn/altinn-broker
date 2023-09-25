@@ -37,6 +37,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
+    services.AddSingleton<DatabaseConnectionProvider>();
 
     services.AddSingleton<IShipmentRepository, ShipmentRepository>();
     services.AddSingleton<IActorRepository, ActorRepository>();

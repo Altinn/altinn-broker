@@ -1,8 +1,8 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Tests.Persistence;
@@ -10,20 +10,22 @@ namespace Altinn.Broker.Tests.Persistence;
 public class RepositoryTests
 {
     private readonly string DATABASE_CONNECTION_STRING = "Host=localhost:5432;Username=postgres;Password=postgres;Database=broker";
+    private readonly DatabaseConnectionProvider _databaseConnectionProvider;
     private FileRepository _fileRepository;
     private ActorRepository _actorRepository;
     private ShipmentRepository _shipmentRepository;
 
     public RepositoryTests()
     {
-        IOptions<DatabaseOptions> databaseOptions = Options.Create<DatabaseOptions>(new DatabaseOptions()
+        IOptions<DatabaseOptions> databaseOptions = Options.Create(new DatabaseOptions()
         {
             ConnectionString = DATABASE_CONNECTION_STRING
         });
+        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions); 
 
-        _fileRepository = new FileRepository(databaseOptions);
-        _actorRepository = new ActorRepository(databaseOptions);
-        _shipmentRepository = new ShipmentRepository(databaseOptions);
+        _fileRepository = new FileRepository(_databaseConnectionProvider);
+        _actorRepository = new ActorRepository(_databaseConnectionProvider);
+        _shipmentRepository = new ShipmentRepository(_databaseConnectionProvider);
     }
 
     [Fact]
