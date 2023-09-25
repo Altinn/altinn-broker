@@ -33,7 +33,7 @@ if (app.Environment.IsDevelopment())
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddCoreServices(config);
-    services.AddSingleton<IFileStore, FileStore>();
+    services.AddSingleton<IFileStore, BlobStore>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
