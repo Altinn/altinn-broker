@@ -16,6 +16,7 @@ RUN dotnet publish -c Release -o out ./src/Altinn.Broker/Altinn.Broker.csproj
 FROM mcr.microsoft.com/dotnet/aspnet:7.0.11-alpine3.18 AS final
 WORKDIR /app
 EXPOSE 2525
+ENV ASPNETCORE_URLS=http://+:2525
 
 COPY --from=build /app/out .
 #COPY src/Altinn.Broker.Persistence/Migration ./Migration
