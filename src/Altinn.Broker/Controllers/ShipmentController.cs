@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Models;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Persistence;
+using Microsoft.AspNetCore.Http.Extensions;
 
 namespace Altinn.Broker.Controllers
 {    
@@ -23,17 +24,25 @@ namespace Altinn.Broker.Controllers
         }
 
         [HttpPost]        
-        [Consumes("application/json")]
         [Route("outbox/simpleShipment")]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> InitialiseUploadAndPublishShipment(InitiateBrokerShipmentRequestExt initiateBrokerShipmentRequest)
+        public async Task<ActionResult<BrokerShipmentResponseExt>> InitialiseUploadAndPublishShipment([FromForm] InitiateSimpleShipmentRequestExt initiateBrokerShipmentRequest)
         {
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
+            BrokerShipmentMetadata brokerShipmentMetadata = initiateBrokerShipmentRequest.Metadata.MapToBrokerShipment();
+            brokerShipmentMetadata.ShipmentId = Guid.NewGuid();
+            string targetDirectory = $@"C:\Temp\testfolderrestapi\{brokerShipmentMetadata.ShipmentId}";
+            if(!Path.Exists(targetDirectory))
+            {
+                System.IO.Directory.CreateDirectory(targetDirectory);
+            }
+            using(FileStream fs = new FileStream($@"{targetDirectory}\{initiateBrokerShipmentRequest.File.FileName}", FileMode.CreateNew))
+            {
+                await initiateBrokerShipmentRequest.File.CopyToAsync(fs);
+            }
 
-            //TODO: HANDLE INIT, UPLOAD AND PuBLISH Shipment and file in single call.
-            BrokerShipmentMetadata brokerShipmentMetadata = initiateBrokerShipmentRequest.MapToBrokerShipment();
-            Guid BrokerShipmentIdentifier = await _shipmentService.SaveBrokerShipmentMetadata(brokerShipmentMetadata);
-            brokerShipmentMetadata.ShipmentId = BrokerShipmentIdentifier;
-            return brokerShipmentMetadata.MapToBrokerShipmentExtResponse();
+            // Guid BrokerShipmentIdentifier = await _shipmentService.SaveBrokerShipmentMetadata(brokerShipmentMetadata);
+            //brokerShipmentMetadata.ShipmentId = BrokerShipmentIdentifier;
+            return Accepted(brokerShipmentMetadata.MapToBrokerShipmentExtResponse());
         }
 
         [HttpPost]        
