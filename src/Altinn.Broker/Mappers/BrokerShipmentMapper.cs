@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Models;
+using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers
@@ -6,11 +7,11 @@ namespace Altinn.Broker.Mappers
     public static class BrokerShipmentMapper
     {
         /// <summary>
-        /// Maps a <see cref="InitiateBrokerShipmentRequestExt"/> to a <see cref="BrokerShipment"/>
+        /// Maps a <see cref="InitiateBrokerShipmentRequestExt"/> to a <see cref="BrokerShipmentMetadata"/>
         /// </summary>
-        public static BrokerShipment MapToBrokerShipment(this InitiateBrokerShipmentRequestExt extRequest)
+        public static BrokerShipmentMetadata MapToBrokerShipment(this InitiateBrokerShipmentRequestExt extRequest)
         {
-            BrokerShipment shipment = new()
+            BrokerShipmentMetadata shipment = new()
             {
                 ServiceCode = extRequest.ServiceCode,
                 ServiceEditionCode = extRequest.ServiceEditionCode,
@@ -22,7 +23,7 @@ namespace Altinn.Broker.Mappers
             return shipment;
         }
 
-        public static BrokerShipmentResponseExt MapToBrokerShipmentExtResponse(this BrokerShipment shipment)
+        public static BrokerShipmentResponseExt MapToBrokerShipmentExtResponse(this BrokerShipmentMetadata shipment)
         {
             BrokerShipmentResponseExt response = new()
             {
@@ -32,7 +33,7 @@ namespace Altinn.Broker.Mappers
                 Recipients = shipment.Recipients,
                 Properties = shipment.Properties,
                 ShipmentId = shipment.ShipmentId,
-                Status = shipment.Status
+                Status = (BrokerShipmentStatusExt)shipment.Status
             };
 
             List<BrokerFileMetadataExt> metaDataExt = new List<BrokerFileMetadataExt>();

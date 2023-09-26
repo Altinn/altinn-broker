@@ -30,7 +30,7 @@ public class BrokerShipmentMapperTests
             }
         };
 
-        BrokerShipment expected = new()
+        BrokerShipmentMetadata expected = new()
         {
             SendersReference = "SendRef_1",
             ServiceCode = "1",
@@ -42,7 +42,7 @@ public class BrokerShipmentMapperTests
                 { "BB","22" }
             },
             FileList = new List<BrokerFileMetadata>(),
-            Status = string.Empty
+            Status =  Core.Enums.BrokerShipmentStatus.Initialized
         };
 
         // Act

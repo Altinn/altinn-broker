@@ -4,10 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 
 using Altinn.Broker.Models;
 using Altinn.Broker.Core.Models;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Persistence;
+using Altinn.Broker.Core.Enums;
 
 namespace Altinn.Broker.Controllers
 {    
@@ -15,9 +15,9 @@ namespace Altinn.Broker.Controllers
     [Route("broker/api/v1/shipment")]
     public class BrokerController : ControllerBase
     {
-        private readonly IShipmentService _shipmentService;
+        private readonly IShipmentServices _shipmentService;
         private readonly IFileStore _fileStore;
-        public BrokerController(IShipmentService shipmentService, IFileStore fileStore)
+        public BrokerController(IShipmentServices shipmentService, IFileStore fileStore)
         {
             _shipmentService = shipmentService;
             _fileStore = fileStore;
@@ -29,8 +29,8 @@ namespace Altinn.Broker.Controllers
         {
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
             Guid BrokerShipmentIdentifier = Guid.NewGuid();
-            BrokerShipment shipmentInternal = initiateBrokerShipmentRequest.MapToBrokerShipment();
-            shipmentInternal.Status ="intialized";
+            BrokerShipmentMetadata shipmentInternal = initiateBrokerShipmentRequest.MapToBrokerShipment();
+            shipmentInternal.Status = BrokerShipmentStatus.Initialized;
             shipmentInternal.ShipmentId = BrokerShipmentIdentifier;
             BrokerShipmentIdentifier = await _shipmentService.SaveBrokerShipment(shipmentInternal);
             shipmentInternal.ShipmentId = BrokerShipmentIdentifier;
@@ -49,7 +49,7 @@ namespace Altinn.Broker.Controllers
             {
                 return StatusCode(404, "shipmentId is not valid");
             }
-            shipmentInternal.Status = "upload finalized";
+            shipmentInternal.Status = BrokerShipmentStatus.Published;
             await _shipmentService.UpdateBrokerShipment(shipmentInternal);
 
             return Accepted(shipmentInternal.MapToBrokerShipmentExtResponse());
@@ -72,13 +72,13 @@ namespace Altinn.Broker.Controllers
                 ShipmentId = shipmentId,
                 SendersFileReference = sendersFileReference,
                 FileName = fileName ?? string.Empty,
-                FileStatus = "awaiting upload"
+                FileStatus = BrokerFileStatus.Uploaded
             };
 
             var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
             await _fileStore.UploadFile(Request.Body, shipmentId.ToString(), brokerFileMetadata.GetId());
-            brokerFileMetadata.FileStatus = "file uploaded";
-            shipmentInternal.Status = $"fileReference {brokerFileMetadata.GetId()} created for sendersref: {brokerFileMetadata.SendersFileReference}, fileName: {brokerFileMetadata.FileName}";
+            brokerFileMetadata.FileStatus = BrokerFileStatus.Uploaded;
+            shipmentInternal.Status = BrokerShipmentStatus.RequiresSenderInteraction;
             shipmentInternal.FileList.Add(brokerFileMetadata);
             return Accepted(brokerFileMetadata);
         }

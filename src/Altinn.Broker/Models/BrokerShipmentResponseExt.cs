@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
+using Altinn.Broker.Enums;
+
 namespace Altinn.Broker.Models
 {
     /// <summary>
@@ -57,6 +59,6 @@ namespace Altinn.Broker.Models
         /// Gets or sets the SendersReference.
         /// </summary>
         [JsonPropertyName("status")]
-        public string Status {get;set;} = string.Empty;
+        public BrokerShipmentStatusExt Status { get; set; }
     }
 }

@@ -1,11 +1,13 @@
 
+using Altinn.Broker.Core.Enums;
+
 namespace Altinn.Broker.Core.Models
 {
     /// <summary>
     /// Entity containing Broker Service Instance metadata
     /// This describes the initiation of a Broker Service and is used in conjunction with a file sender uploading a file.
     /// </summary>
-    public class BrokerShipment
+    public class BrokerShipmentMetadata
     {
         /// <summary>
         /// Gets or sets external service code given when external parties are retrieving service information
@@ -37,7 +39,7 @@ namespace Altinn.Broker.Core.Models
         /// </summary>
         public List<BrokerFileMetadata> FileList {get;set;} = new List<BrokerFileMetadata>();
 
-        public string Status {get;set;} = string.Empty;
+        public BrokerShipmentStatus Status {get;set;} = BrokerShipmentStatus.Initialized;
         public Guid ShipmentId {get;set;}
     }
 }

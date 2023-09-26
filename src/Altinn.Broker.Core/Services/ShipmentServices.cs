@@ -6,27 +6,27 @@ using Altinn.Broker.Core.Services.Interfaces;
 
 namespace Altinn.Broker.Core.Services
 {
-    public class ShipmentService : IShipmentService
+    public class ShipmentServices : IShipmentServices
     {
         [AllowNull]
         private static DataStore _dataStore;
-        public ShipmentService()
+        public ShipmentServices()
         {
             _dataStore = DataStore.Instance;
         }
 
-        public async Task<BrokerShipment> GetBrokerShipment(Guid shipmentId)
+        public async Task<BrokerShipmentMetadata> GetBrokerShipment(Guid shipmentId)
         {
             return await Task.Run(() => _dataStore.BrokerShipStore[shipmentId]);
         }
 
-        public async Task<Guid> SaveBrokerShipment(BrokerShipment shipment)
+        public async Task<Guid> SaveBrokerShipment(BrokerShipmentMetadata shipment)
         {
             await Task.Run(() =>_dataStore.BrokerShipStore[shipment.ShipmentId] = shipment);
             return shipment.ShipmentId;
         }
 
-        public async Task UpdateBrokerShipment(BrokerShipment shipment)
+        public async Task UpdateBrokerShipment(BrokerShipmentMetadata shipment)
         {
             await Task.Run(() => _dataStore.BrokerShipStore[shipment.ShipmentId] = shipment);
         }
