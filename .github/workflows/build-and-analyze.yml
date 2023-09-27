@@ -1,4 +1,4 @@
-name: .NET Analysis
+name: Build, test and push
 on:
   push:
     branches: [ main ]
