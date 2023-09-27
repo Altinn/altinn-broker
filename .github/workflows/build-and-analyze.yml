@@ -77,5 +77,4 @@ jobs:
       - name: Push image to registry
         run: |
               docker build . --tag ghcr.io/altinn-broker/altinn-broker:latest
-              docker run ghcr.io/altinn-broker/altinn-broker:latest
               docker push ghcr.io/altinn-broker/altinn-broker:latest
