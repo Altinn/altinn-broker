@@ -68,3 +68,14 @@ jobs:
         with:
           TRX_PATH: ${{ github.workspace }}/TestResults
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push image to registry
+        run: |
+              docker build . --tag ghcr.io/altinn-broker/altinn-broker:latest
+              docker run ghcr.io/altinn-broker/altinn-broker:latest
+              docker push ghcr.io/altinn-broker/altinn-broker:latest
