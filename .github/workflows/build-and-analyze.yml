@@ -76,5 +76,5 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push image to registry
         run: |
-              docker build . --tag ghcr.io/Altinn/altinn-broker:latest
-              docker push ghcr.io/Altinn/altinn-broker:latest
+              docker build . --tag ghcr.io/altinn/altinn-broker:latest
+              docker push ghcr.io/altinn/altinn-broker:latest
