@@ -2,14 +2,14 @@ namespace Altinn.Broker.Core.Enums
 {
     public enum BrokerShipmentStatus
     {
-        //
         Initialized,
-        RequiresSenderInteraction,
-        ReadyToPublish,
+        UploadInProgress,
+        AwaitingUploadProcessing,
+        AllFilesUploadedAndProcessed,
         Published,
-        VirusScanError,
-        UploadError,
-        InternalError,
-        Deleted
+        Cancelled,
+        Completed,
+        Deleted,
+        Failed
     }
 }

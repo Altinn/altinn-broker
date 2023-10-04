@@ -6,19 +6,25 @@ namespace Altinn.Broker.Core.Services.Interfaces
     public interface IShipmentService
     {
         /// <summary>
-        /// Retrieves <see cref="BrokerShipmentMetadata" /> from Metadata database.
-        /// Should also contain list of <see cref="BrokerFileMetadata" />.
+        /// Retrieves overview of BrokerShipment. Includes current status information.
         /// </summary>
         /// <param name="shipmentId">ShipmentId to retrieve metadata for.</param>
         /// <returns>Shipment Metadata</returns>
-        Task<BrokerShipmentMetadata> GetBrokerShipmentMetadata(Guid shipmentId);
+        Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId);
 
         /// <summary>
-        /// Used when initializing a new <see cref="BrokerShipmentMetadata" /> object in Metadata database.
+        /// Retrieves detailed BrokerShipment data. Includes historical status information.
+        /// </summary>
+        /// <param name="shipmentId">ShipmentId to retrieve metadata for.</param>
+        /// <returns>Shipment Metadata</returns>
+        Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId);
+
+        /// <summary>
+        /// Used when initializing a new <see cref="BrokerShipmentMetadata" /> object in BrokerShipment database.
         /// </summary>
         /// <param name="shipment"><see cref="BrokerShipmentMetadata" /> object containing new Metadata.</param>
         /// <returns>ShipmentId for initialized <see cref="BrokerShipmentMetadata" /></returns>
-        Task<Guid> SaveBrokerShipmentMetadata(BrokerShipmentMetadata shipment);
+        Task<Guid> InitializeShipment(BrokerShipmentInitialize shipment);
 
         /// <summary>
         /// Used internally when updating status of <see cref="BrokerShipmentMetadata" />.

@@ -20,19 +20,13 @@ namespace Altinn.Broker.Core.Services
             throw new NotImplementedException();
         }
 
-        /// <inheritdoc />
-        public Task<BrokerShipmentMetadata> GetBrokerShipmentMetadata(Guid shipmentId)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<BrokerShipmentMetadata> PublishShipment(Guid shipmentId)
         {
             throw new NotImplementedException();
         }
 
         /// <inheritdoc />
-        public Task<Guid> SaveBrokerShipmentMetadata(BrokerShipmentMetadata shipment)
+        public Task<Guid> InitializeShipment(BrokerShipmentInitialize shipment)
         {
             throw new NotImplementedException();
         }
@@ -45,6 +39,16 @@ namespace Altinn.Broker.Core.Services
 
         /// <inheritdoc />
         public void UpdateBrokerShipmentMetadata(BrokerShipmentMetadata shipment)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId)
         {
             throw new NotImplementedException();
         }

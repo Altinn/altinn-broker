@@ -72,13 +72,13 @@ namespace Altinn.Broker.Controllers
                 ShipmentId = shipmentId,
                 SendersFileReference = sendersFileReference,
                 FileName = fileName ?? string.Empty,
-                FileStatus = BrokerFileStatus.Uploaded
+                FileStatus = BrokerFileStatus.Initialized
             };
 
             var shipmentInternal = await _shipmentService.GetBrokerShipment(shipmentId);
             await _fileStore.UploadFile(Request.Body, shipmentId.ToString(), brokerFileMetadata.GetId());
-            brokerFileMetadata.FileStatus = BrokerFileStatus.Uploaded;
-            shipmentInternal.Status = BrokerShipmentStatus.RequiresSenderInteraction;
+            brokerFileMetadata.FileStatus = BrokerFileStatus.Initialized;
+            shipmentInternal.Status = BrokerShipmentStatus.UploadInProgress;
             shipmentInternal.FileList.Add(brokerFileMetadata);
             return Accepted(brokerFileMetadata);
         }

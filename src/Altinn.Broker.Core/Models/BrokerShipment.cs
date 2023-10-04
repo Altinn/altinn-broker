@@ -9,6 +9,7 @@ namespace Altinn.Broker.Core.Models
     /// </summary>
     public class BrokerShipmentMetadata
     {
+        public Guid BrokerResourceId {get;set;}
         /// <summary>
         /// Gets or sets external service code given when external parties are retrieving service information
         /// </summary>

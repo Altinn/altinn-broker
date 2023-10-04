@@ -3,14 +3,15 @@ namespace Altinn.Broker.Core.Enums
     public enum BrokerFileStatus
     {
         Initialized,
-        Uploaded,
-        VirusScanInProgress,
-        VirusScanOK,
+        AwaitingUpload,
+        UploadInProgress,
+        AwaitingUploadProcessing,
+        UploadedAndProcessed,
         Published,
+        Cancelled,
         Downloaded,
-        VirusScanError,
-        UploadError,
-        InternalError,
-        Deleted
+        AllConfirmedDownloaded,
+        Deleted,
+        Failed
     }
 }
