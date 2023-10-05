@@ -3,25 +3,22 @@ using Altinn.Broker.Core.Domain;
 using File = Altinn.Broker.Core.Domain.File;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Persistence.Options;
-using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
 public class FileRepository : IFileRepository
 {
-    private readonly string _connectionString;
+    private DatabaseConnectionProvider _connectionProvider;
 
-    public FileRepository(IOptions<DatabaseOptions> databaseOptions)
+    public FileRepository(DatabaseConnectionProvider connectionProvider)
     {
-        _connectionString = databaseOptions.Value.ConnectionString;
+        _connectionProvider = connectionProvider;
     }
 
     public File? GetFile(Guid fileId)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
-
+        var connection = _connectionProvider.GetConnection();
+        
         using var command = new NpgsqlCommand(
             "SELECT *, sr.file_location, afs.actor_id_fk_pk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
@@ -76,8 +73,7 @@ public class FileRepository : IFileRepository
 
     public void AddReceipt(FileReceipt receipt)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         using (var command = new NpgsqlCommand(
             "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " +
@@ -92,8 +88,7 @@ public class FileRepository : IFileRepository
 
     public void AddFile(File file)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         NpgsqlCommand command = new NpgsqlCommand(
             "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
@@ -114,8 +109,7 @@ public class FileRepository : IFileRepository
 
     private long AddFileStorageReference(string fileLocation)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         long? storageReferenceId;
         using (var command = new NpgsqlCommand(

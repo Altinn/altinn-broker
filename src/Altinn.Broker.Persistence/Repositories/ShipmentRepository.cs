@@ -1,28 +1,26 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Persistence.Options;
-
-using Microsoft.Extensions.Options;
+using Altinn.Broker.Persistence;
 
 using Npgsql;
 
 public class ShipmentRepository : IShipmentRepository
 {
-    private readonly string _connectionString;
     private const string SHIPMENT_SQL = "SELECT *, ass.actor_id_fk_pk, a.actor_external_id, ass.actor_shipment_status_id_fk, ass.actor_shipment_status_date FROM broker.shipment " +
             "LEFT JOIN broker.actor_shipment_status ass on ass.shipment_id_fk_pk = shipment_id_pk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = ass.actor_id_fk_pk";
+            
+    private DatabaseConnectionProvider _connectionProvider;
 
-    public ShipmentRepository(IOptions<DatabaseOptions> databaseOptions)
+    public ShipmentRepository(DatabaseConnectionProvider connectionProvider)
     {
-        _connectionString = databaseOptions.Value.ConnectionString;
+        _connectionProvider = connectionProvider;
     }
 
     public List<Shipment> GetAllShipments()
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         using var command = new NpgsqlCommand(
             SHIPMENT_SQL,
@@ -69,8 +67,7 @@ public class ShipmentRepository : IShipmentRepository
 
     public Shipment? GetShipment(Guid shipmentId)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         using var command = new NpgsqlCommand(
             SHIPMENT_SQL +
@@ -119,8 +116,7 @@ public class ShipmentRepository : IShipmentRepository
 
     public void AddShipment(Shipment shipment)
     {
-        using var connection = new NpgsqlConnection(_connectionString);
-        connection.Open();
+        var connection = _connectionProvider.GetConnection();
 
         NpgsqlCommand command = new NpgsqlCommand(
                 "INSERT INTO broker.shipment (shipment_id_pk, external_shipment_reference, uploader_actor_id_fk, initiated, shipment_status_id_fk) " +
