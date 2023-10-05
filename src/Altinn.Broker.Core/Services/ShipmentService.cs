@@ -1,34 +1,55 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.AccessControl;
 
 using Altinn.Broker.Core.Enums;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Services.Interfaces;
+using Altinn.Broker.Mappers;
 
 namespace Altinn.Broker.Core.Services
 {
     public class ShipmentService : IShipmentService
     {
         [AllowNull]
-        private static DataStore _dataStore;
+        private static IDataService _dataStore;
+        public ShipmentService(IDataService dataService)
+        {
+            _dataStore = dataService;
+        }
 
-        public Task<BrokerShipmentMetadata> CancelShipment(Guid shipmentId, string reasonText)
+        public Task<BrokerShipmentStatusOverview> CancelShipment(Guid shipmentId, string reasonText)
         {
             // TODO: Cancel shipment.
             // TODO: Cancel each file in shipment.
             throw new NotImplementedException();
         }
 
-        public Task<BrokerShipmentMetadata> PublishShipment(Guid shipmentId)
-        {
-            throw new NotImplementedException();
-        }
-
         /// <inheritdoc />
-        public Task<Guid> InitializeShipment(BrokerShipmentInitialize shipment)
+        public async Task<BrokerShipmentStatusOverview> InitializeShipment(BrokerShipmentInitialize shipment)
         {
-            throw new NotImplementedException();
+            BrokerShipmentStatusOverview bsso;
+            if(true)
+            {
+                bsso = new ()
+                {
+                    BrokerResourceId = shipment.BrokerResourceId,
+                    CurrentShipmentStatus = BrokerShipmentStatus.Initialized,
+                    CurrentShipmentStatusChanged = DateTime.Now,
+                    CurrentShipmentStatusText = "Shipment is initialized and awaiting file uploads.",
+                    FileList = shipment.Files.MapToOverview(),
+                    Metadata = shipment.Metadata,
+                    RecipientStatusList = shipment.Recipients.MapToRecipientStatusOverview(),
+                    Sender = shipment.Sender,
+                    SendersShipmentReference = shipment.SendersShipmentReference,
+                    ShipmentId = Guid.NewGuid(),
+                    ShipmentInitialized = DateTime.Now
+                };
+
+                await Task.Run(() =>_dataStore.SaveBrokerShipmentStatusOverview(bsso));
+            }
+
+            return bsso;
         }
 
         /// <inheritdoc />
@@ -43,14 +64,16 @@ namespace Altinn.Broker.Core.Services
             throw new NotImplementedException();
         }
 
-        public Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId)
+        public async Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId)
         {
             throw new NotImplementedException();
         }
 
-        public Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId)
+        public async Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId)
         {
-            throw new NotImplementedException();
+            BrokerShipmentStatusOverview bsso = new BrokerShipmentStatusOverview();
+            bsso = _dataStore.GetBrokerShipmentStatusOverview(shipmentId);
+            return await Task<BrokerShipmentStatusOverview>.Run(() => _dataStore.GetBrokerShipmentStatusOverview(shipmentId));
         }
     }
 }

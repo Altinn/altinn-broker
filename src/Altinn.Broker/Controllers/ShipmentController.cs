@@ -18,11 +18,9 @@ namespace Altinn.Broker.Controllers
     public class ShipmentController : ControllerBase
     {
         private readonly IShipmentService _shipmentService;
-        private readonly IFileStore _fileStore;
-        public ShipmentController(IShipmentService shipmentService, IFileStore fileStore)
+        public ShipmentController(IShipmentService shipmentService)
         {
             _shipmentService = shipmentService;
-            _fileStore = fileStore;
         }
 
         [HttpPost]        
@@ -93,12 +91,12 @@ namespace Altinn.Broker.Controllers
         [HttpPost]        
         [Consumes("application/json")]
         [Route("outbox/shipment")]
-        public async Task<ActionResult<Guid>> InitialiseShipment(BrokerShipmentInitializeExt initiateBrokerShipmentRequest)
+        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitialiseShipment(BrokerShipmentInitializeExt initiateBrokerShipmentRequest)
         {
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
             BrokerShipmentInitialize brokerShipmentInitialize = initiateBrokerShipmentRequest.MapToBrokerShipmentInitialize();
-            Guid shipmentId = await _shipmentService.InitializeShipment(brokerShipmentInitialize);
-            return shipmentId;
+            BrokerShipmentStatusOverview shipmentStatus = await _shipmentService.InitializeShipment(brokerShipmentInitialize);
+            return Accepted(shipmentStatus.MapToOverviewExternal());
         }
 
         [HttpGet]
@@ -141,7 +139,7 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult<BrokerShipmentResponseExt>> CancelShipment(Guid shipmentId, string reasonText)
         {
             var shipmentInternal = await _shipmentService.CancelShipment(shipmentId, reasonText);
-            return Accepted(shipmentInternal.MapToBrokerShipmentExtResponse());
+            return Accepted(shipmentInternal.MapToOverviewExternal());
         }
     }
 }

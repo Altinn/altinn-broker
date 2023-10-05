@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.AccessControl;
 
 using Altinn.Broker.Core.Enums;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Services.Interfaces;
 
@@ -11,7 +10,7 @@ namespace Altinn.Broker.Core.Services
     public class FileService : IFileService
     {
         [AllowNull]
-        private static DataStore _dataStore;
+        private static IDataService _dataStore;
 
         public Task<BrokerFileMetadata> CancelFile(Guid fileId)
         {

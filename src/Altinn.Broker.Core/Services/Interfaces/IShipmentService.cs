@@ -24,7 +24,7 @@ namespace Altinn.Broker.Core.Services.Interfaces
         /// </summary>
         /// <param name="shipment"><see cref="BrokerShipmentMetadata" /> object containing new Metadata.</param>
         /// <returns>ShipmentId for initialized <see cref="BrokerShipmentMetadata" /></returns>
-        Task<Guid> InitializeShipment(BrokerShipmentInitialize shipment);
+        Task<BrokerShipmentStatusOverview> InitializeShipment(BrokerShipmentInitialize shipment);
 
         /// <summary>
         /// Used internally when updating status of <see cref="BrokerShipmentMetadata" />.
@@ -46,14 +46,6 @@ namespace Altinn.Broker.Core.Services.Interfaces
         /// <param name="shipment">ShipmentId to cancel.</param>
         /// <param name="reasonText">Voluntary text detailing why shipment was cancelled.</param>
         /// <returns><see cref="BrokerShipmentMetadata" /></returns>
-        Task<BrokerShipmentMetadata> CancelShipment(Guid shipmentId, string reasonText);
-
-        /// <summary>
-        /// Marks a given <see cref="BrokerShipmentMetadata" /> to be published as soon as possible.
-        /// If a file in the shipment fails anti-virus scanning then the Shipment will not be published.
-        /// </summary>
-        /// <param name="shipmentId">ShipmentId to publish.</param>
-        /// <returns>Shipment Metadata</returns>
-        Task<BrokerShipmentMetadata> PublishShipment(Guid shipmentId);
+        Task<BrokerShipmentStatusOverview> CancelShipment(Guid shipmentId, string reasonText);
     }    
 }

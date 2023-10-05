@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 
 using Altinn.Broker.Models;
 using Altinn.Broker.Core.Models;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Persistence;
