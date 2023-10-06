@@ -110,13 +110,13 @@ namespace Altinn.Broker.Controllers
         [Route("outbox/shipment")]
         public async Task<ActionResult<List<BrokerShipmentStatusOverviewExt>>> GetShipments([AllowNull] Guid resourceId,[AllowNull] string shipmentStatus,[AllowNull] DateTime initiatedDateFrom,[AllowNull] DateTime initiatedDateTo)
         {
-            var shipmentInternal = new BrokerShipmentMetadata();
+            var shipmentInternal = new BrokerShipmentStatusOverview();
             // TODO: validate Parameters.
 
             // TODO: retrieve shipments based on multiple inputs
+
             
-            
-            return new List<BrokerShipmentStatusOverviewExt> () {shipmentInternal.MapToBrokerShipmentExtResponse()};
+            return new List<BrokerShipmentStatusOverviewExt> () {shipmentInternal.MapToOverviewExternal()};
         }
 
         [HttpPost]
