@@ -38,7 +38,6 @@ namespace Altinn.Broker.Mappers
             BrokerFileStatusOverview bfso = new ()
             {
                 Checksum = bfi.Checksum,
-                FileId = Guid.NewGuid(),
                 FileName = bfi.FileName,
                 FileStatus = BrokerFileStatus.AwaitingUpload,
                 FileStatusChanged = DateTime.Now,

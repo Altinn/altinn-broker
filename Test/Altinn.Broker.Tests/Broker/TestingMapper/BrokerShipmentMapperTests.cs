@@ -17,36 +17,36 @@ public class BrokerShipmentMapperTests
     public void MapToMapToBrokerShipment_SimpleCase()
     {
         // Arrange
-        InitiateBrokerShipmentRequestExt input = new()
+        BrokerShipmentInitializeExt input = new()
         {
-            SendersReference = "SendRef_1",
-            ServiceCode = "1",
-            ServiceEditionCode = 2023,
-            Recipients = new List<String> { "911911911" },
-            Properties = new Dictionary<string, string>
-            {
-                { "AA","11" },
-                { "BB","22" }
-            }
-        };
-
-        BrokerShipmentMetadata expected = new()
-        {
-            SendersReference = "SendRef_1",
-            ServiceCode = "1",
-            ServiceEditionCode = 2023,
-            Recipients = new List<String> { "911911911" },
-            Properties = new Dictionary<string, string>
+            BrokerResourceId = Guid.NewGuid(),
+            Recipients = new List<string> { "911911911" },
+            Metadata = new Dictionary<string, string>
             {
                 { "AA","11" },
                 { "BB","22" }
             },
-            FileList = new List<BrokerFileMetadata>(),
-            Status =  Core.Enums.BrokerShipmentStatus.Initialized
+            Files = new List<BrokerFileInitalizeExt>(),
+            SendersShipmentReference = "SendRef_1",
+            Sender = "9090908"
+        };
+
+        BrokerShipmentInitialize expected = new()
+        {
+            SendersShipmentReference = "SendRef_1",
+            BrokerResourceId = input.BrokerResourceId,
+            Recipients = new List<String> { "911911911" },
+            Metadata = new Dictionary<string, string>
+            {
+                { "AA","11" },
+                { "BB","22" }
+            },
+            Files = new List<BrokerFileInitalize>(),            
+            Sender = "9090908"
         };
 
         // Act
-        var actual = input.MapToBrokerShipment();
+        var actual = input.MapToBrokerShipmentInitialize();
 
         // Assert
         Assert.Equivalent(expected, actual);

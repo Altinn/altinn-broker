@@ -54,7 +54,7 @@ namespace Altinn.Broker.Mappers
                 FileName = ibfd.FileName,
                 FileStatus =  ibfd.FileStatus,
                 FileStatusChanged = ibfd.FileStatusChanged,
-                FileStatusHistory = new List<FileStatusEventExt>(),
+                FileStatusHistory = new List<BrokerFileStatusEventExt>(),
                 FileStatusText = ibfd.FileStatusText,
                 SendersFileReference = ibfd.SendersFileReference
             };
@@ -67,9 +67,9 @@ namespace Altinn.Broker.Mappers
             return detailsExt;
         }
 
-        public static FileStatusEventExt MapToExternal(this FileStatusEvent ifse)
+        public static BrokerFileStatusEventExt MapToExternal(this FileStatusEvent ifse)
         {
-            FileStatusEventExt ext = new()
+            BrokerFileStatusEventExt ext = new()
             {
                 FileStatus = ifse.FileStatus,
                 FileStatusChanged = ifse.FileStatusChanged,
@@ -124,8 +124,8 @@ namespace Altinn.Broker.Mappers
         {
             BrokerShipmentInitialize bsi = new BrokerShipmentInitialize()
             {
-                 BrokerResourceId = extRequest.BrokerResourceId,
-                 Files = extRequest.Files.ToList<BrokerFileInitalize>(),
+                 BrokerResourceId = extRequest.BrokerResourceId,                 
+                 Files = extRequest.Files.MapToInternal(),
                  Metadata = extRequest.Metadata,
                  Recipients = extRequest.Recipients,
                  Sender = extRequest.Sender,
@@ -134,44 +134,20 @@ namespace Altinn.Broker.Mappers
 
             return bsi;
         }
-        /// <summary>
-        /// Maps a <see cref="InitiateBrokerShipmentRequestExt"/> to a <see cref="BrokerShipmentMetadata"/>
-        /// </summary>
-        public static BrokerShipmentMetadata MapToBrokerShipment(this InitiateBrokerShipmentRequestExt extRequest)
-        {
-            BrokerShipmentMetadata shipment = new()
-            {
-                ServiceCode = extRequest.ServiceCode,
-                ServiceEditionCode = extRequest.ServiceEditionCode,
-                SendersReference = extRequest.SendersReference,
-                Recipients = extRequest.Recipients,
-                Properties = extRequest.Properties
-            };
 
-            return shipment;
+        public static List<BrokerFileInitalize> MapToInternal(this List<BrokerFileInitalizeExt> extList)
+        {
+            return extList.Select(f => f.MapToInternal()).ToList();
         }
 
-        public static BrokerShipmentResponseExt MapToBrokerShipmentExtResponse(this BrokerShipmentMetadata shipment)
+        public static BrokerFileInitalize MapToInternal(this BrokerFileInitalizeExt extObj)
         {
-            BrokerShipmentResponseExt response = new()
+            return new BrokerFileInitalize()
             {
-                ServiceCode = shipment.ServiceCode,
-                ServiceEditionCode = shipment.ServiceEditionCode,
-                SendersReference = shipment.SendersReference,
-                Recipients = shipment.Recipients,
-                Properties = shipment.Properties,
-                ShipmentId = shipment.ShipmentId,
-                Status = (BrokerShipmentStatusExt)shipment.Status
+                Checksum = extObj.Checksum,
+                FileName = extObj.FileName,
+                SendersFileReference = extObj.SendersFileReference
             };
-
-            List<BrokerFileMetadataExt> metaDataExt = new List<BrokerFileMetadataExt>();
-            shipment.FileList?.ForEach(f => metaDataExt.Add(f.MapToBrokerFileMetadataExt()));
-            if(metaDataExt.Count > 0)
-            {
-                response.Files = metaDataExt;
-            }
-            
-            return response;
         }
 
         public static BrokerFileMetadataExt MapToBrokerFileMetadataExt(this BrokerFileMetadata brokerFile)

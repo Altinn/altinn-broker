@@ -13,6 +13,18 @@ namespace Altinn.Broker.Persistence.Repositories
 
         public void SaveBrokerShipmentStatusOverview(BrokerShipmentStatusOverview overview)
         {
+            if(overview.ShipmentId == Guid.Empty)
+            {
+                overview.ShipmentId = Guid.NewGuid();
+                foreach(var file in overview.FileList)
+                {
+                    if(file.FileId == Guid.Empty)
+                    {
+                        file.FileId = Guid.NewGuid();
+                    }
+                }
+            }
+            
             Repository.BrokerShipOverviews[overview.ShipmentId] = overview;
         }
 

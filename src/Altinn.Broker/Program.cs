@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Extensions;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Repositories.Interfaces;
 using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
@@ -36,6 +37,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddCoreServices(config);
     services.AddSingleton<IDataService, DataStore>();
     services.AddSingleton<IFileStore, BlobStore>();
+    services.AddSingleton<IFileStorage, FileStore>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));

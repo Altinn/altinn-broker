@@ -7,6 +7,7 @@ namespace Altinn.Broker.Core.Services.Interfaces
 {    
     public interface IFileService
     {
+        Task<BrokerFileStatusOverview> UploadFile(Guid shipmentId, Stream filestream, BrokerFileInitalize brokerFile);
         Task<BrokerFileMetadata> GetBrokerFileMetadata(Guid fileId);
         Task<Guid> SaveBrokerFileMetadata(BrokerFileMetadata file);
         void UpdateBrokerFileMetadata(BrokerFileMetadata file);

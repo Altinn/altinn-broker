@@ -10,6 +10,7 @@ using Altinn.Broker.Persistence;
 using Microsoft.AspNetCore.Http.Extensions;
 using System.Numerics;
 using Altinn.Broker.Core.Enums;
+using Altinn.Broker.Core.Repositories.Interfaces;
 
 namespace Altinn.Broker.Controllers
 {    
@@ -18,74 +19,57 @@ namespace Altinn.Broker.Controllers
     public class ShipmentController : ControllerBase
     {
         private readonly IShipmentService _shipmentService;
-        public ShipmentController(IShipmentService shipmentService)
+        private readonly IFileStorage _fileStorage;
+        public ShipmentController(IShipmentService shipmentService, IFileStorage fileStorage)
         {
             _shipmentService = shipmentService;
+            _fileStorage = fileStorage;
         }
 
         [HttpPost]        
         [Route("outbox/simpleShipment")]
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> InitialiseUploadAndPublishShipment([FromForm] IFormFile file, 
-        [FromForm] InitiateBrokerShipmentRequestExt metadata)
+        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitialiseUploadAndPublishShipment([FromForm] IFormFile file, 
+        [FromForm] BrokerShipmentInitializeExt metadata)
         {
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
-            BrokerShipmentMetadata brokerShipmentMetadata = metadata.MapToBrokerShipment();
-            brokerShipmentMetadata.ShipmentId = Guid.NewGuid();
-            string targetDirectory = $@"C:\Temp\testfolderrestapi\{brokerShipmentMetadata.ShipmentId}";
-            if(!Path.Exists(targetDirectory))
-            {
-                System.IO.Directory.CreateDirectory(targetDirectory);
-            }
-
-            using(FileStream fs = new FileStream($@"{targetDirectory}\{file.FileName}", FileMode.CreateNew))
-            {
-                await file.CopyToAsync(fs);
-            }
-
-            // Guid BrokerShipmentIdentifier = await _shipmentService.SaveBrokerShipmentMetadata(brokerShipmentMetadata);
-            //brokerShipmentMetadata.ShipmentId = BrokerShipmentIdentifier;
-            GC.Collect();
-            return Accepted(brokerShipmentMetadata.MapToBrokerShipmentExtResponse());
+            var metadataInit = metadata.MapToBrokerShipmentInitialize();
+            var overview = await _shipmentService.InitializeShipment(metadataInit);
+            
+            _ = await _fileStorage.SaveFile(overview.ShipmentId, file.OpenReadStream(), metadataInit.Files.First());
+            return Accepted(overview.MapToOverviewExternal());
         }
 
         [HttpPost]        
         [Route("outbox/simpleShipment2")]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> InitialiseUploadAndPublishShipment2([FromQuery] string serviceCode, 
-        [FromQuery] string serviceEditionCode, [FromQuery] string sendersReference,[FromQuery] string[] recipients,[FromQuery] string[] properties, [FromQuery] string fileName)
+        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitialiseUploadAndPublishShipment2([FromQuery] Guid brokerResourceId, 
+        [FromQuery] string sendersShipmentReference,[FromQuery] string[] recipients,[FromQuery] string[] properties, [FromQuery] string fileName, [FromQuery] string checksum, [FromQuery] string sendersFileReference)
         {
-            InitiateBrokerShipmentRequestExt metadata = new InitiateBrokerShipmentRequestExt()
+            BrokerShipmentInitialize brokershipinit = new BrokerShipmentInitialize
             {
-                ServiceCode = serviceCode, Recipients = recipients.ToList(), ServiceEditionCode = int.Parse(serviceEditionCode), SendersReference = sendersReference            
-
+                BrokerResourceId = brokerResourceId,
+                Recipients = recipients.ToList(),
+                SendersShipmentReference = sendersShipmentReference,
+                Metadata = new Dictionary<string, string>()
             };
-            metadata.Properties = new Dictionary<string, string>();
 
-            if(properties != null && properties.Count() > 0)
+            if (properties != null && properties.Count() > 0)
             {
                 foreach(string s in properties)
                 {
-                    metadata.Properties[s.Split(":")[0]] = s.Split(":")[1];
+                    brokershipinit.Metadata[s.Split(":")[0]] = s.Split(":")[1];
                 }
             }
 
+            brokershipinit.Files = new List<BrokerFileInitalize>
+            {
+                new() { Checksum = checksum, FileName = fileName, SendersFileReference = sendersFileReference }
+            };
+
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
-            BrokerShipmentMetadata brokerShipmentMetadata = metadata.MapToBrokerShipment();
-            brokerShipmentMetadata.ShipmentId = Guid.NewGuid();
-            string targetDirectory = $@"C:\Temp\testfolderrestapi\{brokerShipmentMetadata.ShipmentId}";
-            if(!Path.Exists(targetDirectory))
-            {
-                System.IO.Directory.CreateDirectory(targetDirectory);
-            }
-
-            using(FileStream fs = new FileStream($@"{targetDirectory}\{fileName}", FileMode.CreateNew))
-            {
-                await Request.Body.CopyToAsync(fs);
-            }
-
-            // Guid BrokerShipmentIdentifier = await _shipmentService.SaveBrokerShipmentMetadata(brokerShipmentMetadata);
-            //brokerShipmentMetadata.ShipmentId = BrokerShipmentIdentifier;
-            return Accepted(brokerShipmentMetadata.MapToBrokerShipmentExtResponse());
+            var overview = await _shipmentService.InitializeShipment(brokershipinit);
+            _ =  await _fileStorage.SaveFile(overview.ShipmentId, Request.Body, brokershipinit.Files.First());
+            return Accepted(overview.MapToOverviewExternal());
         }
 
         [HttpPost]        
@@ -124,19 +108,20 @@ namespace Altinn.Broker.Controllers
 
         [HttpGet]
         [Route("outbox/shipment")]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> GetShipments([AllowNull] Guid resourceId,[AllowNull] string shipmentStatus,[AllowNull] DateTime initiatedDateFrom,[AllowNull] DateTime initiatedDateTo)
+        public async Task<ActionResult<List<BrokerShipmentStatusOverviewExt>>> GetShipments([AllowNull] Guid resourceId,[AllowNull] string shipmentStatus,[AllowNull] DateTime initiatedDateFrom,[AllowNull] DateTime initiatedDateTo)
         {
             var shipmentInternal = new BrokerShipmentMetadata();
             // TODO: validate Parameters.
 
             // TODO: retrieve shipments based on multiple inputs
             
-            return shipmentInternal.MapToBrokerShipmentExtResponse();
+            
+            return new List<BrokerShipmentStatusOverviewExt> () {shipmentInternal.MapToBrokerShipmentExtResponse()};
         }
 
         [HttpPost]
         [Route("outbox/Shipment/{shipmentId}/Cancel")]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> CancelShipment(Guid shipmentId, string reasonText)
+        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> CancelShipment(Guid shipmentId, string reasonText)
         {
             var shipmentInternal = await _shipmentService.CancelShipment(shipmentId, reasonText);
             return Accepted(shipmentInternal.MapToOverviewExternal());
