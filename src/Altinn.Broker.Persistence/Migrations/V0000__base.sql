@@ -3,9 +3,19 @@ CREATE SCHEMA broker;
 CREATE EXTENSION "uuid-ossp";
 
 -- Grant access for Azure AD users (application and developers)
-GRANT USAGE ON SCHEMA broker TO azure_pg_admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA broker TO azure_pg_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA broker GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO azure_pg_admin;
+DO $do$
+DECLARE
+    role_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO role_count FROM pg_roles WHERE rolname = 'azure_pg_admin';
+
+    IF role_count > 0 THEN
+        GRANT USAGE ON SCHEMA broker TO azure_pg_admin;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA broker TO azure_pg_admin;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA broker GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO azure_pg_admin;
+    END IF;
+END
+$do$;
 
 -- Create tables
 CREATE TABLE broker.actor (
