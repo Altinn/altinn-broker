@@ -2,6 +2,11 @@
 CREATE SCHEMA broker;
 CREATE EXTENSION "uuid-ossp";
 
+-- Grant access for Azure AD users (application and developers
+GRANT USAGE ON SCHEMA broker TO azure_pg_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA broker TO azure_pg_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA broker GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO azure_pg_admin;
+
 -- Create tables
 CREATE TABLE broker.actor (
     actor_id_pk bigserial PRIMARY KEY,
