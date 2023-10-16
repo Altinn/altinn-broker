@@ -5,6 +5,7 @@ using Altinn.Broker.Persistence.Options;
 using Azure.Core;
 using Azure.Identity;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -17,23 +18,29 @@ public class DatabaseConnectionProvider : IDisposable
     private readonly string _connectionString;
     private NpgsqlConnection? _connection;
     private string? _accessToken;
+    private readonly ILogger<DatabaseConnectionProvider> _log;
 
-    public DatabaseConnectionProvider(IOptions<DatabaseOptions> databaseOptions)
+    public DatabaseConnectionProvider(IOptions<DatabaseOptions> databaseOptions, ILogger<DatabaseConnectionProvider> log)
     {
         _connectionString = databaseOptions.Value.ConnectionString ?? throw new ArgumentNullException("DatabaseOptions__ConnectionString");
+        _log = log;
     }
 
     public async Task<NpgsqlConnection> GetConnectionAsync()
     {
+        _log.LogDebug("Now getting connection");
         NpgsqlConnectionStringBuilder connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
         if (string.IsNullOrWhiteSpace(connectionStringBuilder.Password))
         {
+            _log.LogDebug("Connection string did not have password");
             connectionStringBuilder.Password = _accessToken;
-            if (IsAccessTokenValid())
+            if (!IsAccessTokenValid())
             {
+                _log.LogDebug("Access token invalid");
                 await RefreshToken();
+                _log.LogDebug("Access token refreshed");
                 connectionStringBuilder.Password = _accessToken;
-                _connection = new NpgsqlConnection(_connectionString);
+                _connection = new NpgsqlConnection(connectionStringBuilder.ConnectionString);
             }
         }
 
