@@ -4,7 +4,7 @@ namespace Altinn.Broker.Core.Repositories;
 
 public interface IShipmentRepository
 {
-    void AddShipment(Shipment shipment);
-    List<Shipment> GetAllShipments();
-    Shipment? GetShipment(Guid shipmentId);
+    Task AddShipmentAsync(Shipment shipment);
+    Task<List<Shipment>> GetAllShipmentsAsync();
+    Task<Shipment?> GetShipmentAsync(Guid shipmentId);
 }

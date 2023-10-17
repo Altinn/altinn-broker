@@ -29,21 +29,21 @@ public class RepositoryTests
     }
 
     [Fact]
-    public void AddFileStorageReference_WhenAddFile_ShouldBeCreated()
+    public async Task AddFileStorageReference_WhenAddFile_ShouldBeCreated()
     {
         // Arrange
         Guid fileId = Guid.NewGuid();
         string fileLocation = "path/to/file" + fileId.ToString();
 
         var senderActorId = new Random().Next(0, 10000000);
-        _actorRepository.AddActor(new Actor()
+        await _actorRepository.AddActorAsync(new Actor()
         {
             ActorId = senderActorId,
             ActorExternalId = "1"
         });
 
         Guid shipmentId = Guid.NewGuid();
-        _shipmentRepository.AddShipment(new Shipment()
+        await _shipmentRepository.AddShipmentAsync(new Shipment()
         {
             ShipmentId = shipmentId,
             ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
@@ -55,7 +55,7 @@ public class RepositoryTests
 
 
         // Act
-        _fileRepository.AddFile(new Core.Domain.File()
+        await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
             ShipmentId = shipmentId,
             FileId = fileId,
@@ -68,30 +68,30 @@ public class RepositoryTests
         });
 
         // Assert
-        var savedFile = _fileRepository.GetFile(fileId);
+        var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.Equal(fileLocation, savedFile.FileLocation);
     }
 
     [Fact]
-    public void AddReceipt_WhenCalled_ShouldSaveReceipt()
+    public async Task AddReceipt_WhenCalled_ShouldSaveReceipt()
     {
         // Arrange
         var senderActorId = new Random().Next(0, 10000000);
-        _actorRepository.AddActor(new Actor()
+        await _actorRepository.AddActorAsync(new Actor()
         {
             ActorId = senderActorId,
             ActorExternalId = "1"
         });
 
         var recipientActorId = new Random().Next(0, 10000000);
-        _actorRepository.AddActor(new Actor()
+        await _actorRepository.AddActorAsync(new Actor()
         {
             ActorId = recipientActorId,
             ActorExternalId = "1"
         });
 
         Guid shipmentId = Guid.NewGuid();
-        _shipmentRepository.AddShipment(new Shipment()
+        await _shipmentRepository.AddShipmentAsync(new Shipment()
         {
             ShipmentId = shipmentId,
             ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
@@ -102,7 +102,7 @@ public class RepositoryTests
         });
 
         Guid fileId = Guid.NewGuid();
-        _fileRepository.AddFile(new Core.Domain.File()
+        await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
             ShipmentId = shipmentId,
             FileId = fileId,
@@ -115,7 +115,7 @@ public class RepositoryTests
         });
 
         // Act
-        _fileRepository.AddReceipt(new FileReceipt()
+        await _fileRepository.AddReceiptAsync(new FileReceipt()
         {
             Actor = new Actor()
             {
@@ -128,7 +128,7 @@ public class RepositoryTests
         });
 
         // Assert
-        var savedFile = _fileRepository.GetFile(fileId);
+        var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
         Assert.NotEmpty(savedFile.Receipts);
         Assert.Equal(1, savedFile.Receipts.Count);
@@ -136,18 +136,18 @@ public class RepositoryTests
     }
 
     [Fact]
-    public void GetFile_ExistingFileId_ShouldReturnFile()
+    public async Task GetFile_ExistingFileId_ShouldReturnFile()
     {
         // Arrange
         var senderActorId = new Random().Next(0, 10000000);
-        _actorRepository.AddActor(new Actor()
+        await _actorRepository.AddActorAsync(new Actor()
         {
             ActorId = senderActorId,
             ActorExternalId = "1"
         });
 
         Guid shipmentId = Guid.NewGuid();
-        _shipmentRepository.AddShipment(new Shipment()
+        await _shipmentRepository.AddShipmentAsync(new Shipment()
         {
             ShipmentId = shipmentId,
             ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
@@ -158,7 +158,7 @@ public class RepositoryTests
         });
 
         Guid fileId = Guid.NewGuid();
-        _fileRepository.AddFile(new Core.Domain.File()
+        await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
             ShipmentId = shipmentId,
             FileId = fileId,
@@ -171,25 +171,25 @@ public class RepositoryTests
         });
 
         // Act
-        var result = _fileRepository.GetFile(fileId);
+        var result = await _fileRepository.GetFileAsync(fileId);
 
         // Assert
         Assert.NotNull(result);
     }
 
     [Fact]
-    public void GetFile_NonExistingFileId_ShouldReturnNull()
+    public async Task GetFile_NonExistingFileId_ShouldReturnNull()
     {
         // Arrange
         // Act
-        var result = _fileRepository.GetFile(Guid.NewGuid());
+        var result = await _fileRepository.GetFileAsync(Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public void SaveShipment_Successful_CanRetrieveShipment()
+    public async Task SaveShipment_Successful_CanRetrieveShipment()
     {
         // Arrange
         var actor = new Actor()
@@ -197,7 +197,7 @@ public class RepositoryTests
             ActorId = new Random().Next(0, 10000000),
             ActorExternalId = Guid.NewGuid().ToString(),
         };
-        _actorRepository.AddActor(actor);
+        await _actorRepository.AddActorAsync(actor);
         var shipment = new Shipment()
         {
             ExternalShipmentReference = Guid.NewGuid().ToString(),
@@ -209,15 +209,15 @@ public class RepositoryTests
         };
 
         // Act
-        _shipmentRepository.AddShipment(shipment);
-        var savedShipment = _shipmentRepository.GetShipment(shipment.ShipmentId);
+        await _shipmentRepository.AddShipmentAsync(shipment);
+        var savedShipment = await _shipmentRepository.GetShipmentAsync(shipment.ShipmentId);
 
         // Assert
         Assert.Equal(shipment.ShipmentId, savedShipment?.ShipmentId);
     }
 
     [Fact]
-    public void SaveActor_Successful_CanRetrieveActor()
+    public async Task SaveActor_Successful_CanRetrieveActor()
     {
         // Arrange
         var actor = new Actor()
@@ -227,8 +227,8 @@ public class RepositoryTests
         };
 
         // Act
-        _actorRepository.AddActor(actor);
-        var savedActor = _actorRepository.GetActor(actor.ActorId);
+        await _actorRepository.AddActorAsync(actor);
+        var savedActor = await _actorRepository.GetActorAsync(actor.ActorId);
 
         // Assert
         Assert.Equal(actor.ActorExternalId, savedActor.ActorExternalId);
