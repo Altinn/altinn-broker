@@ -15,10 +15,10 @@ public class FileRepository : IFileRepository
         _connectionProvider = connectionProvider;
     }
 
-    public File? GetFile(Guid fileId)
+    public async Task<File?> GetFileAsync(Guid fileId)
     {
-        var connection = _connectionProvider.GetConnection();
-        
+        var connection = await _connectionProvider.GetConnectionAsync();
+
         using var command = new NpgsqlCommand(
             "SELECT *, sr.file_location, afs.actor_id_fk_pk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
@@ -71,9 +71,9 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public void AddReceipt(FileReceipt receipt)
+    public async Task AddReceiptAsync(FileReceipt receipt)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " +
@@ -86,15 +86,15 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public void AddFile(File file)
+    public async Task AddFileAsync(File file)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         NpgsqlCommand command = new NpgsqlCommand(
             "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
             "VALUES (@fileId, @externalFileReference, @shipmentId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
             connection);
-        long storageReference = AddFileStorageReference(file.FileLocation);
+        long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
         command.Parameters.AddWithValue("@fileId", file.FileId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
@@ -107,9 +107,9 @@ public class FileRepository : IFileRepository
         command.ExecuteNonQuery();
     }
 
-    private long AddFileStorageReference(string fileLocation)
+    private async Task<long> AddFileStorageReferenceAsync(string fileLocation)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         long? storageReferenceId;
         using (var command = new NpgsqlCommand(

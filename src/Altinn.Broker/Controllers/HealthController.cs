@@ -18,14 +18,14 @@ namespace Altinn.Broker.Controllers
         }
 
         [HttpGet]
-        public ActionResult HealthCheck(){
-            var connection = _databaseConnectionProvider.GetConnection();
+        public async Task<ActionResult> HealthCheckAsync(){
+            var connection = await _databaseConnectionProvider.GetConnectionAsync();
             var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.actor_shipment_status_description", connection);
             var count = (long)(command.ExecuteScalar() ?? 0);
             if (count == 0){
                 return BadRequest("Unable to query database. Is DatabaseOptions__ConnectionString set and is the database migrated?");
             }
-            return Ok("Environment properly configured rev4");
+            return Ok("Environment properly configured rev6");
         }
     }
 }

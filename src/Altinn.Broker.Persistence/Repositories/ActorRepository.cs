@@ -14,9 +14,9 @@ public class ActorRepository : IActorRepository
         _connectionProvider = connectionProvider;
     }
 
-    public Actor? GetActor(long actorId)
+    public async Task<Actor?> GetActorAsync(long actorId)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
             "SELECT * FROM broker.actor WHERE actor_id_pk = @actorId",
@@ -40,9 +40,9 @@ public class ActorRepository : IActorRepository
         return actor;
     }
 
-    public void AddActor(Actor actor)
+    public async Task AddActorAsync(Actor actor)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         NpgsqlCommand command = new NpgsqlCommand(
                     "INSERT INTO broker.actor (actor_id_pk, actor_external_id) " +

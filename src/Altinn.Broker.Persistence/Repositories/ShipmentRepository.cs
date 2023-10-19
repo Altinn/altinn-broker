@@ -18,9 +18,9 @@ public class ShipmentRepository : IShipmentRepository
         _connectionProvider = connectionProvider;
     }
 
-    public List<Shipment> GetAllShipments()
+    public async Task<List<Shipment>> GetAllShipmentsAsync()
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
             SHIPMENT_SQL,
@@ -65,9 +65,9 @@ public class ShipmentRepository : IShipmentRepository
 
     }
 
-    public Shipment? GetShipment(Guid shipmentId)
+    public async Task<Shipment?> GetShipmentAsync(Guid shipmentId)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
             SHIPMENT_SQL +
@@ -114,9 +114,9 @@ public class ShipmentRepository : IShipmentRepository
         return shipment;
     }
 
-    public void AddShipment(Shipment shipment)
+    public async Task AddShipmentAsync(Shipment shipment)
     {
-        var connection = _connectionProvider.GetConnection();
+        var connection = await _connectionProvider.GetConnectionAsync();
 
         NpgsqlCommand command = new NpgsqlCommand(
                 "INSERT INTO broker.shipment (shipment_id_pk, external_shipment_reference, uploader_actor_id_fk, initiated, shipment_status_id_fk) " +
