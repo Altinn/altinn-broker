@@ -1,3 +1,5 @@
+using Altinn.Broker.Core.Enums;
+
 namespace Altinn.Broker.Core.Models
 {
     public class RecipientShipmentStatusOverview

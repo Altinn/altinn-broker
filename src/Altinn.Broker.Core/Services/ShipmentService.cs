@@ -18,10 +18,8 @@ namespace Altinn.Broker.Core.Services
             _dataStore = dataService;
         }
 
-        public Task<BrokerShipmentStatusOverview> CancelShipment(Guid shipmentId, string reasonText)
+        Task<BrokerShipmentStatusDetailed> IShipmentService.CancelShipment(Guid shipmentId, string reasonText)
         {
-            // TODO: Cancel shipment.
-            // TODO: Cancel each file in shipment.
             throw new NotImplementedException();
         }
 
@@ -64,12 +62,13 @@ namespace Altinn.Broker.Core.Services
             throw new NotImplementedException();
         }
 
-        public async Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId)
+        public async Task<BrokerShipmentStatusDetailed> GetBrokerShipmentDetailed(Guid shipmentId)
         {
+            await Task.Run(() => 1 == 1);
             throw new NotImplementedException();
         }
 
-        public async Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId)
+        public async Task<BrokerShipmentStatusOverview> GetShipment(Guid shipmentId)
         {
             BrokerShipmentStatusOverview bsso = new BrokerShipmentStatusOverview();
             bsso = _dataStore.GetBrokerShipmentStatusOverview(shipmentId);

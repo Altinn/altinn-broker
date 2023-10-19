@@ -46,7 +46,7 @@ public class BrokerShipmentMapperTests
         };
 
         // Act
-        var actual = input.MapToBrokerShipmentInitialize();
+        var actual = input.MapToInternal();
 
         // Assert
         Assert.Equivalent(expected, actual);

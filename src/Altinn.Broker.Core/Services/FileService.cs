@@ -9,15 +9,27 @@ namespace Altinn.Broker.Core.Services
 {
     public class FileService : IFileService
     {
-        [AllowNull]
-        private static IDataService _dataStore;
-
         public Task<BrokerFileMetadata> CancelFile(Guid fileId)
         {
             throw new NotImplementedException();
         }
 
+        public Task<BrokerFileMetadata> ConfirmDownload(Guid fileId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<Stream> DownloadFile(Guid fileId)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<BrokerFileMetadata> GetBrokerFileMetadata(Guid fileId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<BrokerFileStatusOverview> GetFileStatus(Guid fileId)
         {
             throw new NotImplementedException();
         }
@@ -52,7 +64,7 @@ namespace Altinn.Broker.Core.Services
             throw new NotImplementedException();
         }
 
-        public Task<BrokerFileStatusOverview> UploadFile(Guid shipmentId, Stream filestream, BrokerFileInitalize brokerFile)
+        public Task<BrokerFileStatusOverview> UploadFile(Guid shipmentId, Guid FileId, Stream filestream)
         {
             
             throw new NotImplementedException();

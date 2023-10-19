@@ -5,10 +5,10 @@ namespace Altinn.Broker.Persistence.Repositories
 {
     public class DataStore : IDataService
     {
-        private static DataRepo Repository;
+        private static DataRepo? _repository;
         public DataStore()
         {
-            Repository = DataRepo.Instance;
+            _repository = DataRepo.Instance;
         }
 
         public void SaveBrokerShipmentStatusOverview(BrokerShipmentStatusOverview overview)
@@ -25,22 +25,22 @@ namespace Altinn.Broker.Persistence.Repositories
                 }
             }
             
-            Repository.BrokerShipOverviews[overview.ShipmentId] = overview;
+            _repository.BrokerShipOverviews[overview.ShipmentId] = overview;
         }
 
         public BrokerShipmentStatusOverview GetBrokerShipmentStatusOverview(Guid shipmentId)
         {
-            return Repository.BrokerShipOverviews[shipmentId] ;
+            return _repository.BrokerShipOverviews[shipmentId] ;
         }
 
         public void SaveBrokerShipmentMetadata(BrokerShipmentMetadata metadata)
         {
-            Repository.BrokerShipStore[metadata.ShipmentId] = metadata;
+            _repository.BrokerShipStore[metadata.ShipmentId] = metadata;
         }
 
         public BrokerShipmentMetadata GetBrokerShipmentMetadata(Guid shipmentId)
         {
-            return Repository.BrokerShipStore[shipmentId] ;
+            return _repository.BrokerShipStore[shipmentId] ;
         }
     }
     public sealed class DataRepo

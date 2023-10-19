@@ -1,15 +1,14 @@
 namespace Altinn.Broker.Enums
 {
-    public enum BrokerShipmentStatusExt
+    public enum BrokerFileStatusExt
     {
         Initialized,
         UploadInProgress,
         AwaitingUploadProcessing,
-        AllFilesUploadedAndProcessed,
+        UploadedAndProcessed,
         Published,
         Cancelled,
-        Completed,
-        Expired,
+        AllConfirmedDownloaded,
         Deleted,
         Failed
     }

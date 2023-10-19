@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -8,119 +10,68 @@ namespace Altinn.Broker.Mappers
 {
     public static class BrokerShipmentMapper
     {
-        public static BrokerShipmentStatusDetailsExt MapToDetailsExternal(this BrokerShipmentStatusDetails ibsd)
+        public static List<BrokerShipmentStatusDetailedExt> MapToExternal(this List<BrokerShipmentStatusDetailed> i)
         {
-            BrokerShipmentStatusDetailsExt detailsExt = new()
+            return i.Select(status => status.MapToExternal()).ToList();
+        }
+        public static BrokerShipmentStatusDetailedExt MapToExternal(this BrokerShipmentStatusDetailed ibsd)
+        {
+            return new BrokerShipmentStatusDetailedExt()
             {
                 BrokerResourceId = ibsd.BrokerResourceId,
                 CurrentShipmentStatus = ibsd.CurrentShipmentStatus,
                 CurrentShipmentStatusChanged = ibsd.CurrentShipmentStatusChanged,
                 CurrentShipmentStatusText = ibsd.CurrentShipmentStatusText,
-                FileList = new List<BrokerFileStatusDetailsExt>(),
+                FileList = ibsd.FileList.MapToExternal(),
                 Metadata = ibsd.Metadata,
                 RecipientStatusList = ibsd.RecipientStatusList,
                 Sender = ibsd.Sender,
                 SendersShipmentReference = ibsd.SendersShipmentReference,
                 ShipmentId = ibsd.ShipmentId,
                 ShipmentInitialized = ibsd.ShipmentInitialized,
-                ShipmentStatusHistory = new List<BrokerShipmentStatusEventExt>()
+                ShipmentStatusHistory = ibsd.ShipmentStatusHistory.MapToExternal()
             };
-
-            foreach(var i in ibsd.FileList)
-            {
-                detailsExt.FileList.Add(i.MapToDetailsExternal());
-            }
-
-            foreach(var ss in ibsd.ShipmentStatusHistory)
-            {
-                detailsExt.ShipmentStatusHistory.Add(ss.MapToExternal());
-            }
-
-            return detailsExt;
         }
-
+        public static List<BrokerShipmentStatusEventExt> MapToExternal(this List<BrokerShipmentStatusEvent> i)
+        {
+            return i.Select(e => e.MapToExternal()).ToList();
+        }
         public static BrokerShipmentStatusEventExt MapToExternal(this BrokerShipmentStatusEvent ibse)
         {
-            BrokerShipmentStatusEventExt ext = (BrokerShipmentStatusEventExt)ibse;
-            return ext;
-        }
-
-        public static BrokerFileStatusDetailsExt MapToDetailsExternal(this BrokerFileStatusDetails ibfd)
-        {
-            BrokerFileStatusDetailsExt detailsExt = new()
+            BrokerShipmentStatusEventExt ext = new()
             {
-                Checksum = ibfd.Checksum,
-                FileId = ibfd.FileId,
-                FileName = ibfd.FileName,
-                FileStatus =  ibfd.FileStatus,
-                FileStatusChanged = ibfd.FileStatusChanged,
-                FileStatusHistory = new List<BrokerFileStatusEventExt>(),
-                FileStatusText = ibfd.FileStatusText,
-                SendersFileReference = ibfd.SendersFileReference
-            };
-
-            foreach(var fs in ibfd.FileStatusHistory)
-            {
-                detailsExt.FileStatusHistory.Add(fs.MapToExternal());
-            }
-
-            return detailsExt;
-        }
-
-        public static BrokerFileStatusEventExt MapToExternal(this FileStatusEvent ifse)
-        {
-            BrokerFileStatusEventExt ext = new()
-            {
-                FileStatus = ifse.FileStatus,
-                FileStatusChanged = ifse.FileStatusChanged,
-                FileStatusText = ifse.FileStatusText
+                ShipmentStatusChanged = ibse.ShipmentStatusChanged,
+                ShipmentStatusText = ibse.ShipmentStatusText,
+                ShipmentStatus = (BrokerShipmentStatusExt)ibse.ShipmentStatus
             };
 
             return ext;
         }
-
-        public static BrokerShipmentStatusOverviewExt MapToOverviewExternal(this BrokerShipmentStatusOverview ibsso)
+      
+        public static List<BrokerShipmentStatusOverviewExt> MapToExternal(this List<BrokerShipmentStatusOverview> ibssos)
         {
-            BrokerShipmentStatusOverviewExt ebsso = new()
+            return ibssos.Select(ibsso => ibsso.MapToExternal()).ToList();
+        }
+
+        public static BrokerShipmentStatusOverviewExt MapToExternal(this BrokerShipmentStatusOverview ibsso)
+        {
+            return new BrokerShipmentStatusOverviewExt()
             {
                 BrokerResourceId = ibsso.BrokerResourceId,
                 Metadata = ibsso.Metadata,
                 RecipientStatusList = ibsso.RecipientStatusList,
                 Sender = ibsso.Sender,
                 SendersShipmentReference = ibsso.SendersShipmentReference,
-                CurrentShipmentStatus = ibsso.CurrentShipmentStatus,
+                CurrentShipmentStatus = (BrokerShipmentStatusExt)ibsso.CurrentShipmentStatus,
                 ShipmentId = ibsso.ShipmentId,
                 CurrentShipmentStatusChanged = ibsso.CurrentShipmentStatusChanged,
                 CurrentShipmentStatusText = ibsso.CurrentShipmentStatusText,
                 ShipmentInitialized = ibsso.ShipmentInitialized,
-                FileList = new List<BrokerFileStatusOverviewExt>()
+                FileList = ibsso.FileList.Select(f => f.MapToExternal()).ToList()
             };
-
-            foreach(BrokerFileStatusOverview bfso in ibsso.FileList)
-            {
-                ebsso.FileList.Add(bfso.MapToOverviewExternal());
-            }
-
-            return ebsso;
         }
 
-        public static BrokerFileStatusOverviewExt MapToOverviewExternal(this BrokerFileStatusOverview ibfso)
-        {
-            BrokerFileStatusOverviewExt ebfso = new ()
-            {
-                Checksum = ibfso.Checksum,
-                FileId = ibfso.FileId,
-                FileName = ibfso.FileName,
-                FileStatus = ibfso.FileStatus,
-                FileStatusChanged = ibfso.FileStatusChanged,
-                FileStatusText = ibfso.FileStatusText,
-                SendersFileReference = ibfso.SendersFileReference
-            };
-
-            return ebfso;
-        }
-
-        public static BrokerShipmentInitialize MapToBrokerShipmentInitialize(this BrokerShipmentInitializeExt extRequest)
+        public static BrokerShipmentInitialize MapToInternal(this BrokerShipmentInitializeExt extRequest)
         {
             BrokerShipmentInitialize bsi = new BrokerShipmentInitialize()
             {
@@ -135,32 +86,5 @@ namespace Altinn.Broker.Mappers
             return bsi;
         }
 
-        public static List<BrokerFileInitalize> MapToInternal(this List<BrokerFileInitalizeExt> extList)
-        {
-            return extList.Select(f => f.MapToInternal()).ToList();
-        }
-
-        public static BrokerFileInitalize MapToInternal(this BrokerFileInitalizeExt extObj)
-        {
-            return new BrokerFileInitalize()
-            {
-                Checksum = extObj.Checksum,
-                FileName = extObj.FileName,
-                SendersFileReference = extObj.SendersFileReference
-            };
-        }
-
-        public static BrokerFileMetadataExt MapToBrokerFileMetadataExt(this BrokerFileMetadata brokerFile)
-        {
-            BrokerFileMetadataExt metadataExt = new BrokerFileMetadataExt()
-            {
-                FileId = brokerFile.FileId,
-                FileName = brokerFile.FileName,
-                FileStatus = brokerFile.FileStatus,
-                SendersFileReference = brokerFile.SendersFileReference,
-                ShipmentId = brokerFile.ShipmentId
-            };
-            return metadataExt;
-        }
-    }
+     }
 }

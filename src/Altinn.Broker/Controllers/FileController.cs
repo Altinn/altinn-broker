@@ -11,7 +11,7 @@ using Altinn.Broker.Persistence;
 namespace Altinn.Broker.Controllers
 {    
     [ApiController]
-    [Route("broker/api/v1.1/outbox/file")]
+    [Route("broker/api/v1.1/file")]
     public class FileController : ControllerBase
     {
         private readonly IFileService _fileService;
@@ -29,19 +29,69 @@ namespace Altinn.Broker.Controllers
         /// <param name="checksum">Checksum for the file.</param>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> UploadFileStreamed(
+        public async Task<ActionResult<Guid>> UploadFileStreamed(
             Guid shipmentId, 
-            string fileName,
-            string sendersFileReference,
-            string checksum)
+            Guid fileId)
         {
-            BrokerFileMetadata brokerFileMetadata = await _fileService.UploadFile(shipmentId, Request.Body, fileName, sendersFileReference, checksum);
-            return Accepted(brokerFileMetadata.MapToBrokerFileMetadataExt());
+            BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(shipmentId, fileId, Request.Body);
+            return Accepted(brokerFileMetadata.FileId);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<BrokerFileStatusOverviewExt>> GetFileStatus(Guid fileId)
+        {
+            BrokerFileStatusOverview brokerFileStatusOverview = await _fileService.GetFileStatus(fileId);
+            return Accepted(brokerFileStatusOverview.MapToExternal());
+        }
+
+        [HttpGet]
+        [Route("{fileId}/download")]
+        public async Task<Stream> DownloadFile(Guid fileId)
+        {
+            await Task.Run(() => 1 == 1);
+            MemoryStream ms = new MemoryStream();
+            return ms;
+        }
+
+        [HttpGet]
+        [Route("{fileId}/confirm")]
+        public async Task<ActionResult> ConfirmDownload(Guid fileId)
+        {
+            await Task.Run(() => 1 == 1);
+            return Accepted();
+        }
+
+        [HttpPut]
+        public async Task<ActionResult<BrokerFileStatusOverviewExt>> OverwriteFileStreamed(Guid fileId, 
+        string fileName, 
+        string sendersFileReference, 
+        string checksum)
+        {
+            await Task.Run(() => 1 == 1);
+            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
+            return Accepted(brokerFileStatusOverviewExt);
+        }
+
+        [HttpPost]
+        [Route("{fileId}/cancel")]
+        public async Task<ActionResult> CancelFile(Guid fileId, string reasonText)
+        {
+            await Task.Run(() => 1 == 1);
+            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
+            return Accepted();
+        }
+
+        [HttpPost]
+        [Route("{fileId}/Report")]
+        public async void ReportFile(Guid fileId, string reportText)
+        {
+            await Task.Run(() => 1 == 1);
+            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
         }
 
         [HttpPost]
         [Route("{fileId}/resume")]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> ResumeUploadFileStreamed(
+        public async Task<ActionResult<Guid>> ResumeUploadFileStreamed(
             Guid fileId, 
             Guid shipmentId,
             string fileName,
@@ -49,32 +99,7 @@ namespace Altinn.Broker.Controllers
             string checksum)
         {
             BrokerFileMetadata brokerFileMetadata = await _fileService.ResumeUploadFile(shipmentId, fileId, Request.Body, fileName, sendersFileReference, checksum);
-            return Accepted(brokerFileMetadata.MapToBrokerFileMetadataExt());
-        }
-
-        [HttpGet]
-        public async Task<ActionResult<object>> GetFileStatus(Guid fileId)
-        {
-            BrokerFileMetadata brokerFileMetadata = await _fileService.GetBrokerFileMetadata(fileId);
-            return Accepted(brokerFileMetadata.MapToBrokerFileMetadataExt());
-        }
-
-        [HttpPut]
-        public async Task<ActionResult<BrokerShipmentResponseExt>> OverwriteFileStreamed(Guid fileId, 
-        string fileName, 
-        string sendersFileReference, 
-        string checksum)
-        {
-            BrokerFileMetadata md = await _fileService.OverwriteFile(fileId, Request.Body, fileName, sendersFileReference, checksum);
-            return Accepted(md.MapToBrokerFileMetadataExt());
-        }
-
-        [HttpPost]
-        [Route("{fileId}/cancel")]
-        public async Task<ActionResult<object>> CancelFile(Guid fileId)
-        {
-            BrokerFileMetadata md = await _fileService.CancelFile(fileId);
-            return Accepted(md.MapToBrokerFileMetadataExt());
+            return Accepted(brokerFileMetadata.FileId);
         }
     }
 }

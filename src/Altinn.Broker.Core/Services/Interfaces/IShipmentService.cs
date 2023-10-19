@@ -10,14 +10,14 @@ namespace Altinn.Broker.Core.Services.Interfaces
         /// </summary>
         /// <param name="shipmentId">ShipmentId to retrieve metadata for.</param>
         /// <returns>Shipment Metadata</returns>
-        Task<BrokerShipmentStatusOverview> GetBrokerShipmentOverview(Guid shipmentId);
+        Task<BrokerShipmentStatusOverview> GetShipment(Guid shipmentId);
 
         /// <summary>
         /// Retrieves detailed BrokerShipment data. Includes historical status information.
         /// </summary>
         /// <param name="shipmentId">ShipmentId to retrieve metadata for.</param>
         /// <returns>Shipment Metadata</returns>
-        Task<BrokerShipmentStatusDetails> GetBrokerShipmentDetails(Guid shipmentId);
+        Task<BrokerShipmentStatusDetailed> GetBrokerShipmentDetailed(Guid shipmentId);
 
         /// <summary>
         /// Used when initializing a new <see cref="BrokerShipmentMetadata" /> object in BrokerShipment database.
@@ -46,6 +46,6 @@ namespace Altinn.Broker.Core.Services.Interfaces
         /// <param name="shipment">ShipmentId to cancel.</param>
         /// <param name="reasonText">Voluntary text detailing why shipment was cancelled.</param>
         /// <returns><see cref="BrokerShipmentMetadata" /></returns>
-        Task<BrokerShipmentStatusOverview> CancelShipment(Guid shipmentId, string reasonText);
+        Task<BrokerShipmentStatusDetailed> CancelShipment(Guid shipmentId, string reasonText);
     }    
 }
