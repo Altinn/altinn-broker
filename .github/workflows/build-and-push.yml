@@ -11,6 +11,7 @@ jobs:
   check-formatting:
     name: Check formatting
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +23,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
       - name: Format
-        continue-on-error: true
         run: |
             dotnet format --verify-no-changes --verbosity diagnostic
             STATUS=$?
