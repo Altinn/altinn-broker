@@ -1,6 +1,10 @@
 # altinn-broker
 Formidlingstjenesten
 
+[![Build and push](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml)
+
+[![Formatting](https://github.com/Altinn/altinn-broker/actions/workflows/check-formatting.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/check-formatting.yml)
+
 ## Altinn broker Upload PoC
 This is a PoC of Altinn-broker setting up a basic docker container with a simple service for uploading a file.
 It is very much subject to change and should not be considered an example of the finished service.
@@ -30,3 +34,7 @@ When running tests or when running locally, we use the Azurite storage emulator 
 
 The solution uses Flyway to run migrations. The migration scripts can be found in /src/Altinn.Broker.Persistence/Migrations. Script naming must follow the convention "V${four-digit-version-number}__${name}".
 If you need to re-initialize the database during local development, you can delete the database container and re-run docker compose.
+
+### Formatting
+
+Formatting of the code base is handled by Dotnet format. [See how to configure it to format-on-save in Visual Studio here.](https://learn.microsoft.com/en-us/community/content/how-to-enforce-dotnet-format-using-editorconfig-github-actions#3---formatting-your-code-locally)
