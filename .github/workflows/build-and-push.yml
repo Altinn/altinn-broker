@@ -24,7 +24,11 @@ jobs:
       - name: Format
         continue-on-error: true
         run: |
-          dotnet format --verify-no-changes --verbosity diagnostic
+            dotnet format --verify-no-changes --verbosity diagnostic
+            STATUS=$?
+            if [ $STATUS -ne 0 ]; then
+              echo "::warning::Dotnet format verification failed"
+            fi
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
