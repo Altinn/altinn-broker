@@ -5,7 +5,7 @@ namespace Altinn.Broker.Core.Domain;
 public class File
 {
     public Guid FileId { get; set; }
-    public string ExternalFileReference { get; set; };
+    public string ExternalFileReference { get; set; }
     public Guid ShipmentId { get; set; }
     public FileStatus FileStatus { get; set; } // Joined in
     public DateTimeOffset? LastStatusUpdate { get; set; }
