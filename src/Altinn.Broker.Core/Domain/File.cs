@@ -11,5 +11,5 @@ public class File
     public DateTimeOffset? LastStatusUpdate { get; set; }
     public DateTimeOffset Uploaded { get; set; }
     public string FileLocation { get; set; } = string.Empty; // Joined in
-    public List<FileReceipt>? Receipts { get; set; } // Joined in
+    public List<FileReceipt> Receipts { get; set; } // Joined in
 }

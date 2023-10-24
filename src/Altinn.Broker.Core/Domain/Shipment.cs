@@ -9,5 +9,5 @@ public class Shipment
     public long UploaderActorId { get; set; }
     public DateTimeOffset Initiated { get; set; }
     public ShipmentStatus ShipmentStatus { get; set; } // Joined in
-    public List<ShipmentReceipt>? Receipts { get; set; } // Joined in
+    public List<ShipmentReceipt> Receipts { get; set; } // Joined in
 }
