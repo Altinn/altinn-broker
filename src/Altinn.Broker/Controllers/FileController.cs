@@ -11,7 +11,7 @@ using Altinn.Broker.Persistence;
 namespace Altinn.Broker.Controllers
 {    
     [ApiController]
-    [Route("broker/api/v1.1/file")]
+    [Route("broker/api/v1/file")]
     public class FileController : ControllerBase
     {
         private readonly IFileService _fileService;

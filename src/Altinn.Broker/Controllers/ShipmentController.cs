@@ -12,7 +12,7 @@ using Altinn.Broker.Enums;
 namespace Altinn.Broker.Controllers
 {    
     [ApiController]
-    [Route("broker/api/v1.1/outbox/")]
+    [Route("broker/api/v1/")]
     public class ShipmentController : ControllerBase
     {
         private readonly IShipmentService _shipmentService;
@@ -24,7 +24,7 @@ namespace Altinn.Broker.Controllers
         }
 
         [HttpPost]        
-        [Route("simpleShipment")]
+        [Route("shipment")]
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitializeUploadAndPublishShipmentStreamed([FromForm] IFormFile file, 
         [FromForm] BrokerShipmentInitializeExt metadata)
@@ -35,6 +35,17 @@ namespace Altinn.Broker.Controllers
             
             _ = await _fileStorage.SaveFile(overview.ShipmentId, file.OpenReadStream(), metadataInit.Files.First());
             return Accepted(overview.MapToExternal());
+        }
+
+        [HttpPost]        
+        [Consumes("application/json")]
+        [Route("shipment/advanced")]
+        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitialiseShipment(BrokerShipmentInitializeExt initiateBrokerShipmentRequest)
+        {
+            // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
+            BrokerShipmentInitialize brokerShipmentInitialize = initiateBrokerShipmentRequest.MapToInternal();
+            BrokerShipmentStatusOverview shipmentStatus = await _shipmentService.InitializeShipment(brokerShipmentInitialize);
+            return Accepted(shipmentStatus.MapToExternal());
         }
 
         [HttpGet]
@@ -97,17 +108,6 @@ namespace Altinn.Broker.Controllers
         {
             // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
             await Task.Run(() => 1 == 1);
-        }
-
-        [HttpPost]        
-        [Consumes("application/json")]
-        [Route("shipment")]
-        public async Task<ActionResult<BrokerShipmentStatusOverviewExt>> InitialiseShipment(BrokerShipmentInitializeExt initiateBrokerShipmentRequest)
-        {
-            // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
-            BrokerShipmentInitialize brokerShipmentInitialize = initiateBrokerShipmentRequest.MapToInternal();
-            BrokerShipmentStatusOverview shipmentStatus = await _shipmentService.InitializeShipment(brokerShipmentInitialize);
-            return Accepted(shipmentStatus.MapToExternal());
         }
 
         [HttpPost]        
