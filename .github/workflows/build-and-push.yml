@@ -6,6 +6,7 @@ on:
       - "test/k6/**"
       - ".github/**"
   workflow_dispatch:
+
 jobs:
   build-test-analyze:
     name: Build and push
@@ -22,5 +23,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push image to registry
         run: |
-              docker build . --tag ghcr.io/altinn/altinn-broker:latest
-              docker push ghcr.io/altinn/altinn-broker:latest
+              # Construct the image tag using the Git hash
+              IMAGE_TAG="ghcr.io/altinn/altinn-broker:${{ github.sha }}"
+              
+              docker build . --tag $IMAGE_TAG
+              docker push $IMAGE_TAG
