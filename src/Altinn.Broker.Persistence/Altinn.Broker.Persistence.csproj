@@ -21,4 +21,7 @@
     <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
+  </ItemGroup>
 </Project>

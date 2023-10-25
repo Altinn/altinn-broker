@@ -7,7 +7,7 @@ namespace Altinn.Broker.Validators;
 /// <summary>
 /// Claass contining validation logic for the <see cref="EmailNotificationOrderRequestExt"/> model
 /// </summary>
-public class InitiateBrokerShipmentValidator : AbstractValidator<InitiateBrokerShipmentRequestExt>
+public class InitiateBrokerShipmentValidator : AbstractValidator<BrokerShipmentInitializeExt>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="InitiateBrokerShipmentValidator"/> class.
@@ -20,8 +20,8 @@ public class InitiateBrokerShipmentValidator : AbstractValidator<InitiateBrokerS
             .Must(recipients => recipients?.Exists(a => string.IsNullOrEmpty(a)) == false)
             .WithMessage("Cannot provide empty recipient.");
 
-        RuleFor(shipment => shipment.ServiceCode).NotEmpty().WithMessage("ServiceCode must be defined for InitiateBrokerShipment.");
-        RuleFor(shipment => shipment.ServiceEditionCode).NotEqual(0).WithMessage("ServiceEditionCode must be defined for InitiateBrokerShipment.");
-        RuleFor(shipment => shipment.SendersReference).NotEmpty();
+        RuleFor(shipment => shipment.BrokerResourceId).NotEmpty().WithMessage("ResoureceId must be defined for Request..");
+        RuleFor(shipment => shipment.Sender).NotEmpty().WithMessage("Sender must be defined for Request.");
+        RuleFor(shipment => shipment.SendersShipmentReference).NotEmpty();
     }
 }

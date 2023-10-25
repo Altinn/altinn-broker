@@ -2,5 +2,5 @@
 
 public class StorageOptions
 {
-    public string ConnectionString { get; set; }
+    public required string ConnectionString { get; set; }
 }
