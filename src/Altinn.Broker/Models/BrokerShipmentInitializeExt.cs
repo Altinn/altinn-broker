@@ -11,7 +11,7 @@ namespace Altinn.Broker.Models
     /// </summary>
     public class BrokerShipmentInitializeExt
     {
-        
+
         /// <summary>
         /// Gets or sets the ResourceId for Broker Service
         /// </summary>
@@ -46,6 +46,6 @@ namespace Altinn.Broker.Models
         /// Gets or sets predefined list of files that will be uploaded to the broker shipment.
         /// </summary>
         [JsonPropertyName("files")]
-        public List<BrokerFileInitalizeExt> Files {get;set;} = new List<BrokerFileInitalizeExt>();
+        public List<BrokerFileInitalizeExt> Files { get; set; } = new List<BrokerFileInitalizeExt>();
     }
 }

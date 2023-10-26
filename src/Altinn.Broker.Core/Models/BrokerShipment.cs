@@ -9,7 +9,7 @@ namespace Altinn.Broker.Core.Models
     /// </summary>
     public class BrokerShipmentMetadata
     {
-        public Guid BrokerResourceId {get;set;}
+        public Guid BrokerResourceId { get; set; }
         /// <summary>
         /// Gets or sets external service code given when external parties are retrieving service information
         /// </summary>
@@ -38,9 +38,9 @@ namespace Altinn.Broker.Core.Models
         /// <summary>
         /// Gets or sets files related to shipment.
         /// </summary>
-        public List<BrokerFileMetadata> FileList {get;set;} = new List<BrokerFileMetadata>();
+        public List<BrokerFileMetadata> FileList { get; set; } = new List<BrokerFileMetadata>();
 
-        public BrokerShipmentStatus Status {get;set;} = BrokerShipmentStatus.Initialized;
-        public Guid ShipmentId {get;set;}
+        public BrokerShipmentStatus Status { get; set; } = BrokerShipmentStatus.Initialized;
+        public Guid ShipmentId { get; set; }
     }
 }

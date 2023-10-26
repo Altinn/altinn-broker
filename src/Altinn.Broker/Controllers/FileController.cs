@@ -1,15 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
 
-using Microsoft.AspNetCore.Mvc;
-
-using Altinn.Broker.Models;
 using Altinn.Broker.Core.Models;
-using Altinn.Broker.Mappers;
 using Altinn.Broker.Core.Services.Interfaces;
+using Altinn.Broker.Mappers;
+using Altinn.Broker.Models;
 using Altinn.Broker.Persistence;
 
+using Microsoft.AspNetCore.Mvc;
+
 namespace Altinn.Broker.Controllers
-{    
+{
     [ApiController]
     [Route("broker/api/v1/file")]
     public class FileController : ControllerBase
@@ -30,7 +30,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         public async Task<ActionResult<Guid>> UploadFileStreamed(
-            Guid shipmentId, 
+            Guid shipmentId,
             Guid fileId)
         {
             BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(shipmentId, fileId, Request.Body);
@@ -62,9 +62,9 @@ namespace Altinn.Broker.Controllers
         }
 
         [HttpPut]
-        public async Task<ActionResult<BrokerFileStatusOverviewExt>> OverwriteFileStreamed(Guid fileId, 
-        string fileName, 
-        string sendersFileReference, 
+        public async Task<ActionResult<BrokerFileStatusOverviewExt>> OverwriteFileStreamed(Guid fileId,
+        string fileName,
+        string sendersFileReference,
         string checksum)
         {
             await Task.Run(() => 1 == 1);
@@ -92,7 +92,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         [Route("{fileId}/resume")]
         public async Task<ActionResult<Guid>> ResumeUploadFileStreamed(
-            Guid fileId, 
+            Guid fileId,
             Guid shipmentId,
             string fileName,
             string sendersFileReference,

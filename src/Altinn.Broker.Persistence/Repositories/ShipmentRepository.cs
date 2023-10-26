@@ -10,7 +10,7 @@ public class ShipmentRepository : IShipmentRepository
     private const string SHIPMENT_SQL = "SELECT *, ass.actor_id_fk_pk, a.actor_external_id, ass.actor_shipment_status_id_fk, ass.actor_shipment_status_date FROM broker.shipment " +
             "LEFT JOIN broker.actor_shipment_status ass on ass.shipment_id_fk_pk = shipment_id_pk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = ass.actor_id_fk_pk";
-            
+
     private DatabaseConnectionProvider _connectionProvider;
 
     public ShipmentRepository(DatabaseConnectionProvider connectionProvider)

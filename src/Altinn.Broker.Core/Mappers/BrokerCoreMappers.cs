@@ -1,5 +1,5 @@
-using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Enums;
+using Altinn.Broker.Core.Models;
 
 namespace Altinn.Broker.Mappers
 {
@@ -9,7 +9,7 @@ namespace Altinn.Broker.Mappers
         public static List<RecipientShipmentStatusOverview> MapToRecipientStatusOverview(this List<string> recipients)
         {
             List<RecipientShipmentStatusOverview> recipientOverviews = new();
-            foreach(string s in recipients)
+            foreach (string s in recipients)
             {
                 recipientOverviews.Add(new RecipientShipmentStatusOverview()
                 {
@@ -25,17 +25,17 @@ namespace Altinn.Broker.Mappers
         public static List<BrokerFileStatusOverview> MapToOverview(this List<BrokerFileInitalize> bfis)
         {
             List<BrokerFileStatusOverview> bfsos = new List<BrokerFileStatusOverview>();
-            foreach(var bfi in bfis)
+            foreach (var bfi in bfis)
             {
-                bfsos.Add(bfi.MapToOverview());                
+                bfsos.Add(bfi.MapToOverview());
             }
-            
+
             return bfsos;
         }
 
         public static BrokerFileStatusOverview MapToOverview(this BrokerFileInitalize bfi)
         {
-            BrokerFileStatusOverview bfso = new ()
+            BrokerFileStatusOverview bfso = new()
             {
                 Checksum = bfi.Checksum,
                 FileName = bfi.FileName,
@@ -44,7 +44,7 @@ namespace Altinn.Broker.Mappers
                 FileStatusText = "BrokerFile is initialized and awaiting upload.",
                 SendersFileReference = bfi.SendersFileReference
             };
-            
+
             return bfso;
         }
 

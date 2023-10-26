@@ -1,8 +1,10 @@
-﻿using Npgsql;
-using Altinn.Broker.Core.Domain;
-using File = Altinn.Broker.Core.Domain.File;
+﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+
+using Npgsql;
+
+using File = Altinn.Broker.Core.Domain.File;
 
 namespace Altinn.Broker.Persistence.Repositories;
 

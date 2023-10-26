@@ -17,14 +17,14 @@ namespace Altinn.Broker.Mappers
                 Checksum = ibfd.Checksum,
                 FileId = ibfd.FileId,
                 FileName = ibfd.FileName,
-                FileStatus =  (BrokerFileStatusExt)ibfd.FileStatus,
+                FileStatus = (BrokerFileStatusExt)ibfd.FileStatus,
                 FileStatusChanged = ibfd.FileStatusChanged,
                 FileStatusHistory = ibfd.FileStatusHistory.MapToExternal(),
                 FileStatusText = ibfd.FileStatusText,
                 SendersFileReference = ibfd.SendersFileReference
             };
-        }        
-       public static List<BrokerFileStatusOverviewExt> MapToExternal(this List<BrokerFileStatusOverview> i)
+        }
+        public static List<BrokerFileStatusOverviewExt> MapToExternal(this List<BrokerFileStatusOverview> i)
         {
             return i.Select(o => o.MapToExternal()).ToList();
         }
@@ -45,7 +45,7 @@ namespace Altinn.Broker.Mappers
         {
             return extList.Select(f => f.MapToInternal()).ToList();
         }
-       public static BrokerFileInitalize MapToInternal(this BrokerFileInitalizeExt extObj)
+        public static BrokerFileInitalize MapToInternal(this BrokerFileInitalizeExt extObj)
         {
             return new BrokerFileInitalize()
             {
@@ -60,7 +60,7 @@ namespace Altinn.Broker.Mappers
         }
         public static BrokerFileStatusEventExt MapToExternal(this FileStatusEvent ifse)
         {
-            return new BrokerFileStatusEventExt ()
+            return new BrokerFileStatusEventExt()
             {
                 FileStatus = ifse.FileStatus,
                 FileStatusChanged = ifse.FileStatusChanged,

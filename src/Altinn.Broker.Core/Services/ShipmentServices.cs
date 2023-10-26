@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.AccessControl;
+
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Services.Interfaces;
 

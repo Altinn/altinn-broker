@@ -21,7 +21,7 @@ public class RepositoryTests
         {
             ConnectionString = DATABASE_CONNECTION_STRING
         });
-        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions); 
+        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions);
 
         _fileRepository = new FileRepository(_databaseConnectionProvider);
         _actorRepository = new ActorRepository(_databaseConnectionProvider);
@@ -131,7 +131,7 @@ public class RepositoryTests
         var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
         Assert.NotEmpty(savedFile.Receipts);
-        Assert.Equal(1, savedFile.Receipts.Count);
+        Assert.Single(savedFile.Receipts);
         Assert.Equal(Core.Domain.Enums.ActorFileStatus.Uploaded, savedFile.Receipts.First().Status);
     }
 

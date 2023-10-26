@@ -13,7 +13,7 @@ public class FileStore : IFileStorage
     private static bool InDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")?.ToLower() == "true";
 
     public async Task<BrokerFileStatusOverview> SaveFile(Guid shipmentId, Stream filestream, BrokerFileInitalize brokerFile)
-    {        
+    {
         BrokerFileStatusOverview brokerFileStatusOverview = new BrokerFileStatusOverview();
         brokerFileStatusOverview.FileId = Guid.NewGuid();
         brokerFileStatusOverview.Checksum = brokerFile.Checksum;
@@ -22,12 +22,12 @@ public class FileStore : IFileStorage
         brokerFileStatusOverview.FileStatus = Core.Enums.BrokerFileStatus.AwaitingUploadProcessing;
 
         string basefolder = InDocker ? @"/mnt/storage/" : @"c:\Altinn\storage\";
-        if(!Directory.Exists(basefolder))
+        if (!Directory.Exists(basefolder))
         {
             Directory.CreateDirectory(basefolder);
         }
         string shipmentFolder = basefolder + (InDocker ? $"/{shipmentId}" : $@"\{shipmentId}");
-        if(!Directory.Exists(shipmentFolder))
+        if (!Directory.Exists(shipmentFolder))
         {
             Directory.CreateDirectory(shipmentFolder);
         }
@@ -37,7 +37,7 @@ public class FileStore : IFileStorage
         {
             await filestream.CopyToAsync(storestream);
         }
-        
+
         brokerFileStatusOverview.FileStatusText = "File uploaded and awaiting processing.";
         brokerFileStatusOverview.FileStatusChanged = DateTime.Now;
 
@@ -45,14 +45,14 @@ public class FileStore : IFileStorage
     }
 
     public async Task UploadFile(Stream filestream, string shipmentId, string fileReference)
-    {   
+    {
         string basefolder = InDocker ? @"/mnt/storage/" : @"c:\Altinn\storage\";
-        if(!Directory.Exists(basefolder))
+        if (!Directory.Exists(basefolder))
         {
             Directory.CreateDirectory(basefolder);
         }
         string shipmentFolder = basefolder + (InDocker ? $"/{shipmentId}" : $@"\{shipmentId}");
-        if(!Directory.Exists(shipmentFolder))
+        if (!Directory.Exists(shipmentFolder))
         {
             Directory.CreateDirectory(shipmentFolder);
         }
@@ -64,4 +64,3 @@ public class FileStore : IFileStorage
         }
     }
 }
-

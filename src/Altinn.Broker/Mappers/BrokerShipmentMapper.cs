@@ -47,7 +47,7 @@ namespace Altinn.Broker.Mappers
 
             return ext;
         }
-      
+
         public static List<BrokerShipmentStatusOverviewExt> MapToExternal(this List<BrokerShipmentStatusOverview> ibssos)
         {
             return ibssos.Select(ibsso => ibsso.MapToExternal()).ToList();
@@ -75,16 +75,16 @@ namespace Altinn.Broker.Mappers
         {
             BrokerShipmentInitialize bsi = new BrokerShipmentInitialize()
             {
-                 BrokerResourceId = extRequest.BrokerResourceId,                 
-                 Files = extRequest.Files.MapToInternal(),
-                 Metadata = extRequest.Metadata,
-                 Recipients = extRequest.Recipients,
-                 Sender = extRequest.Sender,
-                 SendersShipmentReference = extRequest.SendersShipmentReference
+                BrokerResourceId = extRequest.BrokerResourceId,
+                Files = extRequest.Files.MapToInternal(),
+                Metadata = extRequest.Metadata,
+                Recipients = extRequest.Recipients,
+                Sender = extRequest.Sender,
+                SendersShipmentReference = extRequest.SendersShipmentReference
             };
 
             return bsi;
         }
 
-     }
+    }
 }

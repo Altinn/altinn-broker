@@ -12,7 +12,7 @@ namespace Altinn.Broker.Models
     /// </summary>
     public class BrokerShipmentStatusDetailedExt : BrokerShipmentStatusDetailed
     {
-        public new List<BrokerShipmentStatusEventExt> ShipmentStatusHistory {get;set;} = new List<BrokerShipmentStatusEventExt>();
-        public new List<BrokerFileStatusDetailsExt> FileList {get;set;} = new List<BrokerFileStatusDetailsExt>();
+        public new List<BrokerShipmentStatusEventExt> ShipmentStatusHistory { get; set; } = new List<BrokerShipmentStatusEventExt>();
+        public new List<BrokerFileStatusDetailsExt> FileList { get; set; } = new List<BrokerFileStatusDetailsExt>();
     }
 }

@@ -1,6 +1,7 @@
 namespace Altinn.Broker.Core.Domain.Enums;
 
-public enum FileStatus {
+public enum FileStatus
+{
     None = 0,
     Initialized = 1,
     Processing = 2,

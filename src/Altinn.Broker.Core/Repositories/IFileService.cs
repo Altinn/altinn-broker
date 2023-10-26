@@ -4,7 +4,7 @@ using Altinn.Broker.Core.Enums;
 using Altinn.Broker.Core.Models;
 
 namespace Altinn.Broker.Core.Services.Interfaces
-{    
+{
     public interface IFileService
     {
         Task<BrokerFileStatusOverview> UploadFile(Guid shipmentId, Guid fileId, Stream fileStream);
@@ -19,5 +19,5 @@ namespace Altinn.Broker.Core.Services.Interfaces
         Task<BrokerFileMetadata> UploadFile(Guid shipmentId, Stream fileStream, string fileName, string fileReference, string checksum);
         Task<BrokerFileMetadata> ResumeUploadFile(Guid shipmentId, Guid fileId, Stream fileStream, string fileName, string fileReference, string checksum);
         Task<BrokerFileMetadata> OverwriteFile(Guid fileId, Stream fileStream, string fileName, string fileReference, string checksum);
-    }    
+    }
 }

@@ -43,6 +43,6 @@ namespace Altinn.Broker.Core.Models
         /// Gets or sets predefined list of files that will be uploaded to the broker shipment.
         /// </summary>
         [JsonPropertyName("files")]
-        public List<BrokerFileInitalize> Files {get;set;} = new List<BrokerFileInitalize>();
+        public List<BrokerFileInitalize> Files { get; set; } = new List<BrokerFileInitalize>();
     }
 }

@@ -5,6 +5,6 @@ namespace Altinn.Broker.Core.Models
 {
     public class BrokerFileStatusDetailsExt : BrokerFileStatusOverviewExt
     {
-        public List<BrokerFileStatusEventExt> FileStatusHistory {get;set;} = new List<BrokerFileStatusEventExt>();
+        public List<BrokerFileStatusEventExt> FileStatusHistory { get; set; } = new List<BrokerFileStatusEventExt>();
     }
 }

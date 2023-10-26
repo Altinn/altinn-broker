@@ -27,9 +27,9 @@ namespace Altinn.Broker.Core.Services
         public async Task<BrokerShipmentStatusOverview> InitializeShipment(BrokerShipmentInitialize shipment)
         {
             BrokerShipmentStatusOverview bsso;
-            if(true)
+            if (true)
             {
-                bsso = new ()
+                bsso = new()
                 {
                     BrokerResourceId = shipment.BrokerResourceId,
                     CurrentShipmentStatus = BrokerShipmentStatus.Initialized,
@@ -44,7 +44,7 @@ namespace Altinn.Broker.Core.Services
                     ShipmentInitialized = DateTime.Now
                 };
 
-                await Task.Run(() =>_dataStore.SaveBrokerShipmentStatusOverview(bsso));
+                await Task.Run(() => _dataStore.SaveBrokerShipmentStatusOverview(bsso));
             }
 
             return bsso;

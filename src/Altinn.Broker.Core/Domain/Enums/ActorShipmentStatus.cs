@@ -1,6 +1,7 @@
 namespace Altinn.Broker.Core.Domain.Enums;
 
-public enum ActorShipmentStatus {
+public enum ActorShipmentStatus
+{
     None = 0,
     Initialized = 1,
     Finalized = 2,

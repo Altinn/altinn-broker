@@ -66,7 +66,7 @@ namespace Altinn.Broker.Core.Services
 
         public Task<BrokerFileStatusOverview> UploadFile(Guid shipmentId, Guid FileId, Stream filestream)
         {
-            
+
             throw new NotImplementedException();
         }
     }
