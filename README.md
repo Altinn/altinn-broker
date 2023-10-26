@@ -3,8 +3,6 @@ Formidlingstjenesten
 
 [![Build and push](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml)
 
-[![Formatting](https://github.com/Altinn/altinn-broker/actions/workflows/check-formatting.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/check-formatting.yml)
-
 ## Altinn broker Upload PoC
 This is a PoC of Altinn-broker setting up a basic docker container with a simple service for uploading a file.
 It is very much subject to change and should not be considered an example of the finished service.
