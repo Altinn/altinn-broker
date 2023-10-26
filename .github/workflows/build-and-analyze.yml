@@ -19,6 +19,8 @@ jobs:
         with:
           dotnet-version: |
             7.0.x      
+      - name: Restore dependencies
+        run: dotnet restore
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
@@ -68,3 +70,6 @@ jobs:
         with:
           TRX_PATH: ${{ github.workspace }}/TestResults
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Format
+        run: |
+            dotnet format --verify-no-changes --verbosity diagnostic
