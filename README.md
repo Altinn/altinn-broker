@@ -1,18 +1,9 @@
-# altinn-broker
+# altinn-broker (work-in-progress)
 Formidlingstjenesten
 
 [![Build and push](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml)
 
-## Altinn broker Upload PoC
-This is a PoC of Altinn-broker setting up a basic docker container with a simple service for uploading a file.
-It is very much subject to change and should not be considered an example of the finished service.
-
-## Running the PoC
-The PoC can be run by either opening it in Visual Studio Code and running it, or by deploying it to a local Docker container using the command:
-
-```bash
-docker-compose up -d --build
-```
+## Postman
 
 Example requests using postman can be found in [Altinn3 Broker.postman_collection_examples.json](Altinn3 Broker.postman_collection_examples.json). 
 
@@ -36,3 +27,7 @@ If you need to re-initialize the database during local development, you can dele
 ### Formatting
 
 Formatting of the code base is handled by Dotnet format. [See how to configure it to format-on-save in Visual Studio here.](https://learn.microsoft.com/en-us/community/content/how-to-enforce-dotnet-format-using-editorconfig-github-actions#3---formatting-your-code-locally)
+
+## Deploy
+
+The build and push workflow produces a docker image that is pushed to Github packages. This image is then used by the release action found in the [altinn-broker-infra repository](https://github.com/Altinn/altinn-broker-infra).
