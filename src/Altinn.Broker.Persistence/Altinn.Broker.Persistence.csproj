@@ -14,11 +14,14 @@
     <PackageReference Include="Azure.Identity" Version="1.10.2" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.18.0" />
     <PackageReference Include="Npgsql" Version="7.0.6" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.0.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.0.3" />
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
+  </ItemGroup>
 </Project>

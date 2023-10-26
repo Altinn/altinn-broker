@@ -20,7 +20,7 @@
 				"body": {
 					"mode": "file",
 					"file": {
-						"src": "C:/Windows/System32/cmd.exe"
+						"src": "/C:/Temp/Postman-win64-Setup.exe"
 					}
 				},
 				"url": {
@@ -65,22 +65,22 @@
 				"body": {
 					"mode": "file",
 					"file": {
-						"src": "/C:/Temp/Postman-win64-Setup.exe"
+						"src": "/C:/Temp/5mb"
 					}
 				},
 				"url": {
-					"raw": "https://localhost:7241/broker/api/v1/shipment/a6b17cae-4ea7-4485-88d2-c879c097f1b5?sendersFileReference=sendersRef123&fileName=input.txt",
-					"protocol": "https",
+					"raw": "http://localhost:2525/broker/api/v1/shipment/7800c263-bba9-4931-9d92-4852fdef2d0d?sendersFileReference=sendersRef123&fileName=input.txt",
+					"protocol": "http",
 					"host": [
 						"localhost"
 					],
-					"port": "7241",
+					"port": "2525",
 					"path": [
 						"broker",
 						"api",
 						"v1",
 						"shipment",
-						"a6b17cae-4ea7-4485-88d2-c879c097f1b5"
+						"7800c263-bba9-4931-9d92-4852fdef2d0d"
 					],
 					"query": [
 						{
@@ -117,7 +117,7 @@
 					}
 				},
 				"url": {
-					"raw": "https://localhost:7241/broker/api/v1/shipment",
+					"raw": "https://localhost:7241/broker/api/v1.1/shipment",
 					"protocol": "https",
 					"host": [
 						"localhost"
@@ -126,8 +126,93 @@
 					"path": [
 						"broker",
 						"api",
-						"v1",
+						"v1.1",
 						"shipment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateSimpleShipment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "initiateBrokerShipmentRequest",
+							"value": "{\n    \"serviceCode\": \"test1\",\n    \"serviceEditioinCode\": 1,\n    \"recipients\": [\n        \"rep1\",\n        \"rep2\"\n    ],\n    \"sendersReference\": \"testsendersREF\"\n}",
+							"type": "text",
+							"disabled": true
+						},
+						{
+							"key": "File",
+							"type": "file",
+							"src": "/C:/Temp/5mb"
+						},
+						{
+							"key": "Metadata.ServiceCode",
+							"value": "124",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.ServiceEditionCode",
+							"value": "12",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.SendersReference",
+							"value": "125nlgag915",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.Recipients",
+							"value": "123",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.Recipients",
+							"value": "45",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.Recipients",
+							"value": "6789",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.Properties.Prop1",
+							"value": "value1",
+							"type": "text"
+						},
+						{
+							"key": "Metadata.Properties.Prop2",
+							"value": "value2",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://localhost:7241/broker/api/v1.1/outbox/simpleshipment",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "7241",
+					"path": [
+						"broker",
+						"api",
+						"v1.1",
+						"outbox",
+						"simpleshipment"
 					]
 				}
 			},
@@ -154,12 +239,12 @@
 					}
 				},
 				"url": {
-					"raw": "https://localhost:7241/broker/api/v1/shipment",
-					"protocol": "https",
+					"raw": "http://localhost:2525/broker/api/v1/shipment",
+					"protocol": "http",
 					"host": [
 						"localhost"
 					],
-					"port": "7241",
+					"port": "2525",
 					"path": [
 						"broker",
 						"api",
