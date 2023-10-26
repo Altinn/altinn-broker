@@ -26,7 +26,7 @@ public class BrokerShipmentMapperTests
                 { "AA","11" },
                 { "BB","22" }
             },
-            Files = new List<BrokerFileInitalizeExt>(),
+            Files = new List<FileInitalizeExt>(),
             SendersShipmentReference = "SendRef_1",
             Sender = "9090908"
         };

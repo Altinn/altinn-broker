@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Security.AccessControl;
 
 using Altinn.Broker.Core.Enums;
 using Altinn.Broker.Core.Models;

@@ -4,48 +4,48 @@ using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers
 {
-    public static class BrokerFileMapper
+    public static class FileMapper
     {
-        public static List<BrokerFileStatusDetailsExt> MapToExternal(this List<BrokerFileStatusDetails> i)
+        public static List<FileStatusDetailsExt> MapToExternal(this List<BrokerFileStatusDetails> i)
         {
             return i.Select(fsd => fsd.MapToExternal()).ToList();
         }
-        public static BrokerFileStatusDetailsExt MapToExternal(this BrokerFileStatusDetails ibfd)
+        public static FileStatusDetailsExt MapToExternal(this BrokerFileStatusDetails ibfd)
         {
-            return new BrokerFileStatusDetailsExt()
+            return new FileStatusDetailsExt()
             {
                 Checksum = ibfd.Checksum,
                 FileId = ibfd.FileId,
                 FileName = ibfd.FileName,
-                FileStatus =  (BrokerFileStatusExt)ibfd.FileStatus,
+                FileStatus =  (FileStatusExt)ibfd.FileStatus,
                 FileStatusChanged = ibfd.FileStatusChanged,
                 FileStatusHistory = ibfd.FileStatusHistory.MapToExternal(),
                 FileStatusText = ibfd.FileStatusText,
                 SendersFileReference = ibfd.SendersFileReference
             };
         }        
-       public static List<BrokerFileStatusOverviewExt> MapToExternal(this List<BrokerFileStatusOverview> i)
+       public static List<FileStatusOverviewExt> MapToExternal(this List<BrokerFileStatusOverview> i)
         {
             return i.Select(o => o.MapToExternal()).ToList();
         }
-        public static BrokerFileStatusOverviewExt MapToExternal(this BrokerFileStatusOverview i)
+        public static FileStatusOverviewExt MapToExternal(this BrokerFileStatusOverview i)
         {
-            return new BrokerFileStatusOverviewExt()
+            return new FileStatusOverviewExt()
             {
                 Checksum = i.Checksum,
                 FileId = i.FileId,
                 FileName = i.FileName,
-                FileStatus = (BrokerFileStatusExt)i.FileStatus,
+                FileStatus = (FileStatusExt)i.FileStatus,
                 FileStatusChanged = i.FileStatusChanged,
                 FileStatusText = i.FileStatusText,
                 SendersFileReference = i.SendersFileReference
             };
         }
-        public static List<BrokerFileInitalize> MapToInternal(this List<BrokerFileInitalizeExt> extList)
+        public static List<BrokerFileInitalize> MapToInternal(this List<FileInitalizeExt> extList)
         {
             return extList.Select(f => f.MapToInternal()).ToList();
         }
-       public static BrokerFileInitalize MapToInternal(this BrokerFileInitalizeExt extObj)
+       public static BrokerFileInitalize MapToInternal(this FileInitalizeExt extObj)
         {
             return new BrokerFileInitalize()
             {
@@ -54,13 +54,13 @@ namespace Altinn.Broker.Mappers
                 SendersFileReference = extObj.SendersFileReference
             };
         }
-        public static List<BrokerFileStatusEventExt> MapToExternal(this List<FileStatusEvent> i)
+        public static List<FileStatusEventExt> MapToExternal(this List<FileStatusEvent> i)
         {
             return i.Select(fse => fse.MapToExternal()).ToList();
         }
-        public static BrokerFileStatusEventExt MapToExternal(this FileStatusEvent ifse)
+        public static FileStatusEventExt MapToExternal(this FileStatusEvent ifse)
         {
-            return new BrokerFileStatusEventExt ()
+            return new FileStatusEventExt ()
             {
                 FileStatus = ifse.FileStatus,
                 FileStatusChanged = ifse.FileStatusChanged,
