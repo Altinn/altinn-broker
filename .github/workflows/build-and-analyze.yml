@@ -36,6 +36,9 @@ jobs:
       - name: Install SonarCloud scanners
         run: |
           dotnet tool install --global dotnet-sonarscanner
+      - name: Format
+        run: |
+            dotnet format --verify-no-changes --verbosity diagnostic
       - name: Start dependencies for tests (docker-compose)
         run: |
           docker-compose up -d
@@ -68,6 +71,3 @@ jobs:
         with:
           TRX_PATH: ${{ github.workspace }}/TestResults
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Format
-        run: |
-            dotnet format --verify-no-changes --verbosity diagnostic
