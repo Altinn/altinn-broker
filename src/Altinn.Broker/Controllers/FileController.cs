@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Models;
+using Altinn.Broker.Core.Repositories.Interfaces;
 using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
@@ -34,7 +35,7 @@ namespace Altinn.Broker.Controllers
         }
         
         /// <summary>
-        /// Upload a file using a binary stream.
+        /// Upload to an initialized file using a binary stream.
         /// </summary>
         /// <returns></returns>
         [HttpPost]
@@ -45,9 +46,28 @@ namespace Altinn.Broker.Controllers
             await _fileStore.UploadFile(Request.Body, fileId.ToString(), fileId.ToString());
             return Ok();
         }
+        
+        /// <summary>
+        /// Initialize and upload a file using form-data
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        public async Task<ActionResult> InitializeAndUpload(
+            [FromForm] FileInitializeAndUploadExt form
+        )
+        {
+            // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
+            //var metadataInit = form.Metadata.MapToInternal();
+
+            //BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(Guid.NewGuid(), Guid.NewGuid(), form.File.OpenReadStream());
+            //return Accepted(brokerFileMetadata.MapToExternal());
+            return Ok();
+        }
 
         /// <summary>
-        /// Upload a file using a binary stream.
+        /// Publish an uploaded file
         /// </summary>
         /// <returns></returns>
         /*[HttpPost]
