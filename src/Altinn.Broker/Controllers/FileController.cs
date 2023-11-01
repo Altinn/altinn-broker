@@ -1,5 +1,4 @@
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services.Interfaces;
 using Altinn.Broker.Models;
 using Altinn.Broker.Persistence;
 
@@ -11,7 +10,6 @@ namespace Altinn.Broker.Controllers
     [Route("broker/api/v1/file")]
     public class FileController : ControllerBase
     {
-        private readonly IFileService _fileService;
         private readonly IFileRepository _fileRepository;
         private readonly IFileStore _fileStore;
 

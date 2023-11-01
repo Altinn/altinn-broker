@@ -13,7 +13,6 @@ public class RepositoryTests
     private readonly DatabaseConnectionProvider _databaseConnectionProvider;
     private FileRepository _fileRepository;
     private ActorRepository _actorRepository;
-    private ShipmentRepository _shipmentRepository;
 
     public RepositoryTests()
     {
@@ -25,7 +24,6 @@ public class RepositoryTests
 
         _fileRepository = new FileRepository(_databaseConnectionProvider);
         _actorRepository = new ActorRepository(_databaseConnectionProvider);
-        _shipmentRepository = new ShipmentRepository(_databaseConnectionProvider);
     }
 
     [Fact]
@@ -42,22 +40,10 @@ public class RepositoryTests
             ActorExternalId = "1"
         });
 
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
-
 
         // Act
         await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            ShipmentId = shipmentId,
             FileId = fileId,
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
@@ -90,21 +76,9 @@ public class RepositoryTests
             ActorExternalId = "1"
         });
 
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
-
         Guid fileId = Guid.NewGuid();
         await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            ShipmentId = shipmentId,
             FileId = fileId,
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
@@ -146,21 +120,9 @@ public class RepositoryTests
             ActorExternalId = "1"
         });
 
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
-
         Guid fileId = Guid.NewGuid();
         await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            ShipmentId = shipmentId,
             FileId = fileId,
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
@@ -186,34 +148,6 @@ public class RepositoryTests
 
         // Assert
         Assert.Null(result);
-    }
-
-    [Fact]
-    public async Task SaveShipment_Successful_CanRetrieveShipment()
-    {
-        // Arrange
-        var actor = new Actor()
-        {
-            ActorId = new Random().Next(0, 10000000),
-            ActorExternalId = Guid.NewGuid().ToString(),
-        };
-        await _actorRepository.AddActorAsync(actor);
-        var shipment = new Shipment()
-        {
-            ExternalShipmentReference = Guid.NewGuid().ToString(),
-            Initiated = DateTime.Now.ToUniversalTime(),
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            UploaderActorId = actor.ActorId,
-            ShipmentId = Guid.NewGuid(),
-            Receipts = new List<ShipmentReceipt>()
-        };
-
-        // Act
-        await _shipmentRepository.AddShipmentAsync(shipment);
-        var savedShipment = await _shipmentRepository.GetShipmentAsync(shipment.ShipmentId);
-
-        // Assert
-        Assert.Equal(shipment.ShipmentId, savedShipment?.ShipmentId);
     }
 
     [Fact]

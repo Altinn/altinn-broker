@@ -5,7 +5,6 @@ using Altinn.Broker.Persistence.Options;
 using Azure.Core;
 using Azure.Identity;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
