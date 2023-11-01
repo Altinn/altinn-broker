@@ -44,13 +44,11 @@ CREATE TABLE broker.file_metadata (
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
     external_file_reference character varying(500) NOT NULL,
-    shipment_id_fk uuid NOT NULL,
     file_status_id_fk integer NOT NULL,
     last_status_update timestamp without time zone,
     uploaded timestamp without time zone NOT NULL,
     storage_reference_id_fk bigint NOT NULL,
     FOREIGN KEY (file_status_id_fk) REFERENCES broker.file_status (file_status_id_pk),
-    FOREIGN KEY (shipment_id_fk) REFERENCES broker.shipment (shipment_id_pk),
     FOREIGN KEY (storage_reference_id_fk) REFERENCES broker.storage_reference (storage_reference_id_pk)
 );
 

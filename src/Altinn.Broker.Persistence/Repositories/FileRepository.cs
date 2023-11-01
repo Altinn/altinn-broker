@@ -91,7 +91,7 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
+            "INSERT INTO broker.file (file_id_pk, external_file_reference, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
             "VALUES (@fileId, @externalFileReference, @shipmentId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
             connection);
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);

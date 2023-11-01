@@ -20,7 +20,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         public async Task<ActionResult> HealthCheckAsync(){
             var connection = await _databaseConnectionProvider.GetConnectionAsync();
-            var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.actor_shipment_status_description", connection);
+            var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_status", connection);
             var count = (long)(command.ExecuteScalar() ?? 0);
             if (count == 0){
                 return BadRequest("Unable to query database. Is DatabaseOptions__ConnectionString set and is the database migrated?");

@@ -15,9 +15,9 @@ public class BlobStore : IFileStore
         _connectionString = storageOptions.Value.ConnectionString ?? throw new ArgumentNullException("StorageOptions__ConnectionString");
     }
     
-    public async Task UploadFile(Stream filestream, string shipmentId, string fileReference)
+    public async Task UploadFile(Stream filestream, string fileId, string fileReference)
     {   
-        var containerClient = new BlobContainerClient(_connectionString, shipmentId);
+        var containerClient = new BlobContainerClient(_connectionString, fileId);
         await containerClient.CreateIfNotExistsAsync();
         BlobClient blobClient = containerClient.GetBlobClient(fileReference);
         await blobClient.UploadAsync(filestream, true);

@@ -32,13 +32,13 @@ namespace Altinn.Broker.Models
         public Guid BrokerResourceId { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Gets or sets the sender of the broker shipment.
+        /// Gets or sets the sender of the broker file.
         /// </summary>
         [JsonPropertyName("sender")]
         public string Sender { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the recipients of the broker shipment.
+        /// Gets or sets the recipients of the broker file.
         /// </summary>
         [JsonPropertyName("recipients")]
         public List<string> Recipients { get; set; } = new List<string>();
