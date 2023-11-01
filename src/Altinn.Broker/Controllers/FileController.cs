@@ -1,7 +1,5 @@
-using Altinn.Broker.Core.Models;
-using Altinn.Broker.Core.Repositories.Interfaces;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services.Interfaces;
-using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 using Altinn.Broker.Persistence;
 
@@ -14,11 +12,12 @@ namespace Altinn.Broker.Controllers
     public class FileController : ControllerBase
     {
         private readonly IFileService _fileService;
+        private readonly IFileRepository _fileRepository;
         private readonly IFileStore _fileStore;
 
-        public FileController(IFileService fileService, IFileStore fileStore)
+        public FileController(IFileRepository fileRepository, IFileStore fileStore)
         {
-            _fileService = fileService;
+            _fileRepository = fileRepository;
             _fileStore = fileStore;
         }
 
@@ -29,9 +28,14 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initalizeExt)
         {
-            BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(Guid.NewGuid(), Guid.NewGuid(), Request.Body);
+            var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
+            {
+                ExternalFileReference = initalizeExt.SendersFileReference,
+                FileStatus = Core.Domain.Enums.FileStatus.Initialized,
+                FileLocation = "altinn3-blob"
+            });
 
-            return Ok(brokerFileMetadata.FileId);
+            return Ok(fileId);
         }
         
         /// <summary>
@@ -43,7 +47,19 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
+            var file = await _fileRepository.GetFileAsync(fileId);
             await _fileStore.UploadFile(Request.Body, fileId.ToString(), fileId.ToString());
+            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
+            {
+                Actor = new Core.Domain.Actor()
+                {
+                    ActorExternalId = "0",
+                    ActorId = 0
+                },
+                Date = DateTime.UtcNow,
+                FileId = fileId,
+                Status = Core.Domain.Enums.ActorFileStatus.Uploaded
+            });
             return Ok();
         }
         
@@ -58,48 +74,65 @@ namespace Altinn.Broker.Controllers
             [FromForm] FileInitializeAndUploadExt form
         )
         {
-            // This method should initiate a "broker shipment" that will allow enduser to upload file, similar to Altinn 2 Soap operation.
-            //var metadataInit = form.Metadata.MapToInternal();
+            var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
+            {
+                ExternalFileReference = form.Metadata.SendersFileReference,
+                FileStatus = Core.Domain.Enums.FileStatus.Initialized,
+                FileLocation = "altinn3-blob"
+            });
 
-            //BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(Guid.NewGuid(), Guid.NewGuid(), form.File.OpenReadStream());
-            //return Accepted(brokerFileMetadata.MapToExternal());
+            await _fileStore.UploadFile(Request.Body, fileId.ToString(), fileId.ToString());
+            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
+            {
+                Actor = new Core.Domain.Actor()
+                {
+                    ActorExternalId = "0",
+                    ActorId = 0
+                },
+                Date = DateTime.UtcNow,
+                FileId = fileId,
+                Status = Core.Domain.Enums.ActorFileStatus.Uploaded
+            });
             return Ok();
         }
-
-        /// <summary>
-        /// Publish an uploaded file
-        /// </summary>
-        /// <returns></returns>
-        /*[HttpPost]
-        [Route("{fileId}/publish")]
-        public async Task<ActionResult> PublishFile(
-            Guid fileId)
-        {
-            return Ok();
-        }*/
 
         [HttpGet]
         public async Task<ActionResult<FileStatusOverviewExt>> GetFileStatus(Guid fileId)
         {
-            BrokerFileStatusOverview brokerFileStatusOverview = await _fileService.GetFileStatus(fileId);
-            return Accepted(brokerFileStatusOverview.MapToExternal());
+            var file = await _fileRepository.GetFileAsync(fileId);
+            return Ok(new FileStatusOverviewExt(){
+                FileId = fileId
+            });
         }
 
         [HttpGet]
         [Route("{fileId}/download")]
-        public async Task<Stream> DownloadFile(Guid fileId)
+        public async Task<ActionResult> DownloadFile(Guid fileId)
         {
-            await Task.Run(() => 1 == 1);
-            MemoryStream ms = new MemoryStream();
-            return ms;
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (string.IsNullOrWhiteSpace(file?.FileLocation))
+            {
+                return BadRequest("No file uploaded yet");
+            }
+            return Redirect(file.FileLocation);
         }
 
         [HttpPost]
         [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(Guid fileId)
         {
-            await Task.Run(() => 1 == 1);
-            return Accepted();
+            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
+            {
+                Actor = new Core.Domain.Actor()
+                {
+                    ActorExternalId = "0",
+                    ActorId = 0
+                },
+                Date = DateTime.UtcNow,
+                FileId = fileId,
+                Status = Core.Domain.Enums.ActorFileStatus.Downloaded
+            });
+            return Ok();
         }
     }
 }
