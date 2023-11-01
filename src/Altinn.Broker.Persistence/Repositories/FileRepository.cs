@@ -86,17 +86,18 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task AddFileAsync(File file)
+    public async Task<Guid> AddFileAsync(File file)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
+        var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
             "INSERT INTO broker.file (file_id_pk, external_file_reference, shipment_id_fk, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
             "VALUES (@fileId, @externalFileReference, @shipmentId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
             connection);
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
-        command.Parameters.AddWithValue("@fileId", file.FileId);
+        command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
         command.Parameters.AddWithValue("@shipmentId", file.ShipmentId);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
@@ -105,6 +106,7 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@storageReferenceId", storageReference);
 
         command.ExecuteNonQuery();
+        return fileId;
     }
 
     private async Task<long> AddFileStorageReferenceAsync(string fileLocation)
