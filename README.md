@@ -30,3 +30,8 @@ When running tests or when running locally, we use the Azurite storage emulator 
 
 The solution uses Flyway to run migrations. The migration scripts can be found in /src/Altinn.Broker.Persistence/Migrations. Script naming must follow the convention "V${four-digit-version-number}__${name}".
 If you need to re-initialize the database during local development, you can delete the database container and re-run docker compose.
+
+### Authorization
+
+For the time being, we have not implemented proper authorization. Any JWT token with a "sub" claim can be used (see jwt.io to make one).
+
