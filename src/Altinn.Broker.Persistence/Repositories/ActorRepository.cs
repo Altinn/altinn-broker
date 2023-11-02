@@ -40,17 +40,17 @@ public class ActorRepository : IActorRepository
         return actor;
     }
 
-    public async Task AddActorAsync(Actor actor)
+    public async Task<long> AddActorAsync(Actor actor)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         NpgsqlCommand command = new NpgsqlCommand(
-                    "INSERT INTO broker.actor (actor_id_pk, actor_external_id) " +
-                    "VALUES (@actorId, @actorExternalId)",
+                    "INSERT INTO broker.actor (actor_external_id) " +
+                    "VALUES (@actorExternalId) " +
+                    "RETURNING actor_id_pk",
                     connection);
 
-        command.Parameters.AddWithValue("@actorId", actor.ActorId);
         command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
-        command.ExecuteNonQuery();
+        return (long)command.ExecuteScalar()!;
     }
 }
