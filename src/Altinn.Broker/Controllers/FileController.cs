@@ -70,7 +70,8 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
             var file = await _fileRepository.GetFileAsync(fileId);
-            await _fileStore.UploadFile(Request.Body, fileId);
+            using var bodyStream = HttpContext.Request.BodyReader.AsStream(true);
+            await _fileStore.UploadFile(bodyStream, fileId);
             await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
             {
                 Actor = new Core.Domain.Actor()
@@ -82,7 +83,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Status = Core.Domain.Enums.ActorFileStatus.Uploaded
             });
-            return Ok();
+            return Ok(fileId);
         }
         
         /// <summary>
@@ -108,7 +109,7 @@ namespace Altinn.Broker.Controllers
                 FileLocation = "altinn3-blob"
             });
 
-            await _fileStore.UploadFile(Request.Body, fileId);
+            await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
             await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
             {
                 Actor = new Core.Domain.Actor()

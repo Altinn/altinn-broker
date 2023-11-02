@@ -108,8 +108,8 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
-        command.Parameters.AddWithValue("@lastStatusUpdate", file.LastStatusUpdate);
-        command.Parameters.AddWithValue("@uploaded", file.Uploaded);
+        command.Parameters.AddWithValue("@lastStatusUpdate", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@uploaded", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageReferenceId", storageReference);
 
         command.ExecuteNonQuery();
