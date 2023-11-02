@@ -33,14 +33,6 @@ CREATE TABLE broker.storage_reference (
     file_location character varying(600) NOT NULL
 );
 
-CREATE TABLE broker.file_metadata (
-    metadata_id_pk bigserial PRIMARY KEY,
-    file_id_fk uuid NOT NULL,
-    key character varying(50) NOT NULL,
-    value character varying(300) NOT NULL,
-    FOREIGN KEY (file_id_fk) REFERENCES broker.file (file_id_pk) ON DELETE CASCADE
-);
-
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
     external_file_reference character varying(500) NOT NULL,
@@ -50,6 +42,14 @@ CREATE TABLE broker.file (
     storage_reference_id_fk bigint NOT NULL,
     FOREIGN KEY (file_status_id_fk) REFERENCES broker.file_status (file_status_id_pk),
     FOREIGN KEY (storage_reference_id_fk) REFERENCES broker.storage_reference (storage_reference_id_pk)
+);
+
+CREATE TABLE broker.file_metadata (
+    metadata_id_pk bigserial PRIMARY KEY,
+    file_id_fk uuid NOT NULL,
+    key character varying(50) NOT NULL,
+    value character varying(300) NOT NULL,
+    FOREIGN KEY (file_id_fk) REFERENCES broker.file (file_id_pk) ON DELETE CASCADE
 );
 
 CREATE TABLE broker.actor_file_status_description (
