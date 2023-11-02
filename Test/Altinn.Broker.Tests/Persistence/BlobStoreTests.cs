@@ -22,9 +22,9 @@ public class BlobStoreTests
         await blobStore.UploadFile(fileStream, fileId);
 
         // Assert
-        var containerClient = new BlobContainerClient(options.Value.ConnectionString, fileId.ToString());
+        var containerClient = new BlobContainerClient(options.Value.ConnectionString, "files");
         await containerClient.CreateIfNotExistsAsync(publicAccessType: Azure.Storage.Blobs.Models.PublicAccessType.BlobContainer);
-        BlobClient blobClient = containerClient.GetBlobClient(fileReference);
+        BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
         Assert.True(blobClient.Exists());
     }
 }
