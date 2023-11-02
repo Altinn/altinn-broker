@@ -122,4 +122,9 @@ public class FileRepository : IFileRepository
             return (long)storageReferenceId;
         }
     }
+
+    public Task<List<string>> GetFilesAsync(string actorExernalReference)
+    {
+        throw new NotImplementedException();
+    }
 }

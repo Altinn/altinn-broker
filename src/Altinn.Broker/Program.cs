@@ -2,10 +2,19 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -35,6 +44,27 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
+
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = false,
+            ValidateLifetime = false,
+            RequireExpirationTime = false,
+            RequireSignedTokens = false,
+            SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+            {
+                var jwt = new JwtSecurityToken(token);
+
+                return jwt;
+            },
+        };
+    });
 }
 
 app.UseHttpsRedirection();
