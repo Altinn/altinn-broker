@@ -20,18 +20,17 @@ public class RepositoryTests
         {
             ConnectionString = DATABASE_CONNECTION_STRING
         });
-        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions); 
+        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions);
 
-        _fileRepository = new FileRepository(_databaseConnectionProvider);
         _actorRepository = new ActorRepository(_databaseConnectionProvider);
+        _fileRepository = new FileRepository(_databaseConnectionProvider, _actorRepository);
     }
 
     [Fact]
     public async Task AddFileStorageReference_WhenAddFile_ShouldBeCreated()
     {
         // Arrange
-        Guid fileId = Guid.NewGuid();
-        string fileLocation = "path/to/file" + fileId.ToString();
+        string fileLocation = "path/to/file";
 
         var senderActorId = new Random().Next(0, 10000000);
         await _actorRepository.AddActorAsync(new Actor()
@@ -42,9 +41,8 @@ public class RepositoryTests
 
 
         // Act
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
+        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            FileId = fileId,
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
             FileLocation = fileLocation,
@@ -62,24 +60,19 @@ public class RepositoryTests
     public async Task AddReceipt_WhenCalled_ShouldSaveReceipt()
     {
         // Arrange
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        var senderActorId = await _actorRepository.AddActorAsync(new Actor()
         {
-            ActorId = senderActorId,
             ActorExternalId = "1"
         });
 
-        var recipientActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        var recipientActorId = await _actorRepository.AddActorAsync(new Actor()
         {
-            ActorId = recipientActorId,
             ActorExternalId = "1"
         });
 
-        Guid fileId = Guid.NewGuid();
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
+        Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            FileId = fileId,
+            Sender = "1",
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
             Uploaded = DateTime.UtcNow,
@@ -120,10 +113,8 @@ public class RepositoryTests
             ActorExternalId = "1"
         });
 
-        Guid fileId = Guid.NewGuid();
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
+        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
         {
-            FileId = fileId,
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
             Uploaded = DateTime.UtcNow,
@@ -156,13 +147,12 @@ public class RepositoryTests
         // Arrange
         var actor = new Actor()
         {
-            ActorId = new Random().Next(0, 10000000),
             ActorExternalId = Guid.NewGuid().ToString()
         };
 
         // Act
-        await _actorRepository.AddActorAsync(actor);
-        var savedActor = await _actorRepository.GetActorAsync(actor.ActorId);
+        var actorId = await _actorRepository.AddActorAsync(actor);
+        var savedActor = await _actorRepository.GetActorAsync(actorId);
 
         // Assert
         Assert.Equal(actor.ActorExternalId, savedActor.ActorExternalId);

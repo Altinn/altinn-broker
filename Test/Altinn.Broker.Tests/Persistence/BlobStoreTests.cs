@@ -17,12 +17,12 @@ public class BlobStoreTests
 
         // Act
         FileStream fileStream = File.Open("../../../Persistence/data/test.txt", FileMode.Open);
-        string shipmentId = "testshipmentid";
+        var fileId = Guid.NewGuid();
         string fileReference = "test.txt";
-        await blobStore.UploadFile(fileStream, shipmentId, fileReference);
+        await blobStore.UploadFile(fileStream, fileId);
 
         // Assert
-        var containerClient = new BlobContainerClient(options.Value.ConnectionString, shipmentId);
+        var containerClient = new BlobContainerClient(options.Value.ConnectionString, fileId.ToString());
         await containerClient.CreateIfNotExistsAsync(publicAccessType: Azure.Storage.Blobs.Models.PublicAccessType.BlobContainer);
         BlobClient blobClient = containerClient.GetBlobClient(fileReference);
         Assert.True(blobClient.Exists());
