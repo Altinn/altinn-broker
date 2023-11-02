@@ -4,10 +4,9 @@ namespace Altinn.Broker.Models
 {
     public class RecipientFileStatusEventExt
     {
-        public string Recipient {get;set;} = string.Empty;
-        public Guid FileId {get;set;}
-        public RecipientFileStatusExt RecipientFileStatusCode {get;set;}
-        public string RecipientFileStatusText {get;set;} = string.Empty;
-        public DateTime RecipientFileStatusChanged {get;set;}
+        public string Recipient { get; set; } = string.Empty;
+        public RecipientFileStatusExt RecipientFileStatusCode { get; set; }
+        public string RecipientFileStatusText { get; set; } = string.Empty;
+        public DateTime RecipientFileStatusChanged { get; set; }
     }
 }

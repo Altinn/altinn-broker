@@ -10,13 +10,13 @@ namespace Altinn.Broker.Models
     /// </summary>
     public class FileStatusOverviewExt
     {
-        public Guid FileId {get;set;}
-        public string FileName {get;set;}=string.Empty;
-        public string SendersFileReference {get;set;}=string.Empty;
-        public string Checksum{get;set;}=string.Empty;
-        public FileStatusExt FileStatus {get;set;}
-        public string FileStatusText {get;set;} = string.Empty;
-        public DateTime FileStatusChanged{get;set;}
+        public Guid FileId { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string SendersFileReference { get; set; } = string.Empty;
+        public string Checksum{ get; set; } = string.Empty;
+        public FileStatusExt FileStatus { get; set; }
+        public string FileStatusText { get; set; } = string.Empty;
+        public DateTime FileStatusChanged { get; set; }
         
         /// <summary>
         /// Gets or sets the ResourceId for broker service
@@ -34,7 +34,7 @@ namespace Altinn.Broker.Models
         /// Gets or sets the recipients of the file
         /// </summary>
         [JsonPropertyName("recipients")]
-        public List<string> Recipients { get; set; } = new List<string>();
+        public List<RecipientFileStatusEventExt> Recipients { get; set; } = new List<RecipientFileStatusEventExt>();
         
         /// <summary>
         /// Gets or sets the properties field.

@@ -24,12 +24,6 @@ namespace Altinn.Broker.Models
         /// </summary>
         [JsonPropertyName("checksum")]
         public string Checksum{get;set;} = string.Empty;
-        
-        /// <summary>
-        /// Gets or sets the ResourceId for Broker Service
-        /// </summary>
-        [JsonPropertyName("brokerResourceId")]
-        public Guid BrokerResourceId { get; set; } = Guid.NewGuid();
 
         /// <summary>
         /// Gets or sets the sender of the broker file.

@@ -14,7 +14,6 @@ public class FileInitializeExtValidator : AbstractValidator<FileInitalizeExt>
             .Must(recipients => recipients?.Exists(a => string.IsNullOrEmpty(a)) == false)
             .WithMessage("Cannot provide empty recipient.");
 
-        RuleFor(file => file.BrokerResourceId).NotEmpty().WithMessage("ResoureceId must be defined for Request..");
         RuleFor(file => file.Sender).NotEmpty().WithMessage("Sender must be defined for Request.");
         RuleFor(file => file.SendersFileReference).NotEmpty();
     }
