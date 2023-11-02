@@ -33,5 +33,4 @@ If you need to re-initialize the database during local development, you can dele
 
 ### Authorization
 
-For the time being, we have not implemented proper authorization. Any JWT token with a "sub" claim can be used (see jwt.io to make one).
-
+For the time being, we have not implemented proper authorization. Any JWT token with a "sub" claim can be used (see jwt.io to make one). There is a dummy token in the Postman collection that can be used.
