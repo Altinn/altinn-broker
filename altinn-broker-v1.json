@@ -208,73 +208,155 @@
             }
         }
     },
-      "/broker/api/v1/file/{fileId}/download": {
-        "get": {
-          "tags": ["File"],
-          "summary": "Download a file.",
-          "description": "This endpoint allows for the downloading of a specified file.",
-          "operationId": "DownloadFile",
-          "parameters": [
-            {
-              "name": "fileId",
-              "in": "path",
-              "required": true,
-              "style": "simple",
-              "schema": {
-                "type": "string",
-                "format": "uuid"
-              }
+    "/broker/api/v1/file/{fileId}/download": {
+      "get": {
+        "tags": ["File"],
+        "summary": "Download a file.",
+        "description": "This endpoint allows for the downloading of a specified file.",
+        "operationId": "DownloadFile",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
-          ],
-          "responses": {
-            "200": {
-              "description": "Successfully downloaded the file.",
-              "content": {
-                "text/plain": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Stream"
-                  }
-                },
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Stream"
-                  }
-                },
-                "text/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Stream"
-                  }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully downloaded the file.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
                 }
               }
             }
           }
         }
-      },
-      "/broker/api/v1/file/{fileId}/confirmdownload": {
-        "post": {
-          "tags": ["File"],
-          "summary": "Confirm a file download.",
-          "description": "This endpoint confirms the successful download of a specified file.",
-          "operationId": "ConfirmDownload",
-          "parameters": [
-            {
-              "name": "fileId",
-              "in": "path",
-              "required": true,
-              "style": "simple",
-              "schema": {
-                "type": "string",
-                "format": "uuid"
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "Successfully confirmed the file download."
+      }
+    },
+    "/broker/api/v1/file/{fileId}/confirmdownload": {
+      "post": {
+        "tags": ["File"],
+        "summary": "Confirm a file download.",
+        "description": "This endpoint confirms the successful download of a specified file.",
+        "operationId": "ConfirmDownload",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully confirmed the file download."
+          }
         }
-      },
+      }
+    },
+    "/broker/api/v1/file/{fileId}": {
+      "get": {
+          "tags": [
+              "File"
+          ],
+          "parameters": [
+              {
+                  "name": "fileId",
+                  "in": "path",
+                  "required": true,
+                  "style": "simple",
+                  "schema": {
+                      "type": "string",
+                      "format": "uuid"
+                  }
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Success",
+                  "content": {
+                      "text/plain": {
+                          "schema": {
+                              "$ref": "#/components/schemas/FileOverviewExt"
+                          }
+                      },
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/FileOverviewExt"
+                          }
+                      },
+                      "text/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/FileOverviewExt"
+                          }
+                      }
+                  }
+              }
+          }
+      }
+    },
+    "/broker/api/v1/file/{fileId}/details": {
+        "get": {
+            "tags": [
+                "File"
+            ],
+            "parameters": [
+                {
+                    "name": "fileId",
+                    "in": "path",
+                    "required": true,
+                    "style": "simple",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "text/plain": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                            }
+                        },
+                        "text/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
       "/health": {
         "get": {
           "tags": ["Health"],
@@ -446,6 +528,133 @@
             }
           },
           "additionalProperties": false
+          },
+          "FileStatusDetailsExt": {
+            "type": "object",
+            "properties": {
+                "fileId": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "fileName": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "sendersFileReference": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "checksum": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "fileStatus": {
+                    "$ref": "#/components/schemas/FileStatusExt"
+                },
+                "fileStatusText": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "fileStatusChanged": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "sender": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "recipients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                    },
+                    "nullable": true
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "nullable": true
+                },
+                "fileStatusHistory": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/components/schemas/FileStatusEventExt"
+                    },
+                    "nullable": true
+                },
+                "recipientFileStatusHistory": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                    },
+                    "nullable": true
+                }
+            },
+            "additionalProperties": false
+        },
+        "FileStatusEventExt": {
+            "type": "object",
+            "properties": {
+                "fileStatus": {
+                    "$ref": "#/components/schemas/FileStatusExt"
+                },
+                "fileStatusText": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "fileStatusChanged": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "additionalProperties": false
+        },
+        "FileStatusExt": {
+            "enum": [
+                "Initialized",
+                "UploadInProgress",
+                "AwaitingUploadProcessing",
+                "UploadedAndProcessed",
+                "Published",
+                "Cancelled",
+                "AllConfirmedDownloaded",
+                "Deleted",
+                "Failed"
+            ],
+            "type": "string"
+        },
+        "RecipientFileStatusEventExt": {
+            "type": "object",
+            "properties": {
+                "recipient": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "recipientFileStatusCode": {
+                    "$ref": "#/components/schemas/RecipientFileStatusExt"
+                },
+                "recipientFileStatusText": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "recipientFileStatusChanged": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "additionalProperties": false
+        },
+        "RecipientFileStatusExt": {
+            "enum": [
+                "Initialized",
+                "Published",
+                "Downloaded",
+                "ConfirmDownloaded",
+                "Cancelled"
+            ],
+            "type": "string"
         },
         "Stream": {
           "type": "object",
