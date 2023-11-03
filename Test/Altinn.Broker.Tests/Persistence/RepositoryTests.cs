@@ -48,7 +48,7 @@ public class RepositoryTests
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
             LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
+            ActorEvents = new List<ActorFileStatus>(),
         });
 
         // Assert
@@ -78,11 +78,11 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
+            ActorEvents = new List<ActorFileStatus>(),
         });
 
         // Act
-        await _fileRepository.AddReceiptAsync(new FileReceipt()
+        await _fileRepository.AddReceiptAsync(new ActorFileStatus()
         {
             Actor = new Actor()
             {
@@ -97,9 +97,9 @@ public class RepositoryTests
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
-        Assert.NotEmpty(savedFile.Receipts);
-        Assert.Equal(1, savedFile.Receipts.Count);
-        Assert.Equal(Core.Domain.Enums.ActorFileStatus.Uploaded, savedFile.Receipts.First().Status);
+        Assert.NotEmpty(savedFile.ActorEvents);
+        Assert.Equal(1, savedFile.ActorEvents.Count);
+        Assert.Equal(Core.Domain.Enums.ActorFileStatus.Uploaded, savedFile.ActorEvents.First().Status);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
+            ActorEvents = new List<ActorFileStatus>(),
         });
 
         // Act
@@ -152,9 +152,9 @@ public class RepositoryTests
 
         // Act
         var actorId = await _actorRepository.AddActorAsync(actor);
-        var savedActor = await _actorRepository.GetActorAsync(actorId);
+        var savedActor = await _actorRepository.GetActorAsync(actor.ActorExternalId);
 
         // Assert
-        Assert.Equal(actor.ActorExternalId, savedActor.ActorExternalId);
+        Assert.Equal(savedActor.ActorId, actorId);
     }
 }
