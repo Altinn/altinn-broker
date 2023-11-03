@@ -35,6 +35,7 @@ CREATE TABLE broker.storage_reference (
 
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
+    sender_actor_id_fk bigserial,
     external_file_reference character varying(500) NOT NULL,
     file_status_description_id_fk integer NOT NULL,
     last_status_update timestamp without time zone,
@@ -67,16 +68,17 @@ CREATE TABLE broker.actor_file_status_description (
 );
 
 CREATE TABLE broker.actor_file_status (
-    actor_id_fk_pk bigint NOT NULL,
-    file_id_fk_pk uuid NOT NULL,
+    actor_file_status_id_pk bigserial PRIMARY KEY,
+    actor_id_fk bigint NOT NULL,
+    file_id_fk uuid NOT NULL,
     actor_file_status_id_fk integer NOT NULL,
     actor_file_status_date timestamp without time zone NOT NULL,
-    PRIMARY KEY (actor_id_fk_pk, file_id_fk_pk),
-    FOREIGN KEY (actor_id_fk_pk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
+    FOREIGN KEY (actor_id_fk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
     FOREIGN KEY (actor_file_status_id_fk) REFERENCES broker.actor_file_status_description (actor_file_status_id_pk),
-    FOREIGN KEY (file_id_fk_pk) REFERENCES broker.file (file_id_pk)
+    FOREIGN KEY (file_id_fk) REFERENCES broker.file (file_id_pk)
 );
 
 -- Create indexes
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
-CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk)
+CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
+CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);

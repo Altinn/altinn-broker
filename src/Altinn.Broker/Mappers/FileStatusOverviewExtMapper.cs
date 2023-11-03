@@ -8,7 +8,7 @@ namespace Altinn.Broker.Mappers;
 
 public static class FileStatusOverviewExtMapper
 {
-    public static FileOverviewExt MapToExternalModel(Core.Domain.File file)
+    public static FileOverviewExt MapToExternalModel(FileEntity file)
     {
         return new FileOverviewExt()
         {
@@ -50,14 +50,14 @@ public static class FileStatusOverviewExtMapper
         };
     }
 
-    public static List<FileStatusEventExt> MapToFileStatusHistoryExt(List<Core.Domain.FileStatusEntity> fileHistory) => fileHistory.Select(entity => new FileStatusEventExt()
+    public static List<FileStatusEventExt> MapToFileStatusHistoryExt(List<FileStatusEntity> fileHistory) => fileHistory.Select(entity => new FileStatusEventExt()
     {
         FileStatus = MapToExternalEnum(entity.Status),
         FileStatusChanged = entity.Date,
         FileStatusText = MapToFileStatusText(entity.Status)
     }).ToList();
 
-    public static List<RecipientFileStatusEventExt> MapToRecipients(List<Core.Domain.ActorFileStatus> fileReceipts)
+    public static List<RecipientFileStatusEventExt> MapToRecipients(List<Altinn.Broker.Core.Domain.ActorFileStatusEntity> fileReceipts)
     {
         var lastStatusForEveryRecipient = fileReceipts
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
@@ -73,24 +73,24 @@ public static class FileStatusOverviewExtMapper
         }).ToList();
     }
 
-    private static RecipientFileStatusExt MapToExternalRecipientStatus(Core.Domain.Enums.ActorFileStatus actorFileStatus) 
+    private static RecipientFileStatusExt MapToExternalRecipientStatus(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus) 
     {    
         return actorFileStatus switch {
-            Core.Domain.Enums.ActorFileStatus.None => RecipientFileStatusExt.Initialized,
-            Core.Domain.Enums.ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
-            Core.Domain.Enums.ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,
-            Core.Domain.Enums.ActorFileStatus.Downloaded => RecipientFileStatusExt.ConfirmDownloaded
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.None => RecipientFileStatusExt.Initialized,
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Downloaded => RecipientFileStatusExt.ConfirmDownloaded
         };
     }
 
-    private static string MapToRecipientStatusText(Core.Domain.Enums.ActorFileStatus actorFileStatus)
+    private static string MapToRecipientStatusText(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            Core.Domain.Enums.ActorFileStatus.None => "Unknown",
-            Core.Domain.Enums.ActorFileStatus.Initialized => "Waiting for file to be uploaded",
-            Core.Domain.Enums.ActorFileStatus.Uploaded => "Sender has uploaded file",
-            Core.Domain.Enums.ActorFileStatus.Downloaded => "Recipient has downloaded file"
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.None => "Unknown",
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized => "Initialized",
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Uploaded => "Sender has uploaded file",
+            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Downloaded => "Recipient has downloaded file"
         };
 
     }

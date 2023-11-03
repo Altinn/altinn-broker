@@ -14,7 +14,7 @@ public class ActorRepository : IActorRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<Actor?> GetActorAsync(string actorExternalId)
+    public async Task<ActorEntity?> GetActorAsync(string actorExternalId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -26,11 +26,11 @@ public class ActorRepository : IActorRepository
 
         using NpgsqlDataReader reader = command.ExecuteReader();
 
-        Actor? actor = null;
+        ActorEntity? actor = null;
 
         while (reader.Read())
         {
-            actor = new Actor
+            actor = new ActorEntity
             {
                 ActorId = reader.GetInt32(reader.GetOrdinal("actor_id_pk")),
                 ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
@@ -40,7 +40,7 @@ public class ActorRepository : IActorRepository
         return actor;
     }
 
-    public async Task<long> AddActorAsync(Actor actor)
+    public async Task<long> AddActorAsync(ActorEntity actor)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 

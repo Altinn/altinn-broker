@@ -3,21 +3,20 @@
 
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
-using Altinn.Broker.Validators;
 
 public static class FileInitializeExtMapper {
 
-    public static Altinn.Broker.Core.Domain.File MapToDomain(FileInitalizeExt initializeExt, string caller) 
+    public static FileEntity MapToDomain(FileInitalizeExt initializeExt, string caller) 
     {
-        return new Altinn.Broker.Core.Domain.File(){
+        return new FileEntity(){
             FileId = Guid.Empty,
             Filename = initializeExt.FileName,
             ExternalFileReference = initializeExt.SendersFileReference,
             Checksum = initializeExt.Checksum,
             Sender = caller,
-            ActorEvents = initializeExt.Recipients.Select(recipient => new ActorFileStatus(){
+            ActorEvents = initializeExt.Recipients.Select(recipient => new ActorFileStatusEntity(){
                 FileId = Guid.Empty,
-                Actor = new Actor(){
+                Actor = new ActorEntity(){
                     ActorExternalId = recipient,
                     ActorId = 0
                 }

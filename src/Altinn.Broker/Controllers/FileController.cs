@@ -132,8 +132,8 @@ namespace Altinn.Broker.Controllers
                 return NotFound();
             }
 
-            var fileHistory = _fileRepository.GetFileStatusHistory(fileId);
-            var recipientHistory = _fileRepository.GetFileRecipientStatusHistory(fileId);
+            var fileHistory = await _fileRepository.GetFileStatusHistoryAsync(fileId);
+            var recipientHistory = await _fileRepository.GetFileRecipientStatusHistoryAsync(fileId);
 
             var fileOverview = FileStatusOverviewExtMapper.MapToExternalModel(file);
             return new FileStatusDetailsExt()

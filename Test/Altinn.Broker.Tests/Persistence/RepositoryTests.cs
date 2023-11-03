@@ -33,7 +33,7 @@ public class RepositoryTests
         string fileLocation = "path/to/file";
 
         var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        await _actorRepository.AddActorAsync(new ActorEntity()
         {
             ActorId = senderActorId,
             ActorExternalId = "1"
@@ -41,14 +41,14 @@ public class RepositoryTests
 
 
         // Act
-        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
+        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatus>(),
+            ActorEvents = new List<ActorFileStatusEntity>(),
         });
 
         // Assert
@@ -60,17 +60,17 @@ public class RepositoryTests
     public async Task AddReceipt_WhenCalled_ShouldSaveReceipt()
     {
         // Arrange
-        var senderActorId = await _actorRepository.AddActorAsync(new Actor()
+        var senderActorId = await _actorRepository.AddActorAsync(new ActorEntity()
         {
             ActorExternalId = "1"
         });
 
-        var recipientActorId = await _actorRepository.AddActorAsync(new Actor()
+        var recipientActorId = await _actorRepository.AddActorAsync(new ActorEntity()
         {
             ActorExternalId = "1"
         });
 
-        Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
+        Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             Sender = "1",
             ExternalFileReference = "1",
@@ -78,13 +78,13 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatus>(),
+            ActorEvents = new List<ActorFileStatusEntity>(),
         });
 
         // Act
-        await _fileRepository.AddReceiptAsync(new ActorFileStatus()
+        await _fileRepository.AddReceiptAsync(new ActorFileStatusEntity()
         {
-            Actor = new Actor()
+            Actor = new ActorEntity()
             {
                 ActorId = recipientActorId,
                 ActorExternalId = "1",
@@ -107,20 +107,20 @@ public class RepositoryTests
     {
         // Arrange
         var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        await _actorRepository.AddActorAsync(new ActorEntity()
         {
             ActorId = senderActorId,
             ActorExternalId = "1"
         });
 
-        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
+        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Ready,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatus>(),
+            ActorEvents = new List<ActorFileStatusEntity>(),
         });
 
         // Act
@@ -145,7 +145,7 @@ public class RepositoryTests
     public async Task SaveActor_Successful_CanRetrieveActor()
     {
         // Arrange
-        var actor = new Actor()
+        var actor = new ActorEntity()
         {
             ActorExternalId = Guid.NewGuid().ToString()
         };
