@@ -406,62 +406,43 @@
             "uploadProtocol": {
             "$ref": "#/components/schemas/UploadProtocolType"
             },
-            "filename": {
-              "x-comment-Erik-2023-10-26-22:41": "Reference to FilenameType schema",
-              "$ref": "#/components/schemas/FilenameType"
-            },
-            "sendersFileReference": {
-              "type": "string",
-              "description": "A unique reference ID provided by the sender.",
-              "nullable": true
-            },
-            "checksum": {
-              "type": "string",
-              "description": "Checksum value for verifying the file's integrity.",
-              "nullable": true
-            },
-            "brokerResourceId": {
-              "type": "string",
-              "description": "Unique resource ID assigned by the broker.",
-              "format": "uuid"
-            },
-            "sender": {
-              "type": "string",
-              "description": "The entity or individual sending the file.",
-              "nullable": true
-            },
-            "recipients": {
-              "type": "array",
-              "description": "List of intended recipients for the file.",
-              "items": {
-                "type": "string"
+              "filename": {
+                  "x-comment-Erik-2023-10-26-22:41": "Reference to FilenameType schema",
+                  "$ref": "#/components/schemas/FilenameType"
               },
-              "nullable": true
-            },
-            "metadata": {
-              "type": "object",
-              "description": "Additional metadata associated with the file.",
-              "additionalProperties": {
-                "type": "string"
+              "sendersFileReference": {
+                  "type": "string",
+                  "description": "A unique reference ID provided by the sender.",
+                  "nullable": true
               },
-              "nullable": true
-            }
+              "checksum": {
+                  "type": "string",
+                  "description": "Checksum value for verifying the file's integrity.",
+                  "nullable": true
+              },
+              "sender": {
+                  "type": "string",
+                  "description": "The entity or individual sending the file.",
+                  "nullable": true
+              },
+              "recipients": {
+                  "type": "array",
+                  "description": "List of intended recipients for the file.",
+                  "items": {
+                      "type": "string"
+                  },
+                  "nullable": true
+              },
+              "metadata": {
+                  "type": "object",
+                  "description": "Additional metadata associated with the file.",
+                  "additionalProperties": {
+                      "type": "string"
+                  },
+                  "nullable": true
+              }
           },
           "additionalProperties": false
-        },
-        "FileStatusExt": {
-          "enum": [
-              "Initialized",
-              "UploadInProgress",
-              "AwaitingUploadProcessing",
-              "UploadedAndProcessed",
-              "Published",
-              "Cancelled",
-              "AllConfirmedDownloaded",
-              "Deleted",
-              "Failed"
-          ],
-          "type": "string"
         },
         "FileStatusOverviewExt": {
           "type": "object",
@@ -500,36 +481,31 @@
               "description": "Timestamp indicating the last change in file status.",
               "format": "date-time"
             },
-            "brokerResourceId": {
-              "type": "string",
-              "description": "Resource ID assigned by the broker.",
-              "format": "uuid"
+                "sender": {
+                    "type": "string",
+                    "description": "Entity or individual sending the file.",
+                    "nullable": true
+                },
+                "recipients": {
+                    "type": "array",
+                    "description": "List of recipients for the file.",
+                    "items": {
+                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                    },
+                    "nullable": true
+                },
+                "metadata": {
+                    "type": "object",
+                    "description": "Metadata associated with the file.",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "nullable": true
+                }
             },
-            "sender": {
-              "type": "string",
-              "description": "Entity or individual sending the file.",
-              "nullable": true
-            },
-            "recipients": {
-              "type": "array",
-              "description": "List of recipients for the file.",
-              "items": {
-                "type": "string"
-              },
-              "nullable": true
-            },
-            "metadata": {
-              "type": "object",
-              "description": "Metadata associated with the file.",
-              "additionalProperties": {
-                "type": "string"
-              },
-              "nullable": true
-            }
-          },
-          "additionalProperties": false
-          },
-          "FileStatusDetailsExt": {
+            "additionalProperties": false
+        },
+        "FileStatusDetailsExt": {
             "type": "object",
             "properties": {
                 "fileId": {
