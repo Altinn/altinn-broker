@@ -40,17 +40,17 @@ public class FileRepository : IFileRepository
             {
                 FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
                 ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
-                FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_id_fk")),
+                FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                 LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
                 Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
                 FileLocation = reader.GetString(reader.GetOrdinal("file_location"))
             };
             if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk_pk")))
             {
-                var receipts = new List<FileReceipt>();
+                var receipts = new List<Core.Domain.ActorFileStatus>();
                 do
                 {
-                    receipts.Add(new FileReceipt()
+                    receipts.Add(new Core.Domain.ActorFileStatus()
                     {
                         FileId = fileId,
                         Actor = new Actor()
@@ -58,11 +58,11 @@ public class FileRepository : IFileRepository
                             ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk_pk")),
                             ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
                         },
-                        Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
+                        Status = (Core.Domain.Enums.ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
                         Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date"))
                     });
                 } while (reader.Read());
-                file.Receipts = receipts;
+                file.ActorEvents = receipts;
             }
             return file;
         }
@@ -72,7 +72,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task AddReceiptAsync(FileReceipt receipt)
+    public async Task AddReceiptAsync(Core.Domain.ActorFileStatus receipt)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -100,7 +100,7 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, external_file_reference, file_status_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
+            "INSERT INTO broker.file (file_id_pk, external_file_reference, file_status_description_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
             "VALUES (@fileId, @externalFileReference, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
             connection);
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
@@ -126,13 +126,57 @@ public class FileRepository : IFileRepository
             "VALUES (DEFAULT, @fileLocation) " +
             "RETURNING storage_reference_id_pk", connection))
         {
-            command.Parameters.AddWithValue("@fileLocation", fileLocation);
+            command.Parameters.AddWithValue("@fileLocation", fileLocation ?? "altinn-3-blob");
             storageReferenceId = (long)command.ExecuteScalar();
             return (long)storageReferenceId;
         }
     }
 
-    public Task<List<string>> GetFilesAsync(string actorExernalReference)
+    public Task<List<string>> GetFilesAvailableForCaller(string actorExernalReference)
+    {
+        throw new NotImplementedException();
+    }
+
+    public async Task AddReceipt(Guid fileId, Core.Domain.Enums.ActorFileStatus status, string actorExternalReference)
+    {
+        var connection = await _connectionProvider.GetConnectionAsync();
+
+        var actor = await _actorRepository.GetActorAsync(actorExternalReference);
+        long actorId = 0;
+        if (actor is null)
+        {
+            actorId = await _actorRepository.AddActorAsync(new Actor()
+            {
+                ActorExternalId = actorExternalReference
+            });
+        } else
+        {
+            actorId = actor.ActorId;
+        }
+
+        using (var command = new NpgsqlCommand(
+            "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " +
+            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())", connection))
+        {
+            command.Parameters.AddWithValue("@actorId", actorId);
+            command.Parameters.AddWithValue("@fileId", fileId);
+            command.Parameters.AddWithValue("@actorFileStatusId", (int)status);
+            var commandText = command.CommandText;
+            command.ExecuteNonQuery();
+        }
+    }
+
+    public Task SetStorageReference(Guid fileId, string storageReference)
+    {
+        throw new NotImplementedException();
+    }
+
+    public List<FileStatusEntity> GetFileStatusHistory(Guid fileId)
+    {
+        throw new NotImplementedException();
+    }
+
+    public List<Core.Domain.ActorFileStatus> GetFileRecipientStatusHistory(Guid fileId)
     {
         throw new NotImplementedException();
     }

@@ -45,6 +45,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
 
+    services.AddHttpClient();
+
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;

@@ -14,15 +14,15 @@ public class ActorRepository : IActorRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<Actor?> GetActorAsync(long actorId)
+    public async Task<Actor?> GetActorAsync(string actorExternalId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
-            "SELECT * FROM broker.actor WHERE actor_id_pk = @actorId",
+            "SELECT * FROM broker.actor WHERE actor_external_id = @actorExternalId",
             connection);
 
-        command.Parameters.AddWithValue("@actorId", actorId);
+        command.Parameters.AddWithValue("@actorExternalId", actorExternalId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
 

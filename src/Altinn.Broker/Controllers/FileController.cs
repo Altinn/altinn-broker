@@ -1,5 +1,7 @@
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 using Altinn.Broker.Persistence;
 
@@ -16,11 +18,13 @@ namespace Altinn.Broker.Controllers
     {
         private readonly IFileRepository _fileRepository;
         private readonly IFileStore _fileStore;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public FileController(IFileRepository fileRepository, IFileStore fileStore)
+        public FileController(IFileRepository fileRepository, IFileStore fileStore, IHttpClientFactory httpClientFactory)
         {
             _fileRepository = fileRepository;
             _fileStore = fileStore;
+            _httpClientFactory = httpClientFactory;
         }
 
         /// <summary>
@@ -28,29 +32,17 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initalizeExt)
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt)
         {
             var caller = GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))
             {
                 return Unauthorized();
             }
-            var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
-            {
-                ExternalFileReference = initalizeExt.SendersFileReference,
-                FileStatus = Core.Domain.Enums.FileStatus.Initialized,
-                FileLocation = "altinn3-blob",
-                LastStatusUpdate = DateTimeOffset.UtcNow,
-                Receipts = new List<Core.Domain.FileReceipt>(),
-            });
 
-            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt(){
-                FileId = fileId,
-                Status = Core.Domain.Enums.ActorFileStatus.Initialized,
-                Actor = new Core.Domain.Actor(){
-                    ActorExternalId = caller ?? "default"
-                }
-            });
+            var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
+            var fileId = await _fileRepository.AddFileAsync(file);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Initialized, caller);
 
             return Ok(fileId);
         }
@@ -70,19 +62,15 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
             var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return BadRequest();
+            }
+
             using var bodyStream = HttpContext.Request.BodyReader.AsStream(true);
             await _fileStore.UploadFile(bodyStream, fileId);
-            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
-            {
-                Actor = new Core.Domain.Actor()
-                {
-                    ActorExternalId = caller ?? "default",
-                    ActorId = 0
-                },
-                Date = DateTime.UtcNow,
-                FileId = fileId,
-                Status = Core.Domain.Enums.ActorFileStatus.Uploaded
-            });
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, caller);
+
             return Ok(fileId);
         }
         
@@ -102,44 +90,67 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
-            var fileId = await _fileRepository.AddFileAsync(new Core.Domain.File()
-            {
-                ExternalFileReference = form.Metadata.SendersFileReference,
-                FileStatus = Core.Domain.Enums.FileStatus.Initialized,
-                FileLocation = "altinn3-blob"
-            });
 
+            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
+            var fileId = await _fileRepository.AddFileAsync(file);
             await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
-            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
-            {
-                Actor = new Core.Domain.Actor()
-                {
-                    ActorExternalId = caller ?? "default",
-                    ActorId = 0
-                },
-                Date = DateTime.UtcNow,
-                FileId = fileId,
-                Status = Core.Domain.Enums.ActorFileStatus.Uploaded
-            });
-            return Ok();
+            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, caller);
+
+            return Ok(fileId);
         }
 
+        /// <summary>
+        /// Initialize and upload a file using form-data
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        public async Task<ActionResult<FileStatusOverviewExt>> GetFileStatus(Guid fileId)
+        public async Task<ActionResult<FileOverviewExt>> GetFileOverview(Guid fileId)
         {
             var file = await _fileRepository.GetFileAsync(fileId);
-            return Ok(new FileStatusOverviewExt(){
-                FileId = fileId
-            });
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(FileStatusOverviewExtMapper.MapToExternalModel(file));
         }
 
         [HttpGet]
         [Route("{fileId}/details")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
         {
-            var fileHistory = _fileRepository.GetFileAsync(fileId);
-            throw new NotImplementedException();
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            var fileHistory = _fileRepository.GetFileStatusHistory(fileId);
+            var recipientHistory = _fileRepository.GetFileRecipientStatusHistory(fileId);
+
+            var fileOverview = FileStatusOverviewExtMapper.MapToExternalModel(file);
+            return new FileStatusDetailsExt()
+            {
+                Checksum = fileOverview.Checksum,
+                FileId = fileId,
+                FileName = fileOverview.FileName,
+                Sender = fileOverview.Sender,
+                FileStatus = fileOverview.FileStatus,
+                FileStatusChanged = fileOverview.FileStatusChanged,
+                FileStatusText = fileOverview.FileStatusText,
+                Metadata = fileOverview.Metadata,
+                Recipients = fileOverview.Recipients,
+                SendersFileReference = fileOverview.SendersFileReference,
+                FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
+                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipients(recipientHistory)
+            };
         }
 
         [HttpGet]
@@ -150,20 +161,32 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
-            var files = _fileRepository.GetFilesAsync(caller);
+
+            var files = _fileRepository.GetFilesAvailableForCaller(caller);
+            
             return Ok(files);
         }
 
         [HttpGet]
         [Route("{fileId}/download")]
-        public async Task<ActionResult> DownloadFile(Guid fileId)
+        public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
         {
             var file = await _fileRepository.GetFileAsync(fileId);
             if (string.IsNullOrWhiteSpace(file?.FileLocation))
             {
                 return BadRequest("No file uploaded yet");
             }
-            return Redirect(file.FileLocation);
+
+            var client = _httpClientFactory.CreateClient();
+            var response = await client.GetAsync(file.FileLocation);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode(502, "File could not be accessed at the location.");
+            }
+            var stream = await response.Content.ReadAsStreamAsync();
+            var contentType = response.Content.Headers.ContentType.ToString();
+            
+            return File(stream, contentType, file.Filename);
         }
 
         [HttpPost]
@@ -175,17 +198,9 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
-            await _fileRepository.AddReceiptAsync(new Core.Domain.FileReceipt()
-            {
-                Actor = new Core.Domain.Actor()
-                {
-                    ActorExternalId = caller ?? "default",
-                    ActorId = 0
-                },
-                Date = DateTime.UtcNow,
-                FileId = fileId,
-                Status = Core.Domain.Enums.ActorFileStatus.Downloaded
-            });
+
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Downloaded, caller);
+
             return Ok();
         }
 

@@ -5,5 +5,5 @@ namespace Altinn.Broker.Core.Repositories;
 public interface IActorRepository
 {
     Task<long> AddActorAsync(Actor actor);
-    Task<Actor?> GetActorAsync(long actorId);
+    Task<Actor?> GetActorAsync(string actorReference);
 }
