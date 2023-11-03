@@ -28,12 +28,17 @@ public static class FileStatusOverviewExtMapper
     public static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
     {
         return domainEnum switch {
-            FileStatus.None => FileStatusExt.Initialized,
             FileStatus.Initialized => FileStatusExt.Initialized,
-            FileStatus.Processing => FileStatusExt.AwaitingUploadProcessing,
-            FileStatus.Ready => FileStatusExt.Initialized,
-            FileStatus.Failed => FileStatusExt.Failed,
+            FileStatus.AwaitingUpload => FileStatusExt.Initialized,
+            FileStatus.UploadInProgress => FileStatusExt.UploadInProgress,
+            FileStatus.AwaitingUploadProcessing => FileStatusExt.AwaitingUploadProcessing,
+            FileStatus.UploadedAndProcessed => FileStatusExt.UploadedAndProcessed,
+            FileStatus.Published => FileStatusExt.Published,
+            FileStatus.Cancelled => FileStatusExt.Cancelled,
+            FileStatus.Downloaded => FileStatusExt.Published,
+            FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
             FileStatus.Deleted => FileStatusExt.Deleted,
+            FileStatus.Failed => FileStatusExt.Failed
         };
     }
 
@@ -41,12 +46,17 @@ public static class FileStatusOverviewExtMapper
     {
         return domainEnum switch
         {
-            FileStatus.None => "Ready for upload",
             FileStatus.Initialized => "Ready for upload",
-            FileStatus.Processing => "Processing upload",
-            FileStatus.Ready => "Ready for download",
-            FileStatus.Failed => "Upload failed",
-            FileStatus.Deleted => "File has been deleted"
+            FileStatus.AwaitingUpload => "Ready for upload",
+            FileStatus.UploadInProgress => "Uploading",
+            FileStatus.AwaitingUploadProcessing => "Processing upload",
+            FileStatus.UploadedAndProcessed => "Processing upload",
+            FileStatus.Published => "Ready for download",
+            FileStatus.Cancelled => "File cancelled",
+            FileStatus.Downloaded => "Ready for download",
+            FileStatus.AllConfirmedDownloaded => "All downloaded",
+            FileStatus.Deleted => "File has been deleted",
+            FileStatus.Failed => "Upload failed"
         };
     }
 
