@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
@@ -32,23 +33,27 @@ public class RepositoryTests
         // Arrange
         string fileLocation = "path/to/file";
 
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new ActorEntity()
-        {
-            ActorId = senderActorId,
-            ActorExternalId = "1"
-        });
-
 
         // Act
-        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
+        var fileId = await _fileRepository.AddFileAsync(new FileEntity()
         {
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
+            Sender = "1",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatusEntity>(),
+            ActorEvents = new List<ActorFileStatusEntity>()
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                }
+            }
         });
 
         // Assert
@@ -60,16 +65,6 @@ public class RepositoryTests
     public async Task AddReceipt_WhenCalled_ShouldSaveReceipt()
     {
         // Arrange
-        var senderActorId = await _actorRepository.AddActorAsync(new ActorEntity()
-        {
-            ActorExternalId = "1"
-        });
-
-        var recipientActorId = await _actorRepository.AddActorAsync(new ActorEntity()
-        {
-            ActorExternalId = "1"
-        });
-
         Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             Sender = "1",
@@ -78,7 +73,17 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatusEntity>(),
+            ActorEvents = new List<ActorFileStatusEntity>()
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                }
+            }
         });
 
         // Act
@@ -86,8 +91,7 @@ public class RepositoryTests
         {
             Actor = new ActorEntity()
             {
-                ActorId = recipientActorId,
-                ActorExternalId = "1",
+                ActorExternalId = "1"
             },
             Date = DateTime.UtcNow,
             FileId = fileId,
@@ -98,29 +102,32 @@ public class RepositoryTests
         var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
         Assert.NotEmpty(savedFile.ActorEvents);
-        Assert.Equal(1, savedFile.ActorEvents.Count);
-        Assert.Equal(Core.Domain.Enums.ActorFileStatus.Uploaded, savedFile.ActorEvents.First().Status);
+        Assert.Equal(3, savedFile.ActorEvents.Count);
     }
 
     [Fact]
     public async Task GetFile_ExistingFileId_ShouldReturnFile()
     {
         // Arrange
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new ActorEntity()
-        {
-            ActorId = senderActorId,
-            ActorExternalId = "1"
-        });
-
         var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             ExternalFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
+            Sender = "altinn",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatusEntity>(),
+            ActorEvents = new List<ActorFileStatusEntity>() 
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                } 
+            }
         });
 
         // Act

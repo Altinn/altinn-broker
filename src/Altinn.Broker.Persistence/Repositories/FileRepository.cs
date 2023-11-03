@@ -21,16 +21,16 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
-            "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date " + 
+            "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date, sender.actor_external_id " + 
             "FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
-            "WHERE file_id_pk = @fileId and afs.actor_id_fk != sender_actor_id_fk",
+            "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
+            "WHERE file_id_pk = @fileId ",
             connection);
 
         command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@uploadStatus", (int)ActorFileStatus.Uploaded);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
 
@@ -44,11 +44,12 @@ public class FileRepository : IFileRepository
                 FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                 LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
                 Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
-                FileLocation = reader.GetString(reader.GetOrdinal("file_location"))
+                FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
+                Sender = reader.GetString(reader.GetOrdinal("actor_external_id"))
             };
+            var receipts = new List<ActorFileStatusEntity>();
             if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk")))
             {
-                var receipts = new List<ActorFileStatusEntity>();
                 do
                 {
                     receipts.Add(new ActorFileStatusEntity()
@@ -63,8 +64,8 @@ public class FileRepository : IFileRepository
                         Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date"))
                     });
                 } while (reader.Read());
-                file.ActorEvents = receipts;
             }
+            file.ActorEvents = receipts;
             return file;
         }
         else
@@ -84,7 +85,7 @@ public class FileRepository : IFileRepository
         }
 
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.actor_file_status (actor_id_fk_pk, file_id_fk_pk, actor_file_status_id_fk, actor_file_status_date) " +
+            "INSERT INTO broker.actor_file_status (actor_id_fk, file_id_fk, actor_file_status_id_fk, actor_file_status_date) " +
             "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())", connection))
         {
             command.Parameters.AddWithValue("@actorId", actorId);
@@ -128,19 +129,18 @@ public class FileRepository : IFileRepository
 
         command.ExecuteNonQuery();
 
-        var recipients = file.ActorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender);
-        var addRecipientTasks = file.ActorEvents.Select(actorEvent => AddReceipt(fileId, ActorFileStatus.Initialized, actorEvent.Actor.ActorExternalId));
+        var addActorTasks = file.ActorEvents.Select(actorEvent => AddReceipt(fileId, ActorFileStatus.Initialized, actorEvent.Actor.ActorExternalId));
 
         try
         {
-            await Task.WhenAll(addRecipientTasks);
+            await Task.WhenAll(addActorTasks);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"An error occurred: {ex.Message}");
         }
 
-        if (addRecipientTasks.Any(t => t.IsFaulted))
+        if (addActorTasks.Any(t => t.IsFaulted))
         {
             Console.WriteLine($"An error occurred: One of the jobs to add actor file status failed");
         }
@@ -292,7 +292,7 @@ public class FileRepository : IFileRepository
                         Actor = new ActorEntity()
                         {
                             ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                            ActorExternalId = reader.GetString(reader.GetOrdinal("a.actor_external_id"))
+                            ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
                         }
                     });
                 }
