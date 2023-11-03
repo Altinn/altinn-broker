@@ -1,6 +1,7 @@
 namespace Altinn.Broker.Core.Domain.Enums;
 
-public enum FileStatus {
+public enum FileStatus
+{
     Initialized = 0,
     AwaitingUpload = 1,
     UploadInProgress = 2,

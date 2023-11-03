@@ -1,13 +1,14 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
+
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-
-using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 

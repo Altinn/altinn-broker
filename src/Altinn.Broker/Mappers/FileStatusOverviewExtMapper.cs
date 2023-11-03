@@ -27,7 +27,8 @@ public static class FileStatusOverviewExtMapper
 
     public static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
     {
-        return domainEnum switch {
+        return domainEnum switch
+        {
             FileStatus.Initialized => FileStatusExt.Initialized,
             FileStatus.AwaitingUpload => FileStatusExt.Initialized,
             FileStatus.UploadInProgress => FileStatusExt.UploadInProgress,
@@ -71,7 +72,7 @@ public static class FileStatusOverviewExtMapper
     {
         var lastStatusForEveryRecipient = fileReceipts
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
-            .Select(receiptsForRecipient => 
+            .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
             .ToList();
         return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileStatusEventExt()
@@ -83,9 +84,10 @@ public static class FileStatusOverviewExtMapper
         }).ToList();
     }
 
-    private static RecipientFileStatusExt MapToExternalRecipientStatus(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus) 
-    {    
-        return actorFileStatus switch {
+    private static RecipientFileStatusExt MapToExternalRecipientStatus(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus)
+    {
+        return actorFileStatus switch
+        {
             Altinn.Broker.Core.Domain.Enums.ActorFileStatus.None => RecipientFileStatusExt.Initialized,
             Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
             Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,

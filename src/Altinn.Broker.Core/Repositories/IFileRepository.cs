@@ -10,8 +10,8 @@ public interface IFileRepository
     Task<List<string>> GetFilesAvailableForCaller(string actorExernalReference);
 
     Task AddReceipt(
-        Guid fileId, 
-        Domain.Enums.ActorFileStatus status, 
+        Guid fileId,
+        Domain.Enums.ActorFileStatus status,
         string actorExternalReference
     );
 

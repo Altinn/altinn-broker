@@ -59,16 +59,17 @@ public class DatabaseConnectionProvider : IDisposable
     {
         var sqlServerTokenProvider = new DefaultAzureCredential();
         _accessToken = (await sqlServerTokenProvider.GetTokenAsync(
-            new TokenRequestContext(scopes: new string[] { "https://ossrdbms-aad.database.windows.net/.default" }) { })).Token;        
+            new TokenRequestContext(scopes: new string[] { "https://ossrdbms-aad.database.windows.net/.default" }) { })).Token;
     }
 
     private bool IsAccessTokenValid()
-    {        
-        if (string.IsNullOrWhiteSpace(_accessToken)) {
+    {
+        if (string.IsNullOrWhiteSpace(_accessToken))
+        {
             return false;
         }
         JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
-        SecurityToken token = tokenHandler.ReadToken(_accessToken);        
+        SecurityToken token = tokenHandler.ReadToken(_accessToken);
         return token.ValidTo > DateTime.Now.Subtract(TimeSpan.FromSeconds(60));
     }
 

@@ -1,7 +1,8 @@
-﻿using Npgsql;
-using Altinn.Broker.Core.Domain;
+﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+
+using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
@@ -13,7 +14,7 @@ public class FileRepository : IFileRepository
     public FileRepository(DatabaseConnectionProvider connectionProvider, IActorRepository actorRepository)
     {
         _connectionProvider = connectionProvider;
-        _actorRepository = actorRepository; 
+        _actorRepository = actorRepository;
     }
 
     public async Task<FileEntity?> GetFileAsync(Guid fileId)
@@ -21,7 +22,7 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
-            "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date, sender.actor_external_id " + 
+            "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date, sender.actor_external_id " +
             "FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
@@ -106,7 +107,8 @@ public class FileRepository : IFileRepository
             {
                 ActorExternalId = file.Sender
             });
-        } else
+        }
+        else
         {
             actorId = actor.ActorId;
         }
@@ -120,7 +122,7 @@ public class FileRepository : IFileRepository
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
         command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@senderActorId", actorId);        
+        command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
         command.Parameters.AddWithValue("@lastStatusUpdate", DateTime.UtcNow);
@@ -204,7 +206,8 @@ public class FileRepository : IFileRepository
             {
                 ActorExternalId = actorExternalReference
             });
-        } else
+        }
+        else
         {
             actorId = actor.ActorId;
         }
@@ -235,7 +238,7 @@ public class FileRepository : IFileRepository
             ")", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
-            command.Parameters.AddWithValue("@fileLocation", storageReference );
+            command.Parameters.AddWithValue("@fileLocation", storageReference);
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }
@@ -246,8 +249,8 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "SELECT * " + 
-            "FROM broker.file_status fis " + 
+            "SELECT * " +
+            "FROM broker.file_status fis " +
             "WHERE fis.file_id_fk = @fileId", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);

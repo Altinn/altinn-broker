@@ -46,7 +46,7 @@ namespace Altinn.Broker.Controllers
 
             return Ok(fileId);
         }
-        
+
         /// <summary>
         /// Upload to an initialized file using a binary stream.
         /// </summary>
@@ -73,7 +73,7 @@ namespace Altinn.Broker.Controllers
 
             return Ok(fileId);
         }
-        
+
         /// <summary>
         /// Initialize and upload a file using form-data
         /// </summary>
@@ -101,12 +101,12 @@ namespace Altinn.Broker.Controllers
         }
 
         /// <summary>
-        /// Initialize and upload a file using form-data
+        /// Get information about the file and its current status
         /// </summary>
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        public async Task<ActionResult<FileOverviewExt>> GetFileOverview(Guid fileId)
+        public async Task<ActionResult<FileOverviewExt>> GetFileStatus(Guid fileId)
         {
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
@@ -117,6 +117,10 @@ namespace Altinn.Broker.Controllers
             return Ok(FileStatusOverviewExtMapper.MapToExternalModel(file));
         }
 
+        /// <summary>
+        /// Get more detailed information about the file upload for auditing and troubleshooting purposes
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
@@ -153,6 +157,10 @@ namespace Altinn.Broker.Controllers
             };
         }
 
+        /// <summary>
+        /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files.
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<List<string>>> GetFiles()
         {
@@ -163,10 +171,14 @@ namespace Altinn.Broker.Controllers
             }
 
             var files = _fileRepository.GetFilesAvailableForCaller(caller);
-            
+
             return Ok(files);
         }
 
+        /// <summary>
+        /// Downloads the file
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/download")]
         public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
@@ -185,10 +197,14 @@ namespace Altinn.Broker.Controllers
             }
             var stream = await response.Content.ReadAsStreamAsync();
             var contentType = response.Content.Headers.ContentType.ToString();
-            
+
             return File(stream, contentType, file.Filename);
         }
 
+        /// <summary>
+        /// Confirms that the file has been downloaded
+        /// </summary>
+        /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(Guid fileId)

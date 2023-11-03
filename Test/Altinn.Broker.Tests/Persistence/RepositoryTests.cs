@@ -117,7 +117,7 @@ public class RepositoryTests
             FileLocation = "path/to/file",
             Sender = "altinn",
             LastStatusUpdate = DateTime.UtcNow,
-            ActorEvents = new List<ActorFileStatusEntity>() 
+            ActorEvents = new List<ActorFileStatusEntity>()
             {
                 new ActorFileStatusEntity(){
                     Actor = new ActorEntity()
@@ -126,7 +126,7 @@ public class RepositoryTests
                     },
                     Date= DateTime.UtcNow,
                     Status = ActorFileStatus.Initialized
-                } 
+                }
             }
         });
 
