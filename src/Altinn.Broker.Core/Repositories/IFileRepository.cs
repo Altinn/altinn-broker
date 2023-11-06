@@ -21,6 +21,6 @@ public interface IFileRepository
         string storageReference
     );
     Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId);
-    Task<List<ActorFileStatusEntity>> GetFileRecipientStatusHistoryAsync(Guid fileId);
+    Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId);
     Task InsertFileStatus(Guid fileId, FileStatus status);
 }

@@ -142,7 +142,7 @@ namespace Altinn.Broker.Controllers
             }
 
             var fileHistory = await _fileRepository.GetFileStatusHistoryAsync(fileId);
-            var recipientHistory = await _fileRepository.GetFileRecipientStatusHistoryAsync(fileId);
+            var actorEvents = await _fileRepository.GetActorEvents(fileId);
 
             var fileOverview = FileStatusOverviewExtMapper.MapToExternalModel(file);
             return new FileStatusDetailsExt()
@@ -158,7 +158,7 @@ namespace Altinn.Broker.Controllers
                 Recipients = fileOverview.Recipients,
                 SendersFileReference = fileOverview.SendersFileReference,
                 FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
-                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipientEvents(recipientHistory)
+                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipientEvents(actorEvents.Where(actorEvents => actorEvents.Actor.ActorExternalId != file.Sender).ToList())
             };
         }
 

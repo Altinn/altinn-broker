@@ -292,7 +292,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<ActorFileStatusEntity>> GetFileRecipientStatusHistoryAsync(Guid fileId)
+    public async Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
