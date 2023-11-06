@@ -341,7 +341,7 @@ public class FileRepository : IFileRepository
 
     private async Task SetMetadata(Guid fileId, Dictionary<string, string> metadata)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
+        var connection = await _connectionProvider.GetConnectionAsync();
         using var transaction = connection.BeginTransaction();
         using var command = new NpgsqlCommand(
             "INSERT INTO broker.file_metadata (metadata_id_pk, file_id_fk, key, value) " +
