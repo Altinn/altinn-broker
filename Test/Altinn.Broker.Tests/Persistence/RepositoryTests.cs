@@ -42,7 +42,7 @@ public class RepositoryTests
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
             Sender = "1",
-            LastStatusUpdate = DateTime.UtcNow,
+            FileStatusChanged = DateTime.UtcNow,
             ActorEvents = new List<ActorFileStatusEntity>()
             {
                 new ActorFileStatusEntity(){
@@ -54,7 +54,7 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        });
+        }, "1234567890");
 
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
@@ -72,7 +72,7 @@ public class RepositoryTests
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
-            LastStatusUpdate = DateTime.UtcNow,
+            FileStatusChanged = DateTime.UtcNow,
             ActorEvents = new List<ActorFileStatusEntity>()
             {
                 new ActorFileStatusEntity(){
@@ -84,7 +84,7 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        });
+        }, "1234567890");
 
         // Act
         await _fileRepository.AddReceiptAsync(new ActorFileStatusEntity()
@@ -116,7 +116,7 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             Sender = "altinn",
-            LastStatusUpdate = DateTime.UtcNow,
+            FileStatusChanged = DateTime.UtcNow,
             ActorEvents = new List<ActorFileStatusEntity>()
             {
                 new ActorFileStatusEntity(){
@@ -128,7 +128,7 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        });
+        }, "1234567890");
 
         // Act
         var result = await _fileRepository.GetFileAsync(fileId);

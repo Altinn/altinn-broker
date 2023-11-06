@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 
 namespace Altinn.Broker.Core.Repositories;
 
@@ -21,4 +22,5 @@ public interface IFileRepository
     );
     Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId);
     Task<List<ActorFileStatusEntity>> GetFileRecipientStatusHistoryAsync(Guid fileId);
+    Task InsertFileStatus(Guid fileId, FileStatus status);
 }

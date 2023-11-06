@@ -15,7 +15,7 @@ namespace Altinn.Broker.Models
         public string Checksum { get; set; } = string.Empty;
         public FileStatusExt FileStatus { get; set; }
         public string FileStatusText { get; set; } = string.Empty;
-        public DateTime FileStatusChanged { get; set; }
+        public DateTimeOffset FileStatusChanged { get; set; }
 
         /// <summary>
         /// Sender of the file.

@@ -51,7 +51,7 @@ public static class FileStatusOverviewExtMapper
             FileStatus.AwaitingUpload => "Ready for upload",
             FileStatus.UploadInProgress => "Uploading",
             FileStatus.AwaitingUploadProcessing => "Processing upload",
-            FileStatus.UploadedAndProcessed => "Processing upload",
+            FileStatus.UploadedAndProcessed => "Uploaded",
             FileStatus.Published => "Ready for download",
             FileStatus.Cancelled => "File cancelled",
             FileStatus.Downloaded => "Ready for download",

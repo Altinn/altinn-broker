@@ -40,11 +40,8 @@ CREATE TABLE broker.file (
     checksum character varying(500) NULL,
     sender_actor_id_fk bigserial,
     external_file_reference character varying(500) NOT NULL,
-    file_status_description_id_fk integer NOT NULL,
-    last_status_update timestamp without time zone,
     uploaded timestamp without time zone NOT NULL,
     storage_reference_id_fk bigint NOT NULL,
-    FOREIGN KEY (file_status_description_id_fk) REFERENCES broker.file_status_description (file_status_description_id_pk),
     FOREIGN KEY (storage_reference_id_fk) REFERENCES broker.storage_reference (storage_reference_id_pk)
 );
 

@@ -27,18 +27,31 @@ public class FileRepository : IFileRepository
 
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
-            "SELECT *, sr.file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId " +
+            "SELECT *, sr.file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId, " +
+                "(" +
+                    "SELECT fs.file_status_description_id_fk " +
+                    "FROM broker.file_status fs " +
+                    "WHERE fs.file_id_fk = @fileId " +
+                    "ORDER BY fs.file_status_date desc " +
+                    "LIMIT 1" +
+                ") as file_status_description_id_fk, " +
+                "(" +
+                    "SELECT fs.file_status_date " +
+                    "FROM broker.file_status fs " +
+                    "WHERE fs.file_id_fk = @fileId " +
+                    "ORDER BY fs.file_status_date desc " +
+                    "LIMIT 1" +
+                ") as file_status_date " +
             "FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
             "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
-            "WHERE file_id_pk = @fileId ",
+            "WHERE file_id_pk = @fileId",
             connection);
         { 
             command.Parameters.AddWithValue("@fileId", fileId);
             using NpgsqlDataReader reader = command.ExecuteReader();
-
             if (reader.Read())
             {
                 file = new FileEntity
@@ -49,7 +62,7 @@ public class FileRepository : IFileRepository
                     Checksum = reader.GetString(reader.GetOrdinal("checksum")),
                     ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                     FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
-                    LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
+                    FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
                     Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
                     FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
                     Sender = reader.GetString(reader.GetOrdinal("senderExternalId"))
@@ -124,8 +137,8 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, application_id, filename, checksum, external_file_reference, sender_actor_id_fk, file_status_description_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
-            "VALUES (@fileId, @applicationId, @filename, @checksum, @externalFileReference, @senderActorId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
+            "INSERT INTO broker.file (file_id_pk, application_id, filename, checksum, external_file_reference, sender_actor_id_fk, uploaded, storage_reference_id_fk) " +
+            "VALUES (@fileId, @applicationId, @filename, @checksum, @externalFileReference, @senderActorId, @uploaded, @storageReferenceId)",
             connection);
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
@@ -136,7 +149,6 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
-        command.Parameters.AddWithValue("@lastStatusUpdate", DateTime.UtcNow);
         command.Parameters.AddWithValue("@uploaded", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageReferenceId", storageReference);
 
@@ -154,6 +166,7 @@ public class FileRepository : IFileRepository
         }
 
         await SetMetadata(fileId, file.Metadata);
+        await InsertFileStatus(fileId, FileStatus.Initialized);
 
         return fileId;
     }
@@ -366,4 +379,23 @@ public class FileRepository : IFileRepository
             throw;
         }
     }
+
+    public async Task InsertFileStatus(Guid fileId, FileStatus status)
+    {
+        var connection = await _connectionProvider.GetConnectionAsync();
+        using var command = new NpgsqlCommand("", connection);
+
+        command.CommandText =
+            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date) " +
+            "VALUES (@fileId, @statusId, NOW()) RETURNING file_status_id_pk;";
+        command.Parameters.AddWithValue("@fileId", fileId);
+        command.Parameters.AddWithValue("@statusId", (int)status);
+
+        var fileStatusId = await command.ExecuteScalarAsync();
+        if (fileStatusId == null)
+        {
+            throw new InvalidOperationException("No file_status_id_pk was returned after insert.");
+        }
+    }
 }
+
