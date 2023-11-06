@@ -69,8 +69,7 @@ namespace Altinn.Broker.Controllers
                 return BadRequest();
             }
 
-            using var bodyStream = HttpContext.Request.BodyReader.AsStream(true);
-            await _fileStore.UploadFile(bodyStream, fileId);
+            await _fileStore.UploadFile(Request.Body, fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
             await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
 
