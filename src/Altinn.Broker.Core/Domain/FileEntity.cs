@@ -14,7 +14,7 @@ public class FileEntity
     public string FileLocation { get; set; } // Joined in
     public List<ActorFileStatusEntity> ActorEvents { get; set; } // Joined in
     public string Filename { get; set; }
-    public string Checksum { get; set; }
+    public string? Checksum { get; set; }
     public Dictionary<string, string> Metadata { get; set; }
     public DateTime FileStatusChanged { get; set; }
 }

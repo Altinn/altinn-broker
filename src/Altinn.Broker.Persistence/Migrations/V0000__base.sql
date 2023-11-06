@@ -37,6 +37,7 @@ CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
     application_id character varying(100) NOT NULL,
     filename character varying(500) NOT NULL,
+    checksum character varying(500) NULL,
     sender_actor_id_fk bigserial,
     external_file_reference character varying(500) NOT NULL,
     file_status_description_id_fk integer NOT NULL,
