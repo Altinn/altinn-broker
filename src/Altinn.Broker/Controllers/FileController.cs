@@ -19,12 +19,14 @@ namespace Altinn.Broker.Controllers
         private readonly IFileRepository _fileRepository;
         private readonly IFileStore _fileStore;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<FileController> _logger;
 
-        public FileController(IFileRepository fileRepository, IFileStore fileStore, IHttpClientFactory httpClientFactory)
+        public FileController(IFileRepository fileRepository, IFileStore fileStore, IHttpClientFactory httpClientFactory, ILogger<FileController> logger)
         {
             _fileRepository = fileRepository;
             _fileStore = fileStore;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         /// <summary>
@@ -55,6 +57,7 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
+            _logger.LogInformation("File size is {FileSize]} bytes", Request.ContentLength);
             var caller = GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))
             {

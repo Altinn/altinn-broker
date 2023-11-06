@@ -22,8 +22,6 @@
 
         public async Task Invoke(HttpContext httpContext)
         {
-            var cancellationToken = httpContext.RequestAborted;
-
             // Log request
             var requestMethod = httpContext.Request.Method;
             var requestPath = httpContext.Request.PathBase.Add(httpContext.Request.Path).ToString();
@@ -36,27 +34,7 @@
                 );
             }
 
-            // Facilitate reading response body to allow us to log validation errors
-            string responseBody;
-            using (var memoryStream = new MemoryStream()) // Need a read-write stream to support reading body later
-            {
-                var originalResponseStream = httpContext.Response.Body;
-                httpContext.Response.Body = memoryStream;
-                await _next(httpContext);
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    _logger.LogWarning("Request was cancelled");
-                    return;
-                }
-                using (var responseReader = new StreamReader(memoryStream))
-                {
-                    responseBody = responseReader.ReadToEnd();
-                    memoryStream.Seek(0, SeekOrigin.Begin);
-                    await memoryStream.CopyToAsync(originalResponseStream, cancellationToken);
-                }
-                httpContext.Response.Body = originalResponseStream;
-            }
+            await _next(httpContext);
 
             // Log response
             var statusCode = httpContext.Response.StatusCode;
@@ -74,21 +52,19 @@
                 else if (statusCode >= 400 && statusCode < 500)
                 {
                     _logger.LogWarning(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}. Body was: {ResponseBody}",
+                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}.}",
                         requestMethod,
                         requestPath,
-                        httpContext.Response.StatusCode,
-                        responseBody
+                        httpContext.Response.StatusCode
                     );
                 }
                 else if (statusCode >= 500)
                 {
                     _logger.LogError(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}. Body was: {ResponseBody}",
+                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}.",
                         requestMethod,
                         requestPath,
-                        httpContext.Response.StatusCode,
-                        responseBody
+                        httpContext.Response.StatusCode
                     );
                 }
             }
