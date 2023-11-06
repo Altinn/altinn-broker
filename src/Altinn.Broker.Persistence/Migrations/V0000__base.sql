@@ -86,3 +86,4 @@ CREATE INDEX ix_file_application_id ON broker.file (application_id);
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);
+CREATE INDEX ix_file_metadata_file_id ON broker.file_metadata (file_id_fk);

@@ -1,8 +1,12 @@
-﻿using Altinn.Broker.Core.Domain;
+﻿using System.Data;
+
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
 using Npgsql;
+
+using NpgsqlTypes;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
@@ -21,6 +25,7 @@ public class FileRepository : IFileRepository
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
+        var file = new FileEntity();
         using var command = new NpgsqlCommand(
             "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date, sender.actor_external_id " +
             "FROM broker.file " +
@@ -30,52 +35,52 @@ public class FileRepository : IFileRepository
             "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
             "WHERE file_id_pk = @fileId ",
             connection);
+        { 
+            command.Parameters.AddWithValue("@fileId", fileId);
+            using NpgsqlDataReader reader = command.ExecuteReader();
 
-        command.Parameters.AddWithValue("@fileId", fileId);
-
-        using NpgsqlDataReader reader = command.ExecuteReader();
-
-
-        if (reader.Read())
-        {
-            var file = new FileEntity
+            if (reader.Read())
             {
-                FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
-                Filename = reader.GetString(reader.GetOrdinal("filename")),
-                Checksum = reader.GetString(reader.GetOrdinal("checksum")),
-                ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
-                FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
-                LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
-                Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
-                FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
-                Sender = reader.GetString(reader.GetOrdinal("actor_external_id"))
-            };
-            var receipts = new List<ActorFileStatusEntity>();
-            if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk")))
-            {
-                do
+                file = new FileEntity
                 {
-                    receipts.Add(new ActorFileStatusEntity()
+                    FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
+                    ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
+                    Filename = reader.GetString(reader.GetOrdinal("filename")),
+                    Checksum = reader.GetString(reader.GetOrdinal("checksum")),
+                    ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
+                    FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
+                    LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
+                    Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
+                    FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
+                    Sender = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                };
+                var receipts = new List<ActorFileStatusEntity>();
+                if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk")))
+                {
+                    do
                     {
-                        FileId = fileId,
-                        Actor = new ActorEntity()
+                        receipts.Add(new ActorFileStatusEntity()
                         {
-                            ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                            ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
-                        },
-                        Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
-                        Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date"))
-                    });
-                } while (reader.Read());
+                            FileId = fileId,
+                            Actor = new ActorEntity()
+                            {
+                                ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
+                                ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                            },
+                            Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
+                            Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date"))
+                        });
+                    } while (reader.Read());
+                }
+                file.ActorEvents = receipts;
             }
-            file.ActorEvents = receipts;
-            return file;
+            else
+            {
+                return null;
+            }
         }
-        else
-        {
-            return null;
-        }
+        file.Metadata = await GetMetadata(fileId);
+        return file;
     }
 
     public async Task AddReceiptAsync(ActorFileStatusEntity receipt)
@@ -152,6 +157,8 @@ public class FileRepository : IFileRepository
         {
             Console.WriteLine($"An error occurred: One of the jobs to add actor file status failed");
         }
+
+        await SetMetadata(fileId, file.Metadata);
 
         return fileId;
     }
@@ -277,7 +284,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<Core.Domain.ActorFileStatusEntity>> GetFileRecipientStatusHistoryAsync(Guid fileId)
+    public async Task<List<ActorFileStatusEntity>> GetFileRecipientStatusHistoryAsync(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -288,7 +295,7 @@ public class FileRepository : IFileRepository
             "WHERE afs.file_id_fk = @fileId", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
-            var fileStatuses = new List<Core.Domain.ActorFileStatusEntity>();
+            var fileStatuses = new List<ActorFileStatusEntity>();
             using (var reader = await command.ExecuteReaderAsync())
             {
                 while (await reader.ReadAsync())
@@ -307,6 +314,61 @@ public class FileRepository : IFileRepository
                 }
             }
             return fileStatuses;
+        }
+    }
+
+    private async Task<Dictionary<string, string>> GetMetadata(Guid fileId)
+    {
+        var connection = await _connectionProvider.GetConnectionAsync();
+
+        using (var command = new NpgsqlCommand(
+            "SELECT * " +
+            "FROM broker.file_metadata " +
+            "WHERE file_id_fk = @fileId", connection))
+        {
+            command.Parameters.AddWithValue("@fileId", fileId);
+            var metadata = new Dictionary<string, string>();
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
+                }
+            }
+            return metadata;
+        }
+    }
+
+    private async Task SetMetadata(Guid fileId, Dictionary<string, string> metadata)
+    {
+        using var connection = await _connectionProvider.GetConnectionAsync();
+        using var transaction = connection.BeginTransaction();
+        using var command = new NpgsqlCommand(
+            "INSERT INTO broker.file_metadata (metadata_id_pk, file_id_fk, key, value) " +
+            "VALUES (DEFAULT, @fileId, @key, @value)",
+            connection);
+
+        command.Parameters.AddWithValue("@fileId", fileId);
+        command.Parameters.Add(new NpgsqlParameter("@key", NpgsqlDbType.Varchar));
+        command.Parameters.Add(new NpgsqlParameter("@value", NpgsqlDbType.Varchar));
+
+        try
+        {
+            foreach (var metadataEntry in metadata)
+            {
+                command.Parameters[1].Value = metadataEntry.Key;
+                command.Parameters[2].Value = metadataEntry.Value;
+                if (command.ExecuteNonQuery() != 1)
+                {
+                    throw new NpgsqlException("Failed while inserting metadata");
+                }
+            }
+            transaction.Commit();
+        }
+        catch (Exception)
+        {
+            transaction.Rollback();
+            throw;
         }
     }
 }
