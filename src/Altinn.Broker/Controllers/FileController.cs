@@ -194,16 +194,22 @@ namespace Altinn.Broker.Controllers
                 return BadRequest("No file uploaded yet");
             }
 
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync(file.FileLocation);
-            if (!response.IsSuccessStatusCode)
+            if (file.FileLocation.StartsWith("altinn-3"))
             {
-                return StatusCode(502, "File could not be accessed at the location.");
+                var stream = await _fileStore.GetFileStream(fileId);
+                return File(stream, "application/octet-stream", file.Filename);
+            } else
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync(file.FileLocation);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode(502, "File could not be accessed at the location.");
+                }
+                var stream = await response.Content.ReadAsStreamAsync();
+                var contentType = response.Content.Headers.ContentType.ToString();
+                return File(stream, contentType, file.Filename);
             }
-            var stream = await response.Content.ReadAsStreamAsync();
-            var contentType = response.Content.Headers.ContentType.ToString();
-
-            return File(stream, contentType, file.Filename);
         }
 
         /// <summary>
