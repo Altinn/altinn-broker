@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
@@ -28,6 +29,7 @@ builder.Configuration
 ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
