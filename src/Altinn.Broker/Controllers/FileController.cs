@@ -158,7 +158,7 @@ namespace Altinn.Broker.Controllers
                 Recipients = fileOverview.Recipients,
                 SendersFileReference = fileOverview.SendersFileReference,
                 FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
-                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipients(recipientHistory, file.Sender, file.ApplicationId)
+                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipientEvents(recipientHistory)
             };
         }
 
@@ -175,7 +175,7 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
 
-            var files = _fileRepository.GetFilesAvailableForCaller(caller);
+            var files = await _fileRepository.GetFilesAvailableForCaller(caller);
 
             return Ok(files);
         }

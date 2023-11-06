@@ -68,7 +68,7 @@ public static class FileStatusOverviewExtMapper
         FileStatusText = MapToFileStatusText(entity.Status)
     }).ToList();
 
-    public static List<RecipientFileStatusEventExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender, string applicationId)
+    public static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender, string applicationId)
     {
         var recipientEvents = actorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != sender);
         var lastStatusForEveryRecipient = recipientEvents
@@ -76,35 +76,46 @@ public static class FileStatusOverviewExtMapper
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
             .ToList();
-        return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileStatusEventExt()
+        return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileStatusDetailsExt()
         {
             Recipient = statusEvent.Actor.ActorExternalId,
-            RecipientFileStatusChanged = statusEvent.Date,
-            RecipientFileStatusCode = MapToExternalRecipientStatus(statusEvent.Status),
-            RecipientFileStatusText = MapToRecipientStatusText(statusEvent.Status)
+            CurrentRecipientFileStatusChanged = statusEvent.Date,
+            CurrentRecipientFileStatusCode = MapToExternalRecipientStatus(statusEvent.Status),
+            CurrentRecipientFileStatusText = MapToRecipientStatusText(statusEvent.Status)
         }).ToList();
     }
 
-    private static RecipientFileStatusExt MapToExternalRecipientStatus(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus)
+    private static RecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.None => RecipientFileStatusExt.Initialized,
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Downloaded => RecipientFileStatusExt.ConfirmDownloaded
+            ActorFileStatus.None => RecipientFileStatusExt.Initialized,
+            ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
+            ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,
+            ActorFileStatus.Downloaded => RecipientFileStatusExt.ConfirmDownloaded
         };
     }
 
-    private static string MapToRecipientStatusText(Altinn.Broker.Core.Domain.Enums.ActorFileStatus actorFileStatus)
+    private static string MapToRecipientStatusText(ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.None => "Unknown",
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized => "Initialized",
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Uploaded => "Sender has uploaded file",
-            Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Downloaded => "Recipient has downloaded file"
+            ActorFileStatus.None => "Unknown",
+            ActorFileStatus.Initialized => "Initialized",
+            ActorFileStatus.Uploaded => "Sender has uploaded file",
+            ActorFileStatus.Downloaded => "Recipient has downloaded file"
         };
 
+    }
+
+    internal static List<RecipientFileStatusEventExt> MapToRecipientEvents(List<ActorFileStatusEntity> actorEvents)
+    {
+        return actorEvents.Select(actorEvent => new RecipientFileStatusEventExt()
+        {
+            Recipient = actorEvent.Actor.ActorExternalId,
+            RecipientFileStatusChanged = actorEvent.Date,
+            RecipientFileStatusCode = MapToExternalRecipientStatus(actorEvent.Status),
+            RecipientFileStatusText = MapToRecipientStatusText(actorEvent.Status)
+        }).ToList();
     }
 }

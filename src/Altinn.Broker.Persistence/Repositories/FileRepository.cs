@@ -282,7 +282,7 @@ public class FileRepository : IFileRepository
                 {
                     fileStatuses.Add(new FileStatusEntity()
                     {
-                        FileId = reader.GetGuid(reader.GetOrdinal("file_id")),
+                        FileId = reader.GetGuid(reader.GetOrdinal("file_id_fk")),
                         Status = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                         Date = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
                     });

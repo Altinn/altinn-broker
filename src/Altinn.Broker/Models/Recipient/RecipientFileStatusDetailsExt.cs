@@ -7,7 +7,7 @@ namespace Altinn.Broker.Models
         public string Recipient { get; set; } = string.Empty;
         public RecipientFileStatusExt CurrentRecipientFileStatusCode { get; set; }
         public string CurrentRecipientFileStatusText { get; set; } = string.Empty;
-        public DateTime CurrentRecipientFileStatusChanged { get; set; }
+        public DateTimeOffset CurrentRecipientFileStatusChanged { get; set; }
         public List<RecipientFileStatusEventExt>? RecipientFileStatusHistory { get; set; }
     }
 }

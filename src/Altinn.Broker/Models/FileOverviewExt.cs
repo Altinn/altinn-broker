@@ -12,7 +12,7 @@ namespace Altinn.Broker.Models
         public Guid FileId { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string SendersFileReference { get; set; } = string.Empty;
-        public string Checksum { get; set; } = string.Empty;
+        public string? Checksum { get; set; } = string.Empty;
         public FileStatusExt FileStatus { get; set; }
         public string FileStatusText { get; set; } = string.Empty;
         public DateTimeOffset FileStatusChanged { get; set; }
@@ -27,7 +27,7 @@ namespace Altinn.Broker.Models
         /// Rcipients of the file
         /// </summary>
         [JsonPropertyName("recipients")]
-        public List<RecipientFileStatusEventExt> Recipients { get; set; } = new List<RecipientFileStatusEventExt>();
+        public List<RecipientFileStatusDetailsExt> Recipients { get; set; } = new List<RecipientFileStatusDetailsExt>();
 
         /// <summary>
         /// Up to ten arbitrary key value pairs
