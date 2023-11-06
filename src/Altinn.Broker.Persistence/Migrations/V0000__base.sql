@@ -35,6 +35,8 @@ CREATE TABLE broker.storage_reference (
 
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
+    application_id character varying(100) NOT NULL,
+    filename character varying(500) NOT NULL,
     sender_actor_id_fk bigserial,
     external_file_reference character varying(500) NOT NULL,
     file_status_description_id_fk integer NOT NULL,
@@ -79,6 +81,7 @@ CREATE TABLE broker.actor_file_status (
 );
 
 -- Create indexes
+CREATE INDEX ix_file_application_id ON broker.file (application_id);
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);

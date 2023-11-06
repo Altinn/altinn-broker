@@ -5,6 +5,7 @@ namespace Altinn.Broker.Core.Domain;
 public class FileEntity
 {
     public Guid FileId { get; set; }
+    public string ApplicationId { get; set; }
     public string Sender { get; set; } // Joined in
     public string ExternalFileReference { get; set; }
     public FileStatus FileStatus { get; set; }

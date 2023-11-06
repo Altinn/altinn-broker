@@ -41,8 +41,7 @@ namespace Altinn.Broker.Controllers
             }
 
             var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
-            var fileId = await _fileRepository.AddFileAsync(file);
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Initialized, caller);
+            var fileId = await _fileRepository.AddFileAsync(file, caller);
 
             return Ok(fileId);
         }
@@ -69,7 +68,8 @@ namespace Altinn.Broker.Controllers
 
             using var bodyStream = HttpContext.Request.BodyReader.AsStream(true);
             await _fileStore.UploadFile(bodyStream, fileId);
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, caller);
+            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
 
             return Ok(fileId);
         }
@@ -92,10 +92,10 @@ namespace Altinn.Broker.Controllers
             }
 
             var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
-            var fileId = await _fileRepository.AddFileAsync(file);
+            var fileId = await _fileRepository.AddFileAsync(file, caller);
             await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, caller);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
 
             return Ok(fileId);
         }
@@ -153,7 +153,7 @@ namespace Altinn.Broker.Controllers
                 Recipients = fileOverview.Recipients,
                 SendersFileReference = fileOverview.SendersFileReference,
                 FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
-                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipients(recipientHistory)
+                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipients(recipientHistory, file.Sender, file.ApplicationId)
             };
         }
 

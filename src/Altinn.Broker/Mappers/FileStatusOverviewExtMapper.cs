@@ -20,7 +20,7 @@ public static class FileStatusOverviewExtMapper
             FileStatusChanged = file.FileStatusChanged,
             FileStatusText = MapToFileStatusText(file.FileStatus),
             Metadata = file.Metadata,
-            Recipients = MapToRecipients(file.ActorEvents),
+            Recipients = MapToRecipients(file.ActorEvents, file.Sender, file.ApplicationId),
             SendersFileReference = file.ExternalFileReference
         };
     }
@@ -68,9 +68,10 @@ public static class FileStatusOverviewExtMapper
         FileStatusText = MapToFileStatusText(entity.Status)
     }).ToList();
 
-    public static List<RecipientFileStatusEventExt> MapToRecipients(List<Altinn.Broker.Core.Domain.ActorFileStatusEntity> fileReceipts)
+    public static List<RecipientFileStatusEventExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender, string applicationId)
     {
-        var lastStatusForEveryRecipient = fileReceipts
+        var recipientEvents = actorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != sender);
+        var lastStatusForEveryRecipient = recipientEvents
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))

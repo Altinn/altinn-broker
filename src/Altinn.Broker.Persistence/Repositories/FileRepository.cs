@@ -41,6 +41,8 @@ public class FileRepository : IFileRepository
             var file = new FileEntity
             {
                 FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
+                ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
+                Filename = reader.GetString(reader.GetOrdinal("filename")),
                 ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                 FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                 LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
@@ -97,7 +99,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<Guid> AddFileAsync(FileEntity file)
+    public async Task<Guid> AddFileAsync(FileEntity file, string caller)
     {
         long actorId;
         var actor = await _actorRepository.GetActorAsync(file.Sender);
@@ -116,12 +118,14 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, external_file_reference, sender_actor_id_fk, file_status_description_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
-            "VALUES (@fileId, @externalFileReference, @senderActorId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
+            "INSERT INTO broker.file (file_id_pk, application_id, filename, external_file_reference, sender_actor_id_fk, file_status_description_id_fk, last_status_update, uploaded, storage_reference_id_fk) " +
+            "VALUES (@fileId, @applicationId, @filename, @externalFileReference, @senderActorId, @fileStatusId, @lastStatusUpdate, @uploaded, @storageReferenceId)",
             connection);
         long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
         command.Parameters.AddWithValue("@fileId", fileId);
+        command.Parameters.AddWithValue("@applicationId", caller);
+        command.Parameters.AddWithValue("@filename", file.Filename);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
