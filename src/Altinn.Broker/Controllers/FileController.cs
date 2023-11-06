@@ -13,7 +13,7 @@ namespace Altinn.Broker.Controllers
 {
     [ApiController]
     [Route("broker/api/v1/file")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class FileController : ControllerBase
     {
         private readonly IFileRepository _fileRepository;
@@ -226,7 +226,20 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
 
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            var recipientStatuses = file.ActorEvents
+                .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != caller)
+                .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
+                .Select(group => group.Max(statusEvent => statusEvent.Status))
+                .ToList();
+            bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.Downloaded);
             await _fileRepository.AddReceipt(fileId, ActorFileStatus.Downloaded, caller);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.AllConfirmedDownloaded);
 
             return Ok();
         }
