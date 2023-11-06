@@ -54,6 +54,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
