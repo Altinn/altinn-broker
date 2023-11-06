@@ -27,12 +27,12 @@ public class FileRepository : IFileRepository
 
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
-            "SELECT *, sr.file_location, afs.actor_id_fk, a.actor_external_id, afs.actor_file_status_id_fk, afs.actor_file_status_date, sender.actor_external_id " +
+            "SELECT *, sr.file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId " +
             "FROM broker.file " +
             "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
-            "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
             "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
+            "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
             "WHERE file_id_pk = @fileId ",
             connection);
         { 
@@ -52,7 +52,7 @@ public class FileRepository : IFileRepository
                     LastStatusUpdate = reader.GetDateTime(reader.GetOrdinal("last_status_update")),
                     Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
                     FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
-                    Sender = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                    Sender = reader.GetString(reader.GetOrdinal("senderExternalId"))
                 };
                 var receipts = new List<ActorFileStatusEntity>();
                 if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk")))
@@ -64,11 +64,11 @@ public class FileRepository : IFileRepository
                             FileId = fileId,
                             Actor = new ActorEntity()
                             {
-                                ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                                ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                                ActorId = reader.GetInt64(reader.GetOrdinal("eventActorId")),
+                                ActorExternalId = reader.GetString(reader.GetOrdinal("eventActorExernalReference"))
                             },
-                            Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
-                            Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date"))
+                            Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("eventActorFileStatusId")),
+                            Date = reader.GetDateTime(reader.GetOrdinal("eventActorFileStatusDate"))
                         });
                     } while (reader.Read());
                 }
@@ -151,11 +151,6 @@ public class FileRepository : IFileRepository
         catch (Exception ex)
         {
             Console.WriteLine($"An error occurred: {ex.Message}");
-        }
-
-        if (addActorTasks.Any(t => t.IsFaulted))
-        {
-            Console.WriteLine($"An error occurred: One of the jobs to add actor file status failed");
         }
 
         await SetMetadata(fileId, file.Metadata);
@@ -242,12 +237,12 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "UPDATE broker.storage_reference sr " +
-            "SET sr.file_location = @fileLocation " +
-            "WHERE sr.storage_reference_id_pk = ( " +
+            "UPDATE broker.storage_reference " +
+            "SET file_location = @fileLocation " +
+            "WHERE storage_reference_id_pk = ( " +
                 "SELECT f.storage_reference_id_fk " +
                 "FROM broker.file f " +
-                "WHERE f.file_id = @fileId" +
+                "WHERE f.file_id_pk = @fileId" +
             ")", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
