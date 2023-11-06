@@ -21,17 +21,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileInitalizeExt"
+                  "$ref": "#/components/schemas/FileInitalize"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileInitalizeExt"
+                  "$ref": "#/components/schemas/FileInitalize"
                 }
               },
               "application/*+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileInitalizeExt"
+                  "$ref": "#/components/schemas/FileInitalize"
                 }
               }
             }
@@ -84,17 +84,17 @@
               "content": {
                 "text/plain": {
                   "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverviewExt"
+                    "$ref": "#/components/schemas/FileStatusOverview"
                   }
                 },
                 "application/json": {
                   "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverviewExt"
+                    "$ref": "#/components/schemas/FileStatusOverview"
                   }
                 },
                 "text/json": {
                   "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverviewExt"
+                    "$ref": "#/components/schemas/FileStatusOverview"
                   }
                 }
               }
@@ -298,17 +298,17 @@
                   "content": {
                       "text/plain": {
                           "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverviewExt"
+                              "$ref": "#/components/schemas/FileStatusOverview"
                           }
                       },
                       "application/json": {
                           "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverviewExt"
+                              "$ref": "#/components/schemas/FileStatusOverview"
                           }
                       },
                       "text/json": {
                           "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverviewExt"
+                              "$ref": "#/components/schemas/FileStatusOverview"
                           }
                       }
                   }
@@ -339,17 +339,17 @@
                     "content": {
                         "text/plain": {
                             "schema": {
-                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                                "$ref": "#/components/schemas/FileStatusDetails"
                             }
                         },
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                                "$ref": "#/components/schemas/FileStatusDetails"
                             }
                         },
                         "text/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/FileStatusDetailsExt"
+                                "$ref": "#/components/schemas/FileStatusDetails"
                             }
                         }
                     }
@@ -388,7 +388,7 @@
           "nullable":false,
           "description":"Name of the file. Must be alphanumeric and can include hyphens, underscores, and periods."
         },
-        "FileInitalizeExt": {
+        "FileInitalize": {
           "type": "object",
           "description": "Schema for initializing a new file with relevant metadata.",
           "properties": {
@@ -439,7 +439,7 @@
           },
           "additionalProperties": false
         },
-        "FileStatusOverviewExt": {
+        "FileStatusOverview": {
           "type": "object",
           "description": "Overview of the file's current status and associated metadata.",
           "properties": {
@@ -464,7 +464,7 @@
               "nullable": true
             },
             "fileStatus": {
-              "$ref": "#/components/schemas/FileStatusExt"
+              "$ref": "#/components/schemas/FileStatus"
             },
             "fileStatusText": {
               "type": "string",
@@ -485,7 +485,7 @@
                 "type": "array",
                 "description": "List of recipients for the file.",
                 "items": {
-                    "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                    "$ref": "#/components/schemas/RecipientFileStatusEvent"
                 },
                 "nullable": false
             },
@@ -500,7 +500,7 @@
             },
             "additionalProperties": false
         },
-        "FileStatusDetailsExt": {
+        "FileStatusDetails": {
             "type": "object",
             "properties": {
                 "fileId": {
@@ -521,7 +521,7 @@
                     "nullable": true
                 },
                 "fileStatus": {
-                    "$ref": "#/components/schemas/FileStatusExt"
+                    "$ref": "#/components/schemas/FileStatus"
                 },
                 "fileStatusText": {
                     "type": "string",
@@ -539,7 +539,7 @@
                 "recipients": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                        "$ref": "#/components/schemas/RecipientFileStatusEvent"
                     },
                     "nullable": false
                 },
@@ -553,25 +553,25 @@
                 "fileStatusHistory": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/components/schemas/FileStatusEventExt"
+                        "$ref": "#/components/schemas/FileStatusEvent"
                     },
                     "nullable": false
                 },
                 "recipientFileStatusHistory": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+                        "$ref": "#/components/schemas/RecipientFileStatusEvent"
                     },
                     "nullable": false
                 }
             },
             "additionalProperties": false
         },
-        "FileStatusEventExt": {
+        "FileStatusEvent": {
             "type": "object",
             "properties": {
                 "fileStatus": {
-                    "$ref": "#/components/schemas/FileStatusExt"
+                    "$ref": "#/components/schemas/FileStatus"
                 },
                 "fileStatusText": {
                     "type": "string",
@@ -585,7 +585,7 @@
             },
             "additionalProperties": false
         },
-        "FileStatusExt": {
+        "FileStatus": {
             "enum": [
                 "Initialized",
                 "UploadInProgress",
@@ -599,7 +599,7 @@
             ],
             "type": "string"
         },
-        "RecipientFileStatusEventExt": {
+        "RecipientFileStatusEvent": {
             "type": "object",
             "properties": {
                 "recipient": {
@@ -607,7 +607,7 @@
                     "nullable": true
                 },
                 "recipientFileStatusCode": {
-                    "$ref": "#/components/schemas/RecipientFileStatusExt"
+                    "$ref": "#/components/schemas/RecipientFileStatus"
                 },
                 "recipientFileStatusText": {
                     "type": "string",
@@ -621,7 +621,7 @@
             },
             "additionalProperties": false
         },
-        "RecipientFileStatusExt": {
+        "RecipientFileStatus": {
             "enum": [
                 "Initialized",
                 "Published",
