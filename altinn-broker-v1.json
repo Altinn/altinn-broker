@@ -374,7 +374,6 @@
     "components": {
       "schemas": {
         "UploadProtocolType": {
-          "x-comment-Erik-2023-10-26-22:00": "Added this schema to support multiple upload protocols (assume default https)",
           "type": "string",
           "description": "Protocol for uploading the file, e.g. https, tus, etc.",
           "enum": ["https", "tus", "ftp", "sftp"],
@@ -382,7 +381,6 @@
           "nullable": true
         },
         "FilenameType": {
-          "x-comment-Erik-2023-10-26-22:36": "Added this schema to support filename verification",
           "type":"string",
           "minLength":1,
           "maxLength":255,
@@ -391,9 +389,6 @@
           "description":"Name of the file. Must be alphanumeric and can include hyphens, underscores, and periods."
         },
         "FileInitalizeExt": {
-          "x-comment-Erik-2023-10-26-21:37": "Added (optional) property correlationId, to support correlation between files, e.g. within a case", 
-          "x-comment-Erik-2023-10-26-21:40": "Added (optional) property uploadProtocol, to support multiple upload protocols (assume default https", 
-          "x-comment-Erik-2023-10-26-21:45": "Consider setting nullable to false for most of the properties",
           "type": "object",
           "description": "Schema for initializing a new file with relevant metadata.",
           "properties": {
@@ -412,7 +407,7 @@
               },
               "sendersFileReference": {
                   "type": "string",
-                  "description": "A unique reference ID provided by the sender.",
+                  "description": "A reference provided by the sender.",
                   "nullable": true
               },
               "checksum": {
@@ -423,7 +418,7 @@
               "sender": {
                   "type": "string",
                   "description": "The entity or individual sending the file.",
-                  "nullable": true
+                  "nullable": false
               },
               "recipients": {
                   "type": "array",
@@ -431,7 +426,7 @@
                   "items": {
                       "type": "string"
                   },
-                  "nullable": true
+                  "nullable": false
               },
               "metadata": {
                   "type": "object",
@@ -456,7 +451,7 @@
             "fileName": {
               "type": "string",
               "description": "The name of the file.",
-              "nullable": true
+              "nullable": false
             },
             "sendersFileReference": {
               "type": "string",
@@ -474,34 +469,34 @@
             "fileStatusText": {
               "type": "string",
               "description": "Human-readable description of the file's status.",
-              "nullable": true
+              "nullable": false
             },
             "fileStatusChanged": {
               "type": "string",
               "description": "Timestamp indicating the last change in file status.",
               "format": "date-time"
             },
-                "sender": {
-                    "type": "string",
-                    "description": "Entity or individual sending the file.",
-                    "nullable": true
+            "sender": {
+                "type": "string",
+                "description": "Entity or individual sending the file.",
+                "nullable": false
+            },
+            "recipients": {
+                "type": "array",
+                "description": "List of recipients for the file.",
+                "items": {
+                    "$ref": "#/components/schemas/RecipientFileStatusEventExt"
                 },
-                "recipients": {
-                    "type": "array",
-                    "description": "List of recipients for the file.",
-                    "items": {
-                        "$ref": "#/components/schemas/RecipientFileStatusEventExt"
-                    },
-                    "nullable": true
+                "nullable": false
+            },
+            "metadata": {
+                "type": "object",
+                "description": "Metadata associated with the file.",
+                "additionalProperties": {
+                    "type": "string"
                 },
-                "metadata": {
-                    "type": "object",
-                    "description": "Metadata associated with the file.",
-                    "additionalProperties": {
-                        "type": "string"
-                    },
-                    "nullable": true
-                }
+                "nullable": true
+            }
             },
             "additionalProperties": false
         },
@@ -510,11 +505,12 @@
             "properties": {
                 "fileId": {
                     "type": "string",
-                    "format": "uuid"
+                    "format": "uuid",
+                    "nullable": false
                 },
                 "fileName": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": false
                 },
                 "sendersFileReference": {
                     "type": "string",
@@ -529,22 +525,23 @@
                 },
                 "fileStatusText": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": false
                 },
                 "fileStatusChanged": {
                     "type": "string",
-                    "format": "date-time"
+                    "format": "date-time",
+                    "nullable": false
                 },
                 "sender": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": false
                 },
                 "recipients": {
                     "type": "array",
                     "items": {
                         "$ref": "#/components/schemas/RecipientFileStatusEventExt"
                     },
-                    "nullable": true
+                    "nullable": false
                 },
                 "metadata": {
                     "type": "object",
@@ -558,14 +555,14 @@
                     "items": {
                         "$ref": "#/components/schemas/FileStatusEventExt"
                     },
-                    "nullable": true
+                    "nullable": false
                 },
                 "recipientFileStatusHistory": {
                     "type": "array",
                     "items": {
                         "$ref": "#/components/schemas/RecipientFileStatusEventExt"
                     },
-                    "nullable": true
+                    "nullable": false
                 }
             },
             "additionalProperties": false
@@ -578,11 +575,12 @@
                 },
                 "fileStatusText": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": false
                 },
                 "fileStatusChanged": {
                     "type": "string",
-                    "format": "date-time"
+                    "format": "date-time",
+                    "nullable": false
                 }
             },
             "additionalProperties": false
@@ -613,11 +611,12 @@
                 },
                 "recipientFileStatusText": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": false
                 },
                 "recipientFileStatusChanged": {
                     "type": "string",
-                    "format": "date-time"
+                    "format": "date-time",
+                    "nullable": false
                 }
             },
             "additionalProperties": false
