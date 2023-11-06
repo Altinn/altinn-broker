@@ -1,259 +1,667 @@
 {
 	"info": {
-		"_postman_id": "1448ba30-c676-4d52-8909-d42ee4d2a04d",
-		"name": "Altinn3 Broker",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "19092204"
+		"_postman_id": "d12c336b-b0ca-4614-b9e1-8f4cb6c244fd",
+		"name": "Altinn.Broker",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "7106668"
 	},
 	"item": [
 		{
-			"name": "UploadFile",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "",
-						"value": "",
-						"type": "default"
-					}
-				],
-				"body": {
-					"mode": "file",
-					"file": {
-						"src": "/C:/Temp/Postman-win64-Setup.exe"
-					}
-				},
-				"url": {
-					"raw": "https://localhost:7241/broker/api/v1/shipment/a6b17cae-4ea7-4485-88d2-c879c097f1b5?sendersFileReference=sendersRef123&fileName=input.txt",
-					"protocol": "https",
-					"host": [
-						"localhost"
-					],
-					"port": "7241",
-					"path": [
-						"broker",
-						"api",
-						"v1",
-						"shipment",
-						"a6b17cae-4ea7-4485-88d2-c879c097f1b5"
-					],
-					"query": [
+			"name": "broker",
+			"item": [
+				{
+					"name": "api",
+					"item": [
 						{
-							"key": "sendersFileReference",
-							"value": "sendersRef123"
-						},
-						{
-							"key": "fileName",
-							"value": "input.txt"
+							"name": "v1",
+							"item": [
+								{
+									"name": "file",
+									"item": [
+										{
+											"name": "{fileId}",
+											"item": [
+												{
+													"name": "upload",
+													"item": [
+														{
+															"name": "/broker/api/v1/file/:fileId/upload",
+															"request": {
+																"method": "POST",
+																"header": [],
+																"body": {
+																	"mode": "formdata",
+																	"formdata": [
+																		{
+																			"key": "file",
+																			"type": "file",
+																			"src": "/C:/Windows/system.ini"
+																		}
+																	]
+																},
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload"
+															},
+															"response": [
+																{
+																	"name": "Success",
+																	"originalRequest": {
+																		"method": "POST",
+																		"header": [],
+																		"url": {
+																			"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/upload",
+																			"host": [
+																				"{{baseUrl}}"
+																			],
+																			"path": [
+																				"broker",
+																				"api",
+																				"v1",
+																				"file",
+																				":fileId",
+																				"upload"
+																			],
+																			"variable": [
+																				{
+																					"key": "fileId"
+																				}
+																			]
+																		}
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "text",
+																	"header": [],
+																	"cookie": [],
+																	"body": ""
+																}
+															]
+														}
+													]
+												},
+												{
+													"name": "details",
+													"item": [
+														{
+															"name": "/broker/api/v1/file/:fileId/details",
+															"request": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Accept",
+																		"value": "text/plain"
+																	}
+																],
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/details"
+															},
+															"response": [
+																{
+																	"name": "Success",
+																	"originalRequest": {
+																		"method": "GET",
+																		"header": [
+																			{
+																				"key": "Accept",
+																				"value": "text/plain"
+																			}
+																		],
+																		"url": {
+																			"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/details",
+																			"host": [
+																				"{{baseUrl}}"
+																			],
+																			"path": [
+																				"broker",
+																				"api",
+																				"v1",
+																				"file",
+																				":fileId",
+																				"details"
+																			],
+																			"variable": [
+																				{
+																					"key": "fileId"
+																				}
+																			]
+																		}
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "json",
+																	"header": [
+																		{
+																			"key": "Content-Type",
+																			"value": "application/json"
+																		}
+																	],
+																	"cookie": [],
+																	"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Published\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"nulla_e\": \"<string>\"\n  },\n  \"fileStatusHistory\": [\n    {\n      \"fileStatus\": \"AllConfirmedDownloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"fileStatus\": \"Downloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"recipientFileStatusHistory\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ]\n}"
+																}
+															]
+														}
+													]
+												},
+												{
+													"name": "download",
+													"item": [
+														{
+															"name": "/broker/api/v1/file/:fileId/download",
+															"request": {
+																"method": "GET",
+																"header": [],
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download"
+															},
+															"response": [
+																{
+																	"name": "Success",
+																	"originalRequest": {
+																		"method": "GET",
+																		"header": [],
+																		"url": {
+																			"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/download",
+																			"host": [
+																				"{{baseUrl}}"
+																			],
+																			"path": [
+																				"broker",
+																				"api",
+																				"v1",
+																				"file",
+																				":fileId",
+																				"download"
+																			],
+																			"variable": [
+																				{
+																					"key": "fileId"
+																				}
+																			]
+																		}
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "text",
+																	"header": [],
+																	"cookie": [],
+																	"body": ""
+																},
+																{
+																	"name": "/broker/api/v1/file/:fileId/download",
+																	"originalRequest": {
+																		"method": "GET",
+																		"header": [],
+																		"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download"
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "raw",
+																	"header": [
+																		{
+																			"key": "Content-Length",
+																			"value": "0"
+																		},
+																		{
+																			"key": "Content-Type",
+																			"value": "application/octet-stream"
+																		},
+																		{
+																			"key": "Date",
+																			"value": "Mon, 06 Nov 2023 16:58:12 GMT"
+																		},
+																		{
+																			"key": "Server",
+																			"value": "Kestrel"
+																		},
+																		{
+																			"key": "Content-Disposition",
+																			"value": "attachment; filename=document.pdf; filename*=UTF-8''document.pdf"
+																		}
+																	],
+																	"cookie": [],
+																	"body": null
+																}
+															]
+														}
+													]
+												},
+												{
+													"name": "confirmdownload",
+													"item": [
+														{
+															"name": "/broker/api/v1/file/:fileId/confirmdownload",
+															"request": {
+																"auth": {
+																	"type": "bearer",
+																	"bearer": {
+																		"token": "{{recipientToken}}"
+																	}
+																},
+																"method": "POST",
+																"header": [],
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/confirmdownload"
+															},
+															"response": [
+																{
+																	"name": "Success",
+																	"originalRequest": {
+																		"method": "POST",
+																		"header": [],
+																		"url": {
+																			"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/confirmdownload",
+																			"host": [
+																				"{{baseUrl}}"
+																			],
+																			"path": [
+																				"broker",
+																				"api",
+																				"v1",
+																				"file",
+																				":fileId",
+																				"confirmdownload"
+																			],
+																			"variable": [
+																				{
+																					"key": "fileId"
+																				}
+																			]
+																		}
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "text",
+																	"header": [],
+																	"cookie": [],
+																	"body": ""
+																}
+															]
+														}
+													]
+												},
+												{
+													"name": "/broker/api/v1/file/:fileId",
+													"request": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Accept",
+																"value": "text/plain"
+															}
+														],
+														"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}"
+													},
+													"response": [
+														{
+															"name": "Success",
+															"originalRequest": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Accept",
+																		"value": "text/plain"
+																	}
+																],
+																"url": {
+																	"raw": "{{baseUrl}}/broker/api/v1/file/:fileId",
+																	"host": [
+																		"{{baseUrl}}"
+																	],
+																	"path": [
+																		"broker",
+																		"api",
+																		"v1",
+																		"file",
+																		":fileId"
+																	],
+																	"variable": [
+																		{
+																			"key": "fileId"
+																		}
+																	]
+																}
+															},
+															"status": "OK",
+															"code": 200,
+															"_postman_previewlanguage": "json",
+															"header": [
+																{
+																	"key": "Content-Type",
+																	"value": "application/json"
+																}
+															],
+															"cookie": [],
+															"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
+														}
+													]
+												}
+											]
+										},
+										{
+											"name": "upload",
+											"item": [
+												{
+													"name": "/broker/api/v1/file/upload",
+													"event": [
+														{
+															"listen": "test",
+															"script": {
+																"exec": [
+																	"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+																	"pm.collectionVariables.set(\"fileId\", fileId);\r",
+																	""
+																],
+																"type": "text/javascript"
+															}
+														}
+													],
+													"request": {
+														"method": "POST",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "multipart/form-data"
+															}
+														],
+														"body": {
+															"mode": "formdata",
+															"formdata": [
+																{
+																	"key": "Metadata.FileName",
+																	"value": "document.pdf",
+																	"type": "text"
+																},
+																{
+																	"key": "Metadata.SendersFileReference",
+																	"value": "archiveno-20425",
+																	"type": "text"
+																},
+																{
+																	"key": "Metadata.Checksum",
+																	"value": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+																	"type": "text"
+																},
+																{
+																	"key": "Metadata.Sender",
+																	"value": "931669400",
+																	"type": "text"
+																},
+																{
+																	"key": "Metadata.Recipients",
+																	"value": "924806176",
+																	"type": "text"
+																},
+																{
+																	"key": "Metadata.Metadata",
+																	"value": "",
+																	"type": "text",
+																	"disabled": true
+																},
+																{
+																	"key": "File",
+																	"type": "file",
+																	"src": "/C:/Windows/system.ini"
+																}
+															]
+														},
+														"url": "{{baseUrl}}/broker/api/v1/file/upload"
+													},
+													"response": [
+														{
+															"name": "Success",
+															"originalRequest": {
+																"method": "POST",
+																"header": [
+																	{
+																		"key": "Content-Type",
+																		"value": "multipart/form-data"
+																	}
+																],
+																"body": {
+																	"mode": "formdata",
+																	"formdata": [
+																		{
+																			"key": "Metadata.FileName",
+																			"value": "<string>",
+																			"type": "text"
+																		},
+																		{
+																			"key": "Metadata.SendersFileReference",
+																			"value": "<string>",
+																			"type": "text"
+																		},
+																		{
+																			"key": "Metadata.Checksum",
+																			"value": "<string>",
+																			"type": "text"
+																		},
+																		{
+																			"key": "Metadata.Sender",
+																			"value": "<string>",
+																			"type": "text"
+																		},
+																		{
+																			"key": "Metadata.Recipients",
+																			"value": "<string>,<string>",
+																			"type": "text"
+																		},
+																		{
+																			"key": "Metadata.Metadata",
+																			"value": "[object Object]",
+																			"type": "text"
+																		},
+																		{
+																			"key": "File",
+																			"value": "<string>",
+																			"type": "text"
+																		}
+																	]
+																},
+																"url": "{{baseUrl}}/broker/api/v1/file/upload"
+															},
+															"status": "OK",
+															"code": 200,
+															"_postman_previewlanguage": "text",
+															"header": [],
+															"cookie": [],
+															"body": ""
+														}
+													]
+												}
+											]
+										},
+										{
+											"name": "/broker/api/v1/file",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+															"pm.collectionVariables.set(\"fileId\", fileId);\r",
+															""
+														],
+														"type": "text/javascript"
+													}
+												}
+											],
+											"request": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json"
+													},
+													{
+														"key": "Accept",
+														"value": "text/plain"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"filename\": \"system.ini\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"checksum\": \"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e\",\n  \"sender\": \"931669400\",\n  \"recipients\": [\n    \"924806176\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"edtnuresed\",\n    \"veniam_1d\": \"d1_mainev\",\n    \"dialogId\": \"a15af443-8de8-4ebd-9708-08d407b5bb6c\"\n  }\n}",
+													"options": {
+														"raw": {
+															"headerFamily": "json",
+															"language": "json"
+														}
+													}
+												},
+												"url": "{{baseUrl}}/broker/api/v1/file"
+											},
+											"response": [
+												{
+													"name": "Success",
+													"originalRequest": {
+														"method": "POST",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "application/json"
+															},
+															{
+																"key": "Accept",
+																"value": "text/plain"
+															}
+														],
+														"body": {
+															"mode": "raw",
+															"raw": "{\n  \"filename\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    \"<string>\",\n    \"<string>\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"<string>\",\n    \"veniam_1d\": \"<string>\"\n  }\n}",
+															"options": {
+																"raw": {
+																	"headerFamily": "json",
+																	"language": "json"
+																}
+															}
+														},
+														"url": "{{baseUrl}}/broker/api/v1/file"
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "json",
+													"header": [
+														{
+															"key": "Content-Type",
+															"value": "application/json"
+														}
+													],
+													"cookie": [],
+													"body": "<uuid>"
+												}
+											]
+										},
+										{
+											"name": "/broker/api/v1/file",
+											"request": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "text/plain"
+													}
+												],
+												"url": "{{baseUrl}}/broker/api/v1/file"
+											},
+											"response": [
+												{
+													"name": "Success",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Accept",
+																"value": "text/plain"
+															}
+														],
+														"url": "{{baseUrl}}/broker/api/v1/file"
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "json",
+													"header": [
+														{
+															"key": "Content-Type",
+															"value": "application/json"
+														}
+													],
+													"cookie": [],
+													"body": "[\n  \"<string>\",\n  \"<string>\"\n]"
+												}
+											]
+										}
+									]
+								}
+							]
 						}
 					]
 				}
-			},
-			"response": []
+			]
 		},
 		{
-			"name": "UploadFile Docker",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "",
-						"value": "",
-						"type": "default"
-					}
-				],
-				"body": {
-					"mode": "file",
-					"file": {
-						"src": "/C:/Temp/5mb"
-					}
-				},
-				"url": {
-					"raw": "http://localhost:2525/broker/api/v1/shipment/7800c263-bba9-4931-9d92-4852fdef2d0d?sendersFileReference=sendersRef123&fileName=input.txt",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "2525",
-					"path": [
-						"broker",
-						"api",
-						"v1",
-						"shipment",
-						"7800c263-bba9-4931-9d92-4852fdef2d0d"
-					],
-					"query": [
+			"name": "health",
+			"item": [
+				{
+					"name": "/health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{baseUrl}}/health"
+					},
+					"response": [
 						{
-							"key": "sendersFileReference",
-							"value": "sendersRef123"
-						},
-						{
-							"key": "fileName",
-							"value": "input.txt"
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": "{{baseUrl}}/health"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "text",
+							"header": [],
+							"cookie": [],
+							"body": ""
 						}
 					]
 				}
-			},
-			"response": []
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": {
+			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+		}
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
 		},
 		{
-			"name": "CreateShipment",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"serviceCode\": \"test1\",\r\n    \"serviceEditioinCode\": 1,\r\n    \"recipients\": [\r\n        \"rep1\", \"rep2\"\r\n    ],\r\n    \"sendersReference\": \"testsendersREF\"\r\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "https://localhost:7241/broker/api/v1.1/shipment",
-					"protocol": "https",
-					"host": [
-						"localhost"
-					],
-					"port": "7241",
-					"path": [
-						"broker",
-						"api",
-						"v1.1",
-						"shipment"
-					]
-				}
-			},
-			"response": []
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5096"
 		},
 		{
-			"name": "CreateSimpleShipment",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "formdata",
-					"formdata": [
-						{
-							"key": "initiateBrokerShipmentRequest",
-							"value": "{\n    \"serviceCode\": \"test1\",\n    \"serviceEditioinCode\": 1,\n    \"recipients\": [\n        \"rep1\",\n        \"rep2\"\n    ],\n    \"sendersReference\": \"testsendersREF\"\n}",
-							"type": "text",
-							"disabled": true
-						},
-						{
-							"key": "File",
-							"type": "file",
-							"src": "/C:/Temp/5mb"
-						},
-						{
-							"key": "Metadata.ServiceCode",
-							"value": "124",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.ServiceEditionCode",
-							"value": "12",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.SendersReference",
-							"value": "125nlgag915",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.Recipients",
-							"value": "123",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.Recipients",
-							"value": "45",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.Recipients",
-							"value": "6789",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.Properties.Prop1",
-							"value": "value1",
-							"type": "text"
-						},
-						{
-							"key": "Metadata.Properties.Prop2",
-							"value": "value2",
-							"type": "text"
-						}
-					]
-				},
-				"url": {
-					"raw": "https://localhost:7241/broker/api/v1.1/outbox/simpleshipment",
-					"protocol": "https",
-					"host": [
-						"localhost"
-					],
-					"port": "7241",
-					"path": [
-						"broker",
-						"api",
-						"v1.1",
-						"outbox",
-						"simpleshipment"
-					]
-				}
-			},
-			"response": []
+			"key": "fileId",
+			"value": ""
 		},
 		{
-			"name": "CreateShipment Docker",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"serviceCode\": \"test1\",\r\n    \"serviceEditioinCode\": 1,\r\n    \"recipients\": [\r\n        \"rep1\", \"rep2\"\r\n    ],\r\n    \"sendersReference\": \"testsendersREF\"\r\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "http://localhost:2525/broker/api/v1/shipment",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "2525",
-					"path": [
-						"broker",
-						"api",
-						"v1",
-						"shipment"
-					]
-				}
-			},
-			"response": []
+			"key": "recipientToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MjQ4MDYxNzYiLCJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE1MTYyMzkwMjJ9.1DaUih64t_c28VKbWFkf-aywuqw5ksmeZ4U1kaBvpmg",
+			"type": "string"
 		}
 	]
 }
