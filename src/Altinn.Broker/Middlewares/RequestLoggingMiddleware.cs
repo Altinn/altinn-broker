@@ -52,7 +52,7 @@
                 else if (statusCode >= 400 && statusCode < 500)
                 {
                     _logger.LogWarning(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}.}",
+                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                         requestMethod,
                         requestPath,
                         httpContext.Response.StatusCode
@@ -61,7 +61,7 @@
                 else if (statusCode >= 500)
                 {
                     _logger.LogError(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}.",
+                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                         requestMethod,
                         requestPath,
                         httpContext.Response.StatusCode
