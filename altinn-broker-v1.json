@@ -3,11 +3,7 @@
     "info": {
       "title": "Altinn3.Broker",
       "version": "1.0.0",
-      "description": "API for Altinn Broker functionality.",
-      "x-comment-Erik-2023-10-29-23:10": "Started adding comments in this json file, to document change proposals and support discussion on the API",
-      "x-comment-Erik-2023-10-29-23:11": "Added summary, description and operationId to all endpoints (best practice and also used in Altinn 2 Broker API)",
-      "x-comment-Erik-2023-10-29-23:20": "Forgot to add examples for all endpoints (best practice and also used in Altinn 2 Broker API)",
-      "x-comment-Erik-2023-10-29-23:59": "Added version specification for all endpoints"  
+      "description": "API for Altinn Broker functionality."
     },
     "paths": {
       "/broker/api/v1/file": {
@@ -402,7 +398,6 @@
             "$ref": "#/components/schemas/UploadProtocolType"
             },
               "filename": {
-                  "x-comment-Erik-2023-10-26-22:41": "Reference to FilenameType schema",
                   "$ref": "#/components/schemas/FilenameType"
               },
               "sendersFileReference": {
