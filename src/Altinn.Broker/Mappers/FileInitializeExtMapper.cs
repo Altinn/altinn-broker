@@ -14,7 +14,7 @@ public static class FileInitializeExtMapper
             FileId = Guid.Empty,
             ApplicationId = caller,
             Filename = initializeExt.FileName,
-            ExternalFileReference = initializeExt.SendersFileReference,
+            SendersFileReference = initializeExt.SendersFileReference,
             Checksum = initializeExt.Checksum,
             Sender = initializeExt.Sender,
             ActorEvents = (initializeExt.Recipients.Concat(new[] { initializeExt.Sender })).Select(actorExternalId => new ActorFileStatusEntity()

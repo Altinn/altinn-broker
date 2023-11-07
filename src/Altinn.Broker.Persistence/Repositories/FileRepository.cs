@@ -60,7 +60,7 @@ public class FileRepository : IFileRepository
                     ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.GetString(reader.GetOrdinal("checksum")),
-                    ExternalFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
+                    SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                     FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
                     Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
@@ -147,7 +147,7 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@filename", file.Filename);
         command.Parameters.AddWithValue("@checksum", file.Checksum);
         command.Parameters.AddWithValue("@senderActorId", actorId);
-        command.Parameters.AddWithValue("@externalFileReference", file.ExternalFileReference);
+        command.Parameters.AddWithValue("@externalFileReference", file.SendersFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
         command.Parameters.AddWithValue("@uploaded", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageReferenceId", storageReference);

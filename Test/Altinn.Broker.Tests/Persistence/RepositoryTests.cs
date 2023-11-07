@@ -37,7 +37,7 @@ public class RepositoryTests
         // Act
         var fileId = await _fileRepository.AddFileAsync(new FileEntity()
         {
-            ExternalFileReference = "1",
+            SendersFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
@@ -68,7 +68,7 @@ public class RepositoryTests
         Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
             Sender = "1",
-            ExternalFileReference = "1",
+            SendersFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
@@ -111,7 +111,7 @@ public class RepositoryTests
         // Arrange
         var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
-            ExternalFileReference = "1",
+            SendersFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
