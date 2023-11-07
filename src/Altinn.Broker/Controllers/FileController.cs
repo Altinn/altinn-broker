@@ -1,105 +1,248 @@
-using System.Diagnostics.CodeAnalysis;
+using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Models;
+using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Mappers;
+using Altinn.Broker.Models;
+using Altinn.Broker.Persistence;
 
 using Microsoft.AspNetCore.Mvc;
 
-using Altinn.Broker.Models;
-using Altinn.Broker.Core.Models;
-using Altinn.Broker.Mappers;
-using Altinn.Broker.Core.Services.Interfaces;
-using Altinn.Broker.Persistence;
-
 namespace Altinn.Broker.Controllers
-{    
+{
     [ApiController]
     [Route("broker/api/v1/file")]
+    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class FileController : ControllerBase
     {
-        private readonly IFileService _fileService;
-        public FileController(IFileService fileService)
+        private readonly IFileRepository _fileRepository;
+        private readonly IFileStore _fileStore;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<FileController> _logger;
+
+        public FileController(IFileRepository fileRepository, IFileStore fileStore, IHttpClientFactory httpClientFactory, ILogger<FileController> logger)
         {
-            _fileService = fileService;
+            _fileRepository = fileRepository;
+            _fileStore = fileStore;
+            _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         /// <summary>
-        /// Upload a file using a binary stream.
+        /// Initialize a file upload
         /// </summary>
-        /// <param name="shipmentId">ShipmentId - identifies the shipment that the file belongs to.</param>
-        /// <param name="fileName">The name of the file being uploaded.</param>
-        /// <param name="sendersFileReference">External reference for the file.</param>
-        /// <param name="checksum">Checksum for the file.</param>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> UploadFileStreamed(
-            Guid shipmentId, 
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt)
+        {
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+
+            var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
+            var fileId = await _fileRepository.AddFileAsync(file, caller);
+
+            return Ok(fileId);
+        }
+
+        /// <summary>
+        /// Upload to an initialized file using a binary stream.
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("{fileId}/upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
-            BrokerFileStatusOverview brokerFileMetadata = await _fileService.UploadFile(shipmentId, fileId, Request.Body);
-            return Accepted(brokerFileMetadata.FileId);
+            _logger.LogInformation("File size is {FileSize]} bytes", Request.ContentLength);
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return BadRequest();
+            }
+
+            await _fileStore.UploadFile(Request.Body, fileId);
+            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
+
+            return Ok(fileId);
         }
 
-        [HttpGet]
-        public async Task<ActionResult<BrokerFileStatusOverviewExt>> GetFileStatus(Guid fileId)
+        /// <summary>
+        /// Initialize and upload a file using form-data
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        public async Task<ActionResult> InitializeAndUpload(
+            [FromForm] FileInitializeAndUploadExt form
+        )
         {
-            BrokerFileStatusOverview brokerFileStatusOverview = await _fileService.GetFileStatus(fileId);
-            return Accepted(brokerFileStatusOverview.MapToExternal());
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+
+            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
+            var fileId = await _fileRepository.AddFileAsync(file, caller);
+            await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
+            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
+
+            return Ok(fileId);
         }
 
+        /// <summary>
+        /// Get information about the file and its current status
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("{fileId}")]
+        public async Task<ActionResult<FileOverviewExt>> GetFileStatus(Guid fileId)
+        {
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(FileStatusOverviewExtMapper.MapToExternalModel(file));
+        }
+
+        /// <summary>
+        /// Get more detailed information about the file upload for auditing and troubleshooting purposes
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("{fileId}/details")]
+        public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
+        {
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            var fileHistory = await _fileRepository.GetFileStatusHistoryAsync(fileId);
+            var actorEvents = await _fileRepository.GetActorEvents(fileId);
+
+            var fileOverview = FileStatusOverviewExtMapper.MapToExternalModel(file);
+            return new FileStatusDetailsExt()
+            {
+                Checksum = fileOverview.Checksum,
+                FileId = fileId,
+                FileName = fileOverview.FileName,
+                Sender = fileOverview.Sender,
+                FileStatus = fileOverview.FileStatus,
+                FileStatusChanged = fileOverview.FileStatusChanged,
+                FileStatusText = fileOverview.FileStatusText,
+                PropertyList = fileOverview.PropertyList,
+                Recipients = fileOverview.Recipients,
+                SendersFileReference = fileOverview.SendersFileReference,
+                FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
+                RecipientFileStatusHistory = FileStatusOverviewExtMapper.MapToRecipientEvents(actorEvents.Where(actorEvents => actorEvents.Actor.ActorExternalId != file.Sender).ToList())
+            };
+        }
+
+        /// <summary>
+        /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files.
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to)
+        {
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+
+            var files = await _fileRepository.GetFilesAvailableForCaller(caller);
+
+            return Ok(files);
+        }
+
+        /// <summary>
+        /// Downloads the file
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/download")]
-        public async Task<Stream> DownloadFile(Guid fileId)
+        public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
         {
-            await Task.Run(() => 1 == 1);
-            MemoryStream ms = new MemoryStream();
-            return ms;
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (string.IsNullOrWhiteSpace(file?.FileLocation))
+            {
+                return BadRequest("No file uploaded yet");
+            }
+
+            if (file.FileLocation.StartsWith("altinn-3"))
+            {
+                var stream = await _fileStore.GetFileStream(fileId);
+                return File(stream, "application/octet-stream", file.Filename);
+            }
+            else
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync(file.FileLocation);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode(502, "File could not be accessed at the location.");
+                }
+                var stream = await response.Content.ReadAsStreamAsync();
+                var contentType = response.Content.Headers.ContentType.ToString();
+                return File(stream, contentType, file.Filename);
+            }
         }
 
-        [HttpGet]
-        [Route("{fileId}/confirm")]
+        /// <summary>
+        /// Confirms that the file has been downloaded
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(Guid fileId)
         {
-            await Task.Run(() => 1 == 1);
-            return Accepted();
+            var caller = GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
+
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+
+            var recipientStatuses = file.ActorEvents
+                .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != caller)
+                .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
+                .Select(group => group.Max(statusEvent => statusEvent.Status))
+                .ToList();
+            bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.Downloaded);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Downloaded, caller);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.AllConfirmedDownloaded);
+
+            return Ok();
         }
 
-        [HttpPut]
-        public async Task<ActionResult<BrokerFileStatusOverviewExt>> OverwriteFileStreamed(Guid fileId, 
-        string fileName, 
-        string sendersFileReference, 
-        string checksum)
-        {
-            await Task.Run(() => 1 == 1);
-            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
-            return Accepted(brokerFileStatusOverviewExt);
-        }
-
-        [HttpPost]
-        [Route("{fileId}/cancel")]
-        public async Task<ActionResult> CancelFile(Guid fileId, string reasonText)
-        {
-            await Task.Run(() => 1 == 1);
-            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
-            return Accepted();
-        }
-
-        [HttpPost]
-        [Route("{fileId}/Report")]
-        public async void ReportFile(Guid fileId, string reportText)
-        {
-            await Task.Run(() => 1 == 1);
-            BrokerFileStatusOverviewExt brokerFileStatusOverviewExt = new BrokerFileStatusOverviewExt();
-        }
-
-        [HttpPost]
-        [Route("{fileId}/resume")]
-        public async Task<ActionResult<Guid>> ResumeUploadFileStreamed(
-            Guid fileId, 
-            Guid shipmentId,
-            string fileName,
-            string sendersFileReference,
-            string checksum)
-        {
-            BrokerFileMetadata brokerFileMetadata = await _fileService.ResumeUploadFile(shipmentId, fileId, Request.Body, fileName, sendersFileReference, checksum);
-            return Accepted(brokerFileMetadata.FileId);
-        }
+        private string? GetCallerFromTestToken(HttpContext httpContext) => httpContext.User.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     }
 }

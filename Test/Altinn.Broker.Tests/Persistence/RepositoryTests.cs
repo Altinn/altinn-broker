@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
@@ -13,7 +14,6 @@ public class RepositoryTests
     private readonly DatabaseConnectionProvider _databaseConnectionProvider;
     private FileRepository _fileRepository;
     private ActorRepository _actorRepository;
-    private ShipmentRepository _shipmentRepository;
 
     public RepositoryTests()
     {
@@ -21,51 +21,43 @@ public class RepositoryTests
         {
             ConnectionString = DATABASE_CONNECTION_STRING
         });
-        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions); 
+        _databaseConnectionProvider = new DatabaseConnectionProvider(databaseOptions);
 
-        _fileRepository = new FileRepository(_databaseConnectionProvider);
         _actorRepository = new ActorRepository(_databaseConnectionProvider);
-        _shipmentRepository = new ShipmentRepository(_databaseConnectionProvider);
+        _fileRepository = new FileRepository(_databaseConnectionProvider, _actorRepository);
     }
 
     [Fact]
     public async Task AddFileStorageReference_WhenAddFile_ShouldBeCreated()
     {
         // Arrange
-        Guid fileId = Guid.NewGuid();
-        string fileLocation = "path/to/file" + fileId.ToString();
-
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
-        {
-            ActorId = senderActorId,
-            ActorExternalId = "1"
-        });
-
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
+        string fileLocation = "path/to/file";
 
 
         // Act
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
+        var fileId = await _fileRepository.AddFileAsync(new FileEntity()
         {
-            ShipmentId = shipmentId,
-            FileId = fileId,
-            ExternalFileReference = "1",
-            FileStatus = Core.Domain.Enums.FileStatus.Ready,
+            SendersFileReference = "1",
+            FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
-            LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
-        });
+            Sender = "1",
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
+            FileStatusChanged = DateTime.UtcNow,
+            ActorEvents = new List<ActorFileStatusEntity>()
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                }
+            }
+        }, "1234567890");
 
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
@@ -76,51 +68,36 @@ public class RepositoryTests
     public async Task AddReceipt_WhenCalled_ShouldSaveReceipt()
     {
         // Arrange
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        Guid fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
-            ActorId = senderActorId,
-            ActorExternalId = "1"
-        });
-
-        var recipientActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
-        {
-            ActorId = recipientActorId,
-            ActorExternalId = "1"
-        });
-
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
-
-        Guid fileId = Guid.NewGuid();
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
-        {
-            ShipmentId = shipmentId,
-            FileId = fileId,
-            ExternalFileReference = "1",
-            FileStatus = Core.Domain.Enums.FileStatus.Ready,
+            Sender = "1",
+            SendersFileReference = "1",
+            FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
-            LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
-        });
+            FileStatusChanged = DateTime.UtcNow,
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
+            ActorEvents = new List<ActorFileStatusEntity>()
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                }
+            }
+        }, "1234567890");
 
         // Act
-        await _fileRepository.AddReceiptAsync(new FileReceipt()
+        await _fileRepository.AddReceiptAsync(new ActorFileStatusEntity()
         {
-            Actor = new Actor()
+            Actor = new ActorEntity()
             {
-                ActorId = recipientActorId,
-                ActorExternalId = "1",
+                ActorExternalId = "1"
             },
             Date = DateTime.UtcNow,
             FileId = fileId,
@@ -130,45 +107,37 @@ public class RepositoryTests
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
-        Assert.NotEmpty(savedFile.Receipts);
-        Assert.Equal(1, savedFile.Receipts.Count);
-        Assert.Equal(Core.Domain.Enums.ActorFileStatus.Uploaded, savedFile.Receipts.First().Status);
+        Assert.NotEmpty(savedFile.ActorEvents);
+        Assert.Equal(2, savedFile.ActorEvents.Count);
     }
 
     [Fact]
     public async Task GetFile_ExistingFileId_ShouldReturnFile()
     {
         // Arrange
-        var senderActorId = new Random().Next(0, 10000000);
-        await _actorRepository.AddActorAsync(new Actor()
+        var fileId = await _fileRepository.AddFileAsync(new Core.Domain.FileEntity()
         {
-            ActorId = senderActorId,
-            ActorExternalId = "1"
-        });
-
-        Guid shipmentId = Guid.NewGuid();
-        await _shipmentRepository.AddShipmentAsync(new Shipment()
-        {
-            ShipmentId = shipmentId,
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            Initiated = DateTime.UtcNow,
-            ExternalShipmentReference = "1",
-            Receipts = new List<ShipmentReceipt>(),
-            UploaderActorId = senderActorId
-        });
-
-        Guid fileId = Guid.NewGuid();
-        await _fileRepository.AddFileAsync(new Core.Domain.File()
-        {
-            ShipmentId = shipmentId,
-            FileId = fileId,
-            ExternalFileReference = "1",
-            FileStatus = Core.Domain.Enums.FileStatus.Ready,
+            SendersFileReference = "1",
+            FileStatus = Core.Domain.Enums.FileStatus.Initialized,
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
-            LastStatusUpdate = DateTime.UtcNow,
-            Receipts = new List<FileReceipt>(),
-        });
+            Sender = "altinn",
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
+            FileStatusChanged = DateTime.UtcNow,
+            ActorEvents = new List<ActorFileStatusEntity>()
+            {
+                new ActorFileStatusEntity(){
+                    Actor = new ActorEntity()
+                    {
+                        ActorExternalId= "2"
+                    },
+                    Date= DateTime.UtcNow,
+                    Status = ActorFileStatus.Initialized
+                }
+            }
+        }, "1234567890");
 
         // Act
         var result = await _fileRepository.GetFileAsync(fileId);
@@ -189,48 +158,19 @@ public class RepositoryTests
     }
 
     [Fact]
-    public async Task SaveShipment_Successful_CanRetrieveShipment()
-    {
-        // Arrange
-        var actor = new Actor()
-        {
-            ActorId = new Random().Next(0, 10000000),
-            ActorExternalId = Guid.NewGuid().ToString(),
-        };
-        await _actorRepository.AddActorAsync(actor);
-        var shipment = new Shipment()
-        {
-            ExternalShipmentReference = Guid.NewGuid().ToString(),
-            Initiated = DateTime.Now.ToUniversalTime(),
-            ShipmentStatus = Core.Domain.Enums.ShipmentStatus.Initialized,
-            UploaderActorId = actor.ActorId,
-            ShipmentId = Guid.NewGuid(),
-            Receipts = new List<ShipmentReceipt>()
-        };
-
-        // Act
-        await _shipmentRepository.AddShipmentAsync(shipment);
-        var savedShipment = await _shipmentRepository.GetShipmentAsync(shipment.ShipmentId);
-
-        // Assert
-        Assert.Equal(shipment.ShipmentId, savedShipment?.ShipmentId);
-    }
-
-    [Fact]
     public async Task SaveActor_Successful_CanRetrieveActor()
     {
         // Arrange
-        var actor = new Actor()
+        var actor = new ActorEntity()
         {
-            ActorId = new Random().Next(0, 10000000),
             ActorExternalId = Guid.NewGuid().ToString()
         };
 
         // Act
-        await _actorRepository.AddActorAsync(actor);
-        var savedActor = await _actorRepository.GetActorAsync(actor.ActorId);
+        var actorId = await _actorRepository.AddActorAsync(actor);
+        var savedActor = await _actorRepository.GetActorAsync(actor.ActorExternalId);
 
         // Assert
-        Assert.Equal(actor.ActorExternalId, savedActor.ActorExternalId);
+        Assert.Equal(savedActor.ActorId, actorId);
     }
 }

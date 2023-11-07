@@ -1,12 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
-
-using Altinn.Broker.Core.Enums;
-using Altinn.Broker.Core.Models;
-
 namespace Altinn.Broker.Persistence
-{    
+{
     public interface IFileStore
     {
-        Task UploadFile(Stream filestream, string shipmentId, string fileReference);
-    }    
+        Task<Stream> GetFileStream(Guid fileId);
+        Task UploadFile(Stream filestream, Guid fileId);
+    }
 }

@@ -14,23 +14,23 @@ public class ActorRepository : IActorRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<Actor?> GetActorAsync(long actorId)
+    public async Task<ActorEntity?> GetActorAsync(string actorExternalId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using var command = new NpgsqlCommand(
-            "SELECT * FROM broker.actor WHERE actor_id_pk = @actorId",
+            "SELECT * FROM broker.actor WHERE actor_external_id = @actorExternalId",
             connection);
 
-        command.Parameters.AddWithValue("@actorId", actorId);
+        command.Parameters.AddWithValue("@actorExternalId", actorExternalId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
 
-        Actor? actor = null;
+        ActorEntity? actor = null;
 
         while (reader.Read())
         {
-            actor = new Actor
+            actor = new ActorEntity
             {
                 ActorId = reader.GetInt32(reader.GetOrdinal("actor_id_pk")),
                 ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
@@ -40,17 +40,17 @@ public class ActorRepository : IActorRepository
         return actor;
     }
 
-    public async Task AddActorAsync(Actor actor)
+    public async Task<long> AddActorAsync(ActorEntity actor)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         NpgsqlCommand command = new NpgsqlCommand(
-                    "INSERT INTO broker.actor (actor_id_pk, actor_external_id) " +
-                    "VALUES (@actorId, @actorExternalId)",
+                    "INSERT INTO broker.actor (actor_external_id) " +
+                    "VALUES (@actorExternalId) " +
+                    "RETURNING actor_id_pk",
                     connection);
 
-        command.Parameters.AddWithValue("@actorId", actor.ActorId);
         command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
-        command.ExecuteNonQuery();
+        return (long)command.ExecuteScalar()!;
     }
 }
