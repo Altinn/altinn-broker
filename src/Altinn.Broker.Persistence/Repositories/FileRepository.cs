@@ -92,7 +92,7 @@ public class FileRepository : IFileRepository
                 return null;
             }
         }
-        file.Metadata = await GetMetadata(fileId);
+        file.PropertyList = await GetMetadata(fileId);
         return file;
     }
 
@@ -165,7 +165,7 @@ public class FileRepository : IFileRepository
             Console.WriteLine($"An error occurred: {ex.Message}");
         }
 
-        await SetMetadata(fileId, file.Metadata);
+        await SetMetadata(fileId, file.PropertyList);
         await InsertFileStatus(fileId, FileStatus.Initialized);
 
         return fileId;
@@ -340,28 +340,28 @@ public class FileRepository : IFileRepository
 
         using (var command = new NpgsqlCommand(
             "SELECT * " +
-            "FROM broker.file_metadata " +
+            "FROM broker.file_property " +
             "WHERE file_id_fk = @fileId", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
-            var metadata = new Dictionary<string, string>();
+            var property = new Dictionary<string, string>();
             using (var reader = await command.ExecuteReaderAsync())
             {
                 while (await reader.ReadAsync())
                 {
-                    metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
+                    property.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
                 }
             }
-            return metadata;
+            return property;
         }
     }
 
-    private async Task SetMetadata(Guid fileId, Dictionary<string, string> metadata)
+    private async Task SetMetadata(Guid fileId, Dictionary<string, string> property)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
         using var transaction = connection.BeginTransaction();
         using var command = new NpgsqlCommand(
-            "INSERT INTO broker.file_metadata (metadata_id_pk, file_id_fk, key, value) " +
+            "INSERT INTO broker.file_property (property_id_pk, file_id_fk, key, value) " +
             "VALUES (DEFAULT, @fileId, @key, @value)",
             connection);
 
@@ -371,13 +371,13 @@ public class FileRepository : IFileRepository
 
         try
         {
-            foreach (var metadataEntry in metadata)
+            foreach (var propertyEntry in property)
             {
-                command.Parameters[1].Value = metadataEntry.Key;
-                command.Parameters[2].Value = metadataEntry.Value;
+                command.Parameters[1].Value = propertyEntry.Key;
+                command.Parameters[2].Value = propertyEntry.Value;
                 if (command.ExecuteNonQuery() != 1)
                 {
-                    throw new NpgsqlException("Failed while inserting metadata");
+                    throw new NpgsqlException("Failed while inserting property");
                 }
             }
             transaction.Commit();

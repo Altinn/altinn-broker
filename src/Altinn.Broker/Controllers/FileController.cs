@@ -154,7 +154,7 @@ namespace Altinn.Broker.Controllers
                 FileStatus = fileOverview.FileStatus,
                 FileStatusChanged = fileOverview.FileStatusChanged,
                 FileStatusText = fileOverview.FileStatusText,
-                Metadata = fileOverview.Metadata,
+                PropertyList = fileOverview.PropertyList,
                 Recipients = fileOverview.Recipients,
                 SendersFileReference = fileOverview.SendersFileReference,
                 FileStatusHistory = FileStatusOverviewExtMapper.MapToFileStatusHistoryExt(fileHistory),
