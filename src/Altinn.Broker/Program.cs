@@ -1,17 +1,22 @@
-using Altinn.Broker.Core.Extensions;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
+
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Repositories.Interfaces;
-using Altinn.Broker.Core.Services.Interfaces;
+using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -24,8 +29,8 @@ builder.Configuration
 ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -34,18 +39,37 @@ if (app.Environment.IsDevelopment())
 
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
-    services.AddCoreServices(config);
-    services.AddSingleton<IDataService, DataStore>();
     services.AddSingleton<IFileStore, BlobStore>();
-    services.AddSingleton<IFileStorage, FileStore>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
-    services.AddSingleton<IShipmentRepository, ShipmentRepository>();
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
+
+    services.AddHttpClient();
+
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = false,
+            ValidateLifetime = false,
+            RequireExpirationTime = false,
+            RequireSignedTokens = false,
+            SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+            {
+                var jwt = new JwtSecurityToken(token);
+
+                return jwt;
+            },
+        };
+    });
 }
 
 app.UseHttpsRedirection();
