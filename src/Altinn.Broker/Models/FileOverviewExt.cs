@@ -32,7 +32,7 @@ namespace Altinn.Broker.Models
         /// <summary>
         /// Up to ten arbitrary key value pairs
         /// </summary>
-        [JsonPropertyName("metadata")]
+        [JsonPropertyName("propertyList")]
         public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
     }
 }

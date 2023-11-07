@@ -40,7 +40,7 @@ namespace Altinn.Broker.Models
         /// <summary>
         /// Gets or sets the properties field.
         /// </summary>
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>();
+        [JsonPropertyName("propertyList")]
+        public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
     }
 }
