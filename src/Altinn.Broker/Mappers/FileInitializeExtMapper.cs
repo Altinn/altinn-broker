@@ -27,7 +27,7 @@ public static class FileInitializeExtMapper
                 },
                 Status = Altinn.Broker.Core.Domain.Enums.ActorFileStatus.Initialized
             }).ToList(),
-            PropertyList = initializeExt.Metadata
+            PropertyList = initializeExt.PropertyList
         };
     }
 }
