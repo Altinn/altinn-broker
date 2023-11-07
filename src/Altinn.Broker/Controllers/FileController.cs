@@ -13,7 +13,7 @@ namespace Altinn.Broker.Controllers
 {
     [ApiController]
     [Route("broker/api/v1/file")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class FileController : ControllerBase
     {
         private readonly IFileRepository _fileRepository;
@@ -198,7 +198,8 @@ namespace Altinn.Broker.Controllers
             {
                 var stream = await _fileStore.GetFileStream(fileId);
                 return File(stream, "application/octet-stream", file.Filename);
-            } else
+            }
+            else
             {
                 var client = _httpClientFactory.CreateClient();
                 var response = await client.GetAsync(file.FileLocation);

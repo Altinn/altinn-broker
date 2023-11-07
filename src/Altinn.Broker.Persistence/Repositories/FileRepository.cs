@@ -49,7 +49,7 @@ public class FileRepository : IFileRepository
             "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
             "WHERE file_id_pk = @fileId",
             connection);
-        { 
+        {
             command.Parameters.AddWithValue("@fileId", fileId);
             using NpgsqlDataReader reader = command.ExecuteReader();
             if (reader.Read())
@@ -407,4 +407,3 @@ public class FileRepository : IFileRepository
         }
     }
 }
-
