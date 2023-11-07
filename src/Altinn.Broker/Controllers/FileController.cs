@@ -167,7 +167,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        public async Task<ActionResult<List<string>>> GetFiles()
+        public async Task<ActionResult<List<Guid>>> GetFiles()
         {
             var caller = GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))

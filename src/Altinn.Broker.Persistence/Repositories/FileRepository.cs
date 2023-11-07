@@ -187,7 +187,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<string>> GetFilesAvailableForCaller(string actorExernalReference)
+    public async Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -202,12 +202,12 @@ public class FileRepository : IFileRepository
         {
             command.Parameters.AddWithValue("@actorExternalid", actorExernalReference);
 
-            var files = new List<string>();
+            var files = new List<Guid>();
             using (var reader = await command.ExecuteReaderAsync())
             {
                 while (await reader.ReadAsync())
                 {
-                    var fileId = reader.GetString(0);
+                    var fileId = reader.GetGuid(0);
                     files.Add(fileId);
                 }
             }
