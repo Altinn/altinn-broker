@@ -5,8 +5,6 @@ using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 using Altinn.Broker.Persistence;
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Controllers
@@ -167,7 +165,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        public async Task<ActionResult<List<Guid>>> GetFiles()
+        public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to)
         {
             var caller = GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))
