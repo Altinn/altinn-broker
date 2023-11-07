@@ -30,13 +30,10 @@ public static class FileStatusOverviewExtMapper
         return domainEnum switch
         {
             FileStatus.Initialized => FileStatusExt.Initialized,
-            FileStatus.AwaitingUpload => FileStatusExt.Initialized,
             FileStatus.UploadInProgress => FileStatusExt.UploadInProgress,
             FileStatus.AwaitingUploadProcessing => FileStatusExt.AwaitingUploadProcessing,
-            FileStatus.UploadedAndProcessed => FileStatusExt.UploadedAndProcessed,
             FileStatus.Published => FileStatusExt.Published,
             FileStatus.Cancelled => FileStatusExt.Cancelled,
-            FileStatus.Downloaded => FileStatusExt.Published,
             FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
             FileStatus.Deleted => FileStatusExt.Deleted,
             FileStatus.Failed => FileStatusExt.Failed
@@ -48,13 +45,10 @@ public static class FileStatusOverviewExtMapper
         return domainEnum switch
         {
             FileStatus.Initialized => "Ready for upload",
-            FileStatus.AwaitingUpload => "Ready for upload",
             FileStatus.UploadInProgress => "Uploading",
             FileStatus.AwaitingUploadProcessing => "Processing upload",
-            FileStatus.UploadedAndProcessed => "Uploaded",
             FileStatus.Published => "Ready for download",
             FileStatus.Cancelled => "File cancelled",
-            FileStatus.Downloaded => "Ready for download",
             FileStatus.AllConfirmedDownloaded => "All downloaded",
             FileStatus.Deleted => "File has been deleted",
             FileStatus.Failed => "Upload failed"

@@ -73,7 +73,7 @@ namespace Altinn.Broker.Controllers
             await _fileStore.UploadFile(Request.Body, fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
             await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
-            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadedAndProcessed);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
             return Ok(fileId);
         }
@@ -100,7 +100,7 @@ namespace Altinn.Broker.Controllers
             await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
             await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
-            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadedAndProcessed);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
             return Ok(fileId);
         }
