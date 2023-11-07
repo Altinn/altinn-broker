@@ -29,27 +29,17 @@
 															"request": {
 																"method": "POST",
 																"header": [],
-																"url": {
-																	"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/upload",
-																	"host": [
-																		"{{baseUrl}}"
-																	],
-																	"path": [
-																		"broker",
-																		"api",
-																		"v1",
-																		"file",
-																		":fileId",
-																		"upload"
-																	],
-																	"variable": [
+																"body": {
+																	"mode": "formdata",
+																	"formdata": [
 																		{
-																			"key": "fileId",
-																			"value": "<uuid>",
-																			"description": "(Required) "
+																			"key": "file",
+																			"type": "file",
+																			"src": "/C:/Windows/system.ini"
 																		}
 																	]
-																}
+																},
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload"
 															},
 															"response": [
 																{
@@ -101,27 +91,7 @@
 																		"value": "text/plain"
 																	}
 																],
-																"url": {
-																	"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/details",
-																	"host": [
-																		"{{baseUrl}}"
-																	],
-																	"path": [
-																		"broker",
-																		"api",
-																		"v1",
-																		"file",
-																		":fileId",
-																		"details"
-																	],
-																	"variable": [
-																		{
-																			"key": "fileId",
-																			"value": "<uuid>",
-																			"description": "(Required) "
-																		}
-																	]
-																}
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/details"
 															},
 															"response": [
 																{
@@ -178,27 +148,7 @@
 															"request": {
 																"method": "GET",
 																"header": [],
-																"url": {
-																	"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/download",
-																	"host": [
-																		"{{baseUrl}}"
-																	],
-																	"path": [
-																		"broker",
-																		"api",
-																		"v1",
-																		"file",
-																		":fileId",
-																		"download"
-																	],
-																	"variable": [
-																		{
-																			"key": "fileId",
-																			"value": "<uuid>",
-																			"description": "(Required) "
-																		}
-																	]
-																}
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download"
 															},
 															"response": [
 																{
@@ -232,6 +182,41 @@
 																	"header": [],
 																	"cookie": [],
 																	"body": ""
+																},
+																{
+																	"name": "/broker/api/v1/file/:fileId/download",
+																	"originalRequest": {
+																		"method": "GET",
+																		"header": [],
+																		"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download"
+																	},
+																	"status": "OK",
+																	"code": 200,
+																	"_postman_previewlanguage": "raw",
+																	"header": [
+																		{
+																			"key": "Content-Length",
+																			"value": "0"
+																		},
+																		{
+																			"key": "Content-Type",
+																			"value": "application/octet-stream"
+																		},
+																		{
+																			"key": "Date",
+																			"value": "Mon, 06 Nov 2023 16:58:12 GMT"
+																		},
+																		{
+																			"key": "Server",
+																			"value": "Kestrel"
+																		},
+																		{
+																			"key": "Content-Disposition",
+																			"value": "attachment; filename=document.pdf; filename*=UTF-8''document.pdf"
+																		}
+																	],
+																	"cookie": [],
+																	"body": null
 																}
 															]
 														}
@@ -243,29 +228,15 @@
 														{
 															"name": "/broker/api/v1/file/:fileId/confirmdownload",
 															"request": {
+																"auth": {
+																	"type": "bearer",
+																	"bearer": {
+																		"token": "{{recipientToken}}"
+																	}
+																},
 																"method": "POST",
 																"header": [],
-																"url": {
-																	"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/confirmdownload",
-																	"host": [
-																		"{{baseUrl}}"
-																	],
-																	"path": [
-																		"broker",
-																		"api",
-																		"v1",
-																		"file",
-																		":fileId",
-																		"confirmdownload"
-																	],
-																	"variable": [
-																		{
-																			"key": "fileId",
-																			"value": "<uuid>",
-																			"description": "(Required) "
-																		}
-																	]
-																}
+																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/confirmdownload"
 															},
 															"response": [
 																{
@@ -314,26 +285,7 @@
 																"value": "text/plain"
 															}
 														],
-														"url": {
-															"raw": "{{baseUrl}}/broker/api/v1/file/:fileId",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"broker",
-																"api",
-																"v1",
-																"file",
-																":fileId"
-															],
-															"variable": [
-																{
-																	"key": "fileId",
-																	"value": "<uuid>",
-																	"description": "(Required) "
-																}
-															]
-														}
+														"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}"
 													},
 													"response": [
 														{
@@ -386,13 +338,20 @@
 											"item": [
 												{
 													"name": "/broker/api/v1/file/upload",
-													"request": {
-														"auth": {
-															"type": "bearer",
-															"bearer": {
-																"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBcm5lTHVkdmlnc2VuIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.gRWRZh5lQxFjtwIUbmB0w7RRL5rKmJPdzft5HQNVZjg"
+													"event": [
+														{
+															"listen": "test",
+															"script": {
+																"exec": [
+																	"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+																	"pm.collectionVariables.set(\"fileId\", fileId);\r",
+																	""
+																],
+																"type": "text/javascript"
 															}
-														},
+														}
+													],
+													"request": {
 														"method": "POST",
 														"header": [
 															{
@@ -405,38 +364,39 @@
 															"formdata": [
 																{
 																	"key": "Metadata.FileName",
-																	"value": "<string>",
+																	"value": "document.pdf",
 																	"type": "text"
 																},
 																{
 																	"key": "Metadata.SendersFileReference",
-																	"value": "<string>",
+																	"value": "archiveno-20425",
 																	"type": "text"
 																},
 																{
 																	"key": "Metadata.Checksum",
-																	"value": "<string>",
+																	"value": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 																	"type": "text"
 																},
 																{
 																	"key": "Metadata.Sender",
-																	"value": "<string>",
+																	"value": "931669400",
 																	"type": "text"
 																},
 																{
 																	"key": "Metadata.Recipients",
-																	"value": "<string>,<string>",
+																	"value": "924806176",
 																	"type": "text"
 																},
 																{
 																	"key": "Metadata.Metadata",
-																	"value": "[object Object]",
-																	"type": "text"
+																	"value": "",
+																	"type": "text",
+																	"disabled": true
 																},
 																{
 																	"key": "File",
-																	"value": "<string>",
-																	"type": "text"
+																	"type": "file",
+																	"src": "/C:/Windows/system.ini"
 																}
 															]
 														},
@@ -508,6 +468,19 @@
 										},
 										{
 											"name": "/broker/api/v1/file",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+															"pm.collectionVariables.set(\"fileId\", fileId);\r",
+															""
+														],
+														"type": "text/javascript"
+													}
+												}
+											],
 											"request": {
 												"method": "POST",
 												"header": [
@@ -522,7 +495,7 @@
 												],
 												"body": {
 													"mode": "raw",
-													"raw": "{\n  \"filename\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    \"<string>\",\n    \"<string>\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"<string>\",\n    \"veniam_1d\": \"<string>\"\n  }\n}",
+													"raw": "{\n  \"filename\": \"system.ini\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"checksum\": \"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e\",\n  \"sender\": \"931669400\",\n  \"recipients\": [\n    \"924806176\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"edtnuresed\",\n    \"veniam_1d\": \"d1_mainev\",\n    \"dialogId\": \"a15af443-8de8-4ebd-9708-08d407b5bb6c\"\n  }\n}",
 													"options": {
 														"raw": {
 															"headerFamily": "json",
@@ -680,6 +653,15 @@
 		{
 			"key": "baseUrl",
 			"value": "http://localhost:5096"
+		},
+		{
+			"key": "fileId",
+			"value": ""
+		},
+		{
+			"key": "recipientToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MjQ4MDYxNzYiLCJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE1MTYyMzkwMjJ9.1DaUih64t_c28VKbWFkf-aywuqw5ksmeZ4U1kaBvpmg",
+			"type": "string"
 		}
 	]
 }
