@@ -59,7 +59,7 @@ public class FileRepository : IFileRepository
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
                     ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
-                    Checksum = reader.GetString(reader.GetOrdinal("checksum")),
+                    Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                     FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
@@ -146,6 +146,10 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@applicationId", caller);
         command.Parameters.AddWithValue("@filename", file.Filename);
         command.Parameters.AddWithValue("@checksum", file.Checksum);
+        if (file.Checksum is null)
+        {
+            command.Parameters["@checksum"].Value = DBNull.Value;
+        }
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.SendersFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);

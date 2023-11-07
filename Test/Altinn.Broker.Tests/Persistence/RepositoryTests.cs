@@ -42,6 +42,9 @@ public class RepositoryTests
             FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
             Sender = "1",
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
             FileStatusChanged = DateTime.UtcNow,
             ActorEvents = new List<ActorFileStatusEntity>()
             {
@@ -73,6 +76,9 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             FileStatusChanged = DateTime.UtcNow,
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
             ActorEvents = new List<ActorFileStatusEntity>()
             {
                 new ActorFileStatusEntity(){
@@ -102,7 +108,7 @@ public class RepositoryTests
         var savedFile = await _fileRepository.GetFileAsync(fileId);
         Assert.NotNull(savedFile);
         Assert.NotEmpty(savedFile.ActorEvents);
-        Assert.Equal(3, savedFile.ActorEvents.Count);
+        Assert.Equal(2, savedFile.ActorEvents.Count);
     }
 
     [Fact]
@@ -116,6 +122,9 @@ public class RepositoryTests
             Uploaded = DateTime.UtcNow,
             FileLocation = "path/to/file",
             Sender = "altinn",
+            Filename = "document.pdf",
+            Checksum = null,
+            PropertyList = new Dictionary<string, string>(),
             FileStatusChanged = DateTime.UtcNow,
             ActorEvents = new List<ActorFileStatusEntity>()
             {
