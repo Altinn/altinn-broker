@@ -192,13 +192,22 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "SELECT DISTINCT afs.file_id_fk " +
+            "SELECT DISTINCT afs.file_id_fk, 'Recipient'  " +
             "FROM broker.actor_file_status afs " +
-            "WHERE afs.actor_id_fk = ( " +
-                "SELECT a.actor_id_pk " +
-                "FROM broker.actor a " +
-                "WHERE a.actor_external_id = @actorExternalId " +
-            ");", connection))
+            "WHERE afs.actor_id_fk = (  " +
+            "    SELECT a.actor_id_pk  " +
+            "    FROM broker.actor a  " +
+            "    WHERE a.actor_external_id = @actorExternalId" +
+            ")" +
+            "UNION " +
+            "SELECT f.file_id_pk, 'Sender' " +
+            "FROM broker.file f " +
+            "INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk " +
+            "WHERE a.actor_external_id = @actorExternalId " +
+            "UNION " +
+            "SELECT f.file_id_pk, 'Service' " +
+            "FROM broker.file f " +
+            "WHERE f.application_id = @actorExternalId", connection))
         {
             command.Parameters.AddWithValue("@actorExternalid", actorExernalReference);
 
