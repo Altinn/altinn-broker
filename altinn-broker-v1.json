@@ -14,120 +14,150 @@
           "operationId": "InitializeFile",
           "requestBody": {
             "description": "File initialization details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileInitalize"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileInitalize"
-                }
-              },
-              "application/*+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileInitalize"
-                }
-              }
-            }
-          },
-          "responses": {
-            "200": {
-              "description": "Successfully initialized the file.",
               "content": {
-                "text/plain": {
-                  "schema": {
-                    "type": "string",
-                    "format": "uuid"
+                  "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/FileInitalize"
+                      }
+                  },
+                  "text/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/FileInitalize"
+                      }
+                  },
+                  "application/*+json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/FileInitalize"
+                      }
                   }
-                },
-                "application/json": {
-                  "schema": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                },
-                "text/json": {
-                  "schema": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                }
               }
+            },
+            "responses": {
+                "200": {
+                    "description": "Successfully initialized the file.",
+                    "content": {
+                        "text/plain": {
+                            "schema": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        },
+                        "text/json": {
+                            "schema": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        }
+                    }
+                }
             }
-          }
         },
         "get": {
           "tags": ["File"],
-          "summary": "Retrieve file status.",
-          "description": "This endpoint retrieves the status of a specified file.",
-          "operationId": "GetFileStatus",
-          "parameters": [
-            {
-              "name": "fileId",
-              "in": "query",
-              "style": "form",
-              "schema": {
-                "type": "string",
-                "format": "uuid"
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "Successfully retrieved the file status.",
-              "content": {
-                "text/plain": {
-                  "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverview"
-                  }
+          "summary": "List files available for the caller",
+          "description": "This endpoint retrieves a list of files available given for the caller given the query parameters.",
+          "operationId": "List files",
+            "parameters": [
+                {
+                    "name": "status",
+                    "in": "query",
+                    "style": "form",
+                    "schema": {
+                        "$ref": "#/components/schemas/FileStatus"
+                    }
                 },
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverview"
-                  }
+                {
+                    "name": "from",
+                    "in": "query",
+                    "style": "form",
+                    "schema": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
                 },
-                "text/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/FileStatusOverview"
-                  }
+                {
+                    "name": "to",
+                    "in": "query",
+                    "style": "form",
+                    "schema": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
                 }
-              }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "text/plain": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                }
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                }
+                            }
+                        },
+                        "text/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                }
+                            }
+                        }
+                    }
+                }
             }
-          }
         }
-      },
-      "/broker/api/v1/file/{fileId}/upload": {
+    },
+    "/broker/api/v1/file/{fileId}/upload": {
         "post": {
           "tags": ["File"],
           "summary": "Upload a file.",
-          "description": "This endpoint allows for the uploading of a specified file.",
+          "description": "This endpoint allows for the uploading to an initialized file.",
           "operationId": "UploadFile",
-          "parameters": [
-            {
-              "name": "fileId",
-              "in": "path",
-              "required": true,
-              "style": "simple",
-              "schema": {
-                "type": "string",
-                "format": "uuid"
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "Successfully uploaded the file."
-            }
-          }
-        }
-      },
-      "/broker/api/v1/file/upload": {
-        "post": {
-            "tags": [
-                "File"
+            "parameters": [
+                {
+                    "name": "fileId",
+                    "in": "path",
+                    "required": true,
+                    "style": "simple",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
             ],
+            "responses": {
+                "200": {
+                  "description": "Successfully uploaded the file."
+                }
+            }
+        }
+    },
+    "/broker/api/v1/file/upload": {
+        "post": {
+            "tags": ["File"],
+            "summary": "Initialize and upload a file.",
+            "description": "This endpoint allows for the initialization and uploading of a single file.",
+            "operationId": "UploadSingleFile",
             "requestBody": {
                 "content": {
                     "multipart/form-data": {
@@ -143,10 +173,6 @@
                                 "Metadata.Checksum": {
                                     "type": "string"
                                 },
-                                "Metadata.BrokerResourceId": {
-                                    "type": "string",
-                                    "format": "uuid"
-                                },
                                 "Metadata.Sender": {
                                     "type": "string"
                                 },
@@ -156,7 +182,7 @@
                                         "type": "string"
                                     }
                                 },
-                                "Metadata.Metadata": {
+                                "Metadata.PropertyList": {
                                     "type": "object",
                                     "additionalProperties": {
                                         "type": "string"
@@ -178,16 +204,13 @@
                             "Metadata.Checksum": {
                                 "style": "form"
                             },
-                            "Metadata.BrokerResourceId": {
-                                "style": "form"
-                            },
                             "Metadata.Sender": {
                                 "style": "form"
                             },
                             "Metadata.Recipients": {
                                 "style": "form"
                             },
-                            "Metadata.Metadata": {
+                            "Metadata.PropertyList": {
                                 "style": "form"
                             },
                             "File": {
@@ -204,119 +227,54 @@
             }
         }
     },
-    "/broker/api/v1/file/{fileId}/download": {
-      "get": {
-        "tags": ["File"],
-        "summary": "Download a file.",
-        "description": "This endpoint allows for the downloading of a specified file.",
-        "operationId": "DownloadFile",
-        "parameters": [
-          {
-            "name": "fileId",
-            "in": "path",
-            "required": true,
-            "style": "simple",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successfully downloaded the file.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/Stream"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Stream"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Stream"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/broker/api/v1/file/{fileId}/confirmdownload": {
-      "post": {
-        "tags": ["File"],
-        "summary": "Confirm a file download.",
-        "description": "This endpoint confirms the successful download of a specified file.",
-        "operationId": "ConfirmDownload",
-        "parameters": [
-          {
-            "name": "fileId",
-            "in": "path",
-            "required": true,
-            "style": "simple",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successfully confirmed the file download."
-          }
-        }
-      }
-    },
     "/broker/api/v1/file/{fileId}": {
-      "get": {
-          "tags": [
-              "File"
-          ],
-          "parameters": [
-              {
-                  "name": "fileId",
-                  "in": "path",
-                  "required": true,
-                  "style": "simple",
-                  "schema": {
-                      "type": "string",
-                      "format": "uuid"
-                  }
-              }
-          ],
-          "responses": {
-              "200": {
-                  "description": "Success",
-                  "content": {
-                      "text/plain": {
-                          "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverview"
-                          }
-                      },
-                      "application/json": {
-                          "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverview"
-                          }
-                      },
-                      "text/json": {
-                          "schema": {
-                              "$ref": "#/components/schemas/FileStatusOverview"
-                          }
-                      }
-                  }
-              }
-          }
-      }
+        "get": {
+            "tags": ["File"],
+            "summary": "Retrieve file status.",
+            "description": "This endpoint retrieves the status of a specified file.",
+            "operationId": "GetFileStatus",
+            "parameters": [
+                {
+                    "name": "fileId",
+                    "in": "path",
+                    "required": true,
+                    "style": "simple",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "text/plain": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusOverview"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusOverview"
+                            }
+                        },
+                        "text/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FileStatusOverview"
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     "/broker/api/v1/file/{fileId}/details": {
         "get": {
-            "tags": [
-                "File"
-            ],
+            "tags": ["File"],
+            "summary": "Retrieve file details",
+            "description": "Retrieve details about a file for auditing purposes",
+            "operationId": "GetFileDetails",
             "parameters": [
                 {
                     "name": "fileId",
@@ -353,17 +311,71 @@
             }
         }
     },
-      "/health": {
+    "/broker/api/v1/file/{fileId}/download": {
         "get": {
-          "tags": ["Health"],
-          "summary": "Check the health of the service.",
-          "description": "This endpoint checks the health status of the service.",
-          "operationId": "CheckHealth",
-          "responses": {
-            "200": {
-              "description": "Service is healthy."
+          "tags": ["File"],
+          "summary": "Download a file.",
+          "description": "This endpoint allows for the downloading of a specified file.",
+          "operationId": "DownloadFile",
+            "parameters": [
+                {
+                    "name": "fileId",
+                    "in": "path",
+                    "required": true,
+                    "style": "simple",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                  "description": "Successfully downloaded the file.",
+                    "content": {
+                        "text/plain": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Stream"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Stream"
+                            }
+                        },
+                        "text/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Stream"
+                            }
+                        }
+                    }
+                }
             }
-          }
+        }
+    },
+    "/broker/api/v1/file/{fileId}/confirmdownload": {
+        "post": {
+          "tags": ["File"],
+          "summary": "Confirm a file download.",
+          "description": "This endpoint confirms the successful download of a specified file.",
+          "operationId": "ConfirmDownload",
+            "parameters": [
+                {
+                    "name": "fileId",
+                    "in": "path",
+                    "required": true,
+                    "style": "simple",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                  "description": "Successfully confirmed the file download."
+                }
+            }
         }
       }
     },
