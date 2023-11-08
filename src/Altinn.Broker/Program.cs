@@ -8,7 +8,6 @@ using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
