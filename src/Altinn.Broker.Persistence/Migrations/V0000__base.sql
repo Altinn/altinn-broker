@@ -1,6 +1,21 @@
 -- Create schema
 CREATE SCHEMA broker;
-CREATE EXTENSION "uuid-ossp";
+
+-- Add uuid-ossp extension (only local, in environment it must be handled by IAC)
+DO $do$
+DECLARE
+    uuid_extension_installed BOOL;
+BEGIN
+	SELECT EXISTS 
+		(SELECT 1 FROM pg_extension
+		WHERE extname = 'uuid-ossp')
+	INTO uuid_extension_installed;
+	
+	IF uuid_extension_installed = false THEN
+		CREATE EXTENSION "uuid-ossp"; 
+	END IF;
+END;
+$do$;
 
 -- Grant access for Azure AD users (application and developers)
 DO $do$
@@ -14,7 +29,7 @@ BEGIN
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA broker TO azure_pg_admin;
         ALTER DEFAULT PRIVILEGES IN SCHEMA broker GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO azure_pg_admin;
         ALTER DEFAULT PRIVILEGES IN SCHEMA broker GRANT ALL ON SEQUENCES TO azure_pg_admin;
-    END IF;
+	END IF;
 END
 $do$;
 
