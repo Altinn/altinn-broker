@@ -30,7 +30,7 @@ namespace Altinn.Broker.Controllers
                     return BadRequest("Unable to query database. Is DatabaseOptions__ConnectionString set and is the database migrated?");
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Console.Error.WriteLine("Health: Exception thrown while trying to query database: {exception}", e);
                 return BadRequest("Exception thrown while trying to query database");
