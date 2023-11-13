@@ -22,7 +22,7 @@ namespace Altinn.Broker.Controllers
             try
             {
                 var connection = await _databaseConnectionProvider.GetConnectionAsync();
-                var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_status", connection);
+                var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_status_description", connection);
                 var count = (long)(command.ExecuteScalar() ?? 0);
                 if (count == 0)
                 {
@@ -30,12 +30,12 @@ namespace Altinn.Broker.Controllers
                     return BadRequest("Unable to query database. Is DatabaseOptions__ConnectionString set and is the database migrated?");
                 }
             }
-            catch
+            catch(Exception e)
             {
-                Console.Error.WriteLine("Health: Exception thrown while trying to query database");
+                Console.Error.WriteLine("Health: Exception thrown while trying to query database: {exception}", e);
                 return BadRequest("Exception thrown while trying to query database");
             }
-            return Ok("Environment properly configured rev6");
+            return Ok("Environment properly configured");
         }
     }
 }
