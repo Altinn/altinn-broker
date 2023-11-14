@@ -11,6 +11,6 @@ VALUES
 
 INSERT INTO broker.actor_file_status_description (actor_file_status_id_pk, actor_file_status_description)
 VALUES
-(0 'Initialized'),
+(0, 'Initialized'),
 (1, 'DownloadStarted'),
 (2, 'DownloadConfirmed');
