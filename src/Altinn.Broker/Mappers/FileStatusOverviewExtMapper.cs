@@ -83,7 +83,6 @@ public static class FileStatusOverviewExtMapper
     {
         return actorFileStatus switch
         {
-            ActorFileStatus.None => RecipientFileStatusExt.Initialized,
             ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
             ActorFileStatus.DownloadStarted => RecipientFileStatusExt.DownloadStarted,
             ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed
@@ -94,7 +93,6 @@ public static class FileStatusOverviewExtMapper
     {
         return actorFileStatus switch
         {
-            ActorFileStatus.None => "Unknown",
             ActorFileStatus.Initialized => "Initialized",
             ActorFileStatus.DownloadStarted => "Recipient has attempted to download file",
             ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file"
