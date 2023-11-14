@@ -2,10 +2,9 @@ namespace Altinn.Broker.Enums
 {
     public enum RecipientFileStatusExt
     {
+        None,
         Initialized,
-        Published,
-        Downloaded,
-        ConfirmDownloaded,
-        Cancelled
+        DownloadStarted,
+        DownloadConfirmed
     }
 }

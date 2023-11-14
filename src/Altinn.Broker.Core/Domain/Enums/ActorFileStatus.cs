@@ -4,6 +4,6 @@ public enum ActorFileStatus
 {
     None = 0,
     Initialized = 1,
-    Uploaded = 2,
-    Downloaded = 3
+    DownloadStarted = 2,
+    DownloadConfirmed = 3
 }

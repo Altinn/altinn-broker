@@ -30,8 +30,8 @@ public static class FileStatusOverviewExtMapper
         return domainEnum switch
         {
             FileStatus.Initialized => FileStatusExt.Initialized,
-            FileStatus.UploadInProgress => FileStatusExt.UploadInProgress,
-            FileStatus.AwaitingUploadProcessing => FileStatusExt.AwaitingUploadProcessing,
+            FileStatus.UploadStarted => FileStatusExt.UploadStarted,
+            FileStatus.UploadProcessing => FileStatusExt.UploadProcessing,
             FileStatus.Published => FileStatusExt.Published,
             FileStatus.Cancelled => FileStatusExt.Cancelled,
             FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
@@ -45,8 +45,8 @@ public static class FileStatusOverviewExtMapper
         return domainEnum switch
         {
             FileStatus.Initialized => "Ready for upload",
-            FileStatus.UploadInProgress => "Uploading",
-            FileStatus.AwaitingUploadProcessing => "Processing upload",
+            FileStatus.UploadStarted => "Upload started",
+            FileStatus.UploadProcessing => "Processing upload",
             FileStatus.Published => "Ready for download",
             FileStatus.Cancelled => "File cancelled",
             FileStatus.AllConfirmedDownloaded => "All downloaded",
@@ -85,8 +85,8 @@ public static class FileStatusOverviewExtMapper
         {
             ActorFileStatus.None => RecipientFileStatusExt.Initialized,
             ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
-            ActorFileStatus.Uploaded => RecipientFileStatusExt.Published,
-            ActorFileStatus.Downloaded => RecipientFileStatusExt.ConfirmDownloaded
+            ActorFileStatus.DownloadStarted => RecipientFileStatusExt.DownloadStarted,
+            ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed
         };
     }
 
@@ -96,8 +96,8 @@ public static class FileStatusOverviewExtMapper
         {
             ActorFileStatus.None => "Unknown",
             ActorFileStatus.Initialized => "Initialized",
-            ActorFileStatus.Uploaded => "Sender has uploaded file",
-            ActorFileStatus.Downloaded => "Recipient has downloaded file"
+            ActorFileStatus.DownloadStarted => "Recipient has attempted to download file",
+            ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file"
         };
 
     }
