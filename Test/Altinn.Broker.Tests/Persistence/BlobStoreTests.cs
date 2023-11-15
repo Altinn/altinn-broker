@@ -21,7 +21,7 @@ public class BlobStoreTests
         FileStream fileStream = File.Open("../../../Persistence/data/test.txt", FileMode.Open);
         var fileId = Guid.NewGuid();
         string fileReference = "test.txt";
-        await blobStore.UploadFile(fileStream, fileId);
+        await blobStore.UploadFile(fileStream, fileId, null);
 
         // Assert
         var containerClient = new BlobContainerClient(options.Value.ConnectionString, "files");
