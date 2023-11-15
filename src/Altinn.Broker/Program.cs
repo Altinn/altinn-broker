@@ -76,7 +76,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.Configure<KestrelServerOptions>(options =>
     {
         options.Limits.MaxRequestBodySize = int.MaxValue;
-                                                          
+
     });
     services.Configure<FormOptions>(options =>
     {

@@ -14,7 +14,7 @@ public class ServiceOwnerController : ControllerBase
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileStore _fileStore;
 
-    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IFileStore fileStore) 
+    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IFileStore fileStore)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileStore = fileStore;

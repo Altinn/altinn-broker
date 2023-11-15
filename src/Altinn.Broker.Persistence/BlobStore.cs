@@ -33,7 +33,7 @@ public class BlobStore : IFileStore
         await blobClient.UploadAsync(stream, true);
     }
 
-    public async Task<bool> IsOnline(string? connectionString) 
+    public async Task<bool> IsOnline(string? connectionString)
     {
         try
         {
