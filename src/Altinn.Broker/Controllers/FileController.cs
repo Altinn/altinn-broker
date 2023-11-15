@@ -68,9 +68,10 @@ namespace Altinn.Broker.Controllers
                 return BadRequest();
             }
 
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _fileStore.UploadFile(Request.Body, fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
             return Ok(fileId);
@@ -95,11 +96,11 @@ namespace Altinn.Broker.Controllers
 
             var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
             var fileId = await _fileRepository.AddFileAsync(file, caller);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Uploaded, file.Sender);
+            await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
-
             return Ok(fileId);
         }
 
@@ -231,13 +232,13 @@ namespace Altinn.Broker.Controllers
                 return NotFound();
             }
 
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadConfirmed, caller);
             var recipientStatuses = file.ActorEvents
                 .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != caller)
                 .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
                 .Select(group => group.Max(statusEvent => statusEvent.Status))
                 .ToList();
-            bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.Downloaded);
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.Downloaded, caller);
+            bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.DownloadConfirmed);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.AllConfirmedDownloaded);
 
             return Ok();

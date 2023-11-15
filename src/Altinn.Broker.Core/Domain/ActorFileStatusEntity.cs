@@ -1,5 +1,3 @@
-using Altinn.Broker.Core.Domain.Enums;
-
 namespace Altinn.Broker.Core.Domain;
 
 public class ActorFileStatusEntity

@@ -97,11 +97,11 @@ public class RepositoryTests
         {
             Actor = new ActorEntity()
             {
-                ActorExternalId = "1"
+                ActorExternalId = "2"
             },
             Date = DateTime.UtcNow,
             FileId = fileId,
-            Status = Core.Domain.Enums.ActorFileStatus.Uploaded
+            Status = Core.Domain.Enums.ActorFileStatus.DownloadConfirmed
         });
 
         // Assert

@@ -3,8 +3,8 @@ namespace Altinn.Broker.Core.Domain.Enums;
 public enum FileStatus
 {
     Initialized = 0,
-    UploadInProgress = 1,
-    AwaitingUploadProcessing = 2,
+    UploadStarted = 1,
+    UploadProcessing = 2,
     Published = 3,
     Cancelled = 4,
     AllConfirmedDownloaded = 5,

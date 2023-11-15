@@ -3,9 +3,8 @@ namespace Altinn.Broker.Enums
     public enum FileStatusExt
     {
         Initialized,
-        UploadInProgress,
-        AwaitingUploadProcessing,
-        UploadedAndProcessed,
+        UploadStarted,
+        UploadProcessing,
         Published,
         Cancelled,
         AllConfirmedDownloaded,
