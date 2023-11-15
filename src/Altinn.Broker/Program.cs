@@ -8,6 +8,8 @@ using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -69,6 +71,18 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
                 return jwt;
             },
         };
+    });
+
+    services.Configure<KestrelServerOptions>(options =>
+    {
+        options.Limits.MaxRequestBodySize = int.MaxValue;
+                                                          
+    });
+    services.Configure<FormOptions>(options =>
+    {
+        options.ValueLengthLimit = int.MaxValue;
+        options.MultipartBodyLengthLimit = int.MaxValue;
+        options.MultipartHeadersLengthLimit = int.MaxValue;
     });
 }
 

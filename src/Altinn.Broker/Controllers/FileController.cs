@@ -205,13 +205,13 @@ namespace Altinn.Broker.Controllers
             {
                 return BadRequest("No file uploaded yet");
             }
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
+            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
 
             if (file.FileLocation.StartsWith("altinn-3"))
             {
                 var stream = await _fileStore.GetFileStream(fileId, serviceOwner?.StorageAccountConnectionString);
-                return File(stream, "application/octet-stream", file.Filename);
+                return File(stream, "application/force-download", file.Filename);
             }
             else
             {
@@ -223,7 +223,7 @@ namespace Altinn.Broker.Controllers
                 }
                 var stream = await response.Content.ReadAsStreamAsync();
                 var contentType = response.Content.Headers.ContentType.ToString();
-                return File(stream, contentType, file.Filename);
+                return File(stream, "application/force-download", file.Filename);
             }
         }
 
