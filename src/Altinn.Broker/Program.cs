@@ -46,6 +46,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
+    services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
 
     services.AddHttpClient();
 

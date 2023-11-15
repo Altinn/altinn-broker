@@ -10,10 +10,12 @@ namespace Altinn.Broker.Controllers
     public class HealthController : ControllerBase
     {
         private readonly DatabaseConnectionProvider _databaseConnectionProvider;
+        private readonly IFileStore _fileStore;
 
-        public HealthController(DatabaseConnectionProvider databaseConnectionProvider)
+        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IFileStore fileStore)
         {
             _databaseConnectionProvider = databaseConnectionProvider;
+            _fileStore = fileStore;
         }
 
         [HttpGet]
@@ -34,6 +36,13 @@ namespace Altinn.Broker.Controllers
             {
                 Console.Error.WriteLine("Health: Exception thrown while trying to query database: {exception}", e);
                 return BadRequest("Exception thrown while trying to query database");
+            }
+
+            var storageAccountOnline = await _fileStore.IsOnline(null);
+            if (!storageAccountOnline)
+            {
+                Console.Error.WriteLine("Health: Invalid storage account in StorageOptions!");
+                return BadRequest("Invalid storage account in StorageOptions");
             }
             return Ok("Environment properly configured");
         }
