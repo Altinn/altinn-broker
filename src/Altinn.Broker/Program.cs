@@ -2,11 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
-using Altinn.Broker.Persistence.Storage;
+using Altinn.Broker.Repositories;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
@@ -47,12 +49,16 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IFileStore, BlobService>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
-    services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
+    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
+    services.AddSingleton<IFileStore, BlobService>();
+    services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
+    services.AddSingleton<IResourceManager, AzureResourceManager>();
 
     services.AddHangfire(c => c.UseMemoryStorage());
     services.AddHangfireServer();

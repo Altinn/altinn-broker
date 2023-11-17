@@ -4,9 +4,9 @@ namespace Altinn.Broker.Integrations.Azure;
 
 public class AzureResourceManagerOptions
 {
-    public ResourceIdentifier SubscriptionId { get; internal set; }
-    public AzureLocation Location { get; internal set; }
-    public string ClientSecret { get; internal set; }
-    public string ClientId { get; internal set; }
-    public string TenantId { get; internal set; }
+    public required string SubscriptionId { get; set; }
+    public string Location { get; set; }
+    public string ClientSecret { get; set; }
+    public string ClientId { get; set; }
+    public string TenantId { get; set; }
 }

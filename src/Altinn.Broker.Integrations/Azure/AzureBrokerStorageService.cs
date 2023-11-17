@@ -1,16 +1,28 @@
 ﻿using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
+using Altinn.Broker.Repositories;
 
 namespace Altinn.Broker.Integrations.Azure;
 public class AzureBrokerStorageService : IBrokerStorageService
 {
-    public Task UploadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity fileEntity, Stream stream)
+    private readonly IFileStore _fileStore;
+    private readonly IResourceManager _resourceManager;
+
+    public AzureBrokerStorageService(IFileStore fileStore, IResourceManager resourceManager)
     {
-        throw new NotImplementedException();
+        _fileStore = fileStore;
+        _resourceManager = resourceManager;
     }
 
-    public Task<Stream> DownloadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity file)
+    public async Task UploadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity fileEntity, Stream stream)
     {
-        throw new NotImplementedException();
+        var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
+    }
+
+    public async Task<Stream> DownloadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity fileEntity)
+    {
+        var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        return await _fileStore.GetFileStream(fileEntity.FileId, connectionString);
     }
 }

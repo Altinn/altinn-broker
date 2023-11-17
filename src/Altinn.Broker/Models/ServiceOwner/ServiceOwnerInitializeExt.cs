@@ -10,8 +10,4 @@ public class ServiceOwnerInitializeExt
     public string Id { get; set; }
 
     public string Name { get; set; }
-
-    public string ResourceGroupName { get; set; }  
-    
-    public string StorageAccountName { get; set; }
 }

@@ -1,5 +1,5 @@
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence.Options;
-using Altinn.Broker.Persistence.Storage;
 
 using Azure.Storage.Blobs;
 
@@ -11,11 +11,11 @@ public class BlobServiceTests
     public async void StoreBlob_HappyPath_BlobIsStored()
     {
         // Arrange
-        IOptions<StorageOptions> options = Options.Create(new StorageOptions()
+        IOptions<AzureStorageOptions> options = Options.Create(new AzureStorageOptions()
         {
             ConnectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
         });
-        var blobStore = new BlobService(options);
+        var blobStore = new BlobService();
 
         // Act
         FileStream fileStream = File.Open("../../../Persistence/data/test.txt", FileMode.Open);

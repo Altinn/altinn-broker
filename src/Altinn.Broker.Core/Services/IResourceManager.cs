@@ -11,4 +11,10 @@ public interface IResourceManager
     /// <param name="serviceOwnerEntity"></param>
     /// <returns></returns>
     Task Deploy(ServiceOwnerEntity serviceOwnerEntity);
+
+    Task<string> GetStorageConnectionString(ServiceOwnerEntity? serviceOwnerEntity);
+
+    string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity);
+
+    string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity);
 }
