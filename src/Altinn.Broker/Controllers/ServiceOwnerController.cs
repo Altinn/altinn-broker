@@ -58,7 +58,7 @@ public class ServiceOwnerController : ControllerBase
             return NotFound();
         }
 
-        var deploymentStatus = await _brokerStorageService.GetDeploymentStatus(serviceOwner);
+        var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
 
         return new ServiceOwnerOverviewExt()
         {

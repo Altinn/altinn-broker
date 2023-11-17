@@ -5,8 +5,6 @@
 /// </summary>
 public interface IBrokerStorageService
 {
-    Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity? serviceOwnerEntity);
-
     /// <summary>
     /// Looks up the correct storage account to use for service owner and upload the file
     /// </summary>
