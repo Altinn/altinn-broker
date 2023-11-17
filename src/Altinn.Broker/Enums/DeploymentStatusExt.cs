@@ -4,8 +4,6 @@
 public enum DeploymentStatusExt
 {
     NotStarted,
-    Preparing,
-    Prepared,
     DeployingResources,
     Ready
 }

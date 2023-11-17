@@ -28,7 +28,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         {
             serviceOwner = new ServiceOwnerEntity
             {
-                Sub = reader.GetString(reader.GetOrdinal("service_owner_sub_pk")),
+                Id = reader.GetString(reader.GetOrdinal("service_owner_sub_pk")),
                 Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
                 StorageAccountConnectionString = reader.GetString(reader.GetOrdinal("azure_storage_account_connection_string"))
             };

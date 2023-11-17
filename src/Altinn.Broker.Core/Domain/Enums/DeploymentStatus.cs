@@ -5,8 +5,6 @@
 public enum DeploymentStatus
 {
     NotStarted,
-    Preparing,
-    Prepared,
     DeployingResources,
     Ready
 }
