@@ -4,7 +4,6 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
-using Altinn.Broker.Persistence;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -18,17 +17,17 @@ namespace Altinn.Broker.Controllers
     public class FileController : ControllerBase
     {
         private readonly IFileRepository _fileRepository;
-        private readonly IFileStore _fileStore;
         private readonly IServiceOwnerRepository _serviceOwnerRepository;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IBrokerStorageService _brokerStorageService;
         private readonly ILogger<FileController> _logger;
 
-        public FileController(IFileRepository fileRepository, IFileStore fileStore, IServiceOwnerRepository serviceOwnerRepository, IHttpClientFactory httpClientFactory, ILogger<FileController> logger)
+        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IHttpClientFactory httpClientFactory, IBrokerStorageService brokerStorageService, ILogger<FileController> logger)
         {
             _fileRepository = fileRepository;
-            _fileStore = fileStore;
             _serviceOwnerRepository = serviceOwnerRepository;
             _httpClientFactory = httpClientFactory;
+            _brokerStorageService = brokerStorageService;
             _logger = logger;
         }
 
@@ -75,7 +74,7 @@ namespace Altinn.Broker.Controllers
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
 
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
-            await _fileStore.UploadFile(Request.Body, fileId, serviceOwner?.StorageAccountConnectionString);
+            await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
             // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
@@ -105,7 +104,8 @@ namespace Altinn.Broker.Controllers
             var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
             var fileId = await _fileRepository.AddFileAsync(file, caller);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
-            await _fileStore.UploadFile(form.File.OpenReadStream(), fileId, serviceOwner?.StorageAccountConnectionString);
+
+            await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
             await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
             // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
@@ -210,7 +210,7 @@ namespace Altinn.Broker.Controllers
 
             if (file.FileLocation.StartsWith("altinn-3"))
             {
-                var stream = await _fileStore.GetFileStream(fileId, serviceOwner?.StorageAccountConnectionString);
+                var stream = await _brokerStorageService.DownloadFile(serviceOwner, file);
                 return File(stream, "application/force-download", file.Filename);
             }
             else

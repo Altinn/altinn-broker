@@ -6,6 +6,10 @@ using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
+using Altinn.Broker.Persistence.Storage;
+
+using Hangfire;
+using Hangfire.MemoryStorage;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -40,7 +44,7 @@ if (app.Environment.IsDevelopment())
 
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
-    services.AddSingleton<IFileStore, BlobStore>();
+    services.AddSingleton<IFileStore, BlobService>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
@@ -49,6 +53,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
+
+    services.AddHangfire(c => c.UseMemoryStorage());
+    services.AddHangfireServer();
 
     services.AddHttpClient();
 
@@ -76,7 +83,6 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.Configure<KestrelServerOptions>(options =>
     {
         options.Limits.MaxRequestBodySize = int.MaxValue;
-
     });
     services.Configure<FormOptions>(options =>
     {

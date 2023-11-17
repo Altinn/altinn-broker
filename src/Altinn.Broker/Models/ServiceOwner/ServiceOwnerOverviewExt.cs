@@ -6,5 +6,5 @@ public class ServiceOwnerOverviewExt
 
     public string Name { get; set; }
 
-    public bool StorageAccountOnline { get; set; }
+    public DeploymentStatusExt DeploymentStatus { get; set; }
 }

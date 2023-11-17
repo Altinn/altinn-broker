@@ -1,7 +1,11 @@
-﻿using Altinn.Broker.Core.Repositories;
+﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Models.ServiceOwner;
 using Altinn.Broker.Persistence;
+
+using Hangfire;
 
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,12 +16,14 @@ namespace Altinn.Broker.Controllers;
 public class ServiceOwnerController : ControllerBase
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IFileStore _fileStore;
+    private readonly IBrokerStorageService _brokerStorageService;
+    private readonly IResourceManager _resourceManager;
 
-    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IFileStore fileStore)
+    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceManager resourceManager)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
-        _fileStore = fileStore;
+        _brokerStorageService = brokerStorageService;
+        _resourceManager = resourceManager;
     }
 
     [HttpPost]
@@ -29,7 +35,11 @@ public class ServiceOwnerController : ControllerBase
             return Unauthorized();
         }
 
-        await _serviceOwnerRepository.InitializeServiceOwner(caller, serviceOwnerInitializeExt.Name, serviceOwnerInitializeExt.StorageAccountConnectionString);
+        await _serviceOwnerRepository.InitializeServiceOwner(caller, serviceOwnerInitializeExt.Name);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+        BackgroundJob.Enqueue(
+            () => _resourceManager.Deploy(serviceOwner)
+        );
 
         return Ok();
     }
@@ -48,12 +58,13 @@ public class ServiceOwnerController : ControllerBase
             return NotFound();
         }
 
-        var isOnline = await _fileStore.IsOnline(serviceOwner.StorageAccountConnectionString);
+        var deploymentStatus = await _brokerStorageService.GetDeploymentStatus(serviceOwner);
 
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,
-            StorageAccountOnline = isOnline
+            DeploymentStatus = (DeploymentStatusExt) deploymentStatus,
         };
     }
 }
+
