@@ -1,6 +1,7 @@
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
@@ -20,14 +21,16 @@ namespace Altinn.Broker.Controllers
         private readonly IServiceOwnerRepository _serviceOwnerRepository;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IBrokerStorageService _brokerStorageService;
+        private readonly IResourceManager _resourceManager;
         private readonly ILogger<FileController> _logger;
 
-        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IHttpClientFactory httpClientFactory, IBrokerStorageService brokerStorageService, ILogger<FileController> logger)
+        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IHttpClientFactory httpClientFactory, IBrokerStorageService brokerStorageService, IResourceManager resourceManager, ILogger<FileController> logger)
         {
             _fileRepository = fileRepository;
             _serviceOwnerRepository = serviceOwnerRepository;
             _httpClientFactory = httpClientFactory;
             _brokerStorageService = brokerStorageService;
+            _resourceManager = resourceManager;
             _logger = logger;
         }
 
@@ -72,6 +75,14 @@ namespace Altinn.Broker.Controllers
                 return BadRequest();
             }
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is not null)
+            {
+                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+                if (deploymentStatus != DeploymentStatus.Ready)
+                {
+                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+                }
+            }
 
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
@@ -100,6 +111,14 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is not null)
+            {
+                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+                if (deploymentStatus != DeploymentStatus.Ready)
+                {
+                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+                }
+            }
 
             var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
             var fileId = await _fileRepository.AddFileAsync(file, caller);
@@ -207,6 +226,14 @@ namespace Altinn.Broker.Controllers
             }
             var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is not null)
+            {
+                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+                if (deploymentStatus != DeploymentStatus.Ready)
+                {
+                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+                }
+            }
 
             if (file.FileLocation.StartsWith("altinn-3"))
             {
