@@ -37,17 +37,16 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         return serviceOwner;
     }
 
-    public async Task InitializeServiceOwner(string sub, string name, string storageAccountConnectionString)
+    public async Task InitializeServiceOwner(string sub, string name)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.service_owner (service_owner_sub_pk, service_owner_name, azure_storage_account_connection_string) " +
-            "VALUES (@sub, @name, @connectionString)", connection))
+            "INSERT INTO broker.service_owner (service_owner_sub_pk, service_owner_name) " +
+            "VALUES (@sub, @name)", connection))
         {
             command.Parameters.AddWithValue("@sub", sub);
             command.Parameters.AddWithValue("@name", name);
-            command.Parameters.AddWithValue("@connectionString", storageAccountConnectionString);
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }

@@ -5,13 +5,13 @@ using Azure.Storage.Blobs;
 using Microsoft.Azure.Management.Storage;
 using Microsoft.Extensions.Options;
 
-namespace Altinn.Broker.Persistence;
+namespace Altinn.Broker.Persistence.Storage;
 
-public class BlobStore : IFileStore
+public class BlobService : IFileStore
 {
     private static string _connectionString;
 
-    public BlobStore(IOptions<StorageOptions> storageOptions)
+    public BlobService(IOptions<StorageOptions> storageOptions)
     {
         _connectionString = storageOptions.Value.ConnectionString ?? throw new ArgumentNullException("StorageOptions__ConnectionString");
     }
