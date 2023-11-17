@@ -1,4 +1,3 @@
-using Altinn.Broker.Core.Enums;
 using Altinn.Broker.Enums;
 
 namespace Altinn.Broker.Core.Models
