@@ -50,11 +50,14 @@ public class AzureResourceManager : IResourceManager
         // Create or get the resource group
         var subscriptionIdentifier = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}");
         var resourceGroupCollection = _armClient.GetSubscriptionResource(subscriptionIdentifier).GetResourceGroups();
-        var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);       
+        var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
+        resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
+
         var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData);
 
         // Create or get the storage account
         var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
+        storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData);
         var blobService = storageAccount.Value.GetBlobService();
