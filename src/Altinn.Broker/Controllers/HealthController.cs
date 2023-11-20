@@ -1,8 +1,14 @@
 
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Repositories;
 
+using Azure.Core;
+using Azure.Identity;
+using Azure.ResourceManager;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Controllers
 {
@@ -11,11 +17,13 @@ namespace Altinn.Broker.Controllers
     public class HealthController : ControllerBase
     {
         private readonly DatabaseConnectionProvider _databaseConnectionProvider;
+        private readonly AzureResourceManagerOptions _azureResourceManagerOptions;
         private readonly IFileStore _fileStore;
 
-        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IFileStore fileStore)
+        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions, IFileStore fileStore)
         {
             _databaseConnectionProvider = databaseConnectionProvider;
+            _azureResourceManagerOptions = azureResourceManagerOptions.Value;
             _fileStore = fileStore;
         }
 
@@ -45,6 +53,13 @@ namespace Altinn.Broker.Controllers
                 Console.Error.WriteLine("Health: Invalid storage account in StorageOptions!");
                 return BadRequest("Invalid storage account in StorageOptions");
             }
+
+            // Verify that resource manager has access to our subscription
+            var armClient = new ArmClient(new DefaultAzureCredential());
+            var subscriptionIdentifier = new ResourceIdentifier($"/subscriptions/{_azureResourceManagerOptions.SubscriptionId}");
+            var resourceGroupCollection = armClient.GetSubscriptionResource(subscriptionIdentifier).GetResourceGroups();
+            await resourceGroupCollection.GetAsync($"altinn-{_azureResourceManagerOptions.Environment}-broker-rg");
+
             return Ok("Environment properly configured");
         }
     }

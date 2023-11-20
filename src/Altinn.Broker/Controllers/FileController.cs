@@ -1,3 +1,4 @@
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
@@ -39,22 +40,17 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null)
             {
                 return Unauthorized();
             }
-            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
-            if (serviceOwner is null)
-            {
-                return Unauthorized($"Service owner {caller} has not been setup for the broker service");
-            }
-            if (serviceOwner.StorageProvider is null)
-            {
-                return StatusCode(503, $"Service owner infrastructure is not ready.");
-            }
 
-            var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
+            var file = FileInitializeExtMapper.MapToDomain(initializeExt, serviceOwner.Id);
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
             return Ok(fileId);
@@ -70,21 +66,14 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
-            _logger.LogInformation("File size is {FileSize]} bytes", Request.ContentLength);
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
             {
-                return Unauthorized();
+                return authenticationResult;
             }
-            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
             if (serviceOwner is null)
             {
-                return Unauthorized($"Service owner has not been configured for using the broker API.");
-
-            }
-            if (serviceOwner?.StorageProvider is null)
-            {
-                return StatusCode(503, $"Service owner infrastructure is not ready.");
+                return Unauthorized();
             }
 
             var file = await _fileRepository.GetFileAsync(fileId);
@@ -114,26 +103,19 @@ namespace Altinn.Broker.Controllers
             [FromForm] FileInitializeAndUploadExt form
         )
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null)
             {
                 return Unauthorized();
             }
-            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
-            if (serviceOwner is null)
-            {
-                return Unauthorized($"Service owner has not been configured for using the broker API.");
 
-            }
-            if (serviceOwner?.StorageProvider is null)
-            {
-                return StatusCode(503, $"Service owner infrastructure is not ready.");
-            }
-
-            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
+            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, serviceOwner.Id);
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
-
             await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
             await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
             // TODO: Queue Kafka jobs
@@ -172,6 +154,7 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
+
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
@@ -234,6 +217,7 @@ namespace Altinn.Broker.Controllers
             {
                 return BadRequest("No file uploaded yet");
             }
+
             var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
             if (serviceOwner is not null)

@@ -14,13 +14,11 @@ namespace Altinn.Broker.Controllers;
 public class ServiceOwnerController : Controller
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IBrokerStorageService _brokerStorageService;
     private readonly IResourceManager _resourceManager;
 
-    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceManager resourceManager)
+    public ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IResourceManager resourceManager)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
-        _brokerStorageService = brokerStorageService;
         _resourceManager = resourceManager;
     }
 
@@ -41,7 +39,7 @@ public class ServiceOwnerController : Controller
         await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.Id, serviceOwnerInitializeExt.Name);
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
         BackgroundJob.Enqueue(
-            () => _resourceManager.Deploy(serviceOwner)
+            () => _resourceManager.Deploy(serviceOwner!)
         );
 
         return Ok();

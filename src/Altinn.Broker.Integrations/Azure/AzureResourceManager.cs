@@ -24,14 +24,13 @@ public class AzureResourceManager : IResourceManager
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly ILogger<AzureResourceManager> _logger;
-    public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
-    public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"broker{serviceOwnerEntity.Id.Replace(":", "")}sa";
-
+    public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
+    public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
+    
     public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IOptions<AzureStorageOptions> storageOptions, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _storageOptions = storageOptions.Value;
-        //var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
         _armClient = new ArmClient(new DefaultAzureCredential());
         _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
@@ -55,12 +54,9 @@ public class AzureResourceManager : IResourceManager
         var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData);
 
         // Create or get the storage account
-        var storageSku = new StorageSku(StorageSkuName.StandardLrs);
-        
-        var storageAccountData = new StorageAccountCreateOrUpdateContent(storageSku, StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
+        var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData);
-
         var blobService = storageAccount.Value.GetBlobService();
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
@@ -106,7 +102,6 @@ public class AzureResourceManager : IResourceManager
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.GetAsync(storageAccountName);
-
         string accountKey = "";
         var keys = storageAccount.Value.GetKeysAsync();
         await using (var keyEnumerator = keys.GetAsyncEnumerator())
