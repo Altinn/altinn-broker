@@ -17,7 +17,7 @@ public class AzureBrokerStorageService : IBrokerStorageService
     public async Task UploadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity fileEntity, Stream stream)
     {
         var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
-        _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
+        await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
     }
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity? serviceOwnerEntity, FileEntity fileEntity)

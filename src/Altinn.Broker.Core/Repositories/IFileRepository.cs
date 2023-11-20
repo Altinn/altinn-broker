@@ -5,7 +5,7 @@ namespace Altinn.Broker.Core.Repositories;
 
 public interface IFileRepository
 {
-    Task<Guid> AddFileAsync(FileEntity file, string caller);
+    Task<Guid> AddFileAsync(FileEntity file, ServiceOwnerEntity serviceOwner);
     Task AddReceiptAsync(ActorFileStatusEntity receipt);
     Task<Domain.FileEntity?> GetFileAsync(Guid fileId);
     Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference);
@@ -18,7 +18,8 @@ public interface IFileRepository
 
     Task SetStorageReference(
         Guid fileId,
-        string storageReference
+        long storageProviderId,
+        string fileLocation
     );
     Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId);
     Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId);

@@ -20,7 +20,7 @@ public static class FileStatusOverviewExtMapper
             FileStatusChanged = file.FileStatusChanged,
             FileStatusText = MapToFileStatusText(file.FileStatus),
             PropertyList = file.PropertyList,
-            Recipients = MapToRecipients(file.ActorEvents, file.Sender, file.ApplicationId),
+            Recipients = MapToRecipients(file.ActorEvents, file.Sender, file.ServiceOwnerId),
             SendersFileReference = file.SendersFileReference
         };
     }

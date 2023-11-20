@@ -15,20 +15,18 @@ namespace Altinn.Broker.Controllers
     [ApiController]
     [Route("broker/api/v1/file")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class FileController : ControllerBase
+    public class FileController : Controller
     {
         private readonly IFileRepository _fileRepository;
         private readonly IServiceOwnerRepository _serviceOwnerRepository;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IBrokerStorageService _brokerStorageService;
         private readonly IResourceManager _resourceManager;
         private readonly ILogger<FileController> _logger;
 
-        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IHttpClientFactory httpClientFactory, IBrokerStorageService brokerStorageService, IResourceManager resourceManager, ILogger<FileController> logger)
+        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceManager resourceManager, ILogger<FileController> logger)
         {
             _fileRepository = fileRepository;
             _serviceOwnerRepository = serviceOwnerRepository;
-            _httpClientFactory = httpClientFactory;
             _brokerStorageService = brokerStorageService;
             _resourceManager = resourceManager;
             _logger = logger;
@@ -46,9 +44,18 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is null)
+            {
+                return Unauthorized($"Service owner {caller} has not been setup for the broker service");
+            }
+            if (serviceOwner.StorageProvider is null)
+            {
+                return StatusCode(503, $"Service owner infrastructure is not ready.");
+            }
 
             var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
-            var fileId = await _fileRepository.AddFileAsync(file, caller);
+            var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
             return Ok(fileId);
         }
@@ -69,24 +76,26 @@ namespace Altinn.Broker.Controllers
             {
                 return Unauthorized();
             }
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is null)
+            {
+                return Unauthorized($"Service owner has not been configured for using the broker API.");
+
+            }
+            if (serviceOwner?.StorageProvider is null)
+            {
+                return StatusCode(503, $"Service owner infrastructure is not ready.");
+            }
+
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
                 return BadRequest();
             }
-            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
-            if (serviceOwner is not null)
-            {
-                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
-                if (deploymentStatus != DeploymentStatus.Ready)
-                {
-                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
-                }
-            }
 
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
-            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
             // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
@@ -111,21 +120,22 @@ namespace Altinn.Broker.Controllers
                 return Unauthorized();
             }
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
-            if (serviceOwner is not null)
+            if (serviceOwner is null)
             {
-                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
-                if (deploymentStatus != DeploymentStatus.Ready)
-                {
-                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
-                }
+                return Unauthorized($"Service owner has not been configured for using the broker API.");
+
+            }
+            if (serviceOwner?.StorageProvider is null)
+            {
+                return StatusCode(503, $"Service owner infrastructure is not ready.");
             }
 
             var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
-            var fileId = await _fileRepository.AddFileAsync(file, caller);
+            var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
 
             await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
-            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
             // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
@@ -234,24 +244,9 @@ namespace Altinn.Broker.Controllers
                     return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
                 }
             }
+            var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
 
-            if (file.FileLocation.StartsWith("altinn-3"))
-            {
-                var stream = await _brokerStorageService.DownloadFile(serviceOwner, file);
-                return File(stream, "application/force-download", file.Filename);
-            }
-            else
-            {
-                var client = _httpClientFactory.CreateClient();
-                var response = await client.GetAsync(file.FileLocation);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode(502, "File could not be accessed at the location.");
-                }
-                var stream = await response.Content.ReadAsStreamAsync();
-                var contentType = response.Content.Headers.ContentType.ToString();
-                return File(stream, "application/force-download", file.Filename);
-            }
+            return File(downloadStream, "application/force-download", file.Filename);
         }
 
         /// <summary>

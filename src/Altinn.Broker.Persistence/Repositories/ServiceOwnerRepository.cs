@@ -1,6 +1,8 @@
 ﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
+using Microsoft.Azure.Management.Storage.Models;
+
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
@@ -13,14 +15,18 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<ServiceOwnerEntity?> GetServiceOwner(string sub)
+    public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
         using var command = new NpgsqlCommand(
-            "SELECT service_owner_sub_pk, service_owner_name, azure_storage_account_connection_string " +
-            "FROM broker.service_owner WHERE service_owner_sub_pk = @sub",
+            "SELECT service_owner_id_pk, service_owner_name, " +
+            "storage_provider_id_pk, created, resource_name, storage_provider_type " +
+            "FROM broker.service_owner " +
+            "LEFT JOIN broker.storage_provider sp on sp.service_owner_id_fk = service_owner_id_pk " +
+            "WHERE service_owner_id_pk = @serviceOwnerId " +
+            "ORDER BY created desc",
             connection);
-        command.Parameters.AddWithValue("@sub", sub);
+        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
         ServiceOwnerEntity? serviceOwner = null;
@@ -28,8 +34,15 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         {
             serviceOwner = new ServiceOwnerEntity
             {
-                Id = reader.GetString(reader.GetOrdinal("service_owner_sub_pk")),
-                Name = reader.GetString(reader.GetOrdinal("service_owner_name"))
+                Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
+                Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
+                StorageProvider = reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")) ? null : new StorageProviderEntity()
+                {
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    Id = reader.GetInt64(reader.GetOrdinal("storage_provider_id_pk")),
+                    ResourceName = reader.GetString(reader.GetOrdinal("resource_name")),
+                    Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type")))
+                }
             };
         }
 
@@ -41,7 +54,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.service_owner (service_owner_sub_pk, service_owner_name) " +
+            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name) " +
             "VALUES (@sub, @name)", connection))
         {
             command.Parameters.AddWithValue("@sub", sub);
@@ -49,5 +62,24 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }
+
+
+    }
+
+    public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
+    {
+        var connection = await _connectionProvider.GetConnectionAsync();
+
+        using (var command = new NpgsqlCommand(
+            "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk) " +
+            "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId)", connection))
+        {
+            command.Parameters.AddWithValue("@resourceName", resourceName);
+            command.Parameters.AddWithValue("@storageType", storageType.ToString());
+            command.Parameters.AddWithValue("@serviceOwnerId", sub);
+            var commandText = command.CommandText;
+            command.ExecuteNonQuery();
+        }
     }
 }
+

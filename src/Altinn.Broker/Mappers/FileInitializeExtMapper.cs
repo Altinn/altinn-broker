@@ -12,7 +12,7 @@ public static class FileInitializeExtMapper
         return new FileEntity()
         {
             FileId = Guid.Empty,
-            ApplicationId = caller,
+            ServiceOwnerId = caller,
             Filename = initializeExt.FileName,
             SendersFileReference = initializeExt.SendersFileReference,
             Checksum = initializeExt.Checksum,

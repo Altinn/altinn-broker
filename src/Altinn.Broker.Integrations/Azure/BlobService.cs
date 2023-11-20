@@ -13,8 +13,7 @@ public class BlobService : Repositories.IFileStore
 
     public async Task<Stream> GetFileStream(Guid fileId, string connectionString)
     {
-        var containerClient = new BlobContainerClient(connectionString, "files");
-        await containerClient.CreateIfNotExistsAsync();
+        var containerClient = new BlobContainerClient(new Uri(connectionString));
         BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
         var content = await blobClient.DownloadContentAsync();
         return content.Value.Content.ToStream();
@@ -22,8 +21,7 @@ public class BlobService : Repositories.IFileStore
 
     public async Task UploadFile(Stream stream, Guid fileId, string connectionString)
     {
-        var containerClient = new BlobContainerClient(connectionString, "files");
-        await containerClient.CreateIfNotExistsAsync();
+        var containerClient = new BlobContainerClient(new Uri(connectionString));
         BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
         await blobClient.UploadAsync(stream, true);
     }

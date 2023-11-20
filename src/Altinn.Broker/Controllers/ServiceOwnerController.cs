@@ -1,9 +1,7 @@
-﻿using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Repositories;
+﻿using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Models.ServiceOwner;
-using Altinn.Broker.Persistence;
 
 using Hangfire;
 
@@ -13,7 +11,7 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/serviceowner")]
-public class ServiceOwnerController : ControllerBase
+public class ServiceOwnerController : Controller
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IBrokerStorageService _brokerStorageService;
@@ -34,9 +32,14 @@ public class ServiceOwnerController : ControllerBase
         {
             return Unauthorized();
         }
+        var existingServiceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
+        if (existingServiceOwner is not null)
+        {
+            return Conflict("Service owner already exists");
+        }
 
-        await _serviceOwnerRepository.InitializeServiceOwner(caller, serviceOwnerInitializeExt.Name);
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+        await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.Id, serviceOwnerInitializeExt.Name);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner)
         );
@@ -45,14 +48,15 @@ public class ServiceOwnerController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner()
+    [Route("{serviceOwnerId}")]
+    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(string serviceOwnerId)
     {
         var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
         if (string.IsNullOrWhiteSpace(caller))
         {
             return Unauthorized();
         }
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
         if (serviceOwner is null)
         {
             return NotFound();

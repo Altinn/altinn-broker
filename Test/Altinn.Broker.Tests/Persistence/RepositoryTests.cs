@@ -57,7 +57,12 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "1234567890",
+            Name = "Integration test",
+            StorageProvider = null
+        });
 
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
@@ -90,7 +95,12 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "1234567890",
+            Name = "Integration test",
+            StorageProvider = null
+        });
 
         // Act
         await _fileRepository.AddReceiptAsync(new ActorFileStatusEntity()
@@ -137,7 +147,12 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "1234567890",
+            Name = "Integration test",
+            StorageProvider = null
+        });
 
         // Act
         var result = await _fileRepository.GetFileAsync(fileId);
