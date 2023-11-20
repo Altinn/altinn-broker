@@ -9,7 +9,6 @@ using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Repositories;
-
 using Hangfire;
 using Hangfire.MemoryStorage;
 
@@ -61,7 +60,10 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IResourceManager, AzureResourceManager>();
 
     services.AddHangfire(c => c.UseMemoryStorage());
-    services.AddHangfireServer();
+    services.AddHangfireServer((options) =>
+    {
+        options.ServerTimeout = TimeSpan.FromMinutes(30);
+    });
 
     services.AddHttpClient();
 
