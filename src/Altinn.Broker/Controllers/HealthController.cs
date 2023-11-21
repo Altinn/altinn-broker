@@ -55,9 +55,15 @@ namespace Altinn.Broker.Controllers
             }
 
             // Verify that resource manager has access to our subscription
-            var armClient = new ArmClient(new DefaultAzureCredential());
+            var credentials = new ClientSecretCredential(_azureResourceManagerOptions.TenantId, _azureResourceManagerOptions.ClientId, _azureResourceManagerOptions.ClientSecret);
+            var armClient = new ArmClient(credentials);
             var subscriptionIdentifier = new ResourceIdentifier($"/subscriptions/{_azureResourceManagerOptions.SubscriptionId}");
             var resourceGroupCollection = armClient.GetSubscriptionResource(subscriptionIdentifier).GetResourceGroups();
+            var resourceGroupCount = resourceGroupCollection.Count();
+            if (resourceGroupCount < 1)
+            {
+                return BadRequest("Resource groups not found under subscription with id : {_azureResourceManagerOptions.SubscriptionId}. Are the service principal environment variables set?");
+            }
             await resourceGroupCollection.GetAsync($"altinn-{_azureResourceManagerOptions.Environment}-broker-rg");
 
             return Ok("Environment properly configured");

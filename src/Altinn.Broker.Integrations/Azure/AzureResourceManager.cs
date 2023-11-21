@@ -31,7 +31,15 @@ public class AzureResourceManager : IResourceManager
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _storageOptions = storageOptions.Value;
-        _armClient = new ArmClient(new DefaultAzureCredential());
+        if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
+        {
+            _armClient = new ArmClient(new DefaultAzureCredential());
+        } 
+        else
+        {
+            var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
+            _armClient = new ArmClient(credentials);
+        }
         _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
     }

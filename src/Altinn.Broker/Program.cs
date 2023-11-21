@@ -9,6 +9,9 @@ using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Repositories;
+
+using Azure.Identity;
+
 using Hangfire;
 using Hangfire.MemoryStorage;
 
@@ -32,6 +35,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
+builder.Configuration.AddAzureKeyVault(
+        new Uri($"https://{builder.Configuration["KeyVaultName"]}.vault.azure.net/"),
+        new DefaultAzureCredential());
 ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
@@ -42,7 +48,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddSingleton<IFileStore, BlobService>();
