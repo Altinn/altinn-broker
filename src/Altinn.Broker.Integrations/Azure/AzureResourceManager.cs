@@ -56,8 +56,7 @@ public class AzureResourceManager : IResourceManager
         await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
-        var subscriptionIdentifier = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}");
-        var resourceGroupCollection = _armClient.GetSubscriptionResource(subscriptionIdentifier).GetResourceGroups();
+        var resourceGroupCollection = _armClient.GetDefaultSubscription().GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
         resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
 
@@ -80,8 +79,7 @@ public class AzureResourceManager : IResourceManager
 
     public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity)
     {
-        var subscriptionIdentifier = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}");
-        var resourceGroupCollection = _armClient.GetSubscriptionResource(subscriptionIdentifier).GetResourceGroups();
+        var resourceGroupCollection = _armClient.GetDefaultSubscription().GetResourceGroups();
         var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity));
         if (!resourceGroupExists)
         {
