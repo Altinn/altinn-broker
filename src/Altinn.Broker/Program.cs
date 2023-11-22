@@ -35,9 +35,6 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
-builder.Configuration.AddAzureKeyVault(
-        new Uri($"https://{builder.Configuration["KeyVaultName"]}.vault.azure.net/"),
-        new DefaultAzureCredential());
 ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
