@@ -62,7 +62,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/upload")]
-        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
@@ -81,6 +81,7 @@ namespace Altinn.Broker.Controllers
             {
                 return BadRequest();
             }
+            Request.EnableBuffering();
 
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
@@ -149,8 +150,12 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/details")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null)
             {
                 return Unauthorized();
             }
@@ -208,16 +213,6 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
         {
-            var file = await _fileRepository.GetFileAsync(fileId);
-            if (file is null)
-            {
-                return NotFound();
-            }
-            if (string.IsNullOrWhiteSpace(file?.FileLocation))
-            {
-                return BadRequest("No file uploaded yet");
-            }
-
             var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
             if (serviceOwner is not null)
@@ -228,6 +223,21 @@ namespace Altinn.Broker.Controllers
                     return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
                 }
             }
+            if (serviceOwner is null)
+            {
+                return Unauthorized();
+            }
+
+            var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
+            if (string.IsNullOrWhiteSpace(file?.FileLocation))
+            {
+                return BadRequest("No file uploaded yet");
+            }
+
             var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
 
             return File(downloadStream, "application/force-download", file.Filename);
