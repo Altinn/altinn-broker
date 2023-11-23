@@ -146,7 +146,8 @@ public class FileRepository : IFileRepository
         if (file.Checksum is null)
         {
             command.Parameters["@checksum"].Value = DBNull.Value;
-        } else
+        }
+        else
         {
             command.Parameters.AddWithValue("@checksum", file.Checksum);
         }

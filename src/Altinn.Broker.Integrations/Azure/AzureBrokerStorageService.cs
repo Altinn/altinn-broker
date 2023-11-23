@@ -30,12 +30,12 @@ public class AzureBrokerStorageService : IBrokerStorageService
         return await _fileStore.GetFileStream(fileEntity.FileId, connectionString);
     }
 
-    private async Task<string> GetConnectionString(ServiceOwnerEntity serviceOwnerEntity) 
-    { 
-        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development") 
+    private async Task<string> GetConnectionString(ServiceOwnerEntity serviceOwnerEntity)
+    {
+        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
         {
             return _azureStorageOptions.ConnectionString;
         }
         return await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
-    } 
+    }
 }

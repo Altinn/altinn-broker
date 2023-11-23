@@ -65,7 +65,7 @@ public class ServiceOwnerController : Controller
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,
-            DeploymentStatus = (DeploymentStatusExt) deploymentStatus,
+            DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
         };
     }
 }

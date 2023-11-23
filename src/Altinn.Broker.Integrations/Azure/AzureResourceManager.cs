@@ -26,7 +26,7 @@ public class AzureResourceManager : IResourceManager
     private readonly ILogger<AzureResourceManager> _logger;
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
-    
+
     public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IOptions<AzureStorageOptions> storageOptions, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
@@ -34,7 +34,7 @@ public class AzureResourceManager : IResourceManager
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
             _armClient = new ArmClient(new DefaultAzureCredential());
-        } 
+        }
         else
         {
             var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
@@ -118,10 +118,10 @@ public class AzureResourceManager : IResourceManager
         var containerName = "brokerfiles";
         BlobSasBuilder sasBuilder = new BlobSasBuilder()
         {
-            BlobContainerName = containerName, 
-            Resource = "c", 
+            BlobContainerName = containerName,
+            Resource = "c",
             StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1), 
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write);
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
