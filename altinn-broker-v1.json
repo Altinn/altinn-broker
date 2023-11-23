@@ -496,7 +496,7 @@
                 },
                 "nullable": false
             },
-            "metadata": {
+            "propertyList": {
                 "type": "object",
                 "description": "Metadata associated with the file.",
                 "additionalProperties": {
