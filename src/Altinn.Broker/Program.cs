@@ -44,7 +44,14 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+} 
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
     services.AddSingleton<IFileStore, BlobService>();
@@ -101,11 +108,3 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         options.MultipartHeadersLengthLimit = int.MaxValue;
     });
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
