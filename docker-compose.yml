@@ -8,11 +8,27 @@ networks:
     external: false
 
 services:
-  azurite:
+  storage:
     image: mcr.microsoft.com/azure-storage/azurite
     ports:
       - "10000:10000"
       - "10001:10001"
+    healthcheck:
+        test: nc 127.0.0.1 10000 -z
+        interval: 1s
+        retries: 30
+  storage_init:
+      image: mcr.microsoft.com/azure-cli:latest
+      command:
+          - /bin/sh
+          - -c
+          - |
+              az storage container create --name brokerfiles
+      depends_on:
+          storage:
+              condition: service_healthy
+      environment:
+          AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:10000/devstoreaccount1;
   database:
     image: 'postgres:latest'
     ports:
@@ -21,7 +37,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: broker
-  broker-flyway-local:
+  database_migration:
     image: flyway/flyway@sha256:9e78682c33f6b22e83b00a2971a3e8b0f257a51857dfc34ed4a5f6a839038239
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
     volumes:
