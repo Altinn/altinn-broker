@@ -71,7 +71,7 @@ namespace Altinn.Broker.Controllers
             {
                 return authenticationResult;
             }
-            if (serviceOwner is null)
+            if (serviceOwner is null || serviceOwner.StorageProvider is null)
             {
                 return Unauthorized();
             }
@@ -109,7 +109,7 @@ namespace Altinn.Broker.Controllers
             {
                 return authenticationResult;
             }
-            if (serviceOwner is null)
+            if (serviceOwner is null || serviceOwner.StorageProvider is null)
             {
                 return Unauthorized();
             }
