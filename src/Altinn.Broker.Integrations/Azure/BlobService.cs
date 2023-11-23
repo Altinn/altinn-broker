@@ -1,6 +1,7 @@
+using Azure.Identity;
+using Azure.Storage;
 using Azure.Storage.Blobs;
-
-using Microsoft.Extensions.Options;
+using Azure.Storage.Blobs.Models;
 
 namespace Altinn.Broker.Integrations.Azure;
 
@@ -13,7 +14,8 @@ public class BlobService : Repositories.IFileStore
 
     public async Task<Stream> GetFileStream(Guid fileId, string connectionString)
     {
-        var containerClient = new BlobContainerClient(new Uri(connectionString));
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
         var content = await blobClient.DownloadContentAsync();
         return content.Value.Content.ToStream();
@@ -21,9 +23,14 @@ public class BlobService : Repositories.IFileStore
 
     public async Task UploadFile(Stream stream, Guid fileId, string connectionString)
     {
-        var containerClient = new BlobContainerClient(new Uri(connectionString));
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
-        await blobClient.UploadAsync(stream, true);
+        BlobUploadOptions options = new()
+        {
+            TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
+        };
+        await blobClient.UploadAsync(stream, options);
     }
 
     public async Task<bool> IsOnline(string connectionString)
@@ -31,15 +38,15 @@ public class BlobService : Repositories.IFileStore
         try
         {
             var blobServiceClient = new BlobServiceClient(connectionString);
-            var containers = blobServiceClient.GetBlobContainers();
-            foreach (var container in containers)
+            var containers = blobServiceClient.GetBlobContainersAsync();
+            await foreach (var container in containers)
             {
                 // Accessing the containers. If this succeeds, the account exists.
             }
 
             return true;
         }
-        catch (Exception ex)
+        catch
         {
             return false;
         }

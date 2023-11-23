@@ -143,10 +143,12 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
         command.Parameters.AddWithValue("@filename", file.Filename);
-        command.Parameters.AddWithValue("@checksum", file.Checksum);
         if (file.Checksum is null)
         {
             command.Parameters["@checksum"].Value = DBNull.Value;
+        } else
+        {
+            command.Parameters.AddWithValue("@checksum", file.Checksum);
         }
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.SendersFileReference);

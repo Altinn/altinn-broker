@@ -98,13 +98,8 @@ public class AzureResourceManager : IResourceManager
         return DeploymentStatus.Ready;
     }
 
-    public async Task<string> GetStorageConnectionString(ServiceOwnerEntity? serviceOwnerEntity)
+    public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
-        if (serviceOwnerEntity is null)
-        {
-            return _storageOptions.ConnectionString;
-        }
-
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
         var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         var subscription = await _armClient.GetDefaultSubscriptionAsync();

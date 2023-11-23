@@ -12,7 +12,7 @@ public interface IResourceManager
     /// <returns></returns>
     Task Deploy(ServiceOwnerEntity serviceOwnerEntity);
 
-    Task<string> GetStorageConnectionString(ServiceOwnerEntity? serviceOwnerEntity);
+    Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity);
 
     string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity);
 
