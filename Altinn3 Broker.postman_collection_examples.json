@@ -626,7 +626,7 @@
 	"auth": {
 		"type": "bearer",
 		"bearer": {
-			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjk5MTgyNTgyNyJ9.exFSD-mL1fzoWhg8IKcVeCeEyJ5qpABPU9A1AXHDa_k"
 		}
 	},
 	"event": [
@@ -660,7 +660,7 @@
 		},
 		{
 			"key": "recipientToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MjQ4MDYxNzYiLCJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE1MTYyMzkwMjJ9.1DaUih64t_c28VKbWFkf-aywuqw5ksmeZ4U1kaBvpmg",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjkyNDgwNjE3NiIsImlhdCI6MTUxNjIzOTAyMn0.aIKdAanTHukndn5D2N3yWF1e2ORhNv6johkbwlGDmDw",
 			"type": "string"
 		}
 	]
