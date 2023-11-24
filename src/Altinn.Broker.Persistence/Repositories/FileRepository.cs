@@ -196,7 +196,7 @@ public class FileRepository : IFileRepository
             "UNION " +
             "SELECT f.file_id_pk, 'Service' " +
             "FROM broker.file f " +
-            "WHERE f.application_id = @actorExternalId", connection))
+            "WHERE f.service_owner_id_fk = @actorExternalId", connection))
         {
             command.Parameters.AddWithValue("@actorExternalid", actorExernalReference);
 
