@@ -28,16 +28,18 @@
 															"name": "/broker/api/v1/file/:fileId/upload",
 															"request": {
 																"method": "POST",
-																"header": [],
+																"header": [
+																	{
+																		"key": "Content-Type",
+																		"value": "application/octet-stream",
+																		"type": "text"
+																	}
+																],
 																"body": {
-																	"mode": "formdata",
-																	"formdata": [
-																		{
-																			"key": "file",
-																			"type": "file",
-																			"src": "/C:/Windows/system.ini"
-																		}
-																	]
+																	"mode": "file",
+																	"file": {
+																		"src": "/C:/Windows/winhlp32.exe"
+																	}
 																},
 																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload"
 															},
@@ -491,6 +493,19 @@
 													{
 														"key": "Accept",
 														"value": "text/plain"
+													}
+												],
+												"event": [
+													{
+														"listen": "test",
+														"script": {
+															"exec": [
+																"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+																"pm.collectionVariables.set(\"fileId\", fileId);\r",
+																""
+															],
+															"type": "text/javascript"
+														}
 													}
 												],
 												"body": {
