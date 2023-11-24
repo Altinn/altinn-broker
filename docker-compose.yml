@@ -48,3 +48,15 @@ services:
       [
         "flyway",
       ]
+  prepare_test_data:
+    image: flyway/flyway@sha256:9e78682c33f6b22e83b00a2971a3e8b0f257a51857dfc34ed4a5f6a839038239
+    command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate
+    volumes:
+      - ./Test/Altinn.Broker.Tests/Data:/flyway/sql
+    depends_on:
+      - database_migration
+    entrypoint:
+      [
+        "flyway",
+      ]
+  
