@@ -17,15 +17,11 @@ namespace Altinn.Broker.Controllers
     {
         private readonly DatabaseConnectionProvider _databaseConnectionProvider;
         private readonly AzureResourceManagerOptions _azureResourceManagerOptions;
-        private readonly AzureStorageOptions _azureStorageOptions;
-        private readonly IFileStore _fileStore;
 
-        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions, IOptions<AzureStorageOptions> azureStorageOptions, IFileStore fileStore)
+        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions)
         {
             _databaseConnectionProvider = databaseConnectionProvider;
             _azureResourceManagerOptions = azureResourceManagerOptions.Value;
-            _azureStorageOptions = azureStorageOptions.Value;
-            _fileStore = fileStore;
         }
 
         [HttpGet]
@@ -46,13 +42,6 @@ namespace Altinn.Broker.Controllers
             {
                 Console.Error.WriteLine("Health: Exception thrown while trying to query database: {exception}", e);
                 return BadRequest("Exception thrown while trying to query database");
-            }
-
-            var storageAccountOnline = await _fileStore.IsOnline(_azureStorageOptions.ConnectionString);
-            if (!storageAccountOnline)
-            {
-                Console.Error.WriteLine("Health: Invalid storage account in StorageOptions!");
-                return BadRequest("Invalid storage account in StorageOptions");
             }
 
             // Verify that resource manager has access to our subscription
