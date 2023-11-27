@@ -18,6 +18,7 @@ public class FileControllerTests : IClassFixture<WebApplicationFactory<Program>>
 
     public FileControllerTests(WebApplicationFactory<Program> factory)
     {
+        factory.WithWebHostBuilder(configuration => configuration.UseSetting("ASPNETCORE_ENVIRONMENT", "Development"));
         _factory = factory;
         _client = factory.CreateClient();
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjk5MTgyNTgyNyJ9.exFSD-mL1fzoWhg8IKcVeCeEyJ5qpABPU9A1AXHDa_k");
