@@ -46,7 +46,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          ASPNETCORE_ENVIRONMENT: "Development"
+          ASPNETCORE_ENVIRONMENT: Development
         run: |
           dotnet-sonarscanner begin /k:"Altinn_altinn-broker" /o:"altinn" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" /d:sonar.cpd.exclusions="src/Altinn.broker.Persistence/Migration/**/*.sql" /d:sonar.coverage.exclusions="src/Altinn.broker.Persistence/Migration/"
 
