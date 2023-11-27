@@ -23,7 +23,7 @@ namespace Altinn.Broker.Models
         /// Gets or sets checksum for file data.
         /// </summary>
         [JsonPropertyName("checksum")]
-        public string Checksum { get; set; } = string.Empty;
+        public string? Checksum { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the sender of the broker file.

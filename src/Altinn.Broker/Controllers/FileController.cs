@@ -53,7 +53,7 @@ namespace Altinn.Broker.Controllers
             var file = FileInitializeExtMapper.MapToDomain(initializeExt, serviceOwner.Id);
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
-            return Ok(fileId);
+            return Ok(fileId.ToString());
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace Altinn.Broker.Controllers
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
-            return Ok(fileId);
+            return Ok(fileId.ToString());
         }
 
         /// <summary>
@@ -122,7 +122,7 @@ namespace Altinn.Broker.Controllers
             // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
-            return Ok(fileId);
+            return Ok(fileId.ToString());
         }
 
         /// <summary>
@@ -239,6 +239,7 @@ namespace Altinn.Broker.Controllers
             }
 
             var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadStarted, caller);
 
             return File(downloadStream, "application/force-download", file.Filename);
         }

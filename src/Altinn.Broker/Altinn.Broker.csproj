@@ -23,8 +23,4 @@
     <ProjectReference Include="..\Altinn.Broker.Integrations\Altinn.Broker.Integrations.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Persistence\Altinn.Broker.Persistence.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Models\NewFolder\" />
-  </ItemGroup>
 </Project>

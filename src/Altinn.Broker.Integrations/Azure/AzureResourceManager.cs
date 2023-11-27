@@ -13,6 +13,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -20,17 +21,17 @@ namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManager : IResourceManager
 {
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
-    private readonly AzureStorageOptions _storageOptions;
+    private readonly IHostingEnvironment _hostingEnvironment;
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly ILogger<AzureResourceManager> _logger;
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
 
-    public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IOptions<AzureStorageOptions> storageOptions, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
+    public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostingEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
-        _storageOptions = storageOptions.Value;
+        _hostingEnvironment = hostingEnvironment;
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
             _armClient = new ArmClient(new DefaultAzureCredential());
@@ -80,6 +81,10 @@ public class AzureResourceManager : IResourceManager
 
     public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity)
     {
+        if (_hostingEnvironment.IsDevelopment())
+        {
+            return DeploymentStatus.Ready;
+        }
         var resourceGroupCollection = _armClient.GetDefaultSubscription().GetResourceGroups();
         var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity));
         if (!resourceGroupExists)

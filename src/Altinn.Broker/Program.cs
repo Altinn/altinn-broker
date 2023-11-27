@@ -1,4 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
@@ -10,14 +9,13 @@ using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Repositories;
 
-using Azure.Identity;
-
 using Hangfire;
 using Hangfire.MemoryStorage;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,7 +43,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
 app.UseAuthorization();
 
 app.MapControllers();
@@ -90,7 +87,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
             RequireSignedTokens = false,
             SignatureValidator = delegate (string token, TokenValidationParameters parameters)
             {
-                var jwt = new JwtSecurityToken(token);
+                var jwt = new JsonWebToken(token);
 
                 return jwt;
             },
@@ -108,3 +105,5 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         options.MultipartHeadersLengthLimit = int.MaxValue;
     });
 }
+
+public partial class Program { } // For compatibility with WebApplicationFactory
