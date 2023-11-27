@@ -38,7 +38,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: broker
   database_migration:
-    image: flyway/flyway@sha256:9e78682c33f6b22e83b00a2971a3e8b0f257a51857dfc34ed4a5f6a839038239
+    image: flyway/flyway@sha256:54414197790fe7aa1da07b8034f82e40b7e33a8b3f67f27972c2f3f73271147f
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
     volumes:
       - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
@@ -49,7 +49,7 @@ services:
         "flyway",
       ]
   prepare_test_data:
-    image: flyway/flyway@sha256:9e78682c33f6b22e83b00a2971a3e8b0f257a51857dfc34ed4a5f6a839038239
+    image: flyway/flyway@sha256:54414197790fe7aa1da07b8034f82e40b7e33a8b3f67f27972c2f3f73271147f
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate
     volumes:
       - ./Test/Altinn.Broker.Tests/Data:/flyway/sql
