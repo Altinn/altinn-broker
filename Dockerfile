@@ -13,7 +13,7 @@ COPY src ./src
 RUN dotnet publish -c Release -o out ./src/Altinn.Broker/Altinn.Broker.csproj
 
 # Build runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:7.0.14-alpine3.18 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0.0-alpine3.18 AS final
 WORKDIR /app
 EXPOSE 2525
 ENV ASPNETCORE_URLS=http://+:2525
