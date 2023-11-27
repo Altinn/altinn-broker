@@ -3,6 +3,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Repositories;
 
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Azure;
@@ -12,13 +13,15 @@ public class AzureBrokerStorageService : IBrokerStorageService
     private readonly IResourceManager _resourceManager;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly AzureStorageOptions _azureStorageOptions;
+    private readonly ILogger<AzureBrokerStorageService> _logger;
 
-    public AzureBrokerStorageService(IFileStore fileStore, IResourceManager resourceManager, IHostEnvironment hostEnvironment, IOptions<AzureStorageOptions> options)
+    public AzureBrokerStorageService(IFileStore fileStore, IResourceManager resourceManager, IHostEnvironment hostEnvironment, IOptions<AzureStorageOptions> options, ILogger<AzureBrokerStorageService> logger)
     {
         _fileStore = fileStore;
         _resourceManager = resourceManager;
         _hostEnvironment = hostEnvironment;
         _azureStorageOptions = options.Value;
+        _logger = logger;
     }
 
     public async Task UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity, Stream stream)
@@ -37,6 +40,7 @@ public class AzureBrokerStorageService : IBrokerStorageService
     {
         if (_hostEnvironment.IsDevelopment())
         {
+            _logger.LogInformation("Running in development. Using local development storage.");
             return _azureStorageOptions.ConnectionString;
         }
         return await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
