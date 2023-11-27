@@ -3,7 +3,6 @@ using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Repositories;
 
-using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 
@@ -18,12 +17,14 @@ namespace Altinn.Broker.Controllers
     {
         private readonly DatabaseConnectionProvider _databaseConnectionProvider;
         private readonly AzureResourceManagerOptions _azureResourceManagerOptions;
+        private readonly AzureStorageOptions _azureStorageOptions;
         private readonly IFileStore _fileStore;
 
-        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions, IFileStore fileStore)
+        public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions, IOptions<AzureStorageOptions> azureStorageOptions, IFileStore fileStore)
         {
             _databaseConnectionProvider = databaseConnectionProvider;
             _azureResourceManagerOptions = azureResourceManagerOptions.Value;
+            _azureStorageOptions = azureStorageOptions.Value;
             _fileStore = fileStore;
         }
 
@@ -47,7 +48,7 @@ namespace Altinn.Broker.Controllers
                 return BadRequest("Exception thrown while trying to query database");
             }
 
-            var storageAccountOnline = await _fileStore.IsOnline(null);
+            var storageAccountOnline = await _fileStore.IsOnline(_azureStorageOptions.ConnectionString);
             if (!storageAccountOnline)
             {
                 Console.Error.WriteLine("Health: Invalid storage account in StorageOptions!");
