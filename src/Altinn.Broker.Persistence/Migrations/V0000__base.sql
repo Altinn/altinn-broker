@@ -39,26 +39,38 @@ CREATE TABLE broker.actor (
     actor_external_id character varying(500) NOT NULL
 );
 
+CREATE TABLE broker.service_owner (
+    service_owner_id_pk character varying(14) NOT NULL PRIMARY KEY,
+    service_owner_name character varying(500) NOT NULL,
+    CONSTRAINT service_owner_id_pk_format CHECK (service_owner_id_pk ~ '^\d{4}:\d{9}$')
+);
+
+CREATE TABLE broker.storage_provider (
+    storage_provider_id_pk bigserial PRIMARY KEY,    
+    service_owner_id_fk character varying(14) NOT NULL,
+    created timestamp without time zone NOT NULL,
+    storage_provider_type character varying(50) NOT NULL CHECK (storage_provider_type = 'Altinn3Azure'),
+    resource_name character varying(500) NOT NULL,
+    FOREIGN KEY (service_owner_id_fk) REFERENCES broker.service_owner (service_owner_id_pk)
+);
+
 CREATE TABLE broker.file_status_description (
     file_status_description_id_pk integer PRIMARY KEY,
     file_status_description character varying(200) NOT NULL
 );
 
-CREATE TABLE broker.storage_reference (
-    storage_reference_id_pk bigserial PRIMARY KEY,
-    file_location character varying(600) NOT NULL
-);
-
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
-    application_id character varying(100) NOT NULL,
+    service_owner_id_fk character varying(14) NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,
-    sender_actor_id_fk bigserial,
+    sender_actor_id_fk bigint,
     external_file_reference character varying(500) NOT NULL,
-    uploaded timestamp without time zone NOT NULL,
-    storage_reference_id_fk bigint NOT NULL,
-    FOREIGN KEY (storage_reference_id_fk) REFERENCES broker.storage_reference (storage_reference_id_pk)
+    created timestamp without time zone NOT NULL,
+    storage_provider_id_fk bigint NOT NULL,
+    file_location character varying(600) NULL,
+    FOREIGN KEY (service_owner_id_fk) REFERENCES broker.service_owner (service_owner_id_pk),
+    FOREIGN KEY (storage_provider_id_fk) REFERENCES broker.storage_provider (storage_provider_id_pk)
 );
 
 CREATE TABLE broker.file_status (
@@ -95,7 +107,7 @@ CREATE TABLE broker.actor_file_status (
 );
 
 -- Create indexes
-CREATE INDEX ix_file_application_id ON broker.file (application_id);
+CREATE INDEX ix_file_service_owner_id ON broker.file (service_owner_id_fk);
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);

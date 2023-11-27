@@ -6,4 +6,16 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.10.3" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.9.0" />
+    <PackageReference Include="Azure.ResourceManager.Storage" Version="1.1.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.18.0" />
+    <PackageReference Include="Microsoft.Azure.Management.Storage" Version="25.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
+  </ItemGroup>
+
 </Project>

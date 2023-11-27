@@ -27,7 +27,7 @@ public class FileRepository : IFileRepository
 
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
-            "SELECT *, sr.file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId, " +
+            "SELECT *, file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId, " +
                 "(" +
                     "SELECT fs.file_status_description_id_fk " +
                     "FROM broker.file_status fs " +
@@ -43,7 +43,6 @@ public class FileRepository : IFileRepository
                     "LIMIT 1" +
                 ") as file_status_date " +
             "FROM broker.file " +
-            "LEFT JOIN broker.storage_reference sr on sr.storage_reference_id_pk = storage_reference_id_fk " +
             "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
             "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
             "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
@@ -57,14 +56,14 @@ public class FileRepository : IFileRepository
                 file = new FileEntity
                 {
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                    ApplicationId = reader.GetString(reader.GetOrdinal("application_id")),
+                    ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                     FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
-                    Uploaded = reader.GetDateTime(reader.GetOrdinal("uploaded")),
-                    FileLocation = reader.GetString(reader.GetOrdinal("file_location")),
+                    Uploaded = reader.GetDateTime(reader.GetOrdinal("created")),
+                    FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     Sender = reader.GetString(reader.GetOrdinal("senderExternalId"))
                 };
                 var receipts = new List<ActorFileStatusEntity>();
@@ -118,7 +117,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<Guid> AddFileAsync(FileEntity file, string caller)
+    public async Task<Guid> AddFileAsync(FileEntity file, ServiceOwnerEntity serviceOwner)
     {
         long actorId;
         var actor = await _actorRepository.GetActorAsync(file.Sender);
@@ -137,24 +136,19 @@ public class FileRepository : IFileRepository
         var connection = await _connectionProvider.GetConnectionAsync();
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, application_id, filename, checksum, external_file_reference, sender_actor_id_fk, uploaded, storage_reference_id_fk) " +
-            "VALUES (@fileId, @applicationId, @filename, @checksum, @externalFileReference, @senderActorId, @uploaded, @storageReferenceId)",
+            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk) " +
+            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId)",
             connection);
-        long storageReference = await AddFileStorageReferenceAsync(file.FileLocation);
 
         command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@applicationId", caller);
+        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
         command.Parameters.AddWithValue("@filename", file.Filename);
-        command.Parameters.AddWithValue("@checksum", file.Checksum);
-        if (file.Checksum is null)
-        {
-            command.Parameters["@checksum"].Value = DBNull.Value;
-        }
+        command.Parameters.AddWithValue("@checksum", file.Checksum is null ? DBNull.Value : file.Checksum);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", file.SendersFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
-        command.Parameters.AddWithValue("@uploaded", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@storageReferenceId", storageReference);
+        command.Parameters.AddWithValue("@created", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider!.Id);
 
         command.ExecuteNonQuery();
 
@@ -173,22 +167,6 @@ public class FileRepository : IFileRepository
         await InsertFileStatus(fileId, FileStatus.Initialized);
 
         return fileId;
-    }
-
-    private async Task<long> AddFileStorageReferenceAsync(string fileLocation)
-    {
-        var connection = await _connectionProvider.GetConnectionAsync();
-
-        long? storageReferenceId;
-        using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.storage_reference (storage_reference_id_pk, file_location) " +
-            "VALUES (DEFAULT, @fileLocation) " +
-            "RETURNING storage_reference_id_pk", connection))
-        {
-            command.Parameters.AddWithValue("@fileLocation", fileLocation ?? "altinn-3-blob");
-            storageReferenceId = (long)command.ExecuteScalar();
-            return (long)storageReferenceId;
-        }
     }
 
     public async Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference)
@@ -211,7 +189,7 @@ public class FileRepository : IFileRepository
             "UNION " +
             "SELECT f.file_id_pk, 'Service' " +
             "FROM broker.file f " +
-            "WHERE f.application_id = @actorExternalId", connection))
+            "WHERE f.service_owner_id_fk = @actorExternalId", connection))
         {
             command.Parameters.AddWithValue("@actorExternalid", actorExernalReference);
 
@@ -258,22 +236,20 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task SetStorageReference(Guid fileId, string storageReference)
+    public async Task SetStorageReference(Guid fileId, long storageProviderId, string fileLocation)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "UPDATE broker.storage_reference " +
-            "SET file_location = @fileLocation " +
-            "WHERE storage_reference_id_pk = ( " +
-                "SELECT f.storage_reference_id_fk " +
-                "FROM broker.file f " +
-                "WHERE f.file_id_pk = @fileId" +
-            ")", connection))
+            "UPDATE broker.file " +
+            "SET " +
+                "file_location = @fileLocation, " +
+                "storage_provider_id_fk = @storageProviderId " +
+            "WHERE file_id_pk = @fileId", connection))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
-            command.Parameters.AddWithValue("@fileLocation", storageReference);
-            var commandText = command.CommandText;
+            command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
+            command.Parameters.AddWithValue("@fileLocation", fileLocation);
             command.ExecuteNonQuery();
         }
     }

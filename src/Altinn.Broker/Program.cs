@@ -2,12 +2,22 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
+using Altinn.Broker.Repositories;
+
+using Azure.Identity;
+
+using Hangfire;
+using Hangfire.MemoryStorage;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,16 +46,33 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
-    services.AddSingleton<IFileStore, BlobStore>();
+    services.AddSingleton<IFileStore, BlobService>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
-    services.Configure<StorageOptions>(config.GetSection(key: nameof(StorageOptions)));
+    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
+    services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
+    services.AddSingleton<IFileStore, BlobService>();
+    services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
+    services.AddSingleton<IResourceManager, AzureResourceManager>();
+
+    services.AddHangfire(c => c.UseMemoryStorage());
+    services.AddHangfireServer((options) =>
+    {
+        options.ServerTimeout = TimeSpan.FromMinutes(30);
+    });
 
     services.AddHttpClient();
 
@@ -69,12 +96,15 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
             },
         };
     });
+
+    services.Configure<KestrelServerOptions>(options =>
+    {
+        options.Limits.MaxRequestBodySize = int.MaxValue;
+    });
+    services.Configure<FormOptions>(options =>
+    {
+        options.ValueLengthLimit = int.MaxValue;
+        options.MultipartBodyLengthLimit = int.MaxValue;
+        options.MultipartHeadersLengthLimit = int.MaxValue;
+    });
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();

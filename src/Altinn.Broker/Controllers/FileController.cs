@@ -1,29 +1,35 @@
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
-using Altinn.Broker.Persistence;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Controllers
 {
     [ApiController]
     [Route("broker/api/v1/file")]
-    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class FileController : ControllerBase
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public class FileController : Controller
     {
         private readonly IFileRepository _fileRepository;
-        private readonly IFileStore _fileStore;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IServiceOwnerRepository _serviceOwnerRepository;
+        private readonly IBrokerStorageService _brokerStorageService;
+        private readonly IResourceManager _resourceManager;
         private readonly ILogger<FileController> _logger;
 
-        public FileController(IFileRepository fileRepository, IFileStore fileStore, IHttpClientFactory httpClientFactory, ILogger<FileController> logger)
+        public FileController(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceManager resourceManager, ILogger<FileController> logger)
         {
             _fileRepository = fileRepository;
-            _fileStore = fileStore;
-            _httpClientFactory = httpClientFactory;
+            _serviceOwnerRepository = serviceOwnerRepository;
+            _brokerStorageService = brokerStorageService;
+            _resourceManager = resourceManager;
             _logger = logger;
         }
 
@@ -34,14 +40,18 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt)
         {
-            var caller = GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null)
             {
                 return Unauthorized();
             }
 
-            var file = FileInitializeExtMapper.MapToDomain(initializeExt, caller);
-            var fileId = await _fileRepository.AddFileAsync(file, caller);
+            var file = FileInitializeExtMapper.MapToDomain(initializeExt, serviceOwner.Id);
+            var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
             return Ok(fileId);
         }
@@ -52,25 +62,31 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/upload")]
-        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId)
         {
-            _logger.LogInformation("File size is {FileSize]} bytes", Request.ContentLength);
-            var caller = GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null || serviceOwner.StorageProvider is null)
             {
                 return Unauthorized();
             }
+
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
                 return BadRequest();
             }
+            Request.EnableBuffering();
 
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
-            await _fileStore.UploadFile(Request.Body, fileId);
-            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
+            await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
+            // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
@@ -88,17 +104,22 @@ namespace Altinn.Broker.Controllers
             [FromForm] FileInitializeAndUploadExt form
         )
         {
-            var caller = GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null || serviceOwner.StorageProvider is null)
             {
                 return Unauthorized();
             }
 
-            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, caller);
-            var fileId = await _fileRepository.AddFileAsync(file, caller);
+            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, serviceOwner.Id);
+            var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
-            await _fileStore.UploadFile(form.File.OpenReadStream(), fileId);
-            await _fileRepository.SetStorageReference(fileId, "altinn-3-" + fileId.ToString());
+            await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
+            await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
+            // TODO: Queue Kafka jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
             return Ok(fileId);
@@ -129,11 +150,16 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/details")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
         {
-            var caller = GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
+            if (authenticationResult is not null)
+            {
+                return authenticationResult;
+            }
+            if (serviceOwner is null)
             {
                 return Unauthorized();
             }
+
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
@@ -168,7 +194,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to)
         {
-            var caller = GetCallerFromTestToken(HttpContext);
+            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))
             {
                 return Unauthorized();
@@ -187,29 +213,34 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
         {
+            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
+            if (serviceOwner is not null)
+            {
+                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+                if (deploymentStatus != DeploymentStatus.Ready)
+                {
+                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+                }
+            }
+            if (serviceOwner is null)
+            {
+                return Unauthorized();
+            }
+
             var file = await _fileRepository.GetFileAsync(fileId);
+            if (file is null)
+            {
+                return NotFound();
+            }
             if (string.IsNullOrWhiteSpace(file?.FileLocation))
             {
                 return BadRequest("No file uploaded yet");
             }
 
-            if (file.FileLocation.StartsWith("altinn-3"))
-            {
-                var stream = await _fileStore.GetFileStream(fileId);
-                return File(stream, "application/octet-stream", file.Filename);
-            }
-            else
-            {
-                var client = _httpClientFactory.CreateClient();
-                var response = await client.GetAsync(file.FileLocation);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode(502, "File could not be accessed at the location.");
-                }
-                var stream = await response.Content.ReadAsStreamAsync();
-                var contentType = response.Content.Headers.ContentType.ToString();
-                return File(stream, contentType, file.Filename);
-            }
+            var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
+
+            return File(downloadStream, "application/force-download", file.Filename);
         }
 
         /// <summary>
@@ -220,7 +251,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(Guid fileId)
         {
-            var caller = GetCallerFromTestToken(HttpContext);
+            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
             if (string.IsNullOrWhiteSpace(caller))
             {
                 return Unauthorized();
@@ -243,7 +274,5 @@ namespace Altinn.Broker.Controllers
 
             return Ok();
         }
-
-        private string? GetCallerFromTestToken(HttpContext httpContext) => httpContext.User.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     }
 }

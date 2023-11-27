@@ -39,7 +39,6 @@ public class RepositoryTests
         {
             SendersFileReference = "1",
             FileStatus = Core.Domain.Enums.FileStatus.Initialized,
-            FileLocation = fileLocation,
             Uploaded = DateTime.UtcNow,
             Sender = "1",
             Filename = "document.pdf",
@@ -57,7 +56,20 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "0192:991825827",
+            Name = "Integration test",
+            StorageProvider = new StorageProviderEntity()
+            {
+                Id = 1,
+                Created = DateTime.UtcNow,
+                ResourceName = "dummy-value",
+                Type = StorageProviderType.Altinn3Azure
+            }
+        });
+
+        await _fileRepository.SetStorageReference(fileId, 1, fileLocation);
 
         // Assert
         var savedFile = await _fileRepository.GetFileAsync(fileId);
@@ -90,7 +102,18 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "0192:991825827",
+            Name = "Integration test",
+            StorageProvider = new StorageProviderEntity()
+            {
+                Id = 1,
+                Created = DateTime.UtcNow,
+                ResourceName = "dummy-value",
+                Type = StorageProviderType.Altinn3Azure
+            }
+        });
 
         // Act
         await _fileRepository.AddReceiptAsync(new ActorFileStatusEntity()
@@ -137,7 +160,18 @@ public class RepositoryTests
                     Status = ActorFileStatus.Initialized
                 }
             }
-        }, "1234567890");
+        }, new ServiceOwnerEntity()
+        {
+            Id = "0192:991825827",
+            Name = "Integration test",
+            StorageProvider = new StorageProviderEntity()
+            {
+                Id = 1,
+                Created = DateTime.UtcNow,
+                ResourceName = "dummy-value",
+                Type = StorageProviderType.Altinn3Azure
+            }
+        });
 
         // Act
         var result = await _fileRepository.GetFileAsync(fileId);

@@ -28,16 +28,18 @@
 															"name": "/broker/api/v1/file/:fileId/upload",
 															"request": {
 																"method": "POST",
-																"header": [],
+																"header": [
+																	{
+																		"key": "Content-Type",
+																		"value": "application/octet-stream",
+																		"type": "text"
+																	}
+																],
 																"body": {
-																	"mode": "formdata",
-																	"formdata": [
-																		{
-																			"key": "file",
-																			"type": "file",
-																			"src": "/C:/Windows/system.ini"
-																		}
-																	]
+																	"mode": "file",
+																	"file": {
+																		"src": "/C:/Windows/winhlp32.exe"
+																	}
 																},
 																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload"
 															},
@@ -493,6 +495,19 @@
 														"value": "text/plain"
 													}
 												],
+												"event": [
+													{
+														"listen": "test",
+														"script": {
+															"exec": [
+																"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+																"pm.collectionVariables.set(\"fileId\", fileId);\r",
+																""
+															],
+															"type": "text/javascript"
+														}
+													}
+												],
 												"body": {
 													"mode": "raw",
 													"raw": "{\n  \"filename\": \"system.ini\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"checksum\": \"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e\",\n  \"sender\": \"931669400\",\n  \"recipients\": [\n    \"924806176\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"edtnuresed\",\n    \"veniam_1d\": \"d1_mainev\",\n    \"dialogId\": \"a15af443-8de8-4ebd-9708-08d407b5bb6c\"\n  }\n}",
@@ -626,7 +641,7 @@
 	"auth": {
 		"type": "bearer",
 		"bearer": {
-			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjk5MTgyNTgyNyJ9.exFSD-mL1fzoWhg8IKcVeCeEyJ5qpABPU9A1AXHDa_k"
 		}
 	},
 	"event": [
@@ -660,7 +675,7 @@
 		},
 		{
 			"key": "recipientToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MjQ4MDYxNzYiLCJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE1MTYyMzkwMjJ9.1DaUih64t_c28VKbWFkf-aywuqw5ksmeZ4U1kaBvpmg",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjkyNDgwNjE3NiIsImlhdCI6MTUxNjIzOTAyMn0.aIKdAanTHukndn5D2N3yWF1e2ORhNv6johkbwlGDmDw",
 			"type": "string"
 		}
 	]
