@@ -39,6 +39,6 @@ public class AzureBrokerStorageService : IBrokerStorageService
         {
             return _azureStorageOptions.ConnectionString;
         }
-        return _azureStorageOptions.ConnectionString;
+        return await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
     }
 }
