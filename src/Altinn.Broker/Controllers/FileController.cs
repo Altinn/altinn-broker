@@ -213,7 +213,11 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext) ?? "politiet";
+            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(caller))
+            {
+                return Unauthorized();
+            }
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
             if (serviceOwner is not null)
             {

@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Core.Domain;
+﻿using System.ComponentModel;
+
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
@@ -20,7 +22,7 @@ public static class FileStatusOverviewExtMapper
             FileStatusChanged = file.FileStatusChanged,
             FileStatusText = MapToFileStatusText(file.FileStatus),
             PropertyList = file.PropertyList,
-            Recipients = MapToRecipients(file.ActorEvents, file.Sender, file.ServiceOwnerId),
+            Recipients = MapToRecipients(file.ActorEvents, file.Sender),
             SendersFileReference = file.SendersFileReference
         };
     }
@@ -36,7 +38,8 @@ public static class FileStatusOverviewExtMapper
             FileStatus.Cancelled => FileStatusExt.Cancelled,
             FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
             FileStatus.Deleted => FileStatusExt.Deleted,
-            FileStatus.Failed => FileStatusExt.Failed
+            FileStatus.Failed => FileStatusExt.Failed,
+            _ => throw new InvalidEnumArgumentException()
         };
     }
 
@@ -51,7 +54,8 @@ public static class FileStatusOverviewExtMapper
             FileStatus.Cancelled => "File cancelled",
             FileStatus.AllConfirmedDownloaded => "All downloaded",
             FileStatus.Deleted => "File has been deleted",
-            FileStatus.Failed => "Upload failed"
+            FileStatus.Failed => "Upload failed",
+            _ => throw new InvalidEnumArgumentException()
         };
     }
 
@@ -62,7 +66,7 @@ public static class FileStatusOverviewExtMapper
         FileStatusText = MapToFileStatusText(entity.Status)
     }).ToList();
 
-    public static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender, string applicationId)
+    public static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender)
     {
         var recipientEvents = actorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != sender);
         var lastStatusForEveryRecipient = recipientEvents
@@ -85,7 +89,8 @@ public static class FileStatusOverviewExtMapper
         {
             ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
             ActorFileStatus.DownloadStarted => RecipientFileStatusExt.DownloadStarted,
-            ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed
+            ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed,
+            _ => throw new InvalidEnumArgumentException()
         };
     }
 
@@ -95,7 +100,8 @@ public static class FileStatusOverviewExtMapper
         {
             ActorFileStatus.Initialized => "Initialized",
             ActorFileStatus.DownloadStarted => "Recipient has attempted to download file",
-            ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file"
+            ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file",
+            _ => throw new InvalidEnumArgumentException()
         };
 
     }
