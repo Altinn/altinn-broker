@@ -21,14 +21,14 @@ namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManager : IResourceManager
 {
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
-    private readonly IHostingEnvironment _hostingEnvironment;
+    private readonly IHostEnvironment _hostingEnvironment;
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly ILogger<AzureResourceManager> _logger;
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
 
-    public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostingEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
+    public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _hostingEnvironment = hostingEnvironment;
@@ -105,6 +105,7 @@ public class AzureResourceManager : IResourceManager
 
     public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
+        _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
         var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         var subscription = await _armClient.GetDefaultSubscriptionAsync();
@@ -131,6 +132,6 @@ public class AzureResourceManager : IResourceManager
         sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write);
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
 
-        return $"{serviceClient.Uri}{sasBuilder.BlobContainerName}?{sasToken}";
+        return $"BlobEndpoint={serviceClient.Uri}{sasBuilder.BlobContainerName}?{sasToken}";
     }
 }

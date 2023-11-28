@@ -52,7 +52,7 @@ namespace Altinn.Broker.Controllers
             var resourceGroupCount = resourceGroupCollection.Count();
             if (resourceGroupCount < 1)
             {
-                return BadRequest("Resource groups not found under subscription with id : {_azureResourceManagerOptions.SubscriptionId}. Are the service principal environment variables set?");
+                return BadRequest($"Resource groups not found under subscription with id: {subscription.Id}. Are the service principal environment variables set?");
             }
             await resourceGroupCollection.GetAsync($"altinn-{_azureResourceManagerOptions.Environment}-broker-rg");
 

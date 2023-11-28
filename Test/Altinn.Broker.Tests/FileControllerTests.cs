@@ -9,6 +9,8 @@ using Altinn.Broker.Models;
 
 using Microsoft.AspNetCore.Mvc.Testing;
 
+using Xunit;
+
 namespace Altinn.Broker.Tests;
 public class FileControllerTests : IClassFixture<WebApplicationFactory<Program>>
 {
