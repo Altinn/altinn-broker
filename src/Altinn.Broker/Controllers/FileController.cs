@@ -1,11 +1,11 @@
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
-using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
+using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
+using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -38,19 +38,19 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt)
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
-            if (authenticationResult is not null)
+            if (token.Consumer != initializeExt.Sender)
             {
-                return authenticationResult;
+                return Unauthorized("You must use a bearer token that belongs to the sender");
             }
-            if (serviceOwner is null)
+            var file = FileInitializeExtMapper.MapToDomain(initializeExt, token.Supplier);
+            if (token.Consumer != file.Sender || token.Scope != "altinn:broker.write")
             {
-                return Unauthorized();
+                return Unauthorized("You must use a bearer token that belongs to the sender and with scope altinn:broker.write");
             }
-
-            var file = FileInitializeExtMapper.MapToDomain(initializeExt, serviceOwner.Id);
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
             return Ok(fileId.ToString());
@@ -64,25 +64,29 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/upload")]
         [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
-            Guid fileId)
+            Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
-            if (authenticationResult is not null)
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            if (serviceOwner is null)
             {
-                return authenticationResult;
-            }
-            if (serviceOwner is null || serviceOwner.StorageProvider is null)
+                return Unauthorized("Service owner not configured for the broker service");
+            };
+            var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+            if (deploymentStatus != DeploymentStatus.Ready)
             {
-                return Unauthorized();
+                return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
             }
-
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
                 return BadRequest();
             }
-            Request.EnableBuffering();
+            if (token.Consumer != file.Sender || token.Scope != "altinn:broker.write")
+            {
+                return Unauthorized("You must use a bearer token that belongs to the sender and with scope altinn:broker.write");
+            }
 
+            Request.EnableBuffering();
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
             await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
@@ -101,20 +105,26 @@ namespace Altinn.Broker.Controllers
         [Route("upload")]
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult> InitializeAndUpload(
-            [FromForm] FileInitializeAndUploadExt form
+            [FromForm] FileInitializeAndUploadExt form, 
+            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token
         )
         {
-            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
-            if (authenticationResult is not null)
+            if (token.Consumer != form.Metadata.Sender || token.Scope != "altinn:broker.write")
             {
-                return authenticationResult;
+                return Unauthorized("You must use a bearer token that belongs to the sender and with scope altinn:broker.write");
             }
-            if (serviceOwner is null || serviceOwner.StorageProvider is null)
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            if (serviceOwner is null)
             {
-                return Unauthorized();
+                return Unauthorized("Service owner not configured for the broker service");
+            };
+            var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
+            if (deploymentStatus != DeploymentStatus.Ready)
+            {
+                return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
             }
 
-            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, serviceOwner.Id);
+            var file = FileInitializeExtMapper.MapToDomain(form.Metadata, token.Supplier);
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
@@ -131,15 +141,26 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        public async Task<ActionResult<FileOverviewExt>> GetFileStatus(Guid fileId)
+        public async Task<ActionResult<FileOverviewExt>> GetFileStatus(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            if (serviceOwner is null)
+            {
+                return Unauthorized("Service owner not configured for the broker service");
+            };
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
                 return NotFound();
             }
+            if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == token.Consumer))
+            {
+                return NotFound();
+            }
 
-            return Ok(FileStatusOverviewExtMapper.MapToExternalModel(file));
+            var fileView = FileStatusOverviewExtMapper.MapToExternalModel(file);
+
+            return Ok(fileView);
         }
 
         /// <summary>
@@ -148,28 +169,27 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
-        public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId)
+        public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            (ServiceOwnerEntity? serviceOwner, ObjectResult? authenticationResult) = await AuthenticationSimulator.AuthenticateRequestAsync(HttpContext, _serviceOwnerRepository);
-            if (authenticationResult is not null)
-            {
-                return authenticationResult;
-            }
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
             if (serviceOwner is null)
             {
-                return Unauthorized();
-            }
-
+                return Unauthorized("Service owner not configured for the broker service");
+            };
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
+            {
+                return NotFound();
+            }
+            if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == token.Consumer))
             {
                 return NotFound();
             }
 
             var fileHistory = await _fileRepository.GetFileStatusHistoryAsync(fileId);
             var actorEvents = await _fileRepository.GetActorEvents(fileId);
-
             var fileOverview = FileStatusOverviewExtMapper.MapToExternalModel(file);
+
             return new FileStatusDetailsExt()
             {
                 Checksum = fileOverview.Checksum,
@@ -192,15 +212,15 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to)
+        public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            if (serviceOwner is null)
             {
-                return Unauthorized();
-            }
+                return Unauthorized("Service owner not configured for the broker service");
+            };
 
-            var files = await _fileRepository.GetFilesAvailableForCaller(caller);
+            var files = await _fileRepository.GetFilesAvailableForCaller(token.Consumer);
 
             return Ok(files);
         }
@@ -211,29 +231,23 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/download")]
-        public async Task<ActionResult<Stream>> DownloadFile(Guid fileId)
+        public async Task<ActionResult<Stream>> DownloadFile(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            if (token.Scope != "altinn:broker.read")
             {
-                return Unauthorized();
+                return Unauthorized("You must use a bearer token with scope altinn:broker.write");
             }
-            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(caller);
-            if (serviceOwner is not null)
-            {
-                var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
-                if (deploymentStatus != DeploymentStatus.Ready)
-                {
-                    return UnprocessableEntity($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
-                }
-            }
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
             if (serviceOwner is null)
             {
-                return Unauthorized();
-            }
-
+                return Unauthorized("Service owner not configured for the broker service");
+            };
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
+            {
+                return NotFound();
+            }
+            if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == token.Consumer))
             {
                 return NotFound();
             }
@@ -243,7 +257,7 @@ namespace Altinn.Broker.Controllers
             }
 
             var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadStarted, caller);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadStarted, token.Consumer);
 
             return File(downloadStream, "application/force-download", file.Filename);
         }
@@ -254,23 +268,30 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/confirmdownload")]
-        public async Task<ActionResult> ConfirmDownload(Guid fileId)
+        public async Task<ActionResult> ConfirmDownload(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
-            var caller = AuthenticationSimulator.GetCallerFromTestToken(HttpContext);
-            if (string.IsNullOrWhiteSpace(caller))
+            var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+            if (serviceOwner is null)
             {
-                return Unauthorized();
-            }
-
+                return Unauthorized("Service owner not configured for the broker service");
+            };
             var file = await _fileRepository.GetFileAsync(fileId);
             if (file is null)
             {
                 return NotFound();
             }
+            if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == token.Consumer))
+            {
+                return NotFound();
+            }
+            if (string.IsNullOrWhiteSpace(file?.FileLocation))
+            {
+                return BadRequest("No file uploaded yet");
+            }
 
-            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadConfirmed, caller);
+            await _fileRepository.AddReceipt(fileId, ActorFileStatus.DownloadConfirmed, token.Consumer);
             var recipientStatuses = file.ActorEvents
-                .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != caller)
+                .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != token.Consumer)
                 .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
                 .Select(group => group.Max(statusEvent => statusEvent.Status))
                 .ToList();
