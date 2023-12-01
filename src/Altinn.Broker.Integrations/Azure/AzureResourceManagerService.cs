@@ -21,7 +21,6 @@ namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManagerService : IResourceManager
 {
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
-    private readonly AzureStorageOptions _azureStorageOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
@@ -29,10 +28,9 @@ public class AzureResourceManagerService : IResourceManager
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
 
-    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IOptions<AzureStorageOptions> azureStorageOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
+    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
-        _azureStorageOptions = azureStorageOptions.Value;
         _hostEnvironment = hostingEnvironment;
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
@@ -107,11 +105,6 @@ public class AzureResourceManagerService : IResourceManager
 
     public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
-        if (_hostEnvironment.IsDevelopment())
-        {
-            _logger.LogInformation("Running in development. Using local development storage.");
-            return _azureStorageOptions.ConnectionString;
-        }
         _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
         var storageAccountName = GetStorageAccountName(serviceOwnerEntity);

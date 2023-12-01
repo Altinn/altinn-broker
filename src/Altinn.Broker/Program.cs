@@ -54,7 +54,6 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IFileStore, BlobService>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
-    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
