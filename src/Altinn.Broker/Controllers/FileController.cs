@@ -90,7 +90,7 @@ namespace Altinn.Broker.Controllers
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, Request.Body);
             await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
-            // TODO: Queue Kafka jobs
+            // TODO, async jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
 
@@ -129,7 +129,7 @@ namespace Altinn.Broker.Controllers
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadStarted);
             await _brokerStorageService.UploadFile(serviceOwner, file, form.File.OpenReadStream());
             await _fileRepository.SetStorageReference(fileId, serviceOwner.StorageProvider.Id, fileId.ToString());
-            // TODO: Queue Kafka jobs
+            // TODO, async jobs
             await _fileRepository.InsertFileStatus(fileId, FileStatus.UploadProcessing);
             await _fileRepository.InsertFileStatus(fileId, FileStatus.Published);
             return Ok(fileId.ToString());
