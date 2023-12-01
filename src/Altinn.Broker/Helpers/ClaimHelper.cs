@@ -45,32 +45,4 @@ public static class ClaimHelper
         return scopeClaim.Value;
 
     }
-
-    public static async Task<(ServiceOwnerEntity? serviceOwner, ObjectResult? actionResult)> AuthenticateRequestAsync(HttpContext httpContext, IServiceOwnerRepository serviceOwnerRepository)
-    {
-        var caller = ClaimHelper.GetConsumerFromToken(httpContext);
-        if (string.IsNullOrWhiteSpace(caller))
-        {
-            return (null, new ObjectResult("You need to pass in a JWT token with a sub claim")
-            {
-                StatusCode = (int)HttpStatusCode.Unauthorized
-            });
-        }
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(caller);
-        if (serviceOwner is null)
-        {
-            return (null, new ObjectResult($"Service owner {caller} has not been setup for the broker service.")
-            {
-                StatusCode = (int)HttpStatusCode.Unauthorized
-            });
-        }
-        if (serviceOwner.StorageProvider is null)
-        {
-            return (null, new ObjectResult($"Service owner infrastructure is not ready.")
-            {
-                StatusCode = (int)HttpStatusCode.ServiceUnavailable
-            });
-        }
-        return (serviceOwner, null);
-    }
 }
