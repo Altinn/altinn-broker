@@ -63,7 +63,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
     services.AddSingleton<IFileStore, BlobService>();
     services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
-    services.AddSingleton<IResourceManager, AzureResourceManager>();
+    services.AddSingleton<IResourceManager, AzureResourceManagerService>();
 
     services.AddHangfire(c => c.UseMemoryStorage());
     services.AddHangfireServer((options) =>
@@ -79,7 +79,10 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
+            ValidIssuer = "https://test.maskinporten.no/",
+            //ValidAudience = "altinn-broker-sender",
+            //IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+            ValidateIssuer = true,
             ValidateAudience = false,
             ValidateIssuerSigningKey = false,
             ValidateLifetime = false,
