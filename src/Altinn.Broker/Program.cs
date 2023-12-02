@@ -15,6 +15,7 @@ using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -95,6 +96,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
             },
         };
     });
+    services.AddRequiredScopeAuthorization();
 
     services.Configure<KestrelServerOptions>(options =>
     {
