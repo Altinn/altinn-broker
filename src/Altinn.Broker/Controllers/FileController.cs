@@ -1,5 +1,3 @@
-using Altinn.Broker.Application.InitializeFileCommand;
-using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
@@ -12,7 +10,6 @@ using Altinn.Broker.Models.Maskinporten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Identity.Web.Resource;
 
 namespace Altinn.Broker.Controllers
 {
