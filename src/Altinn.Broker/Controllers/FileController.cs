@@ -1,3 +1,5 @@
+using Altinn.Broker.Application.InitializeFileCommand;
+using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Core.Repositories;
@@ -39,7 +41,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             if (token.Consumer != initializeExt.Sender)
@@ -61,7 +63,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         [Route("{fileId}/upload")]
         [Consumes("application/octet-stream")]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
@@ -103,7 +105,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         [Route("upload")]
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult> InitializeAndUpload(
             [FromForm] FileInitializeAndUploadExt form, 
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token
@@ -141,7 +143,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileOverviewExt>> GetFileStatus(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
@@ -170,7 +172,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
@@ -214,7 +216,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [RequiredScope("altinn:broker.write")]
+        [Authorize(Policy = "Sender")]
         public async Task<ActionResult<List<Guid>>> GetFiles([FromQuery] FileStatus? status, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
@@ -234,7 +236,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/download")]
-        [RequiredScope("altinn:broker.read")]
+        [Authorize(Policy = "Recipient")]
         public async Task<ActionResult<Stream>> DownloadFile(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
@@ -268,7 +270,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/confirmdownload")]
-        [RequiredScope("altinn:broker.read")]
+        [Authorize(Policy = "Recipient")]
         public async Task<ActionResult> ConfirmDownload(Guid fileId, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
         {
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);

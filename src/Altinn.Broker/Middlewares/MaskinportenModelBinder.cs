@@ -11,14 +11,14 @@ public class MaskinportenModelBinder : IModelBinder
 {
     public async Task BindModelAsync(ModelBindingContext bindingContext)
     {
-        var consumerOrgNo = Helpers.ClaimHelper.GetConsumerFromToken(bindingContext.HttpContext);
-        var scope = Helpers.ClaimHelper.GetScopeFromToken(bindingContext.HttpContext);
+        var consumerOrgNo = Helpers.MaskinportenHelper.GetConsumerFromToken(bindingContext.HttpContext);
+        var scope = Helpers.MaskinportenHelper.GetScopeFromToken(bindingContext.HttpContext);
         if (string.IsNullOrWhiteSpace(consumerOrgNo) || string.IsNullOrWhiteSpace(scope))
         {
             throw new BadHttpRequestException("Malformed bearer token. It should contain the claims 'consumer' and 'scope'.");
         }
 
-        var supplierOrgNo = Helpers.ClaimHelper.GetSupplierFromToken(bindingContext.HttpContext);
+        var supplierOrgNo = Helpers.MaskinportenHelper.GetSupplierFromToken(bindingContext.HttpContext);
         if (string.IsNullOrWhiteSpace(supplierOrgNo))
         {
             supplierOrgNo = consumerOrgNo; // In the case where service owner uses his own token

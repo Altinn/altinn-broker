@@ -2,8 +2,10 @@ using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Middlewares;
+using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
@@ -16,7 +18,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Identity.Web;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +57,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
+    services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
     services.AddSingleton<IActorRepository, ActorRepository>();
@@ -73,28 +75,30 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddHttpClient();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
     {
+        var maskinportenOptions = new MaskinportenOptions();
+        config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
+        var key = await MaskinportenHelper.GetKeyAsync(maskinportenOptions);
+
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = "https://test.maskinporten.no/",
-            //ValidAudience = "altinn-broker-sender",
-            //IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+            ValidIssuer = maskinportenOptions.Issuer,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateIssuer = true,
             ValidateAudience = false,
-            ValidateIssuerSigningKey = false,
-            ValidateLifetime = false,
-            RequireExpirationTime = false,
-            RequireSignedTokens = false,
-            SignatureValidator = delegate (string token, TokenValidationParameters parameters)
-            {
-                var jwt = new JsonWebToken(token);
-
-                return jwt;
-            },
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            RequireSignedTokens = true
         };
+    });
+
+    services.AddAuthorization(options =>
+    {
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", [ "altinn:broker.write" ]));
+        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", [ "altinn:broker.read" ]));
     });
     services.AddRequiredScopeAuthorization();
 

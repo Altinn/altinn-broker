@@ -1,15 +1,11 @@
-﻿using System.Net;
+﻿using System.Text;
 using System.Text.Json;
 
-using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Models.Maskinporten;
-
-using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Helpers;
 
-public static class ClaimHelper
+public static class MaskinportenHelper
 {
     public static string? GetCallerFromTestToken(HttpContext httpContext) => httpContext.User.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
@@ -43,6 +39,14 @@ public static class ClaimHelper
             return null;
         }
         return scopeClaim.Value;
+    }
 
+    public static async Task<byte[]?> GetKeyAsync(MaskinportenOptions maskinportenOptions)
+    {
+        var httpClient = new HttpClient();
+        var jwkResponse = await httpClient.GetAsync($"{maskinportenOptions.Issuer}jwk");
+        var jwk = await jwkResponse.Content.ReadAsStringAsync();
+        var key = Encoding.UTF8.GetBytes(jwk);
+        return key;
     }
 }

@@ -25,7 +25,7 @@ public class ServiceOwnerController : Controller
     [HttpPost]
     public async Task<ActionResult> CreateNewServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt)
     {
-        var caller = ClaimHelper.GetCallerFromTestToken(HttpContext);
+        var caller = MaskinportenHelper.GetCallerFromTestToken(HttpContext);
         if (string.IsNullOrWhiteSpace(caller))
         {
             return Unauthorized();
@@ -49,7 +49,7 @@ public class ServiceOwnerController : Controller
     [Route("{serviceOwnerId}")]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(string serviceOwnerId)
     {
-        var caller = ClaimHelper.GetCallerFromTestToken(HttpContext);
+        var caller = MaskinportenHelper.GetCallerFromTestToken(HttpContext);
         if (string.IsNullOrWhiteSpace(caller))
         {
             return Unauthorized();
