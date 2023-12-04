@@ -34,7 +34,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = factory.CreateClient();
         _recipientClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RECIPIENT_TOKEN);
-        
+
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true

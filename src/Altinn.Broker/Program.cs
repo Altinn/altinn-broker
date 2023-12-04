@@ -97,7 +97,6 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
         options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
     });
-    services.AddRequiredScopeAuthorization();
 
     services.Configure<KestrelServerOptions>(options =>
     {
