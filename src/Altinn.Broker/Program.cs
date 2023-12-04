@@ -4,6 +4,7 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Middlewares;
+using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
@@ -15,7 +16,7 @@ using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,8 +55,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IFileStore, BlobService>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
-    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
+    services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
     services.AddSingleton<IActorRepository, ActorRepository>();
@@ -63,7 +64,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
     services.AddSingleton<IFileStore, BlobService>();
     services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
-    services.AddSingleton<IResourceManager, AzureResourceManager>();
+    services.AddSingleton<IResourceManager, AzureResourceManagerService>();
 
     services.AddHangfire(c => c.UseMemoryStorage());
     services.AddHangfireServer((options) =>
@@ -73,25 +74,28 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddHttpClient();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
     {
+        var maskinportenOptions = new MaskinportenOptions();
+        config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
+        options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
+            ValidIssuer = maskinportenOptions.Issuer,
+            ValidateIssuer = true,
             ValidateAudience = false,
-            ValidateIssuerSigningKey = false,
-            ValidateLifetime = false,
-            RequireExpirationTime = false,
-            RequireSignedTokens = false,
-            SignatureValidator = delegate (string token, TokenValidationParameters parameters)
-            {
-                var jwt = new JsonWebToken(token);
-
-                return jwt;
-            },
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            RequireSignedTokens = true
         };
+    });
+
+    services.AddAuthorization(options =>
+    {
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
+        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
     });
 
     services.Configure<KestrelServerOptions>(options =>

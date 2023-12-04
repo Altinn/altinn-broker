@@ -54,6 +54,7 @@ services:
     volumes:
       - ./Test/Altinn.Broker.Tests/Data:/flyway/sql
     depends_on:
+      - database
       - database_migration
     entrypoint:
       [

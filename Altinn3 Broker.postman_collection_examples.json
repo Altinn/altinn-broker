@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "d12c336b-b0ca-4614-b9e1-8f4cb6c244fd",
+		"_postman_id": "59aadcbf-a305-40e5-ae58-5e8635b2cdb5",
 		"name": "Altinn.Broker",
-		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "7106668"
 	},
 	"item": [
@@ -27,6 +27,16 @@
 														{
 															"name": "/broker/api/v1/file/:fileId/upload",
 															"request": {
+																"auth": {
+																	"type": "bearer",
+																	"bearer": [
+																		{
+																			"key": "token",
+																			"value": "{{sender_token}}",
+																			"type": "string"
+																		}
+																	]
+																},
 																"method": "POST",
 																"header": [
 																	{
@@ -86,6 +96,16 @@
 														{
 															"name": "/broker/api/v1/file/:fileId/details",
 															"request": {
+																"auth": {
+																	"type": "bearer",
+																	"bearer": [
+																		{
+																			"key": "token",
+																			"value": "{{sender_token}}",
+																			"type": "string"
+																		}
+																	]
+																},
 																"method": "GET",
 																"header": [
 																	{
@@ -148,6 +168,16 @@
 														{
 															"name": "/broker/api/v1/file/:fileId/download",
 															"request": {
+																"auth": {
+																	"type": "bearer",
+																	"bearer": [
+																		{
+																			"key": "token",
+																			"value": "{{recipient_token}}",
+																			"type": "string"
+																		}
+																	]
+																},
 																"method": "GET",
 																"header": [],
 																"url": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download"
@@ -232,9 +262,13 @@
 															"request": {
 																"auth": {
 																	"type": "bearer",
-																	"bearer": {
-																		"token": "{{recipientToken}}"
-																	}
+																	"bearer": [
+																		{
+																			"key": "token",
+																			"value": "{{recipient_token}}",
+																			"type": "string"
+																		}
+																	]
 																},
 																"method": "POST",
 																"header": [],
@@ -280,6 +314,16 @@
 												{
 													"name": "/broker/api/v1/file/:fileId",
 													"request": {
+														"auth": {
+															"type": "bearer",
+															"bearer": [
+																{
+																	"key": "token",
+																	"value": "{{sender_token}}",
+																	"type": "string"
+																}
+															]
+														},
 														"method": "GET",
 														"header": [
 															{
@@ -354,6 +398,16 @@
 														}
 													],
 													"request": {
+														"auth": {
+															"type": "bearer",
+															"bearer": [
+																{
+																	"key": "token",
+																	"value": "{{sender_token}}",
+																	"type": "string"
+																}
+															]
+														},
 														"method": "POST",
 														"header": [
 															{
@@ -484,6 +538,16 @@
 												}
 											],
 											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{sender_token}}",
+															"type": "string"
+														}
+													]
+												},
 												"method": "POST",
 												"header": [
 													{
@@ -510,7 +574,7 @@
 												],
 												"body": {
 													"mode": "raw",
-													"raw": "{\n  \"filename\": \"system.ini\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"checksum\": \"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e\",\n  \"sender\": \"931669400\",\n  \"recipients\": [\n    \"924806176\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"edtnuresed\",\n    \"veniam_1d\": \"d1_mainev\",\n    \"dialogId\": \"a15af443-8de8-4ebd-9708-08d407b5bb6c\"\n  }\n}",
+													"raw": "{\n  \"filename\": \"system.ini\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"checksum\": \"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e\",\n  \"sender\": \"0192:991825827\",\n  \"recipients\": [\n    \"0192:986252932\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"edtnuresed\",\n    \"veniam_1d\": \"d1_mainev\",\n    \"dialogId\": \"a15af443-8de8-4ebd-9708-08d407b5bb6c\"\n  }\n}",
 													"options": {
 														"raw": {
 															"headerFamily": "json",
@@ -607,42 +671,10 @@
 					]
 				}
 			]
-		},
-		{
-			"name": "health",
-			"item": [
-				{
-					"name": "/health",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": "{{baseUrl}}/health"
-					},
-					"response": [
-						{
-							"name": "Success",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": "{{baseUrl}}/health"
-							},
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "text",
-							"header": [],
-							"cookie": [],
-							"body": ""
-						}
-					]
-				}
-			]
 		}
 	],
 	"auth": {
-		"type": "bearer",
-		"bearer": {
-			"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjk5MTgyNTgyNyJ9.exFSD-mL1fzoWhg8IKcVeCeEyJ5qpABPU9A1AXHDa_k"
-		}
+		"type": "inherit"
 	},
 	"event": [
 		{
@@ -672,11 +704,6 @@
 		{
 			"key": "fileId",
 			"value": ""
-		},
-		{
-			"key": "recipientToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTkyOjkyNDgwNjE3NiIsImlhdCI6MTUxNjIzOTAyMn0.aIKdAanTHukndn5D2N3yWF1e2ORhNv6johkbwlGDmDw",
-			"type": "string"
 		}
 	]
 }

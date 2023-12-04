@@ -26,7 +26,11 @@ If you need to re-initialize the database during local development, you can dele
 
 ### Authorization
 
-For the time being, we have not implemented proper authorization. Any JWT token with a "sub" claim can be used (see jwt.io to make one). There is a dummy token in the Postman collection that can be used.
+To get access to the Broker API, a consumer needs to use a Maskinporten token. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work. You can create a Maskinporten integration here:
+https://selvbetjening-samarbeid-ver2.difi.no/integrations
+
+For more on Maskinporten tokens see:
+https://docs.digdir.no/docs/Maskinporten/maskinporten_guide_apikonsument
 
 ### Formatting
 

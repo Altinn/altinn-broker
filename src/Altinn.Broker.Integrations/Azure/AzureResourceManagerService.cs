@@ -18,20 +18,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Azure;
-public class AzureResourceManager : IResourceManager
+public class AzureResourceManagerService : IResourceManager
 {
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
-    private readonly IHostEnvironment _hostingEnvironment;
+    private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly ILogger<AzureResourceManager> _logger;
+    private readonly ILogger<AzureResourceManagerService> _logger;
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
 
-    public AzureResourceManager(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManager> logger)
+    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
-        _hostingEnvironment = hostingEnvironment;
+        _hostEnvironment = hostingEnvironment;
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
             _armClient = new ArmClient(new DefaultAzureCredential());
@@ -81,7 +81,7 @@ public class AzureResourceManager : IResourceManager
 
     public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity)
     {
-        if (_hostingEnvironment.IsDevelopment())
+        if (_hostEnvironment.IsDevelopment())
         {
             return DeploymentStatus.Ready;
         }
