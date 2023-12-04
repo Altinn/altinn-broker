@@ -26,9 +26,9 @@ If you need to re-initialize the database during local development, you can dele
 
 ### Authorization
 
-In its current form, we use Maskinporten bearer tokens to authenticate requests. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work.
+In its current form, we use Maskinporten bearer tokens to authenticate requests.
 
-In order to use the API, you need to use Maskinporten to get an access token that can be used for the broker API. You can create a Maskinporten integration here:
+In order to use the API, you need to use Maskinporten to get an access token that can be used for the broker API. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work. You can create a Maskinporten integration here:
 https://selvbetjening-samarbeid-ver2.difi.no/integrations
 
 For more on Maskinporten tokens see here:
