@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
-using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.Maskinporten;
@@ -79,14 +78,12 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
         var maskinportenOptions = new MaskinportenOptions();
         config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
-        var key = await MaskinportenHelper.GetKeyAsync(maskinportenOptions);
-
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
+        options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidIssuer = maskinportenOptions.Issuer,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateIssuer = true,
             ValidateAudience = false,
             ValidateLifetime = true,
@@ -97,7 +94,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddAuthorization(options =>
     {
-        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write", "altinn:broker.write altinn:broker.read"]));
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
         options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
     });
     services.AddRequiredScopeAuthorization();

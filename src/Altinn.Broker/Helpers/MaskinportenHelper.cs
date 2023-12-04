@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using Altinn.Broker.Models.Maskinporten;
 
@@ -39,14 +38,5 @@ public static class MaskinportenHelper
             return null;
         }
         return scopeClaim.Value;
-    }
-
-    public static async Task<byte[]?> GetKeyAsync(MaskinportenOptions maskinportenOptions)
-    {
-        var httpClient = new HttpClient();
-        var jwkResponse = await httpClient.GetAsync($"{maskinportenOptions.Issuer}jwk");
-        var jwk = await jwkResponse.Content.ReadAsStringAsync();
-        var key = Encoding.UTF8.GetBytes(jwk);
-        return key;
     }
 }
