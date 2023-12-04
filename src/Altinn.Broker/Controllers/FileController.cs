@@ -50,7 +50,7 @@ namespace Altinn.Broker.Controllers
             }
             var file = FileInitializeExtMapper.MapToDomain(initializeExt, token.Supplier);
             var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
-            
+
             var fileId = await _fileRepository.AddFileAsync(file, serviceOwner);
 
             return Ok(fileId.ToString());
@@ -107,7 +107,7 @@ namespace Altinn.Broker.Controllers
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult> InitializeAndUpload(
-            [FromForm] FileInitializeAndUploadExt form, 
+            [FromForm] FileInitializeAndUploadExt form,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token
         )
         {

@@ -2,5 +2,5 @@
 
 public class MaskinportenOptions
 {
-    public string Issuer { get; set; }  
+    public string Issuer { get; set; }
 }

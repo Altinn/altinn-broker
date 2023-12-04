@@ -97,8 +97,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddAuthorization(options =>
     {
-        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", [ "altinn:broker.write" ]));
-        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", [ "altinn:broker.read" ]));
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
+        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read"]));
     });
     services.AddRequiredScopeAuthorization();
 
