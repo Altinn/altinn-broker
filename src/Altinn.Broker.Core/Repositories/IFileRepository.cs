@@ -14,7 +14,7 @@ public interface IFileRepository
         Dictionary<string, string> propertyList,
         string? checksum);
     Task<Domain.FileEntity?> GetFile(Guid fileId);
-    Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference);
+    Task<List<Guid>> GetFilesAssociatedWithActor(ActorEntity actor);
     Task AddReceipt(
         Guid fileId,
         Domain.Enums.ActorFileStatus status,

@@ -11,12 +11,14 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public GetFilesQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, ILogger<GetFilesQueryHandler> logger)
+    public GetFilesQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
+        _actorRepository = actorRepository;
         _logger = logger;
     }
 
@@ -27,7 +29,12 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var files = await _fileRepository.GetFilesAvailableForCaller(request.Consumer);
+        var callingActor = await _actorRepository.GetActorAsync(request.Consumer);
+        if (callingActor is null)
+        {
+            return new List<Guid>();
+        }
+        var files = await _fileRepository.GetFilesAssociatedWithActor(callingActor);
         return files;
     }
 }

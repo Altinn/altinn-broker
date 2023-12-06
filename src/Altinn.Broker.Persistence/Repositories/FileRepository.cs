@@ -151,18 +151,14 @@ public class FileRepository : IFileRepository
         return fileId;
     }
 
-    public async Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference)
+    public async Task<List<Guid>> GetFilesAssociatedWithActor(ActorEntity actor)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "SELECT DISTINCT afs.file_id_fk, 'Recipient'  " +
             "FROM broker.actor_file_status afs " +
-            "WHERE afs.actor_id_fk = (  " +
-            "    SELECT a.actor_id_pk  " +
-            "    FROM broker.actor a  " +
-            "    WHERE a.actor_external_id = @actorExternalId" +
-            ")" +
+            "WHERE afs.actor_id_fk = @actorId " +
             "UNION " +
             "SELECT f.file_id_pk, 'Sender' " +
             "FROM broker.file f " +
@@ -173,7 +169,8 @@ public class FileRepository : IFileRepository
             "FROM broker.file f " +
             "WHERE f.service_owner_id_fk = @actorExternalId", connection))
         {
-            command.Parameters.AddWithValue("@actorExternalid", actorExernalReference);
+            command.Parameters.AddWithValue("@actorId", actor.ActorId);
+            command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
 
             var files = new List<Guid>();
             using (var reader = await command.ExecuteReaderAsync())
