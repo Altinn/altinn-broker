@@ -56,7 +56,7 @@ namespace Altinn.Broker.Controllers
         [Consumes("application/octet-stream")]
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult> UploadFileStreamed(
-            Guid fileId, 
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] UploadFileCommandHandler handler
         )
@@ -120,7 +120,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}")]
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
-            Guid fileId, 
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
@@ -128,7 +128,7 @@ namespace Altinn.Broker.Controllers
             {
                 FileId = fileId,
                 Consumer = token.Consumer,
-                Supplier = token.Supplier                
+                Supplier = token.Supplier
             });
             return commandResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
@@ -144,7 +144,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/details")]
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
-            Guid fileId, 
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
@@ -167,9 +167,9 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<List<Guid>>> GetFiles(
-            [FromQuery] FileStatusExt? status, 
-            [FromQuery] DateTimeOffset? from, 
-            [FromQuery] DateTimeOffset? to, 
+            [FromQuery] FileStatusExt? status,
+            [FromQuery] DateTimeOffset? from,
+            [FromQuery] DateTimeOffset? to,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFilesQueryHandler handler)
         {
@@ -177,14 +177,15 @@ namespace Altinn.Broker.Controllers
             {
                 Consumer = token.Consumer,
                 Supplier = token.Supplier,
-                Status = status is not null ? (FileStatus) status : null,
+                Status = status is not null ? (FileStatus)status : null,
                 From = from,
                 To = to
             });
             return commandResult.Match(
                 Ok,
                 error => error.ToActionResult()
-            );}
+            );
+        }
 
         /// <summary>
         /// Downloads the file
@@ -194,7 +195,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         [Authorize(Policy = "Recipient")]
         public async Task<ActionResult<Stream>> DownloadFile(
-            Guid fileId, 
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] DownloadFileQueryHandler handler)
         {
@@ -218,7 +219,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/confirmdownload")]
         [Authorize(Policy = "Recipient")]
         public async Task<ActionResult> ConfirmDownload(
-            Guid fileId, 
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {

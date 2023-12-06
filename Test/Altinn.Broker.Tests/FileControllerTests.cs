@@ -9,7 +9,6 @@ using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
 
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Identity.Web;
 
 using Xunit;
 

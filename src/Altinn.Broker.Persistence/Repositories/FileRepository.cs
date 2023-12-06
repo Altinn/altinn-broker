@@ -202,7 +202,7 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", sendersFileReference);
-        command.Parameters.AddWithValue("@fileStatusId", (int) FileStatus.Initialized); // TODO, remove?
+        command.Parameters.AddWithValue("@fileStatusId", (int)FileStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
 

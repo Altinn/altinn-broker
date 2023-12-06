@@ -97,7 +97,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration config, IHost
                     return jwt;
                 }
             };
-        } else { 
+        }
+        else
+        {
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidIssuer = maskinportenOptions.Issuer,
