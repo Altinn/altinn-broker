@@ -17,7 +17,7 @@ using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -76,23 +76,45 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddHttpClient();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
+    if (app.Environment.IsDevelopment())
     {
-        var maskinportenOptions = new MaskinportenOptions();
-        config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
-        options.RequireHttpsMetadata = false;
-        options.SaveToken = true;
-        options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
-        options.TokenValidationParameters = new TokenValidationParameters
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
         {
-            ValidIssuer = maskinportenOptions.Issuer,
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            RequireExpirationTime = true,
-            RequireSignedTokens = true
-        };
-    });
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = false,
+                RequireExpirationTime = false,
+                RequireSignedTokens = false,
+                SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+                {
+                    var jwt = new JsonWebToken(token);
+                    return jwt;
+                }
+            };
+        });
+    } else { 
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
+        {
+            var maskinportenOptions = new MaskinportenOptions();
+            config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidIssuer = maskinportenOptions.Issuer,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true
+            };
+        });
+    }
 
     services.AddAuthorization(options =>
     {
