@@ -169,6 +169,62 @@ public class FileRepository : IFileRepository
         return fileId;
     }
 
+    public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
+    {
+        if (serviceOwner.StorageProvider is null)
+        {
+            throw new ArgumentNullException("Storage provider must be set");
+        }
+        long actorId;
+        var actor = await _actorRepository.GetActorAsync(senderExternalId);
+        if (actor is null)
+        {
+            actorId = await _actorRepository.AddActorAsync(new ActorEntity()
+            {
+                ActorExternalId = senderExternalId
+            });
+        }
+        else
+        {
+            actorId = actor.ActorId;
+        }
+
+        var connection = await _connectionProvider.GetConnectionAsync();
+        NpgsqlCommand command = new NpgsqlCommand(
+            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk) " +
+            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId)",
+            connection);
+
+        var fileId = Guid.NewGuid();
+        command.Parameters.AddWithValue("@fileId", fileId);
+        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
+        command.Parameters.AddWithValue("@filename", filename);
+        command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
+        command.Parameters.AddWithValue("@senderActorId", actorId);
+        command.Parameters.AddWithValue("@externalFileReference", sendersFileReference);
+        command.Parameters.AddWithValue("@fileStatusId", (int) FileStatus.Initialized); // TODO, remove?
+        command.Parameters.AddWithValue("@created", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
+
+        command.ExecuteNonQuery();
+
+        var addRecipientEventTasks = recipientIds.Concat([senderExternalId]).Select(recipientId => AddReceipt(fileId, ActorFileStatus.Initialized, recipientId));
+
+        try
+        {
+            await Task.WhenAll(addRecipientEventTasks);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+
+        await SetMetadata(fileId, propertyList);
+        await InsertFileStatus(fileId, FileStatus.Initialized);
+
+        return fileId;
+    }
+
     public async Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference)
     {
         var connection = await _connectionProvider.GetConnectionAsync();

@@ -21,12 +21,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly HttpClient _recipientClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
-    /**
-     * Inject a mock bearer configuration that does not verify anything. 
-     * Generate our own JWT with correct scope, expiry and issuer. 
-     * Set it as default request header
-     * */
-
     public FileControllerTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;

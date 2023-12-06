@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Azure;
@@ -52,13 +53,14 @@ app.Run();
 
 void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
-    services.AddSingleton<IFileStore, BlobService>();
+    services.AddApplicationHandlers();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
+    services.AddSingleton<IFileStore, BlobService>();
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
