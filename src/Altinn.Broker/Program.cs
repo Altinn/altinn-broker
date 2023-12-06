@@ -101,7 +101,6 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         {
             var maskinportenOptions = new MaskinportenOptions();
             config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
-            options.RequireHttpsMetadata = false;
             options.SaveToken = true;
             options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
             options.TokenValidationParameters = new TokenValidationParameters
