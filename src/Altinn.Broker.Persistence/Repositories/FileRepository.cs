@@ -117,58 +117,6 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<Guid> AddFileAsync(FileEntity file, ServiceOwnerEntity serviceOwner)
-    {
-        long actorId;
-        var actor = await _actorRepository.GetActorAsync(file.Sender);
-        if (actor is null)
-        {
-            actorId = await _actorRepository.AddActorAsync(new ActorEntity()
-            {
-                ActorExternalId = file.Sender
-            });
-        }
-        else
-        {
-            actorId = actor.ActorId;
-        }
-
-        var connection = await _connectionProvider.GetConnectionAsync();
-        var fileId = Guid.NewGuid();
-        NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk) " +
-            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId)",
-            connection);
-
-        command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
-        command.Parameters.AddWithValue("@filename", file.Filename);
-        command.Parameters.AddWithValue("@checksum", file.Checksum is null ? DBNull.Value : file.Checksum);
-        command.Parameters.AddWithValue("@senderActorId", actorId);
-        command.Parameters.AddWithValue("@externalFileReference", file.SendersFileReference);
-        command.Parameters.AddWithValue("@fileStatusId", (int)file.FileStatus);
-        command.Parameters.AddWithValue("@created", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider!.Id);
-
-        command.ExecuteNonQuery();
-
-        var addActorTasks = file.ActorEvents.Select(actorEvent => AddReceipt(fileId, ActorFileStatus.Initialized, actorEvent.Actor.ActorExternalId));
-
-        try
-        {
-            await Task.WhenAll(addActorTasks);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"An error occurred: {ex.Message}");
-        }
-
-        await SetMetadata(fileId, file.PropertyList);
-        await InsertFileStatus(fileId, FileStatus.Initialized);
-
-        return fileId;
-    }
-
     public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
     {
         if (serviceOwner.StorageProvider is null)

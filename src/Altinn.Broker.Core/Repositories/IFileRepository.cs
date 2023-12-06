@@ -5,8 +5,6 @@ namespace Altinn.Broker.Core.Repositories;
 
 public interface IFileRepository
 {
-    Task<Guid> AddFileAsync(FileEntity file, ServiceOwnerEntity serviceOwner);
-
     Task<Guid> AddFile(
         ServiceOwnerEntity serviceOwner,
         string filename,
