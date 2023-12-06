@@ -35,7 +35,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
-ConfigureServices(builder.Services, builder.Configuration);
+ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -51,7 +51,7 @@ app.MapControllers();
 
 app.Run();
 
-void ConfigureServices(IServiceCollection services, IConfiguration config)
+void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
 {
     services.AddApplicationHandlers();
 
@@ -76,12 +76,14 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddHttpClient();
 
-    if (app.Environment.IsDevelopment())
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
+        var maskinportenOptions = new MaskinportenOptions();
+        config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
+        options.SaveToken = true;
+        options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
+        if (hostEnvironment.IsDevelopment())
         {
-            options.RequireHttpsMetadata = false;
-            options.SaveToken = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = false,
@@ -95,14 +97,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
                     return jwt;
                 }
             };
-        });
-    } else { 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
-        {
-            var maskinportenOptions = new MaskinportenOptions();
-            config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
-            options.SaveToken = true;
-            options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
+        } else { 
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidIssuer = maskinportenOptions.Issuer,
@@ -112,8 +107,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
                 RequireExpirationTime = true,
                 RequireSignedTokens = true
             };
-        });
-    }
+        }
+    });
 
     services.AddAuthorization(options =>
     {
