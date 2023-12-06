@@ -16,7 +16,7 @@ internal static class InitializeFileMapper
             SenderExternalId = fileInitializeExt.Sender,
             SendersFileReference = fileInitializeExt.SendersFileReference,
             PropertyList = fileInitializeExt.PropertyList,
-            RecipientIds = fileInitializeExt.Recipients,
+            RecipientExternalIds = fileInitializeExt.Recipients,
             Checksum = fileInitializeExt.Checksum,
         };
     }
