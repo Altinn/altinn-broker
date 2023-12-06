@@ -38,7 +38,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceOwnerNotReadyInfrastructure;
         }
-        var file = await _fileRepository.GetFileAsync(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
             return Errors.FileNotFound;

@@ -21,7 +21,7 @@ public class FileRepository : IFileRepository
         _actorRepository = actorRepository;
     }
 
-    public async Task<FileEntity?> GetFileAsync(Guid fileId)
+    public async Task<FileEntity?> GetFile(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -93,28 +93,6 @@ public class FileRepository : IFileRepository
         }
         file.PropertyList = await GetMetadata(fileId);
         return file;
-    }
-
-    public async Task AddReceiptAsync(ActorFileStatusEntity receipt)
-    {
-        var connection = await _connectionProvider.GetConnectionAsync();
-
-        var actorId = receipt.Actor.ActorId;
-        if (actorId == 0)
-        {
-            actorId = await _actorRepository.AddActorAsync(receipt.Actor);
-        }
-
-        using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.actor_file_status (actor_id_fk, file_id_fk, actor_file_status_id_fk, actor_file_status_date) " +
-            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())", connection))
-        {
-            command.Parameters.AddWithValue("@actorId", actorId);
-            command.Parameters.AddWithValue("@fileId", receipt.FileId);
-            command.Parameters.AddWithValue("@actorFileStatusId", (int)receipt.Status);
-            var commandText = command.CommandText;
-            command.ExecuteNonQuery();
-        }
     }
 
     public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
@@ -258,7 +236,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId)
+    public async Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 

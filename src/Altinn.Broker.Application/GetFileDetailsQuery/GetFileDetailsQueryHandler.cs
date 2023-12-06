@@ -23,7 +23,7 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var file = await _fileRepository.GetFileAsync(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
             return Errors.FileNotFound;
@@ -32,7 +32,7 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.FileNotFound;
         }
-        var fileEvents = await _fileRepository.GetFileStatusHistoryAsync(request.FileId);
+        var fileEvents = await _fileRepository.GetFileStatusHistory(request.FileId);
         var actorEvents = await _fileRepository.GetActorEvents(request.FileId);
         return new GetFileDetailsQueryResponse()
         {

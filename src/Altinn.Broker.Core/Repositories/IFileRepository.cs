@@ -13,23 +13,19 @@ public interface IFileRepository
         List<string> recipientIds,
         Dictionary<string, string> propertyList,
         string? checksum);
-
-    Task AddReceiptAsync(ActorFileStatusEntity receipt);
-    Task<Domain.FileEntity?> GetFileAsync(Guid fileId);
+    Task<Domain.FileEntity?> GetFile(Guid fileId);
     Task<List<Guid>> GetFilesAvailableForCaller(string actorExernalReference);
-
     Task AddReceipt(
         Guid fileId,
         Domain.Enums.ActorFileStatus status,
         string actorExternalReference
     );
-
     Task SetStorageReference(
         Guid fileId,
         long storageProviderId,
         string fileLocation
     );
-    Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId);
+    Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId);
     Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId);
     Task InsertFileStatus(Guid fileId, FileStatus status);
 }

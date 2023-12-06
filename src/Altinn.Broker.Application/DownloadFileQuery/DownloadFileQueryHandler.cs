@@ -29,7 +29,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var file = await _fileRepository.GetFileAsync(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
             return Errors.FileNotFound;
