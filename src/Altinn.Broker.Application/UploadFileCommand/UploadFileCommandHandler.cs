@@ -3,7 +3,6 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 using OneOf;

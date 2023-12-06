@@ -1,8 +1,6 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Repositories;
 
-using Microsoft.AspNetCore.Mvc;
-
 using OneOf;
 
 namespace Altinn.Broker.Application.GetFileDetailsQuery;

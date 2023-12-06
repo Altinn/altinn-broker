@@ -262,7 +262,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task AddReceipt(Guid fileId, Core.Domain.Enums.ActorFileStatus status, string actorExternalReference)
+    public async Task AddReceipt(Guid fileId, ActorFileStatus status, string actorExternalReference)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
