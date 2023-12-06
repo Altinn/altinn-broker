@@ -124,13 +124,13 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
-            var commandResult = await handler.Process(new GetFileOverviewQueryRequest()
+            var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
                 FileId = fileId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
-            return commandResult.Match(
+            return queryResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
                 error => error.ToActionResult()
             );
@@ -148,13 +148,13 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
-            var commandResult = await handler.Process(new GetFileDetailsQueryRequest()
+            var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
             {
                 FileId = fileId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
-            return commandResult.Match(
+            return queryResult.Match(
                 result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
                 error => error.ToActionResult()
             );
@@ -173,7 +173,7 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFilesQueryHandler handler)
         {
-            var commandResult = await handler.Process(new GetFilesQueryRequest()
+            var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
                 Consumer = token.Consumer,
                 Supplier = token.Supplier,
@@ -181,7 +181,7 @@ namespace Altinn.Broker.Controllers
                 From = from,
                 To = to
             });
-            return commandResult.Match(
+            return queryResult.Match(
                 Ok,
                 error => error.ToActionResult()
             );
@@ -199,13 +199,13 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] DownloadFileQueryHandler handler)
         {
-            var commandResult = await handler.Process(new DownloadFileQueryRequest()
+            var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
                 FileId = fileId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
-            return commandResult.Match(
+            return queryResult.Match(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
                 error => error.ToActionResult()
             );
