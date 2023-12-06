@@ -27,26 +27,26 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         _logger = logger;
     }
 
-    public async Task<OneOf<Guid, ActionResult>> Process(UploadFileCommandRequest request)
+    public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner?.StorageProvider is null)
         {
-            return new UnauthorizedObjectResult("Service owner not configured for the broker service");
+            return Errors.ServiceOwnerNotConfigured;
         };
         var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
         if (deploymentStatus != DeploymentStatus.Ready)
         {
-            return new UnprocessableEntityObjectResult($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+            return Errors.ServiceOwnerNotReadyInfrastructure;
         }
         var file = await _fileRepository.GetFileAsync(request.FileId);
         if (file is null)
         {
-            return new NotFoundResult();
+            return Errors.FileNotFound;
         }
         if (request.Consumer != file.Sender)
         {
-            return new UnauthorizedObjectResult("You must use a bearer token that belongs to the sender");
+            return Errors.FileNotFound;
         }
 
         await _fileRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);

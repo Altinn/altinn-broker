@@ -43,7 +43,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(commandRequest);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -71,7 +71,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 fileId => Ok(fileId),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -94,7 +94,7 @@ namespace Altinn.Broker.Controllers
             var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
             if (initializeResult.IsT1)
             {
-                return initializeResult.AsT1;
+                return initializeResult.AsT1.ToActionResult();
             }
             var fileId = initializeResult.AsT0;
 
@@ -108,7 +108,7 @@ namespace Altinn.Broker.Controllers
             });
             return uploadResult.Match(
                 fileId => Ok(fileId),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -132,7 +132,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -156,7 +156,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -183,7 +183,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 Ok,
-                error => error
+                error => error.ToActionResult()
             );}
 
         /// <summary>
@@ -206,7 +206,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
-                error => error
+                error => error.ToActionResult()
             );
         }
 
@@ -230,7 +230,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 Ok,
-                error => error
+                error => error.ToActionResult()
             );
         }
     }

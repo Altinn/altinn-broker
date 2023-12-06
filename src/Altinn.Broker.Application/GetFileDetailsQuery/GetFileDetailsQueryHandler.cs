@@ -18,21 +18,21 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         _serviceOwnerRepository = serviceOwnerRepository;
     }
 
-    public async Task<OneOf<GetFileDetailsQueryResponse, ActionResult>> Process(GetFileDetailsQueryRequest request)
+    public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {
-            return new UnauthorizedObjectResult("Service owner not configured for the broker service");
+            return Errors.ServiceOwnerNotConfigured;
         };
         var file = await _fileRepository.GetFileAsync(request.FileId);
         if (file is null)
         {
-            return new NotFoundResult();
+            return Errors.FileNotFound;
         }
         if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
         {
-            return new NotFoundResult();
+            return Errors.FileNotFound;
         }
         var fileEvents = await _fileRepository.GetFileStatusHistoryAsync(request.FileId);
         var actorEvents = await _fileRepository.GetActorEvents(request.FileId);

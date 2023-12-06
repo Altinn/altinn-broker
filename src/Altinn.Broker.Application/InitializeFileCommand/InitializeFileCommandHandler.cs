@@ -23,21 +23,21 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         _logger = logger;
     }
 
-    public async Task<OneOf<Guid, ActionResult>> Process(InitializeFileCommandRequest request)
+    public async Task<OneOf<Guid, Error>> Process(InitializeFileCommandRequest request)
     {
         if (request.Consumer != request.SenderExternalId)
         {
-            return new UnauthorizedObjectResult("You must use a bearer token that belongs to the sender");
+            return Errors.WrongTokenForSender;
         }
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {
-            return new BadRequestObjectResult("Service owner needs to be configured to use the broker API");
+            return Errors.ServiceOwnerNotConfigured;
         }
         var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
         if (deploymentStatus != DeploymentStatus.Ready)
         {
-            return new UnprocessableEntityObjectResult($"Service owner infrastructure is not ready. Status is: ${nameof(deploymentStatus)}");
+            return Errors.ServiceOwnerNotReadyInfrastructure;
         }
         var fileId = await _fileRepository.AddFile(serviceOwner, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientIds, request.PropertyList, request.Checksum);
         return fileId;

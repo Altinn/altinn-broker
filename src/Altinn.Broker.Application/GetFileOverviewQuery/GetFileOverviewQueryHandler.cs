@@ -2,7 +2,6 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
@@ -22,21 +21,21 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         _logger = logger;
     }
 
-    public async Task<OneOf<GetFileOverviewQueryResponse, ActionResult>> Process(GetFileOverviewQueryRequest request)
+    public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {
-            return new UnauthorizedObjectResult("Service owner not configured for the broker service");
+            return Errors.ServiceOwnerNotConfigured;
         };
         var file = await _fileRepository.GetFileAsync(request.FileId);
         if (file is null)
         {
-            return new NotFoundResult();
+            return Errors.FileNotFound;
         }
         if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
         {
-            return new NotFoundResult();
+            return Errors.FileNotFound;
         }
         return new GetFileOverviewQueryResponse()
         {
