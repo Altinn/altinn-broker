@@ -11,42 +11,83 @@ using Altinn.Broker.Persistence.Options;
 using Hangfire;
 using Hangfire.MemoryStorage;
 
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-var builder = WebApplication.CreateBuilder(args);
+using Serilog;
 
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
-ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
+// Using two-stage initialization to catch startup errors.
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Warning()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.ApplicationInsights(
+        TelemetryConfiguration.CreateDefault(),
+        TelemetryConverter.Traces)
+    .CreateBootstrapLogger();
 
-var app = builder.Build();
-app.UseMiddleware<RequestLoggingMiddleware>();
-
-if (app.Environment.IsDevelopment())
+try
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    BuildAndRun(args);
 }
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
-
-void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
+catch (Exception ex) when (ex is not OperationCanceledException)
 {
-    services.AddHttpClient();
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+
+static void BuildAndRun(string[] args)
+{
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Fatal)
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.ApplicationInsights(
+            services.GetRequiredService<TelemetryConfiguration>(),
+            TelemetryConverter.Traces));
+
+    builder.Configuration
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
+    ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
+
+    var app = builder.Build();
+    app.UseMiddleware<RequestLoggingMiddleware>();
+    app.UseSerilogRequestLogging();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.Run();
+}
+
+static void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
+{
     services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
     services.AddEndpointsApiExplorer();
     services.AddSwaggerGen();
+    services.AddApplicationInsightsTelemetry();
 
     services.AddApplicationHandlers();
     services.AddIntegrations();
@@ -56,13 +97,14 @@ void ConfigureServices(IServiceCollection services, IConfiguration config, IHost
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
 
+    services.AddHttpClient();
     services.AddHangfire(c => c.UseMemoryStorage());
     services.AddHangfireServer((options) =>
     {
         options.ServerTimeout = TimeSpan.FromMinutes(30);
     });
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {
         var maskinportenOptions = new MaskinportenOptions();
         config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
