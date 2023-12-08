@@ -21,13 +21,10 @@ public class ActorRepository : IActorRepository
         using var command = new NpgsqlCommand(
             "SELECT * FROM broker.actor WHERE actor_external_id = @actorExternalId",
             connection);
-
         command.Parameters.AddWithValue("@actorExternalId", actorExternalId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
-
         ActorEntity? actor = null;
-
         while (reader.Read())
         {
             actor = new ActorEntity
@@ -36,7 +33,6 @@ public class ActorRepository : IActorRepository
                 ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
             };
         }
-
         return actor;
     }
 
@@ -49,8 +45,8 @@ public class ActorRepository : IActorRepository
                     "VALUES (@actorExternalId) " +
                     "RETURNING actor_id_pk",
                     connection);
-
         command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
+
         return (long)command.ExecuteScalar()!;
     }
 }

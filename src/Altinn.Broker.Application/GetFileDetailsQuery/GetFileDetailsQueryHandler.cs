@@ -9,9 +9,13 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
 {
     private readonly IFileRepository _fileRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IFileStatusRepository _fileStatusRepository;
+    private readonly IActorFileStatusRepository _actorFileStatusRepository;
 
-    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IServiceOwnerRepository serviceOwnerRepository)
+    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceOwnerRepository serviceOwnerRepository)
     {
+        _fileStatusRepository = fileStatusRepository;
+        _actorFileStatusRepository = actorFileStatusRepository;
         _fileRepository = fileRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
     }
@@ -32,8 +36,8 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.FileNotFound;
         }
-        var fileEvents = await _fileRepository.GetFileStatusHistory(request.FileId);
-        var actorEvents = await _fileRepository.GetActorEvents(request.FileId);
+        var fileEvents = await _fileStatusRepository.GetFileStatusHistory(request.FileId);
+        var actorEvents = await _actorFileStatusRepository.GetActorEvents(request.FileId);
         return new GetFileDetailsQueryResponse()
         {
             File = file,

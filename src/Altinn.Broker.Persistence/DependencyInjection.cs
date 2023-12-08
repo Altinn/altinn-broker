@@ -11,6 +11,8 @@ public static class DependencyInjection
         services.AddSingleton<DatabaseConnectionProvider>();
         services.AddSingleton<IActorRepository, ActorRepository>();
         services.AddSingleton<IFileRepository, FileRepository>();
+        services.AddSingleton<IFileStatusRepository, FileStatusRepository>();
+        services.AddSingleton<IActorFileStatusRepository, ActorFileStatusRepository>();
         services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
     }
 }

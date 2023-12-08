@@ -11,13 +11,15 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
+    public DownloadFileQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
+        _actorFileStatusRepository = actorFileStatusRepository;
         _brokerStorageService = brokerStorageService;
         _logger = logger;
     }
@@ -43,7 +45,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
             return Errors.NoFileUploaded;
         }
         var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
-        await _fileRepository.AddReceipt(request.FileId, ActorFileStatus.DownloadStarted, request.Consumer);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Consumer);
         return new DownloadFileQueryResponse()
         {
             Filename = file.Filename,
