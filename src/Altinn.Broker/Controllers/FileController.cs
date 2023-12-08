@@ -8,6 +8,7 @@ using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
@@ -16,6 +17,8 @@ using Altinn.Broker.Models.Maskinporten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+
+using Serilog.Context;
 
 namespace Altinn.Broker.Controllers
 {
@@ -39,6 +42,9 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token, [FromServices] InitializeFileCommandHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Initializing file");
             var commandRequest = InitializeFileMapper.MapToRequest(initializeExt, token);
             var commandResult = await handler.Process(commandRequest);
             return commandResult.Match(
@@ -61,6 +67,8 @@ namespace Altinn.Broker.Controllers
             [FromServices] UploadFileCommandHandler handler
         )
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Uploading file {fileId}", fileId.ToString());
             Request.EnableBuffering();
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
@@ -90,6 +98,9 @@ namespace Altinn.Broker.Controllers
             [FromServices] UploadFileCommandHandler uploadFileCommandHandler
         )
         {
+            LogContextHelpers.EnrichLogsWithInitializeFile(form.Metadata);
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Initializing and uploading file");
             var initializeRequest = InitializeFileMapper.MapToRequest(form.Metadata, token);
             var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
             if (initializeResult.IsT1)
@@ -124,6 +135,8 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Getting file overview for {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
                 FileId = fileId,
@@ -148,6 +161,8 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Getting file details for {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
             {
                 FileId = fileId,
@@ -173,6 +188,8 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFilesQueryHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to.ToString());
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
                 Consumer = token.Consumer,
@@ -199,6 +216,8 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] DownloadFileQueryHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
                 FileId = fileId,
@@ -223,6 +242,8 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {
+            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
             var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
             {
                 FileId = fileId,
