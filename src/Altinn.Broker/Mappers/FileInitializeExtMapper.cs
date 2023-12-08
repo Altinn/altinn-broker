@@ -4,10 +4,10 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
 
-public static class FileInitializeExtMapper
+internal static class FileInitializeExtMapper
 {
 
-    public static FileEntity MapToDomain(FileInitalizeExt initializeExt, string caller)
+    internal static FileEntity MapToDomain(FileInitalizeExt initializeExt, string caller)
     {
         return new FileEntity()
         {

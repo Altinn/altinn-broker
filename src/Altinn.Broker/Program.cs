@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Azure;
@@ -16,7 +17,7 @@ using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,7 +35,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
-ConfigureServices(builder.Services, builder.Configuration);
+ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -50,15 +51,16 @@ app.MapControllers();
 
 app.Run();
 
-void ConfigureServices(IServiceCollection services, IConfiguration config)
+void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
 {
-    services.AddSingleton<IFileStore, BlobService>();
+    services.AddApplicationHandlers();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
     services.AddSingleton<DatabaseConnectionProvider>();
 
+    services.AddSingleton<IFileStore, BlobService>();
     services.AddSingleton<IActorRepository, ActorRepository>();
     services.AddSingleton<IFileRepository, FileRepository>();
     services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
@@ -78,18 +80,36 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
         var maskinportenOptions = new MaskinportenOptions();
         config.GetSection(nameof(MaskinportenOptions)).Bind(maskinportenOptions);
-        options.RequireHttpsMetadata = false;
         options.SaveToken = true;
         options.MetadataAddress = $"{maskinportenOptions.Issuer}.well-known/oauth-authorization-server";
-        options.TokenValidationParameters = new TokenValidationParameters
+        if (hostEnvironment.IsDevelopment())
         {
-            ValidIssuer = maskinportenOptions.Issuer,
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            RequireExpirationTime = true,
-            RequireSignedTokens = true
-        };
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = false,
+                RequireExpirationTime = false,
+                RequireSignedTokens = false,
+                SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+                {
+                    var jwt = new JsonWebToken(token);
+                    return jwt;
+                }
+            };
+        }
+        else
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidIssuer = maskinportenOptions.Issuer,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true
+            };
+        }
     });
 
     services.AddAuthorization(options =>

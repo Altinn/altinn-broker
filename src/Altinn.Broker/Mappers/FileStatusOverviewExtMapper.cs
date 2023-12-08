@@ -8,9 +8,9 @@ using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers;
 
-public static class FileStatusOverviewExtMapper
+internal static class FileStatusOverviewExtMapper
 {
-    public static FileOverviewExt MapToExternalModel(FileEntity file)
+    internal static FileOverviewExt MapToExternalModel(FileEntity file)
     {
         return new FileOverviewExt()
         {
@@ -27,7 +27,7 @@ public static class FileStatusOverviewExtMapper
         };
     }
 
-    public static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
+    internal static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
     {
         return domainEnum switch
         {
@@ -43,7 +43,7 @@ public static class FileStatusOverviewExtMapper
         };
     }
 
-    public static string MapToFileStatusText(FileStatus domainEnum)
+    internal static string MapToFileStatusText(FileStatus domainEnum)
     {
         return domainEnum switch
         {
@@ -59,14 +59,7 @@ public static class FileStatusOverviewExtMapper
         };
     }
 
-    public static List<FileStatusEventExt> MapToFileStatusHistoryExt(List<FileStatusEntity> fileHistory) => fileHistory.Select(entity => new FileStatusEventExt()
-    {
-        FileStatus = MapToExternalEnum(entity.Status),
-        FileStatusChanged = entity.Date,
-        FileStatusText = MapToFileStatusText(entity.Status)
-    }).ToList();
-
-    public static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender)
+    internal static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender)
     {
         var recipientEvents = actorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != sender);
         var lastStatusForEveryRecipient = recipientEvents
@@ -83,7 +76,7 @@ public static class FileStatusOverviewExtMapper
         }).ToList();
     }
 
-    private static RecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
+    internal static RecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
@@ -94,7 +87,7 @@ public static class FileStatusOverviewExtMapper
         };
     }
 
-    private static string MapToRecipientStatusText(ActorFileStatus actorFileStatus)
+    internal static string MapToRecipientStatusText(ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
@@ -104,16 +97,5 @@ public static class FileStatusOverviewExtMapper
             _ => throw new InvalidEnumArgumentException()
         };
 
-    }
-
-    internal static List<RecipientFileStatusEventExt> MapToRecipientEvents(List<ActorFileStatusEntity> actorEvents)
-    {
-        return actorEvents.Select(actorEvent => new RecipientFileStatusEventExt()
-        {
-            Recipient = actorEvent.Actor.ActorExternalId,
-            RecipientFileStatusChanged = actorEvent.Date,
-            RecipientFileStatusCode = MapToExternalRecipientStatus(actorEvent.Status),
-            RecipientFileStatusText = MapToRecipientStatusText(actorEvent.Status)
-        }).ToList();
     }
 }

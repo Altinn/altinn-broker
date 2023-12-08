@@ -6,10 +6,10 @@ using System.Text.Json;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
+using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Identity.Web;
 
 using Xunit;
 
@@ -20,12 +20,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
-
-    /**
-     * Inject a mock bearer configuration that does not verify anything. 
-     * Generate our own JWT with correct scope, expiry and issuer. 
-     * Set it as default request header
-     * */
 
     public FileControllerTests(CustomWebApplicationFactory factory)
     {
@@ -44,23 +38,17 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
 
     [Fact]
-    public async Task WhenAllIsOk_NormalFlow_Success()
+    public async Task NormalFlow_WhenAllIsOK_Success()
     {
-        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", new FileInitalizeExt()
-        {
-            Checksum = null,
-            FileName = "input.txt",
-            PropertyList = [],
-            Recipients = new List<string> { "0192:986252932" },
-            Sender = "0192:991825827",
-            SendersFileReference = "test-data"
-        });
+        // Initialize
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.Equal(System.Net.HttpStatusCode.OK, initializeFileResponse.StatusCode);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var fileAfterInitialize = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(fileAfterInitialize);
+        Assert.True(fileAfterInitialize.FileStatus == FileStatusExt.Initialized);
 
-        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
-        Assert.NotNull(initializedFile);
-        Assert.True(initializedFile.FileStatus == FileStatusExt.Initialized);
-
+        // Upload
         var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
         using (var content = new ByteArrayContent(uploadedFileBytes))
         {
@@ -68,25 +56,62 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode);
         }
+        var fileAfterUpload = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(fileAfterUpload);
+        Assert.True(fileAfterUpload.FileStatus == FileStatusExt.Published); // When running integration test this happens instantly as of now.
 
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
-        Assert.NotNull(uploadedFile);
-        Assert.True(uploadedFile.FileStatus == FileStatusExt.Published); // When running integration test this happens instantly as of now.
-
+        // Download
         var downloadedFile = await _recipientClient.GetAsync($"broker/api/v1/file/{fileId}/download");
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
         Assert.Equal(uploadedFileBytes, downloadedFileBytes);
 
+        // Details
         var downloadedFileDetails = await _senderClient.GetFromJsonAsync<FileStatusDetailsExt>($"broker/api/v1/file/{fileId}/details", _responseSerializerOptions);
         Assert.NotNull(downloadedFileDetails);
         Assert.True(downloadedFileDetails.FileStatus == FileStatusExt.Published);
         Assert.Contains(downloadedFileDetails.RecipientFileStatusHistory, recipient => recipient.RecipientFileStatusCode == RecipientFileStatusExt.DownloadStarted);
 
+        // Confirm
         await _recipientClient.PostAsync($"broker/api/v1/file/{fileId}/confirmdownload", null);
-
         var confirmedFileDetails = await _senderClient.GetFromJsonAsync<FileStatusDetailsExt>($"broker/api/v1/file/{fileId}/details", _responseSerializerOptions);
         Assert.NotNull(confirmedFileDetails);
         Assert.True(confirmedFileDetails.FileStatus == FileStatusExt.AllConfirmedDownloaded);
         Assert.Contains(confirmedFileDetails.RecipientFileStatusHistory, recipient => recipient.RecipientFileStatusCode == RecipientFileStatusExt.DownloadConfirmed);
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenFileDownloadsTwice_ShowLastOccurenceInOverview()
+    {
+        // Arrange
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode);
+        }
+        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+
+        // Act
+        var downloadedFile1 = await _recipientClient.GetAsync($"broker/api/v1/file/{fileId}/download");
+        await Task.Delay(1000);
+        var downloadedFile2 = await _recipientClient.GetAsync($"broker/api/v1/file/{fileId}/download");
+        var downloadedFile1Bytes = await downloadedFile1.Content.ReadAsByteArrayAsync();
+        var downloadedFile2Bytes = await downloadedFile2.Content.ReadAsByteArrayAsync();
+        Assert.Equal(downloadedFile1Bytes, downloadedFile2Bytes);
+
+        // Assert
+        var downloadedFileDetails = await _senderClient.GetFromJsonAsync<FileStatusDetailsExt>($"broker/api/v1/file/{fileId}/details", _responseSerializerOptions);
+        Assert.NotNull(downloadedFileDetails);
+        Assert.Contains(downloadedFileDetails.RecipientFileStatusHistory, recipient => recipient.RecipientFileStatusCode == RecipientFileStatusExt.DownloadStarted);
+        var downloadStartedEvents = downloadedFileDetails.RecipientFileStatusHistory.Where(recipientFileStatus => recipientFileStatus.RecipientFileStatusCode == RecipientFileStatusExt.DownloadStarted);
+        Assert.NotNull(downloadStartedEvents);
+        Assert.Equal(2, downloadStartedEvents.Count());
+        var lastEvent = downloadStartedEvents.OrderBy(recipientFileStatus => recipientFileStatus.RecipientFileStatusChanged).Last();
+        Assert.Equal(lastEvent.RecipientFileStatusChanged, downloadedFileDetails.Recipients.FirstOrDefault(recipient => recipient.Recipient == lastEvent.Recipient)?.CurrentRecipientFileStatusChanged);
     }
 }

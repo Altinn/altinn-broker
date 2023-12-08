@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Application\Altinn.Broker.Application.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Integrations\Altinn.Broker.Integrations.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Persistence\Altinn.Broker.Persistence.csproj" />

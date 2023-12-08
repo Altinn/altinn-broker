@@ -26,11 +26,13 @@ If you need to re-initialize the database during local development, you can dele
 
 ### Authorization
 
-To get access to the Broker API, a consumer needs to use a Maskinporten token. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work. You can create a Maskinporten integration here:
+To get access to the Broker API in staging/production, a consumer needs to use a Maskinporten integration. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work. You can create a Maskinporten integration here:
 https://selvbetjening-samarbeid-ver2.difi.no/integrations
 
 For more on Maskinporten tokens see:
 https://docs.digdir.no/docs/Maskinporten/maskinporten_guide_apikonsument
+
+When running locally for development, you can use any Maskinporten token. It is not validated.
 
 ### Formatting
 
