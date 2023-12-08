@@ -9,11 +9,11 @@ public static class LogContextHelpers
 {
     public static void EnrichLogsWithInitializeFile(FileInitalizeExt fileInitalizeExt)
     {
-        LogContext.PushProperty("sender", fileInitalizeExt.Sender); 
+        LogContext.PushProperty("sender", fileInitalizeExt.Sender);
         LogContext.PushProperty("filename", fileInitalizeExt.FileName);
-        LogContext.PushProperty("recipients", string.Join(',', fileInitalizeExt.Recipients)); 
+        LogContext.PushProperty("recipients", string.Join(',', fileInitalizeExt.Recipients));
         LogContext.PushProperty("sendersFileReference", fileInitalizeExt.SendersFileReference);
-        LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);;
+        LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
 
     public static void EnrichLogsWithMaskinporten(MaskinportenToken token)
