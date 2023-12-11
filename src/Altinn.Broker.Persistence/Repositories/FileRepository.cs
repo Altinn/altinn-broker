@@ -25,14 +25,12 @@ public class FileRepository : IFileRepository
 
         var connection = await _connectionProvider.GetConnectionAsync();
         using var command = new NpgsqlCommand(
-            "SELECT file_id_pk as FileId" + 
-            "FROM broker.file " +
-            "WHERE file_location = @blobUri"
+            "SELECT file_id_pk as FileId FROM broker.file WHERE file_location = @blobUri"
             , connection
         );
 
         {
-            command.Parameters.AddWithValue(@"blobUri", blobUri);
+            command.Parameters.AddWithValue("@blobUri", blobUri);
             using NpgsqlDataReader reader = command.ExecuteReader();
             if (reader.Read())
             {
