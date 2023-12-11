@@ -189,7 +189,7 @@ namespace Altinn.Broker.Controllers
             [FromServices] GetFilesQueryHandler handler)
         {
             LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to.ToString());
+            _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
                 Consumer = token.Consumer,
