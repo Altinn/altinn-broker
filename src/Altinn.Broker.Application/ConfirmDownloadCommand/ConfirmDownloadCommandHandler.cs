@@ -36,7 +36,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             return Errors.FileNotFound;
         }
-        if (!file.ActorEvents.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
+        if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
         {
             return Errors.FileNotFound;
         }
@@ -46,12 +46,11 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         }
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
-        var recipientStatuses = file.ActorEvents
-            .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != request.Consumer)
+        var recipientStatuses = file.RecipientCurrentStatuses
             .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
             .Select(group => group.Max(statusEvent => statusEvent.Status))
             .ToList();
-        bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.DownloadConfirmed);
+        bool shouldConfirmAll = file.RecipientCurrentStatuses.All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
 
         return new ConfirmDownloadCommandResponse();

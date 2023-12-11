@@ -45,7 +45,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         }
         var fileId = await _fileRepository.AddFile(serviceOwner, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
-        var addRecipientEventTasks = request.RecipientExternalIds.Concat([request.SenderExternalId]).Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
+        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
         try
         {
             await Task.WhenAll(addRecipientEventTasks);

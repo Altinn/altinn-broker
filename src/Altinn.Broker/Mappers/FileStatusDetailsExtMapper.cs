@@ -22,7 +22,7 @@ internal static class FileStatusDetailsExtMapper
             Recipients = fileOverview.Recipients,
             SendersFileReference = fileOverview.SendersFileReference,
             FileStatusHistory = MapToFileStatusHistoryExt(fileEvents),
-            RecipientFileStatusHistory = MapToRecipientEvents(actorEvents.Where(actorEvents => actorEvents.Actor.ActorExternalId != file.Sender).ToList())
+            RecipientFileStatusHistory = MapToRecipientEvents(actorEvents)
         };
 
     }

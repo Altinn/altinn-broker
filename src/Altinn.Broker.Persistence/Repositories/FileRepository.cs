@@ -25,26 +25,26 @@ public class FileRepository : IFileRepository
 
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
-            "SELECT *, file_location, afs.actor_id_fk as eventActorId, a.actor_external_id as eventActorExernalReference, afs.actor_file_status_id_fk as eventActorFileStatusId, afs.actor_file_status_date as eventActorFileStatusDate, sender.actor_external_id as senderExternalId, " +
-                "(" +
-                    "SELECT fs.file_status_description_id_fk " +
-                    "FROM broker.file_status fs " +
-                    "WHERE fs.file_id_fk = @fileId " +
-                    "ORDER BY fs.file_status_date desc " +
-                    "LIMIT 1" +
-                ") as file_status_description_id_fk, " +
-                "(" +
-                    "SELECT fs.file_status_date " +
-                    "FROM broker.file_status fs " +
-                    "WHERE fs.file_id_fk = @fileId " +
-                    "ORDER BY fs.file_status_date desc " +
-                    "LIMIT 1" +
-                ") as file_status_date " +
-            "FROM broker.file " +
-            "LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk " +
-            "LEFT JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk " +
-            "LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
-            "WHERE file_id_pk = @fileId",
+            @"
+            SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, 
+                   sender.actor_external_id as senderActorExternalReference,
+                (
+                    SELECT fs.file_status_description_id_fk 
+                    FROM broker.file_status fs 
+                    WHERE fs.file_id_fk = @fileId 
+                    ORDER BY fs.file_status_date desc 
+                    LIMIT 1
+                ) as file_status_description_id_fk, 
+                (
+                    SELECT fs.file_status_date 
+                    FROM broker.file_status fs 
+                    WHERE fs.file_id_fk = @fileId 
+                    ORDER BY fs.file_status_date desc 
+                    LIMIT 1
+                ) as file_status_date 
+            FROM broker.file 
+            INNER JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk 
+            WHERE file_id_pk = @fileId",
             connection);
         {
             command.Parameters.AddWithValue("@fileId", fileId);
@@ -62,35 +62,63 @@ public class FileRepository : IFileRepository
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
                     Uploaded = reader.GetDateTime(reader.GetOrdinal("created")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
-                    Sender = reader.GetString(reader.GetOrdinal("senderExternalId"))
-                };
-                var receipts = new List<ActorFileStatusEntity>();
-                if (!reader.IsDBNull(reader.GetOrdinal("actor_id_fk")))
-                {
-                    do
+                    Sender = new ActorEntity()
                     {
-                        receipts.Add(new ActorFileStatusEntity()
-                        {
-                            FileId = fileId,
-                            Actor = new ActorEntity()
-                            {
-                                ActorId = reader.GetInt64(reader.GetOrdinal("eventActorId")),
-                                ActorExternalId = reader.GetString(reader.GetOrdinal("eventActorExernalReference"))
-                            },
-                            Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("eventActorFileStatusId")),
-                            Date = reader.GetDateTime(reader.GetOrdinal("eventActorFileStatusDate"))
-                        });
-                    } while (reader.Read());
-                }
-                file.ActorEvents = receipts;
+                        ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
+                        ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
+                    }
+                };
             }
             else
             {
                 return null;
             }
         }
+        file.RecipientCurrentStatuses = await GetLatestRecipientFileStatuses(fileId);
         file.PropertyList = await GetMetadata(fileId);
         return file;
+    }
+
+
+    /*
+     * Get the current status of file recipients along wiith the last time their status changed.  
+     * */
+    private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId)
+    {
+        var connection = await _connectionProvider.GetConnectionAsync();
+        
+        var fileStatuses = new List<ActorFileStatusEntity>();
+        using (var command = new NpgsqlCommand(
+            @"
+            SELECT afs.actor_id_fk, MAX(afs.actor_file_status_id_fk) as actor_file_status_id_fk, MAX(afs.actor_file_status_date) as actor_file_status_date, a.actor_external_id 
+            FROM broker.file 
+            LEFT JOIN broker.actor_file_status afs on afs.file_id_fk = file_id_pk 
+            LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk 
+            WHERE file_id_pk = @fileId 
+            GROUP BY afs.actor_id_fk, a.actor_external_id
+        ", connection))
+        {
+            command.Parameters.AddWithValue("@fileId", fileId);
+            var commandText = command.CommandText;
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    fileStatuses.Add(new ActorFileStatusEntity()
+                    {
+                        FileId = fileId,
+                        Status = (ActorFileStatus)reader.GetInt32(reader.GetOrdinal("actor_file_status_id_fk")),
+                        Date = reader.GetDateTime(reader.GetOrdinal("actor_file_status_date")),
+                        Actor = new ActorEntity()
+                        {
+                            ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
+                            ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                        }
+                    });
+                }
+            }
+        }
+        return fileStatuses;
     }
 
     public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)

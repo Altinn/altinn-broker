@@ -18,11 +18,11 @@ internal static class FileStatusOverviewExtMapper
             FileId = file.FileId,
             FileName = file.Filename,
             FileStatus = MapToExternalEnum(file.FileStatus),
-            Sender = file.Sender,
+            Sender = file.Sender.ActorExternalId,
             FileStatusChanged = file.FileStatusChanged,
             FileStatusText = MapToFileStatusText(file.FileStatus),
             PropertyList = file.PropertyList,
-            Recipients = MapToRecipients(file.ActorEvents, file.Sender),
+            Recipients = MapToRecipients(file.RecipientCurrentStatuses),
             SendersFileReference = file.SendersFileReference
         };
     }
@@ -59,9 +59,8 @@ internal static class FileStatusOverviewExtMapper
         };
     }
 
-    internal static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> actorEvents, string sender)
+    internal static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> recipientEvents)
     {
-        var recipientEvents = actorEvents.Where(actorEvent => actorEvent.Actor.ActorExternalId != sender);
         var lastStatusForEveryRecipient = recipientEvents
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
