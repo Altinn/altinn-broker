@@ -21,6 +21,30 @@ public class FileRepository : IFileRepository
         _actorRepository = actorRepository;
     }
 
+    public async Task<Guid> GetFileIdByBlobUriAsync(string blobUri)
+    {
+        Guid result = Guid.Empty;
+
+        var connection = await _connectionProvider.GetConnectionAsync();
+        using var command = new NpgsqlCommand(
+            "SELECT file_id_pk as FileId" + 
+            "FROM broker.file " +
+            "WHERE file_location = @blobUri"
+            , connection
+        );
+
+        {
+            command.Parameters.AddWithValue(@"blobUri", blobUri);
+            using NpgsqlDataReader reader = command.ExecuteReader();
+            if (reader.Read())
+            {
+                result = reader.GetGuid("FileId");
+            }
+        }
+        
+        return result;
+    }
+
     public async Task<FileEntity?> GetFileAsync(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();

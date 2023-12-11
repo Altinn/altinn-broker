@@ -24,4 +24,5 @@ public interface IFileRepository
     Task<List<FileStatusEntity>> GetFileStatusHistoryAsync(Guid fileId);
     Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId);
     Task InsertFileStatus(Guid fileId, FileStatus status);
+    Task<Guid> GetFileIdByBlobUriAsync(string blobUri);
 }

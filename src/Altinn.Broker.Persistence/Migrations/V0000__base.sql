@@ -112,3 +112,4 @@ CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference)
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);
 CREATE INDEX ix_file_property_file_id ON broker.file_property (file_id_fk);
+CREATE INDEX ix_file_file_location ON broker.file (file_location);
