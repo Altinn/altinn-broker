@@ -51,4 +51,12 @@ public class BlobService : Repositories.IFileStore
             return false;
         }
     }
+
+    public async Task DeleteFile(Guid fileId, string connectionString)
+    {
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
+        BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
+        await blobClient.DeleteIfExistsAsync();
+    }
 }
