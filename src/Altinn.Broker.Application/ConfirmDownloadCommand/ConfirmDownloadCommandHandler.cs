@@ -1,8 +1,11 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
+using Altinn.Broker.Application.DeleteFileCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+
+using Hangfire;
 
 using Microsoft.Extensions.Logging;
 
@@ -46,12 +49,12 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         }
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
-        var recipientStatuses = file.RecipientCurrentStatuses
-            .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
-            .Select(group => group.Max(statusEvent => statusEvent.Status))
-            .ToList();
-        bool shouldConfirmAll = file.RecipientCurrentStatuses.All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
+        bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
+        if (shouldConfirmAll) 
+        { 
+            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
+            BackgroundJob.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId), TimeSpan.FromSeconds(0));
+        }
 
         return new ConfirmDownloadCommandResponse();
     }
