@@ -25,6 +25,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, bool>
 
     public async Task<OneOf<bool, Error>> Process(Guid fileId)
     {
+        _logger.LogInformation("Deleting file with id {fileId}", fileId.ToString());
         var file = await _fileRepository.GetFile(fileId);
         if (file is null)
         {
