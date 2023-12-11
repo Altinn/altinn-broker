@@ -13,14 +13,16 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IResourceManager _resourceManager;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IResourceManager resourceMananger, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceManager resourceMananger, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
+        _fileStatusRepository = fileStatusRepository;
         _resourceManager = resourceMananger;
         _brokerStorageService = brokerStorageService;
         _logger = logger;
@@ -48,12 +50,12 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
             return Errors.FileNotFound;
         }
 
-        await _fileRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);
         await _brokerStorageService.UploadFile(serviceOwner, file, request.Filestream);
         await _fileRepository.SetStorageReference(request.FileId, serviceOwner.StorageProvider.Id, request.FileId.ToString());
-        await _fileRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
         // TODO, async jobs
-        await _fileRepository.InsertFileStatus(request.FileId, FileStatus.Published);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);
         return file.FileId;
     }
 }

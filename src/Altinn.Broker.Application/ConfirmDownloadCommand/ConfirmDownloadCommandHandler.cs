@@ -12,12 +12,16 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly IFileStatusRepository _fileStatusRepository;
+    private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, ILogger<ConfirmDownloadCommandHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
+        _fileStatusRepository = fileStatusRepository;
+        _actorFileStatusRepository = actorFileStatusRepository;
         _logger = logger;
     }
     public async Task<OneOf<ConfirmDownloadCommandResponse, Error>> Process(ConfirmDownloadCommandRequest request)
@@ -41,14 +45,14 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
             return Errors.NoFileUploaded;
         }
 
-        await _fileRepository.AddReceipt(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
         var recipientStatuses = file.ActorEvents
             .Where(actorEvent => actorEvent.Actor.ActorExternalId != file.Sender && actorEvent.Actor.ActorExternalId != request.Consumer)
             .GroupBy(actorEvent => actorEvent.Actor.ActorExternalId)
             .Select(group => group.Max(statusEvent => statusEvent.Status))
             .ToList();
         bool shouldConfirmAll = recipientStatuses.All(status => status >= ActorFileStatus.DownloadConfirmed);
-        await _fileRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
 
         return new ConfirmDownloadCommandResponse();
     }
