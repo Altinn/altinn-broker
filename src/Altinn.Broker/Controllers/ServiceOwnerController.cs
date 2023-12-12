@@ -59,7 +59,7 @@ public class ServiceOwnerController : Controller
         {
             Name = serviceOwner.Name,
             DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
-            DeletionTime = serviceOwner.FileTimeToLive
+            FileTimeToLive = serviceOwner.FileTimeToLive
         };
     }
 }
