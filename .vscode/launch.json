@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Altinn.Broker/bin/Debug/net7.0/Altinn.Broker.dll",
+            "program": "${workspaceFolder}/src/Altinn.Broker/bin/Debug/net8.0/Altinn.Broker.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/Altinn.Broker",
             "stopAtEntry": false,
