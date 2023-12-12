@@ -20,5 +20,4 @@ public interface IFileRepository
         long storageProviderId,
         string fileLocation
     );
-    Task<Guid> GetFileIdByBlobUriAsync(string blobUri);
 }
