@@ -37,7 +37,7 @@ public class FileRepository : IFileRepository
                 result = reader.GetGuid(reader.GetOrdinal("FileId"));
             }
         }
-        
+
         return result;
     }
 
