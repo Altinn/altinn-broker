@@ -33,7 +33,7 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         {
             return Errors.FileNotFound;
         }
-        if (file.Sender.ActorExternalId != request.Consumer && 
+        if (file.Sender.ActorExternalId != request.Consumer &&
             !file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
         {
             return Errors.FileNotFound;

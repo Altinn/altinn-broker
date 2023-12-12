@@ -22,10 +22,10 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
     public InitializeFileCommandHandler(
-        IServiceOwnerRepository serviceOwnerRepository, 
-        IFileRepository fileRepository, 
-        IFileStatusRepository fileStatusRepository, 
-        IActorFileStatusRepository actorFileStatusRepository, 
+        IServiceOwnerRepository serviceOwnerRepository,
+        IFileRepository fileRepository,
+        IFileStatusRepository fileStatusRepository,
+        IActorFileStatusRepository actorFileStatusRepository,
         IResourceManager resourceManager,
         IBackgroundJobClient backgroundJobClient,
         ILogger<InitializeFileCommandHandler> logger)

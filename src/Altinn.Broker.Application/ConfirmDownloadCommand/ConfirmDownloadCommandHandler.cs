@@ -52,8 +52,8 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
         bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
-        if (shouldConfirmAll) 
-        { 
+        if (shouldConfirmAll)
+        {
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
             _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId));
         }

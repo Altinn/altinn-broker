@@ -83,8 +83,8 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null ) && job.Method.DeclaringType.Name == "DeleteFileCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileId))),
-            It.IsAny<EnqueuedState>()));        
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "DeleteFileCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileId))),
+            It.IsAny<EnqueuedState>()));
     }
 
     [Fact]

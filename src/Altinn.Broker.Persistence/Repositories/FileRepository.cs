@@ -87,7 +87,7 @@ public class FileRepository : IFileRepository
     private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
-        
+
         var fileStatuses = new List<ActorFileStatusEntity>();
         using (var command = new NpgsqlCommand(
             @"

@@ -157,7 +157,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.ValueLengthLimit = int.MaxValue;
         options.MultipartBodyLengthLimit = int.MaxValue;
         options.MultipartHeadersLengthLimit = int.MaxValue;
-    });    
+    });
 }
 
 public partial class Program { } // For compatibility with WebApplicationFactory

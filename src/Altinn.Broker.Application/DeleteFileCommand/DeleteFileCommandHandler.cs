@@ -44,7 +44,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
         await _brokerStorageService.DeleteFile(serviceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
-        foreach(var recipient in recipientsWhoHaveNotDownloaded)
+        foreach (var recipient in recipientsWhoHaveNotDownloaded)
         {
             _logger.LogError("Recipient {recipientExternalReference} did not download the file with id {fileId}", recipient.Actor.ActorExternalId, recipient.FileId.ToString());
             // TODO, send events
