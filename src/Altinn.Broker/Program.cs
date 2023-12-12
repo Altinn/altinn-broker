@@ -9,7 +9,7 @@ using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 
 using Hangfire;
-using Hangfire.MemoryStorage;
+using Hangfire.PostgreSql;
 
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -28,7 +28,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.ApplicationInsights(
         TelemetryConfiguration.CreateDefault(),
         TelemetryConverter.Traces)
-    .CreateBootstrapLogger();
+    .CreateLogger();
 
 try
 {
@@ -42,7 +42,6 @@ finally
 {
     Log.CloseAndFlush();
 }
-
 
 static void BuildAndRun(string[] args)
 {
@@ -75,6 +74,7 @@ static void BuildAndRun(string[] args)
     app.UseAuthorization();
 
     app.MapControllers();
+    app.UseHangfireDashboard();
 
     app.Run();
 }
@@ -98,11 +98,13 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
 
     services.AddHttpClient();
-    services.AddHangfire(c => c.UseMemoryStorage());
-    services.AddHangfireServer((options) =>
-    {
-        options.ServerTimeout = TimeSpan.FromMinutes(30);
-    });
+
+    var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
+    config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
+    services.AddHangfire(config =>
+        config.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(databaseOptions.ConnectionString))
+    );
+    services.AddHangfireServer();
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {

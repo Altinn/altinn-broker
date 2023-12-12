@@ -42,6 +42,7 @@ CREATE TABLE broker.actor (
 CREATE TABLE broker.service_owner (
     service_owner_id_pk character varying(14) NOT NULL PRIMARY KEY,
     service_owner_name character varying(500) NOT NULL,
+    file_time_to_live interval NOT NULL,
     CONSTRAINT service_owner_id_pk_format CHECK (service_owner_id_pk ~ '^\d{4}:\d{9}$')
 );
 
@@ -62,11 +63,12 @@ CREATE TABLE broker.file_status_description (
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
     service_owner_id_fk character varying(14) NOT NULL,
+    created timestamp without time zone NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,
     sender_actor_id_fk bigint,
     external_file_reference character varying(500) NOT NULL,
-    created timestamp without time zone NOT NULL,
+    expiration_time timestamp without time zone NOT NULL,
     storage_provider_id_fk bigint NOT NULL,
     file_location character varying(600) NULL,
     FOREIGN KEY (service_owner_id_fk) REFERENCES broker.service_owner (service_owner_id_pk),

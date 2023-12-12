@@ -1,7 +1,10 @@
-﻿using Altinn.Broker.Core.Application;
+﻿using Altinn.Broker.Application.DeleteFileCommand;
+using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+
+using Hangfire;
 
 using Microsoft.Extensions.Logging;
 
@@ -15,15 +18,24 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IResourceManager _resourceManager;
+    private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
-    public InitializeFileCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IResourceManager resourceManager, ILogger<InitializeFileCommandHandler> logger)
+    public InitializeFileCommandHandler(
+        IServiceOwnerRepository serviceOwnerRepository,
+        IFileRepository fileRepository,
+        IFileStatusRepository fileStatusRepository,
+        IActorFileStatusRepository actorFileStatusRepository,
+        IResourceManager resourceManager,
+        IBackgroundJobClient backgroundJobClient,
+        ILogger<InitializeFileCommandHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _resourceManager = resourceManager;
+        _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
 
@@ -45,7 +57,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         }
         var fileId = await _fileRepository.AddFile(serviceOwner, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
-        var addRecipientEventTasks = request.RecipientExternalIds.Concat([request.SenderExternalId]).Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
+        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
         try
         {
             await Task.WhenAll(addRecipientEventTasks);
@@ -54,6 +66,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             _logger.LogError("Failed when adding recipient initialized events.");
         }
+        _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId), serviceOwner.FileTimeToLive);
+
         return fileId;
     }
 }

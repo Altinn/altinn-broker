@@ -21,8 +21,9 @@ internal static class FileStatusDetailsExtMapper
             PropertyList = fileOverview.PropertyList,
             Recipients = fileOverview.Recipients,
             SendersFileReference = fileOverview.SendersFileReference,
+            ExpirationTime = fileOverview.ExpirationTime,
             FileStatusHistory = MapToFileStatusHistoryExt(fileEvents),
-            RecipientFileStatusHistory = MapToRecipientEvents(actorEvents.Where(actorEvents => actorEvents.Actor.ActorExternalId != file.Sender).ToList())
+            RecipientFileStatusHistory = MapToRecipientEvents(actorEvents)
         };
 
     }

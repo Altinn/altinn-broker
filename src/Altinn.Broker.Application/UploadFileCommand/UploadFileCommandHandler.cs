@@ -45,7 +45,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileNotFound;
         }
-        if (request.Consumer != file.Sender)
+        if (request.Consumer != file.Sender.ActorExternalId)
         {
             return Errors.FileNotFound;
         }

@@ -9,14 +9,17 @@ using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
-using Microsoft.AspNetCore.Mvc.Testing;
+using Hangfire.Common;
+using Hangfire.States;
+
+using Moq;
 
 using Xunit;
 
 namespace Altinn.Broker.Tests;
 public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
@@ -77,6 +80,11 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(confirmedFileDetails);
         Assert.True(confirmedFileDetails.FileStatus == FileStatusExt.AllConfirmedDownloaded);
         Assert.Contains(confirmedFileDetails.RecipientFileStatusHistory, recipient => recipient.RecipientFileStatusCode == RecipientFileStatusExt.DownloadConfirmed);
+
+        // Confirm that it has been enqueued for deletion
+        _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "DeleteFileCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileId))),
+            It.IsAny<EnqueuedState>()));
     }
 
     [Fact]
