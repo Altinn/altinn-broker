@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.DeleteFileCommand;
-public class DeleteFileCommandHandler : IHandler<Guid, bool>
+public class DeleteFileCommandHandler : IHandler<Guid, Task>
 {
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
@@ -23,7 +23,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, bool>
         _logger = logger;
     }
 
-    public async Task<OneOf<bool, Error>> Process(Guid fileId)
+    public async Task<OneOf<Task, Error>> Process(Guid fileId)
     {
         _logger.LogInformation("Deleting file with id {fileId}", fileId.ToString());
         var file = await _fileRepository.GetFile(fileId);
@@ -39,7 +39,6 @@ public class DeleteFileCommandHandler : IHandler<Guid, bool>
         if (file.FileStatus >= Core.Domain.Enums.FileStatus.Deleted)
         {
             _logger.LogInformation("File has already been set to deleted");
-            return false;
         }
 
         await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
@@ -50,7 +49,6 @@ public class DeleteFileCommandHandler : IHandler<Guid, bool>
             _logger.LogError("Recipient {recipientExternalReference} did not download the file with id {fileId}", recipient.Actor.ActorExternalId, recipient.FileId.ToString());
             // TODO, send events
         }
-
-        return true;
+        return Task.CompletedTask;
     }
 }
