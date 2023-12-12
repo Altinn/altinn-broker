@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.MemoryStorage;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -44,6 +45,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     }
                 };
             });
+            services.AddHangfire(config =>
+                config.UseMemoryStorage()
+            );
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
         });

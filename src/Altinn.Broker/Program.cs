@@ -102,8 +102,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
     config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
     services.AddHangfire(config =>
-    config.UsePostgreSqlStorage(c =>
-        c.UseNpgsqlConnection(databaseOptions.ConnectionString)));
+        config.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(databaseOptions.ConnectionString))
+    );
     services.AddHangfireServer();
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
