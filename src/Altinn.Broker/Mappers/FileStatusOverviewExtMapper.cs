@@ -23,7 +23,8 @@ internal static class FileStatusOverviewExtMapper
             FileStatusText = MapToFileStatusText(file.FileStatus),
             PropertyList = file.PropertyList,
             Recipients = MapToRecipients(file.RecipientCurrentStatuses),
-            SendersFileReference = file.SendersFileReference
+            SendersFileReference = file.SendersFileReference,
+            ExpirationTime = file.ExpirationTime
         };
     }
 

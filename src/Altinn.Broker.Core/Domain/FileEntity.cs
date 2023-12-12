@@ -10,7 +10,8 @@ public class FileEntity
     public string SendersFileReference { get; set; }
     public FileStatus FileStatus { get; set; }
     public DateTimeOffset FileStatusChanged { get; set; }
-    public DateTimeOffset Uploaded { get; set; }
+    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset ExpirationTime { get; set; }
     public List<ActorFileStatusEntity> RecipientCurrentStatuses { get; set; } // Joined in
     public StorageProviderEntity StorageProvider { get; set; }
     public string? FileLocation { get; set; }

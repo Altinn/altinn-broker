@@ -26,7 +26,7 @@ public class FileRepository : IFileRepository
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
             @"
-            SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, 
+            SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
                    sender.actor_external_id as senderActorExternalReference,
                 (
                     SELECT fs.file_status_description_id_fk 
@@ -60,7 +60,8 @@ public class FileRepository : IFileRepository
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
                     FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
-                    Uploaded = reader.GetDateTime(reader.GetOrdinal("created")),
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     Sender = new ActorEntity()
                     {
@@ -143,8 +144,8 @@ public class FileRepository : IFileRepository
 
         var connection = await _connectionProvider.GetConnectionAsync();
         NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk) " +
-            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId)",
+            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)",
             connection);
 
         var fileId = Guid.NewGuid();
@@ -157,6 +158,7 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@fileStatusId", (int)FileStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
+        command.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.Add(serviceOwner.FileTimeToLive));
 
         command.ExecuteNonQuery();
 
