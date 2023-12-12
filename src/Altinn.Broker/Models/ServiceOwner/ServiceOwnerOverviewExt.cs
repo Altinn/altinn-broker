@@ -7,4 +7,6 @@ public class ServiceOwnerOverviewExt
     public string Name { get; set; }
 
     public DeploymentStatusExt DeploymentStatus { get; set; }
+
+    public TimeSpan DeletionTime { get; set; }
 }

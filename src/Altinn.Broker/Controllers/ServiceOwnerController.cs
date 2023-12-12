@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Core.Repositories;
+﻿using System.Xml;
+
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Models.ServiceOwner;
@@ -25,18 +27,14 @@ public class ServiceOwnerController : Controller
     [HttpPost]
     public async Task<ActionResult> CreateNewServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt)
     {
-        var caller = MaskinportenHelper.GetCallerFromTestToken(HttpContext);
-        if (string.IsNullOrWhiteSpace(caller))
-        {
-            return Unauthorized();
-        }
         var existingServiceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
         if (existingServiceOwner is not null)
         {
             return Conflict("Service owner already exists");
         }
 
-        await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.Id, serviceOwnerInitializeExt.Name);
+        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime); // ISO8601 Duration
+        await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.Id, serviceOwnerInitializeExt.Name, fileTimeToLive);
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner!)
@@ -49,11 +47,6 @@ public class ServiceOwnerController : Controller
     [Route("{serviceOwnerId}")]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(string serviceOwnerId)
     {
-        var caller = MaskinportenHelper.GetCallerFromTestToken(HttpContext);
-        if (string.IsNullOrWhiteSpace(caller))
-        {
-            return Unauthorized();
-        }
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
         if (serviceOwner is null)
         {
@@ -66,6 +59,7 @@ public class ServiceOwnerController : Controller
         {
             Name = serviceOwner.Name,
             DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
+            DeletionTime = serviceOwner.FileTimeToLive
         };
     }
 }
