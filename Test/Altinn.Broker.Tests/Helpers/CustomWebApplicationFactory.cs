@@ -1,3 +1,5 @@
+using Hangfire;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -7,8 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
+using Moq;
+
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    internal Mock<IBackgroundJobClient>? HangfireBackgroundJobClient;
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
@@ -39,6 +44,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     }
                 };
             });
+            HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
+            services.AddSingleton(HangfireBackgroundJobClient.Object);
         });
     }
 }
