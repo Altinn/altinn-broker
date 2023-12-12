@@ -28,7 +28,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.ApplicationInsights(
         TelemetryConfiguration.CreateDefault(),
         TelemetryConverter.Traces)
-    .CreateBootstrapLogger();
+    .CreateLogger();
 
 try
 {
