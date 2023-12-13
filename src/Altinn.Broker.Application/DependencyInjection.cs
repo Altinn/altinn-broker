@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Application.DownloadFileQuery;
+﻿using Altinn.Broker.Application.DeleteFileCommand;
+using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileDetailsQuery;
 using Altinn.Broker.Application.GetFileOverviewQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
@@ -17,5 +18,6 @@ public static class DependencyInjection
         services.AddScoped<GetFileDetailsQueryHandler>();
         services.AddScoped<DownloadFileQueryHandler>();
         services.AddScoped<ConfirmDownloadCommandHandler>();
+        services.AddScoped<DeleteFileCommandHandler>();
     }
 }

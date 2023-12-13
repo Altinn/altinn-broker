@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Altinn.Broker.Application;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
+using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
@@ -74,7 +75,13 @@ static void BuildAndRun(string[] args)
     app.UseAuthorization();
 
     app.MapControllers();
-    app.UseHangfireDashboard();
+
+    var hangfireAuthOptions = new HangfireAuthorizationOptions();
+    builder.Configuration.GetSection(nameof(HangfireAuthorizationOptions)).Bind(hangfireAuthOptions);    
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireMaintainerAuthorizationFilter(hangfireAuthOptions.TenantId, hangfireAuthOptions.GroupId) }
+    });
 
     app.Run();
 }
