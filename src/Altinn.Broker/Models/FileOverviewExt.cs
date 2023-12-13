@@ -16,6 +16,7 @@ namespace Altinn.Broker.Models
         public FileStatusExt FileStatus { get; set; }
         public string FileStatusText { get; set; } = string.Empty;
         public DateTimeOffset FileStatusChanged { get; set; }
+        public DateTimeOffset ExpirationTime { get; set; }
 
         /// <summary>
         /// Sender of the file.

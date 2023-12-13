@@ -33,6 +33,12 @@ public class AzureBrokerStorageService : IBrokerStorageService
         return await _fileStore.GetFileStream(fileEntity.FileId, connectionString);
     }
 
+    public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity)
+    {
+        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        await _fileStore.DeleteFile(fileEntity.FileId, connectionString);
+    }
+
     private async Task<string> GetConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
         if (_hostEnvironment.IsDevelopment())

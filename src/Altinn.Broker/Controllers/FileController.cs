@@ -78,7 +78,7 @@ namespace Altinn.Broker.Controllers
                 Filestream = Request.Body
             });
             return commandResult.Match(
-                fileId => Ok(fileId),
+                fileId => Ok(fileId.ToString()),
                 error => error.ToActionResult()
             );
         }
@@ -118,7 +118,7 @@ namespace Altinn.Broker.Controllers
                 Filestream = Request.Body
             });
             return uploadResult.Match(
-                fileId => Ok(fileId),
+                fileId => Ok(fileId.ToString()),
                 error => error.ToActionResult()
             );
         }

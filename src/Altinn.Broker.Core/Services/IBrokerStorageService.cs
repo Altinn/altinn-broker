@@ -14,4 +14,5 @@ public interface IBrokerStorageService
     Task UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity, Stream stream);
 
     Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity file);
+    Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity);
 }
