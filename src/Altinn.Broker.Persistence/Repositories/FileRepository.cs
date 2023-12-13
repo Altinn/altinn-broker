@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Core.Domain;
+﻿using System.Text;
+
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
@@ -137,26 +139,94 @@ public class FileRepository : IFileRepository
         return fileId;
     }
 
-    public async Task<List<Guid>> GetFilesAssociatedWithActor(ActorEntity actor)
+    public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)
     {
         var connection = await _connectionProvider.GetConnectionAsync();
 
-        using (var command = new NpgsqlCommand(
-            "SELECT DISTINCT afs.file_id_fk, 'Recipient'  " +
-            "FROM broker.actor_file_status afs " +
-            "WHERE afs.actor_id_fk = @actorId " +
-            "UNION " +
-            "SELECT f.file_id_pk, 'Sender' " +
-            "FROM broker.file f " +
-            "INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk " +
-            "WHERE a.actor_external_id = @actorExternalId " +
-            "UNION " +
-            "SELECT f.file_id_pk, 'Service' " +
-            "FROM broker.file f " +
-            "WHERE f.service_owner_id_fk = @actorExternalId", connection))
+        StringBuilder commandString = new StringBuilder();
+        commandString.AppendLine("SELECT DISTINCT afs.file_id_fk, 'Recipient'");
+        commandString.AppendLine("FROM broker.actor_file_status afs ");
+        commandString.AppendLine("INNER JOIN broker.file f on f.file_id_pk = afs.file_id_fk");
+        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId");
+        if(fileSearch.Status.HasValue)
         {
-            command.Parameters.AddWithValue("@actorId", actor.ActorId);
-            command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
+            commandString.AppendLine("AND afs.actor_file_status_id_fk = @fileStatus");
+        }
+        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created between @from AND @to");
+        }
+        else if (fileSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
+
+        commandString.AppendLine(";");
+        commandString.AppendLine("UNION");
+
+        commandString.AppendLine("SELECT f.file_id_pk, 'Sender' ");
+        commandString.AppendLine("FROM broker.file f ");
+        commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs	where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
+        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId ");
+        if(fileSearch.Status.HasValue)
+        {
+            commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
+        }
+        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created between @from AND @to");
+        }
+        else if (fileSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
+
+        commandString.AppendLine(";");
+        commandString.AppendLine("UNION");
+
+        commandString.AppendLine("SELECT f.file_id_pk, 'Service' ");
+        commandString.AppendLine("FROM broker.file f ");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs	where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
+        commandString.AppendLine("WHERE f.service_owner_id_fk = @actorExternalId");
+        if(fileSearch.Status.HasValue)
+        {
+            commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
+        }
+        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created between @from AND @to");
+        }
+        else if (fileSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
+        
+        commandString.AppendLine(";");
+
+        using (var command = new NpgsqlCommand(
+            commandString.ToString(), connection))
+        {
+            command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
+            command.Parameters.AddWithValue("@actorExternalId", fileSearch.Actor.ActorExternalId);
+            if (fileSearch.From.HasValue)
+                command.Parameters.AddWithValue("@From", fileSearch.From);
+            if (fileSearch.To.HasValue)
+                command.Parameters.AddWithValue("@To", fileSearch.To);
+            if (fileSearch.Status.HasValue)
+                command.Parameters.AddWithValue("@fileStatus", fileSearch.Status);
 
             var files = new List<Guid>();
             using (var reader = await command.ExecuteReaderAsync())
