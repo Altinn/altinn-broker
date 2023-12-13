@@ -21,7 +21,7 @@ public class HangfireMaintainerAuthorizationFilter : IDashboardAuthorizationFilt
     {
         _tenantId = hangfireAuthOptions.TenantId;
         _permittedGroup = hangfireAuthOptions.GroupId;
-        _configManager = new ConfigurationManager<OpenIdConnectConfiguration>($"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever());
+        _configManager = new ConfigurationManager<OpenIdConnectConfiguration>($"https://login.microsoftonline.com/{_tenantId}/v2.0/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever());
         _jwtValidationParameters = new TokenValidationParameters
         {
             RequireExpirationTime = true,

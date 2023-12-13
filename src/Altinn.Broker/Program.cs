@@ -9,9 +9,6 @@ using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 
-using Hangfire;
-using Hangfire.PostgreSql;
-
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -76,12 +73,7 @@ static void BuildAndRun(string[] args)
 
     app.MapControllers();
 
-    var hangfireAuthOptions = new HangfireAuthorizationOptions();
-    builder.Configuration.GetSection(nameof(HangfireAuthorizationOptions)).Bind(hangfireAuthOptions);    
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
-    {
-        Authorization = new[] { new HangfireMaintainerAuthorizationFilter(hangfireAuthOptions.TenantId, hangfireAuthOptions.GroupId) }
-    });
+    app.ConfigureHangfireDashboard(builder.Configuration);
 
     app.Run();
 }
@@ -106,12 +98,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
 
-    var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
-    config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
-    services.AddHangfire(config =>
-        config.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(databaseOptions.ConnectionString))
-    );
-    services.AddHangfireServer();
+    services.ConfigureHangfire(config);
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {
