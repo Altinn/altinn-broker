@@ -179,7 +179,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("INNER JOIN broker.file f on f.file_id_pk = afs.file_id_fk");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE afs.actor_id_fk = @actorId");
-        if(fileSearch.Status.HasValue)
+        if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
         }
@@ -203,7 +203,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId ");
-        if(fileSearch.Status.HasValue)
+        if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
         }
@@ -226,7 +226,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.file f ");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE f.service_owner_id_fk = @actorExternalId");
-        if(fileSearch.Status.HasValue)
+        if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
         }
@@ -242,7 +242,7 @@ public class FileRepository : IFileRepository
         {
             commandString.AppendLine("AND f.created < @to");
         }
-        
+
         commandString.AppendLine(";");
 
         using (var command = new NpgsqlCommand(

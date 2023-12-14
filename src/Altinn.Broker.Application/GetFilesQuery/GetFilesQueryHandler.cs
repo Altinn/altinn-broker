@@ -42,12 +42,12 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
             Status = request.Status
         };
 
-        if(request.From.HasValue)
+        if (request.From.HasValue)
         {
             fileSearchEntity.From = new DateTimeOffset(request.From.Value.UtcDateTime, TimeSpan.Zero);
         }
 
-        if(request.To.HasValue)
+        if (request.To.HasValue)
         {
             fileSearchEntity.To = new DateTimeOffset(request.To.Value.UtcDateTime, TimeSpan.Zero);
         }
