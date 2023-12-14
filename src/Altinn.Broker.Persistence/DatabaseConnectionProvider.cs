@@ -15,51 +15,39 @@ namespace Altinn.Broker.Persistence;
 public class DatabaseConnectionProvider : IDisposable
 {
     private readonly string _connectionString;
-    private NpgsqlConnection? _connection;
+    private NpgsqlDataSource _dataSource;
     private string? _accessToken;
 
     public DatabaseConnectionProvider(IOptions<DatabaseOptions> databaseOptions)
     {
         _connectionString = databaseOptions.Value.ConnectionString ?? throw new ArgumentNullException("DatabaseOptions__ConnectionString");
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(_connectionString);
+        var dataSource = dataSourceBuilder.Build();
+        _dataSource = dataSource;
     }
 
     public async Task<NpgsqlConnection> GetConnectionAsync()
     {
         NpgsqlConnectionStringBuilder connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
-        if (string.IsNullOrWhiteSpace(connectionStringBuilder.Password))
+        if (!string.IsNullOrWhiteSpace(connectionStringBuilder.Password)) // Developer mode
         {
+            return await _dataSource.OpenConnectionAsync();
+        }
+        if (_dataSource is null || !IsAccessTokenValid())
+        {
+            await RefreshToken();
             connectionStringBuilder.Password = _accessToken;
-            if (!IsAccessTokenValid())
-            {
-                await RefreshToken();
-                connectionStringBuilder.Password = _accessToken;
-                _connection = new NpgsqlConnection(connectionStringBuilder.ConnectionString);
-            }
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionStringBuilder.ConnectionString);
+            _dataSource = dataSourceBuilder.Build();
         }
-
-        if (_connection is null)
-        {
-            _connection = new NpgsqlConnection(connectionStringBuilder.ConnectionString);
-            _connection.Open();
-        }
-        else if (_connection.State == System.Data.ConnectionState.Closed)
-        {
-            _connection.Open();
-        }
-        else if (_connection.State == System.Data.ConnectionState.Broken)
-        {
-            _connection.Close();
-            _connection.Open();
-        }
-
-        return _connection;
+        return await _dataSource.OpenConnectionAsync();
     }
 
     private async Task RefreshToken()
     {
         var sqlServerTokenProvider = new DefaultAzureCredential();
         _accessToken = (await sqlServerTokenProvider.GetTokenAsync(
-            new TokenRequestContext(scopes: new string[] { "https://ossrdbms-aad.database.windows.net/.default" }) { })).Token;
+            new TokenRequestContext(scopes: ["https://ossrdbms-aad.database.windows.net/.default"]) { })).Token;
     }
 
     private bool IsAccessTokenValid()
@@ -73,17 +61,8 @@ public class DatabaseConnectionProvider : IDisposable
         return token.ValidTo > DateTime.Now.Subtract(TimeSpan.FromSeconds(60));
     }
 
-    private void CloseConnection()
-    {
-        if (_connection != null && _connection.State != System.Data.ConnectionState.Closed)
-        {
-            _connection.Close();
-        }
-    }
-
     public void Dispose()
     {
-        CloseConnection();
-        _connection?.Dispose();
+        _dataSource?.Dispose();
     }
 }

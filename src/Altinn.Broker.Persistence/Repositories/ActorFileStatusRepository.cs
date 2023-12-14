@@ -18,7 +18,7 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
 
     public async Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "SELECT *, a.actor_external_id " +
@@ -51,7 +51,7 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
 
     public async Task InsertActorFileStatus(Guid fileId, ActorFileStatus status, string actorExternalReference)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         var actor = await _actorRepository.GetActorAsync(actorExternalReference);
         long actorId = 0;
