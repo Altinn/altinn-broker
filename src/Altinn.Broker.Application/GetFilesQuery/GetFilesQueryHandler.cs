@@ -39,10 +39,18 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         FileSearchEntity fileSearchEntity = new()
         {
             Actor = callingActor,
-            From = request.From,
-            To = request.To,
             Status = request.Status
         };
+
+        if(request.From.HasValue)
+        {
+            fileSearchEntity.From = new DateTimeOffset(request.From.Value.UtcDateTime, TimeSpan.Zero);
+        }
+
+        if(request.To.HasValue)
+        {
+            fileSearchEntity.To = new DateTimeOffset(request.To.Value.UtcDateTime, TimeSpan.Zero);
+        }
 
         var files = await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity);
         return files;
