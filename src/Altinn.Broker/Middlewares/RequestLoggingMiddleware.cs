@@ -17,7 +17,8 @@
 
         private static readonly string[] IgnoredPaths =
         {
-            "/health"
+            "/health",
+            "/hangfire"
         };
 
         public async Task Invoke(HttpContext httpContext)
@@ -25,7 +26,7 @@
             // Log request
             var requestMethod = httpContext.Request.Method;
             var requestPath = httpContext.Request.PathBase.Add(httpContext.Request.Path).ToString();
-            if (!IgnoredPaths.Contains(requestPath.ToLowerInvariant()))
+            if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
             {
                 _logger.LogInformation(
                     "Request for method {RequestMethod} at {RequestPath}",
@@ -38,7 +39,7 @@
 
             // Log response
             var statusCode = httpContext.Response.StatusCode;
-            if (!IgnoredPaths.Contains(requestPath.ToLowerInvariant()))
+            if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
             {
                 if (statusCode >= 200 && statusCode < 400)
                 {
