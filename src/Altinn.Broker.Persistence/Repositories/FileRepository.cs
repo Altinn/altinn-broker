@@ -23,7 +23,7 @@ public class FileRepository : IFileRepository
 
     public async Task<FileEntity?> GetFile(Guid fileId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         var file = new FileEntity();
         using var command = new NpgsqlCommand(
@@ -88,7 +88,7 @@ public class FileRepository : IFileRepository
      * */
     private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         var fileStatuses = new List<ActorFileStatusEntity>();
         using (var command = new NpgsqlCommand(
@@ -144,7 +144,7 @@ public class FileRepository : IFileRepository
             actorId = actor.ActorId;
         }
 
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
         NpgsqlCommand command = new NpgsqlCommand(
             "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
             "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)",
@@ -171,7 +171,7 @@ public class FileRepository : IFileRepository
 
     public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT afs.file_id_fk, 'Recipient'");
@@ -272,7 +272,7 @@ public class FileRepository : IFileRepository
 
     public async Task SetStorageReference(Guid fileId, long storageProviderId, string fileLocation)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "UPDATE broker.file " +
@@ -290,7 +290,7 @@ public class FileRepository : IFileRepository
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "SELECT * " +
@@ -312,7 +312,7 @@ public class FileRepository : IFileRepository
 
     private async Task SetMetadata(Guid fileId, Dictionary<string, string> property)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
         using var transaction = connection.BeginTransaction();
         using var command = new NpgsqlCommand(
             "INSERT INTO broker.file_property (property_id_pk, file_id_fk, key, value) " +

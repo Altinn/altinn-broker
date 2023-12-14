@@ -17,7 +17,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
         using var command = new NpgsqlCommand(
             "SELECT service_owner_id_pk, service_owner_name, file_time_to_live, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type " +
@@ -52,7 +52,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task InitializeServiceOwner(string sub, string name, TimeSpan fileTimeToLive)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, file_time_to_live) " +
@@ -70,7 +70,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk, file_time_to_live) " +

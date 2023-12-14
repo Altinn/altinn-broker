@@ -16,7 +16,7 @@ public class FileStatusRepository : IFileStatusRepository
 
     public async Task InsertFileStatus(Guid fileId, FileStatus status)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
         using var command = new NpgsqlCommand("", connection);
 
         command.CommandText =
@@ -34,7 +34,7 @@ public class FileStatusRepository : IFileStatusRepository
 
     public async Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId)
     {
-        var connection = await _connectionProvider.GetConnectionAsync();
+        using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
             "SELECT * " +
