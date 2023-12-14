@@ -3,13 +3,11 @@ using System.Text.Json.Serialization;
 using Altinn.Broker.Application;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
+using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
-
-using Hangfire;
-using Hangfire.PostgreSql;
 
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -74,7 +72,8 @@ static void BuildAndRun(string[] args)
     app.UseAuthorization();
 
     app.MapControllers();
-    app.UseHangfireDashboard();
+
+    app.ConfigureHangfireDashboard(builder.Configuration);
 
     app.Run();
 }
@@ -99,12 +98,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
 
-    var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
-    config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
-    services.AddHangfire(config =>
-        config.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(databaseOptions.ConnectionString))
-    );
-    services.AddHangfireServer();
+    services.ConfigureHangfire(config);
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {
