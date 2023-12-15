@@ -63,7 +63,7 @@ static void BuildAndRun(string[] args)
     var app = builder.Build();
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseSerilogRequestLogging();
-    
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
