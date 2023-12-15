@@ -16,7 +16,9 @@ using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 using Serilog.Context;
 
@@ -28,10 +30,12 @@ namespace Altinn.Broker.Controllers
     public class FileController : Controller
     {
         private readonly ILogger<FileController> _logger;
+        private readonly ProblemDetailsFactory _problemDetailsFactory;
 
-        public FileController(ILogger<FileController> logger)
+        public FileController(ILogger<FileController> logger, ProblemDetailsFactory problemDetailsFactory)
         {
             _logger = logger;
+            _problemDetailsFactory = problemDetailsFactory;
         }
 
         /// <summary>
@@ -49,7 +53,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(commandRequest);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -79,7 +83,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -105,7 +109,7 @@ namespace Altinn.Broker.Controllers
             var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
             if (initializeResult.IsT1)
             {
-                return initializeResult.AsT1.ToActionResult();
+                Problem(detail: initializeResult.AsT1.Message, statusCode: (int)initializeResult.AsT1.StatusCode);
             }
             var fileId = initializeResult.AsT0;
 
@@ -119,7 +123,7 @@ namespace Altinn.Broker.Controllers
             });
             return uploadResult.Match(
                 fileId => Ok(fileId.ToString()),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -145,7 +149,7 @@ namespace Altinn.Broker.Controllers
             });
             return queryResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -171,7 +175,7 @@ namespace Altinn.Broker.Controllers
             });
             return queryResult.Match(
                 result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -200,7 +204,7 @@ namespace Altinn.Broker.Controllers
             });
             return queryResult.Match(
                 Ok,
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -211,7 +215,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Route("{fileId}/download")]
         [Authorize(Policy = "Recipient")]
-        public async Task<ActionResult<Stream>> DownloadFile(
+        public async Task<ActionResult> DownloadFile(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] DownloadFileQueryHandler handler)
@@ -224,9 +228,9 @@ namespace Altinn.Broker.Controllers
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
-            return queryResult.Match(
+            return queryResult.Match<ActionResult>(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
 
@@ -252,7 +256,7 @@ namespace Altinn.Broker.Controllers
             });
             return commandResult.Match(
                 Ok,
-                error => error.ToActionResult()
+                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
             );
         }
     }

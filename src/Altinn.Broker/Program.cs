@@ -63,7 +63,7 @@ static void BuildAndRun(string[] args)
     var app = builder.Build();
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseSerilogRequestLogging();
-
+    
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -97,6 +97,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
 
     services.AddHttpClient();
+    services.AddProblemDetails();
 
     services.ConfigureHangfire(config);
 
