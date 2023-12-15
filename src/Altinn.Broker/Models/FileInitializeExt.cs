@@ -52,7 +52,7 @@ namespace Altinn.Broker.Models
         /// MD5 checksum for file data.
         /// </summary>
         [JsonPropertyName("checksum")]
-        [MD5Checksum]        
+        [MD5Checksum]
         public string? Checksum { get; set; } = string.Empty;
     }
     internal class MD5ChecksumAttribute : ValidationAttribute
