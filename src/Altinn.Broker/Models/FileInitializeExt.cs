@@ -1,46 +1,55 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+
+using Altinn.Broker.Helpers;
 
 namespace Altinn.Broker.Models
 {
     /// <summary>
-    /// Entity containing BrokerFile initialization data.
+    /// API input model for file initialization.
     /// </summary>
     public class FileInitalizeExt
     {
         /// <summary>
-        /// Gets or sets the original filename
+        /// The filename including extension
         /// </summary>
         [JsonPropertyName("filename")]
+        [Length(1,255)]
         public string FileName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the senders file reference. Used by senders and receivers to identify specific file using external identification methods.
+        /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
         [JsonPropertyName("sendersFileReference")]
+        [Length(1, 4096)]
         public string SendersFileReference { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets checksum for file data.
-        /// </summary>
-        [JsonPropertyName("checksum")]
-        public string? Checksum { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the sender of the broker file.
+        /// The sender organization of the file
         /// </summary>
         [JsonPropertyName("sender")]
+        [RegularExpressionAttribute(@"^\d{4}:\d{9}$", ErrorMessage = "Organization numbers should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
         public string Sender { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the recipients of the broker file.
+        /// The recipient organizations of the broker file.
         /// </summary>
         [JsonPropertyName("recipients")]
+        [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^\d{4}:\d{9}$", ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
         public List<string> Recipients { get; set; } = new List<string>();
 
         /// <summary>
-        /// Gets or sets the properties field.
+        /// User-defined properties related to the file
         /// </summary>
         [JsonPropertyName("propertyList")]
+        [MaxLength(10, ErrorMessage = "propertyList can contain at most 10 properties")]
         public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>
+        /// MD5 checksum for file data.
+        /// </summary>
+        [JsonPropertyName("checksum")]
+        [StringLength(32, MinimumLength = 32, ErrorMessage = "The checksum, if used, must be a MD5 hash with a length of 32 characters")]
+        public string? Checksum { get; set; } = string.Empty;
     }
 }
