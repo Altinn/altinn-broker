@@ -22,7 +22,7 @@ namespace Altinn.Broker.Models
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
         [JsonPropertyName("sendersFileReference")]
-        [Length(1, 4096)]
+        [StringLength(4096, MinimumLength = 1)]
         public string SendersFileReference { get; set; } = string.Empty;
 
         /// <summary>
