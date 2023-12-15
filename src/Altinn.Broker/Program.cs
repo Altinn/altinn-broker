@@ -97,6 +97,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenOptions>(config.GetSection(key: nameof(MaskinportenOptions)));
 
     services.AddHttpClient();
+    services.AddProblemDetails();
 
     services.ConfigureHangfire(config);
 

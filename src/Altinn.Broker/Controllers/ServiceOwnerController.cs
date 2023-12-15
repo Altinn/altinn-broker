@@ -1,4 +1,5 @@
-﻿using System.Xml;
+﻿using System.Net;
+using System.Xml;
 
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -27,15 +28,15 @@ public class ServiceOwnerController : Controller
     [HttpPost]
     public async Task<ActionResult> CreateNewServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt)
     {
-        var existingServiceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
+        var existingServiceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.OrganizationId);
         if (existingServiceOwner is not null)
         {
-            return Conflict("Service owner already exists");
+            return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
         var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime); // ISO8601 Duration
-        await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.Id, serviceOwnerInitializeExt.Name, fileTimeToLive);
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.Id);
+        await _serviceOwnerRepository.InitializeServiceOwner(serviceOwnerInitializeExt.OrganizationId, serviceOwnerInitializeExt.Name, fileTimeToLive);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerInitializeExt.OrganizationId);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner!)
         );
