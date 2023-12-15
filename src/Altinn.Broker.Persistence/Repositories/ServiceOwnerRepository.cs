@@ -73,8 +73,8 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         using var connection = await _connectionProvider.GetConnectionAsync();
 
         using (var command = new NpgsqlCommand(
-            "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk, file_time_to_live) " +
-            "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId, @fileTimeToLive)", connection))
+            "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk) " +
+            "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId)", connection))
         {
             command.Parameters.AddWithValue("@resourceName", resourceName);
             command.Parameters.AddWithValue("@storageType", storageType.ToString());
