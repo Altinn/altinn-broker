@@ -99,7 +99,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddHttpClient();
     services.AddProblemDetails();
 
-    services.ConfigureHangfire(config);
+    services.ConfigureHangfire();
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
     {
