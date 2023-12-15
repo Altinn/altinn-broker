@@ -14,7 +14,8 @@ namespace Altinn.Broker.Models
         /// The filename including extension
         /// </summary>
         [JsonPropertyName("filename")]
-        [Length(1,255)]
+        [StringLength(32, MinimumLength = 1)]
+        [Required]
         public string FileName { get; set; } = string.Empty;
 
         /// <summary>
@@ -29,6 +30,7 @@ namespace Altinn.Broker.Models
         /// </summary>
         [JsonPropertyName("sender")]
         [RegularExpressionAttribute(@"^\d{4}:\d{9}$", ErrorMessage = "Organization numbers should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+        [Required]
         public string Sender { get; set; } = string.Empty;
 
         /// <summary>
@@ -36,6 +38,7 @@ namespace Altinn.Broker.Models
         /// </summary>
         [JsonPropertyName("recipients")]
         [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^\d{4}:\d{9}$", ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+        [Required]
         public List<string> Recipients { get; set; } = new List<string>();
 
         /// <summary>
@@ -49,7 +52,27 @@ namespace Altinn.Broker.Models
         /// MD5 checksum for file data.
         /// </summary>
         [JsonPropertyName("checksum")]
-        [StringLength(32, MinimumLength = 32, ErrorMessage = "The checksum, if used, must be a MD5 hash with a length of 32 characters")]
+        [MD5Checksum]        
         public string? Checksum { get; set; } = string.Empty;
+    }
+    internal class MD5ChecksumAttribute : ValidationAttribute
+    {
+        public MD5ChecksumAttribute()
+        {
+        }
+
+        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        {
+            var stringValue = value as string;
+            if (string.IsNullOrWhiteSpace(stringValue))
+            {
+                return ValidationResult.Success;
+            }
+            if (stringValue.Length != 32)
+            {
+                return new ValidationResult("The checksum, if used, must be a MD5 hash with a length of 32 characters");
+            }
+            return ValidationResult.Success;
+        }
     }
 }
