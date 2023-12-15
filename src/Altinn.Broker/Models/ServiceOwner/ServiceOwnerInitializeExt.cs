@@ -10,5 +10,5 @@ public class ServiceOwnerInitializeExt
     [RegularExpressionAttribute(@"^\d{4}:\d{9}$", ErrorMessage = "ServiceOwnerId should be on the Maskinporten form with countrycode:organizationnumber, for instance 0192:910753614")]
     public string OrganizationId { get; set; }
     public string Name { get; set; }
-    public TimeSpan DeletionTime { get; set; } // ISO8601 Duration
+    public string DeletionTime { get; set; } // ISO8601 Duration
 }
