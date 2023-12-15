@@ -5,6 +5,8 @@ using Altinn.Broker.Persistence.Options;
 using Azure.Core;
 using Azure.Identity;
 
+using Hangfire.PostgreSql;
+
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -12,7 +14,7 @@ using Npgsql;
 
 namespace Altinn.Broker.Persistence;
 
-public class DatabaseConnectionProvider : IDisposable
+public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 {
     private readonly string _connectionString;
     private NpgsqlDataSource _dataSource;
@@ -43,9 +45,14 @@ public class DatabaseConnectionProvider : IDisposable
         return await _dataSource.OpenConnectionAsync();
     }
 
+    public NpgsqlConnection GetOrCreateConnection()
+    {
+        return GetConnectionAsync().Result;
+    }
+
     private async Task RefreshToken()
     {
-        var sqlServerTokenProvider = new DefaultAzureCredential();
+        var sqlServerTokenProvider = new DefaultAzureCredential(new DefaultAzureCredentialOptions());
         _accessToken = (await sqlServerTokenProvider.GetTokenAsync(
             new TokenRequestContext(scopes: ["https://ossrdbms-aad.database.windows.net/.default"]) { })).Token;
     }
@@ -58,7 +65,7 @@ public class DatabaseConnectionProvider : IDisposable
         }
         JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
         SecurityToken token = tokenHandler.ReadToken(_accessToken);
-        return token.ValidTo > DateTime.Now.Subtract(TimeSpan.FromSeconds(60));
+        return DateTime.UtcNow.AddSeconds(60) < token.ValidTo;
     }
 
     public void Dispose()

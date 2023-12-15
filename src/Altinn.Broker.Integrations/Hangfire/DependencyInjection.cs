@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Persistence.Options;
+﻿using Altinn.Broker.Persistence;
+using Altinn.Broker.Persistence.Options;
 
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Hangfire;
 public static class DependencyInjection
@@ -28,12 +30,13 @@ public static class DependencyInjection
         }
     }
 
-    public static void ConfigureHangfire(this IServiceCollection services, IConfiguration config)
+    public static void ConfigureHangfire(this IServiceCollection services)
     {
-        var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
-        config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
+        var serviceProvider = services.BuildServiceProvider();
         services.AddHangfire(config =>
-            config.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(databaseOptions.ConnectionString))
+            config.UsePostgreSqlStorage(
+                c => c.UseConnectionFactory(serviceProvider.GetRequiredService<DatabaseConnectionProvider>())
+            )
         );
         services.AddHangfireServer();
     }
