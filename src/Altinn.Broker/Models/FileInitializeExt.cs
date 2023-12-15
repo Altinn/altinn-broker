@@ -14,7 +14,7 @@ namespace Altinn.Broker.Models
         /// The filename including extension
         /// </summary>
         [JsonPropertyName("filename")]
-        [StringLength(32, MinimumLength = 1)]
+        [StringLength(255, MinimumLength = 1)]
         [Required]
         public string FileName { get; set; } = string.Empty;
 
