@@ -1,8 +1,8 @@
 
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence;
-using Altinn.Broker.Repositories;
 
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 
@@ -29,7 +29,7 @@ namespace Altinn.Broker.Controllers
         {
             try
             {
-                var connection = await _databaseConnectionProvider.GetConnectionAsync();
+                using var connection = await _databaseConnectionProvider.GetConnectionAsync();
                 var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_status_description", connection);
                 var count = (long)(command.ExecuteScalar() ?? 0);
                 if (count == 0)
@@ -47,7 +47,7 @@ namespace Altinn.Broker.Controllers
             // Verify that resource manager has access to our subscription
             var credentials = new ClientSecretCredential(_azureResourceManagerOptions.TenantId, _azureResourceManagerOptions.ClientId, _azureResourceManagerOptions.ClientSecret);
             var armClient = new ArmClient(credentials);
-            var subscription = await armClient.GetDefaultSubscriptionAsync();
+            var subscription = armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_azureResourceManagerOptions.SubscriptionId}"));
             var resourceGroupCollection = subscription.GetResourceGroups();
             var resourceGroupCount = resourceGroupCollection.Count();
             if (resourceGroupCount < 1)
