@@ -39,6 +39,7 @@ namespace Altinn.Broker.Models
         [JsonPropertyName("recipients")]
         [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^\d{4}:\d{9}$", ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
         [Required]
+        [MinLength(1, ErrorMessage = "One or more recipients are required")]
         public List<string> Recipients { get; set; } = new List<string>();
 
         /// <summary>
