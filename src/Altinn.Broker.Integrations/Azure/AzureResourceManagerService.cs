@@ -57,7 +57,7 @@ public class AzureResourceManagerService : IResourceManager
         await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
-        var subscription = await _armClient.GetDefaultSubscriptionAsync();
+        var subscription = _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
         resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
@@ -85,10 +85,13 @@ public class AzureResourceManagerService : IResourceManager
         {
             return DeploymentStatus.Ready;
         }
-        var resourceGroupCollection = _armClient.GetDefaultSubscription().GetResourceGroups();
+        var subscription = _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
+        _logger.LogInformation($"Looking up {GetResourceGroupName(serviceOwnerEntity)} in {subscription.Id}");
+        var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity));
         if (!resourceGroupExists)
         {
+            _logger.LogInformation($"Could not find resource group for {serviceOwnerEntity.Name}");
             return DeploymentStatus.NotStarted;
         }
 
@@ -97,6 +100,7 @@ public class AzureResourceManagerService : IResourceManager
         var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(serviceOwnerEntity));
         if (!storageAccountExists)
         {
+            _logger.LogInformation($"Could not find storage account for {serviceOwnerEntity.Name}");
             return DeploymentStatus.DeployingResources;
         }
 
