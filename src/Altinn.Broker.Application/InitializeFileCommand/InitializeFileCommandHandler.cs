@@ -46,14 +46,9 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
             return Errors.WrongTokenForSender;
         }
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
-        if (serviceOwner is null)
+        if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;
-        }
-        var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
-        if (deploymentStatus != DeploymentStatus.Ready)
-        {
-            return Errors.ServiceOwnerNotReadyInfrastructure;
         }
         var fileId = await _fileRepository.AddFile(serviceOwner, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);

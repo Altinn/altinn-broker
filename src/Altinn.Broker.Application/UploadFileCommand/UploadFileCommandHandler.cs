@@ -35,11 +35,6 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var deploymentStatus = await _resourceManager.GetDeploymentStatus(serviceOwner);
-        if (deploymentStatus != DeploymentStatus.Ready)
-        {
-            return Errors.ServiceOwnerNotReadyInfrastructure;
-        }
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
