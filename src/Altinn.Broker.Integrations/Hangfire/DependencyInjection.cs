@@ -1,5 +1,4 @@
 ﻿using Altinn.Broker.Persistence;
-using Altinn.Broker.Persistence.Options;
 
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -8,7 +7,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Hangfire;
 public static class DependencyInjection
