@@ -128,7 +128,7 @@ public class AzureResourceManagerService : IResourceManager
         {
             return sasToken.Token;
         }
-        
+
         _sasTokens.TryRemove(storageAccountName, out _);
 
         await _semaphore.WaitAsync();
