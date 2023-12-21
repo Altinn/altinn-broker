@@ -11,4 +11,5 @@ internal static class Errors
     public static Error ServiceOwnerNotConfigured = new Error(3, "Service owner needs to be configured to use the broker API", HttpStatusCode.BadRequest);
     public static Error ServiceOwnerNotReadyInfrastructure = new Error(4, "Service owner infrastructure is not ready.", HttpStatusCode.UnprocessableEntity);
     public static Error NoFileUploaded = new Error(5, "No file uploaded yet", HttpStatusCode.BadRequest);
+    public static Error FileAlreadyUploaded = new Error(6, "A file has already been, or attempted to be, uploaded. Create a new file resource.", HttpStatusCode.Conflict);
 }
