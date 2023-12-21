@@ -77,7 +77,7 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 
     private async Task RefreshToken()
     {
-        _logger.LogInformation("New token being prepared");
+        _logger.LogInformation($"New token being prepared. Previous token was {(string.IsNullOrWhiteSpace(_accessToken) ? "not set" : "expired")}.");
         var sqlServerTokenProvider = new DefaultAzureCredential(new DefaultAzureCredentialOptions());
         _accessToken = (await sqlServerTokenProvider.GetTokenAsync(
             new TokenRequestContext(scopes: ["https://ossrdbms-aad.database.windows.net/.default"]) { })).Token;
