@@ -4,7 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <DockerfileRunArguments>--mount type=bind, source="c:/Altinn/Storage", target="/mnt/storage"</DockerfileRunArguments>
   </PropertyGroup>
 
   <ItemGroup>
