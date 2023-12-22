@@ -46,8 +46,8 @@ public class BlobService : Repositories.IFileStore
         var blobLeaseClient = blobClient.GetBlobLeaseClient();
         try
         {
-            if (!await blobClient.ExistsAsync()) 
-            { 
+            if (!await blobClient.ExistsAsync())
+            {
                 await blobClient.UploadAsync(new MemoryStream());
             }
             BlobLease blobLease = await blobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(-1));
@@ -66,7 +66,8 @@ public class BlobService : Repositories.IFileStore
             _logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             await blobClient.DeleteIfExistsAsync();
             throw;
-        } finally
+        }
+        finally
         {
             await blobLeaseClient.BreakAsync();
         }
