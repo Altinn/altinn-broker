@@ -145,12 +145,12 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.Configure<KestrelServerOptions>(options =>
     {
-        options.Limits.MaxRequestBodySize = int.MaxValue;
+        options.Limits.MaxRequestBodySize = null;
     });
     services.Configure<FormOptions>(options =>
     {
         options.ValueLengthLimit = int.MaxValue;
-        options.MultipartBodyLengthLimit = int.MaxValue;
+        options.MultipartBodyLengthLimit = long.MaxValue;
         options.MultipartHeadersLengthLimit = int.MaxValue;
     });
 }

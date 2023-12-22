@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Core.Domain;
+﻿using System.Collections.Concurrent;
+
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
@@ -10,7 +12,6 @@ using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Storage;
 using Azure.ResourceManager.Storage.Models;
 using Azure.Storage;
-using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 
 using Microsoft.Extensions.Hosting;
@@ -24,9 +25,14 @@ public class AzureResourceManagerService : IResourceManager
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
+        new ConcurrentDictionary<string, (DateTime Created, string Token)>();
+    private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly ILogger<AzureResourceManagerService> _logger;
     public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
+
+    private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
     public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
     {
@@ -57,7 +63,7 @@ public class AzureResourceManagerService : IResourceManager
         await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
-        var subscription = _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
+        var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
         resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
@@ -85,7 +91,7 @@ public class AzureResourceManagerService : IResourceManager
         {
             return DeploymentStatus.Ready;
         }
-        var subscription = _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
+        var subscription = GetSubscription();
         _logger.LogInformation($"Looking up {GetResourceGroupName(serviceOwnerEntity)} in {subscription.Id}");
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity));
@@ -110,9 +116,47 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
         _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
+        var sasToken = await GetSasToken(serviceOwnerEntity);
+        return $"BlobEndpoint=https://{GetStorageAccountName(serviceOwnerEntity)}.blob.core.windows.net/brokerfiles?{sasToken}";
+    }
+
+
+    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    {
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
+        {
+            return sasToken.Token;
+        }
+
+        _sasTokens.TryRemove(storageAccountName, out _);
+
+        await _semaphore.WaitAsync();
+        try
+        {
+            if (_sasTokens.TryGetValue(storageAccountName, out sasToken))
+            {
+                return sasToken.Token;
+            }
+            (DateTime Created, string Token) newSasToken = default;
+            newSasToken.Created = DateTime.UtcNow;
+            newSasToken.Token = await CreateSasToken(serviceOwnerEntity);
+
+            _sasTokens.TryAdd(storageAccountName, newSasToken);
+
+            return newSasToken.Token;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    {
+        _logger.LogInformation("Creating new SAS token for " + serviceOwnerEntity.Name);
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
         var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
-        var subscription = await _armClient.GetDefaultSubscriptionAsync();
+        var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
@@ -124,18 +168,16 @@ public class AzureResourceManagerService : IResourceManager
             accountKey = await keyEnumerator.MoveNextAsync() ? keyEnumerator.Current.Value : "";
         }
         StorageSharedKeyCredential credential = new StorageSharedKeyCredential(storageAccountName, accountKey);
-        BlobServiceClient serviceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential);
         var containerName = "brokerfiles";
         BlobSasBuilder sasBuilder = new BlobSasBuilder()
         {
             BlobContainerName = containerName,
             Resource = "c",
             StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(24),
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write);
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
-
-        return $"BlobEndpoint={serviceClient.Uri}{sasBuilder.BlobContainerName}?{sasToken}";
+        return sasToken;
     }
 }

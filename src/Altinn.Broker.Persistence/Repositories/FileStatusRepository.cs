@@ -2,8 +2,6 @@
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
-using Npgsql;
-
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileStatusRepository : IFileStatusRepository
 {
@@ -16,9 +14,9 @@ public class FileStatusRepository : IFileStatusRepository
 
     public async Task InsertFileStatus(Guid fileId, FileStatus status)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-        using var command = new NpgsqlCommand("", connection);
-
+        using var command = await _connectionProvider.CreateCommand(
+            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date) " +
+            "VALUES (@fileId, @statusId, NOW()) RETURNING file_status_id_pk;");
         command.CommandText =
             "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date) " +
             "VALUES (@fileId, @statusId, NOW()) RETURNING file_status_id_pk;";
@@ -34,12 +32,11 @@ public class FileStatusRepository : IFileStatusRepository
 
     public async Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
 
-        using (var command = new NpgsqlCommand(
+        using (var command = await _connectionProvider.CreateCommand(
             "SELECT * " +
             "FROM broker.file_status fis " +
-            "WHERE fis.file_id_fk = @fileId", connection))
+            "WHERE fis.file_id_fk = @fileId"))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var fileStatuses = new List<FileStatusEntity>();

@@ -2,8 +2,6 @@
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
-using Npgsql;
-
 namespace Altinn.Broker.Persistence.Repositories;
 internal class ActorFileStatusRepository : IActorFileStatusRepository
 {
@@ -18,13 +16,12 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
 
     public async Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
 
-        using (var command = new NpgsqlCommand(
+        await using (var command = await _connectionProvider.CreateCommand(
             "SELECT *, a.actor_external_id " +
             "FROM broker.actor_file_status afs " +
             "INNER JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
-            "WHERE afs.file_id_fk = @fileId", connection))
+            "WHERE afs.file_id_fk = @fileId"))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var fileStatuses = new List<ActorFileStatusEntity>();
@@ -51,8 +48,6 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
 
     public async Task InsertActorFileStatus(Guid fileId, ActorFileStatus status, string actorExternalReference)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-
         var actor = await _actorRepository.GetActorAsync(actorExternalReference);
         long actorId = 0;
         if (actor is null)
@@ -67,9 +62,9 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
             actorId = actor.ActorId;
         }
 
-        using (var command = new NpgsqlCommand(
+        await using (var command = await _connectionProvider.CreateCommand(
             "INSERT INTO broker.actor_file_status (actor_id_fk, file_id_fk, actor_file_status_id_fk, actor_file_status_date) " +
-            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())", connection))
+            "VALUES (@actorId, @fileId, @actorFileStatusId, NOW())"))
         {
             command.Parameters.AddWithValue("@actorId", actorId);
             command.Parameters.AddWithValue("@fileId", fileId);

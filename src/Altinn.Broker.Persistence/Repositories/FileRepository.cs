@@ -23,31 +23,29 @@ public class FileRepository : IFileRepository
 
     public async Task<FileEntity?> GetFile(Guid fileId)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-
         var file = new FileEntity();
-        using var command = new NpgsqlCommand(
+
+        using var command = await _connectionProvider.CreateCommand(
             @"
-            SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
-                   sender.actor_external_id as senderActorExternalReference,
-                (
-                    SELECT fs.file_status_description_id_fk 
-                    FROM broker.file_status fs 
-                    WHERE fs.file_id_fk = @fileId 
-                    ORDER BY fs.file_status_date desc 
-                    LIMIT 1
-                ) as file_status_description_id_fk, 
-                (
-                    SELECT fs.file_status_date 
-                    FROM broker.file_status fs 
-                    WHERE fs.file_id_fk = @fileId 
-                    ORDER BY fs.file_status_date desc 
-                    LIMIT 1
-                ) as file_status_date 
-            FROM broker.file 
-            INNER JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk 
-            WHERE file_id_pk = @fileId",
-            connection);
+                SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
+                        sender.actor_external_id as senderActorExternalReference,
+                    (
+                        SELECT fs.file_status_description_id_fk 
+                        FROM broker.file_status fs 
+                        WHERE fs.file_id_fk = @fileId 
+                        ORDER BY fs.file_status_date desc 
+                        LIMIT 1
+                    ) as file_status_description_id_fk, 
+                    (
+                        SELECT fs.file_status_date 
+                        FROM broker.file_status fs 
+                        WHERE fs.file_id_fk = @fileId 
+                        ORDER BY fs.file_status_date desc 
+                        LIMIT 1
+                    ) as file_status_date 
+                FROM broker.file 
+                INNER JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk 
+                WHERE file_id_pk = @fileId");
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             using NpgsqlDataReader reader = command.ExecuteReader();
@@ -88,10 +86,8 @@ public class FileRepository : IFileRepository
      * */
     private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-
         var fileStatuses = new List<ActorFileStatusEntity>();
-        using (var command = new NpgsqlCommand(
+        await using (var command = await _connectionProvider.CreateCommand(
             @"
             SELECT afs.actor_id_fk, MAX(afs.actor_file_status_id_fk) as actor_file_status_id_fk, MAX(afs.actor_file_status_date) as actor_file_status_date, a.actor_external_id 
             FROM broker.file 
@@ -99,7 +95,7 @@ public class FileRepository : IFileRepository
             LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk 
             WHERE file_id_pk = @fileId 
             GROUP BY afs.actor_id_fk, a.actor_external_id
-        ", connection))
+        "))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var commandText = command.CommandText;
@@ -144,13 +140,11 @@ public class FileRepository : IFileRepository
             actorId = actor.ActorId;
         }
 
-        using var connection = await _connectionProvider.GetConnectionAsync();
-        NpgsqlCommand command = new NpgsqlCommand(
-            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
-            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)",
-            connection);
-
         var fileId = Guid.NewGuid();
+        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
+
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
         command.Parameters.AddWithValue("@filename", filename);
@@ -165,14 +159,11 @@ public class FileRepository : IFileRepository
         command.ExecuteNonQuery();
 
         await SetMetadata(fileId, propertyList);
-
         return fileId;
     }
 
     public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT afs.file_id_fk, 'Recipient'");
         commandString.AppendLine("FROM broker.actor_file_status afs ");
@@ -245,8 +236,8 @@ public class FileRepository : IFileRepository
 
         commandString.AppendLine(";");
 
-        using (var command = new NpgsqlCommand(
-            commandString.ToString(), connection))
+        await using (var command = await _connectionProvider.CreateCommand(
+            commandString.ToString()))
         {
             command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
             command.Parameters.AddWithValue("@actorExternalId", fileSearch.Actor.ActorExternalId);
@@ -272,14 +263,12 @@ public class FileRepository : IFileRepository
 
     public async Task SetStorageReference(Guid fileId, long storageProviderId, string fileLocation)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
-
-        using (var command = new NpgsqlCommand(
+        await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.file " +
             "SET " +
                 "file_location = @fileLocation, " +
                 "storage_provider_id_fk = @storageProviderId " +
-            "WHERE file_id_pk = @fileId", connection))
+            "WHERE file_id_pk = @fileId"))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
@@ -290,9 +279,9 @@ public class FileRepository : IFileRepository
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileId)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
+        await using var connection = await _connectionProvider.GetConnectionAsync();
 
-        using (var command = new NpgsqlCommand(
+        await using (var command = new NpgsqlCommand(
             "SELECT * " +
             "FROM broker.file_property " +
             "WHERE file_id_fk = @fileId", connection))
@@ -312,7 +301,7 @@ public class FileRepository : IFileRepository
 
     private async Task SetMetadata(Guid fileId, Dictionary<string, string> property)
     {
-        using var connection = await _connectionProvider.GetConnectionAsync();
+        await using var connection = await _connectionProvider.GetConnectionAsync();
         using var transaction = connection.BeginTransaction();
         using var command = new NpgsqlCommand(
             "INSERT INTO broker.file_property (property_id_pk, file_id_fk, key, value) " +
