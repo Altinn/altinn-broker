@@ -9,6 +9,8 @@ using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 
+using Hangfire;
+
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -73,7 +75,7 @@ static void BuildAndRun(string[] args)
 
     app.MapControllers();
 
-    app.ConfigureHangfireDashboard(builder.Configuration);
+    app.UseHangfireDashboard();
 
     app.Run();
 }
