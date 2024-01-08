@@ -23,4 +23,11 @@
   <ItemGroup>
 	  <ProjectReference Include="..\..\src\Altinn.Broker\Altinn.Broker.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\Test\Altinn.Broker.Tests\Data\*.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
