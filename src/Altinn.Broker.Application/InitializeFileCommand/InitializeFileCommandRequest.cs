@@ -10,4 +10,5 @@ public class InitializeFileCommandRequest
     public List<string> RecipientExternalIds { get; set; }
     public Dictionary<string, string> PropertyList { get; set; }
     public string? Checksum { get; set; }
+    public string ClientId { get; set; }
 }

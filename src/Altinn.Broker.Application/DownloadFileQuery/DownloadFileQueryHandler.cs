@@ -9,14 +9,16 @@ using OneOf;
 namespace Altinn.Broker.Application.DownloadFileQuery;
 public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, DownloadFileQueryResponse>
 {
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
+    public DownloadFileQueryHandler(IServiceRepository serviceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
+        _serviceRepository = serviceRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
@@ -26,6 +28,11 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
     {
+        var service = await _serviceRepository.GetService(request.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {

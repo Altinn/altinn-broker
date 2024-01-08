@@ -11,6 +11,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IServiceRepository _serviceRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DeleteFileCommandHandler> _logger;
 
@@ -31,7 +32,12 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         {
             return Errors.FileNotFound;
         }
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(file.ServiceOwnerId);
+        var service = await _serviceRepository.GetService(file.ServiceId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;

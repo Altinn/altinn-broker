@@ -1,6 +1,7 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DeleteFileCommand;
+using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -17,22 +18,24 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
+    private readonly IServiceRepository _serviceRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceRepository serviceRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
+        _serviceRepository = serviceRepository;
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
     public async Task<OneOf<ConfirmDownloadCommandResponse, Error>> Process(ConfirmDownloadCommandRequest request)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
-        if (serviceOwner is null)
+        var service = await _serviceRepository.GetService(request.ClientId);
+        if (service is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         };

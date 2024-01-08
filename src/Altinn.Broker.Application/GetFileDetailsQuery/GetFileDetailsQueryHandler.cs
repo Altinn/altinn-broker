@@ -8,20 +8,27 @@ namespace Altinn.Broker.Application.GetFileDetailsQuery;
 public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, GetFileDetailsQueryResponse>
 {
     private readonly IFileRepository _fileRepository;
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
 
-    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceOwnerRepository serviceOwnerRepository)
+    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IServiceRepository serviceRepositor, IServiceOwnerRepository serviceOwnerRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
     {
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _fileRepository = fileRepository;
+        _serviceRepository = serviceRepositor;
         _serviceOwnerRepository = serviceOwnerRepository;
     }
 
     public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
+        var service = await _serviceRepository.GetService(request.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {

@@ -7,4 +7,5 @@ public class UploadFileCommandRequest
     public string Supplier { get; set; }
     public Stream Filestream { get; set; }
     public string Consumer { get; set; }
+    public string ClientId { get; set; }
 }

@@ -11,18 +11,25 @@ namespace Altinn.Broker.Application.GetFileOverviewQuery;
 public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest, GetFileOverviewQueryResponse>
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IServiceRepository _serviceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ILogger<GetFileOverviewQueryHandler> _logger;
 
-    public GetFileOverviewQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
+    public GetFileOverviewQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IServiceRepository serviceRepositor, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
     {
         _serviceOwnerRepository = serviceOwnerRepository;
+        _serviceRepository = serviceRepositor;
         _fileRepository = fileRepository;
         _logger = logger;
     }
 
     public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request)
     {
+        var service = await _serviceRepository.GetService(request.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner is null)
         {

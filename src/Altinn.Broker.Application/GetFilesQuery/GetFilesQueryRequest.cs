@@ -9,4 +9,5 @@ public class GetFilesQueryRequest
     public FileStatus? Status { get; set; }
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
+    public string ClientId { get; set; }
 }

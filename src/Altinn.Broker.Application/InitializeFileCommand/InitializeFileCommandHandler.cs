@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Application.DeleteFileCommand;
+using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -13,6 +14,7 @@ using OneOf;
 namespace Altinn.Broker.Application.InitializeFileCommand;
 public class InitializeFileCommandHandler : IHandler<InitializeFileCommandRequest, Guid>
 {
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
@@ -22,6 +24,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
     public InitializeFileCommandHandler(
+        IServiceRepository serviceRepository,
         IServiceOwnerRepository serviceOwnerRepository,
         IFileRepository fileRepository,
         IFileStatusRepository fileStatusRepository,
@@ -30,6 +33,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         IBackgroundJobClient backgroundJobClient,
         ILogger<InitializeFileCommandHandler> logger)
     {
+        _serviceRepository = serviceRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
@@ -45,12 +49,17 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.WrongTokenForSender;
         }
+        var service = await _serviceRepository.GetService(request.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
         if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileId = await _fileRepository.AddFile(serviceOwner, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
+        var fileId = await _fileRepository.AddFile(serviceOwner, service, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
         try
