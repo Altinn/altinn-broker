@@ -3,7 +3,6 @@ using System.Xml;
 
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
-using Altinn.Broker.Helpers;
 using Altinn.Broker.Models.ServiceOwner;
 
 using Hangfire;

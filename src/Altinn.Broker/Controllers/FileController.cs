@@ -5,6 +5,7 @@ using Altinn.Broker.Application.GetFileOverviewQuery;
 using Altinn.Broker.Application.GetFilesQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
 using Altinn.Broker.Application.UploadFileCommand;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
@@ -12,15 +13,10 @@ using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
-using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-
-using Serilog.Context;
 
 namespace Altinn.Broker.Controllers
 {
@@ -30,12 +26,10 @@ namespace Altinn.Broker.Controllers
     public class FileController : Controller
     {
         private readonly ILogger<FileController> _logger;
-        private readonly ProblemDetailsFactory _problemDetailsFactory;
 
-        public FileController(ILogger<FileController> logger, ProblemDetailsFactory problemDetailsFactory)
+        public FileController(ILogger<FileController> logger)
         {
             _logger = logger;
-            _problemDetailsFactory = problemDetailsFactory;
         }
 
         /// <summary>
@@ -79,6 +73,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier,
+                ClientId = token.ClientId,
                 Filestream = Request.Body
             });
             return commandResult.Match(
@@ -119,6 +114,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Supplier = token.Supplier,
                 Consumer = token.Consumer,
+                ClientId = token.ClientId,
                 Filestream = Request.Body
             });
             return uploadResult.Match(
@@ -144,6 +140,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
                 FileId = fileId,
+                ClientId = token.ClientId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
@@ -170,6 +167,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
             {
                 FileId = fileId,
+                ClientId = token.ClientId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
@@ -196,6 +194,7 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
+                ClientId = token.ClientId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier,
                 Status = status is not null ? (FileStatus)status : null,
@@ -225,6 +224,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
                 FileId = fileId,
+                ClientId = token.ClientId,
                 Consumer = token.Consumer,
                 Supplier = token.Supplier
             });
@@ -251,6 +251,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
             {
                 FileId = fileId,
+                ClientId = token.ClientId,
                 Supplier = token.Supplier,
                 Consumer = token.Consumer
             });

@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Application.InitializeFileCommand;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
 using Altinn.Broker.Models.Maskinporten;
 
@@ -18,6 +19,7 @@ internal static class InitializeFileMapper
             PropertyList = fileInitializeExt.PropertyList,
             RecipientExternalIds = fileInitializeExt.Recipients,
             Checksum = fileInitializeExt.Checksum,
+            ClientId = token.ClientId
         };
     }
 }
