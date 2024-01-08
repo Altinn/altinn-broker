@@ -39,4 +39,6 @@ public static class MaskinportenHelper
         }
         return scopeClaim.Value;
     }
+
+    public static string? GetClientIdFromToken(HttpContext httpContext) => httpContext.User.Claims.FirstOrDefault(claim => claim.Type == "client_id")?.Value;
 }
