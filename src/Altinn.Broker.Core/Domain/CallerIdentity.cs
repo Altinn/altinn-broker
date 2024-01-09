@@ -1,8 +1,8 @@
 ﻿namespace Altinn.Broker.Core.Domain;
 
-public class MaskinportenToken
+public class CallerIdentity
 {
-    public MaskinportenToken(
+    public CallerIdentity(
         string scope,
         string consumer,
         string supplier,

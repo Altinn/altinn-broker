@@ -7,7 +7,7 @@ namespace Altinn.Broker.Mappers;
 
 internal static class InitializeFileMapper
 {
-    internal static InitializeFileCommandRequest MapToRequest(FileInitalizeExt fileInitializeExt, MaskinportenToken token)
+    internal static InitializeFileCommandRequest MapToRequest(FileInitalizeExt fileInitializeExt, CallerIdentity token)
     {
         return new InitializeFileCommandRequest()
         {

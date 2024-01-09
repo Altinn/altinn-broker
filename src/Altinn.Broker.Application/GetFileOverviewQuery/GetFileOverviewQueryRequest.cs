@@ -4,6 +4,6 @@ namespace Altinn.Broker.Application.GetFileOverviewQuery;
 
 public class GetFileOverviewQueryRequest
 {
-    public MaskinportenToken Token { get; set; }
+    public CallerIdentity Token { get; set; }
     public Guid FileId { get; set; }
 }

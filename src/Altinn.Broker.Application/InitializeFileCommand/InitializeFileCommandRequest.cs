@@ -4,7 +4,7 @@ using Altinn.Broker.Core.Domain;
 namespace Altinn.Broker.Application.InitializeFileCommand;
 public class InitializeFileCommandRequest
 {
-    public MaskinportenToken Token { get; set; }
+    public CallerIdentity Token { get; set; }
     public string Filename { get; set; }
     public string SendersFileReference { get; set; }
     public string SenderExternalId { get; set; }

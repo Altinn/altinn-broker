@@ -27,7 +27,7 @@ public class ServiceController : Controller
 
     [HttpPost]
     [Authorize(Policy = "ServiceOwner")]
-    public async Task<ActionResult> CreateNewService([ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token)
+    public async Task<ActionResult> CreateNewService([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
         if (serviceOwner is null)

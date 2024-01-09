@@ -16,7 +16,7 @@ public static class LogContextHelpers
         LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
 
-    public static void EnrichLogsWithMaskinporten(MaskinportenToken token)
+    public static void EnrichLogsWithToken(CallerIdentity token)
     {
         LogContext.PushProperty("consumer", token.Consumer);
         LogContext.PushProperty("supplier", token.Supplier);

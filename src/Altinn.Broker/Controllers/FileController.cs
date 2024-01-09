@@ -38,10 +38,10 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Authorize(Policy = "Sender")]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token, [FromServices] InitializeFileCommandHandler handler)
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
         {
             LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Initializing file");
             var commandRequest = InitializeFileMapper.MapToRequest(initializeExt, token);
             var commandResult = await handler.Process(commandRequest);
@@ -61,11 +61,11 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler
         )
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Uploading file {fileId}", fileId.ToString());
             Request.EnableBuffering();
             var commandResult = await handler.Process(new UploadFileCommandRequest()
@@ -90,13 +90,13 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult> InitializeAndUpload(
             [FromForm] FileInitializeAndUploadExt form,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] InitializeFileCommandHandler initializeFileCommandHandler,
             [FromServices] UploadFileCommandHandler uploadFileCommandHandler
         )
         {
             LogContextHelpers.EnrichLogsWithInitializeFile(form.Metadata);
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Initializing and uploading file");
             var initializeRequest = InitializeFileMapper.MapToRequest(form.Metadata, token);
             var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
@@ -128,10 +128,10 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting file overview for {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
@@ -153,10 +153,10 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Sender")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting file details for {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
             {
@@ -179,10 +179,10 @@ namespace Altinn.Broker.Controllers
             [FromQuery] FileStatusExt? status,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFilesQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
@@ -206,10 +206,10 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Recipient")]
         public async Task<ActionResult> DownloadFile(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] DownloadFileQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
@@ -231,10 +231,10 @@ namespace Altinn.Broker.Controllers
         [Authorize(Policy = "Recipient")]
         public async Task<ActionResult> ConfirmDownload(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
+            LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
             var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
             {
