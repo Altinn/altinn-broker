@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
-public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequest, ConfirmDownloadCommandResponse>
+public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequest, Task>
 {
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
@@ -32,7 +32,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
-    public async Task<OneOf<ConfirmDownloadCommandResponse, Error>> Process(ConfirmDownloadCommandRequest request)
+    public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
     {
         var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
@@ -61,6 +61,6 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
             _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId));
         }
 
-        return new ConfirmDownloadCommandResponse();
+        return Task.CompletedTask;
     }
 }
