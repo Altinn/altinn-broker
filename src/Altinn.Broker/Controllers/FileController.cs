@@ -103,7 +103,7 @@ namespace Altinn.Broker.Controllers
             var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
             if (initializeResult.IsT1)
             {
-                Problem(detail: initializeResult.AsT1.Message, statusCode: (int)initializeResult.AsT1.StatusCode);
+                Problem(initializeResult.AsT1);
             }
             var fileId = initializeResult.AsT0;
 
