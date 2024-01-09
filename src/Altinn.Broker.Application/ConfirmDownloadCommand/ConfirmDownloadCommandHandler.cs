@@ -37,7 +37,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ServiceNotConfigured;
         };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
