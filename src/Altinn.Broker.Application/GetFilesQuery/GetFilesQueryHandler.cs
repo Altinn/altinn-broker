@@ -27,17 +27,17 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var callingActor = await _actorRepository.GetActorAsync(request.Consumer);
+        var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer);
         if (callingActor is null)
         {
             return new List<Guid>();

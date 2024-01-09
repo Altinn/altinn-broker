@@ -45,16 +45,16 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
 
     public async Task<OneOf<Guid, Error>> Process(InitializeFileCommandRequest request)
     {
-        if (request.Consumer != request.SenderExternalId)
+        if (request.Token.Consumer != request.SenderExternalId)
         {
             return Errors.WrongTokenForSender;
         }
-        var service = await _serviceRepository.GetService(request.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
         if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;

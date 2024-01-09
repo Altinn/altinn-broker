@@ -24,12 +24,12 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
 
     public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -39,8 +39,8 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.FileNotFound;
         }
-        if (file.Sender.ActorExternalId != request.Consumer &&
-            !file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
+        if (file.Sender.ActorExternalId != request.Token.Consumer &&
+            !file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;
         }

@@ -11,15 +11,13 @@ internal static class InitializeFileMapper
     {
         return new InitializeFileCommandRequest()
         {
-            Consumer = token.Consumer,
-            Supplier = token.Supplier,
+            Token = token,
             Filename = fileInitializeExt.FileName,
             SenderExternalId = fileInitializeExt.Sender,
             SendersFileReference = fileInitializeExt.SendersFileReference,
             PropertyList = fileInitializeExt.PropertyList,
             RecipientExternalIds = fileInitializeExt.Recipients,
-            Checksum = fileInitializeExt.Checksum,
-            ClientId = token.ClientId
+            Checksum = fileInitializeExt.Checksum
         };
     }
 }

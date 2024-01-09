@@ -34,7 +34,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
     }
     public async Task<OneOf<ConfirmDownloadCommandResponse, Error>> Process(ConfirmDownloadCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -44,7 +44,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             return Errors.FileNotFound;
         }
-        if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
+        if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;
         }
@@ -53,8 +53,8 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
             return Errors.NoFileUploaded;
         }
 
-        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Consumer);
-        bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer);
+        bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
         if (shouldConfirmAll)
         {
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);

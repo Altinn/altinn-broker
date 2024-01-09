@@ -71,9 +71,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
                 FileId = fileId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier,
-                ClientId = token.ClientId,
+                Token = token,
                 Filestream = Request.Body
             });
             return commandResult.Match(
@@ -112,9 +110,7 @@ namespace Altinn.Broker.Controllers
             var uploadResult = await uploadFileCommandHandler.Process(new UploadFileCommandRequest()
             {
                 FileId = fileId,
-                Supplier = token.Supplier,
-                Consumer = token.Consumer,
-                ClientId = token.ClientId,
+                Token = token,
                 Filestream = Request.Body
             });
             return uploadResult.Match(
@@ -140,9 +136,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
                 FileId = fileId,
-                ClientId = token.ClientId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
+                Token = token
             });
             return queryResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
@@ -167,9 +161,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
             {
                 FileId = fileId,
-                ClientId = token.ClientId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
+                Token = token
             });
             return queryResult.Match(
                 result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
@@ -194,9 +186,7 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
-                ClientId = token.ClientId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier,
+                Token = token,
                 Status = status is not null ? (FileStatus)status : null,
                 From = from,
                 To = to
@@ -224,9 +214,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
                 FileId = fileId,
-                ClientId = token.ClientId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
+                Token = token
             });
             return queryResult.Match<ActionResult>(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
@@ -251,9 +239,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
             {
                 FileId = fileId,
-                ClientId = token.ClientId,
-                Supplier = token.Supplier,
-                Consumer = token.Consumer
+                Token = token
             });
             return commandResult.Match(
                 Ok,

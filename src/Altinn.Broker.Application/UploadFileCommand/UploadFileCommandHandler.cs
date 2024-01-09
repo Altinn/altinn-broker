@@ -29,12 +29,12 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
         if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -44,7 +44,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileNotFound;
         }
-        if (request.Consumer != file.Sender.ActorExternalId)
+        if (request.Token.Consumer != file.Sender.ActorExternalId)
         {
             return Errors.FileNotFound;
         }
