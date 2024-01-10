@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -13,6 +14,8 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire.Common;
 using Hangfire.States;
+
+using Microsoft.AspNetCore.Mvc;
 
 using Moq;
 
@@ -24,6 +27,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
+    private readonly HttpClient _unregisteredClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public FileControllerTests(CustomWebApplicationFactory factory)
@@ -33,6 +37,8 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = factory.CreateClient();
         _recipientClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _unregisteredClient = factory.CreateClient();
+        _unregisteredClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_UNREGISTERED_TOKEN);
 
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
@@ -234,5 +240,15 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         // Assert
         Assert.Contains(fileId, contentstring);
+    }
+
+    [Fact]
+    public async Task SendFile_UsingUnregisteredService_Fails()
+    {
+        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.False(initializeFileResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ServiceNotConfigured.Message, parsedError.Detail);
     }
 }

@@ -4,7 +4,7 @@ namespace Altinn.Broker.Application;
 
 public record Error(int ErrorCode, string Message, HttpStatusCode StatusCode);
 
-internal static class Errors
+public static class Errors
 {
     public static Error FileNotFound = new Error(1, "The requested file was not found", HttpStatusCode.NotFound);
     public static Error WrongTokenForSender = new Error(2, "You must use a bearer token that belongs to the sender", HttpStatusCode.Unauthorized);
