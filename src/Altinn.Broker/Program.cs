@@ -142,9 +142,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddAuthorization(options =>
     {
-        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", [ MaskinportenHelper.WriteScope ]));
-        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", [ MaskinportenHelper.ReadScope ]));
-        options.AddPolicy("ServiceOwner", policy => policy.RequireClaim("scope", [ MaskinportenHelper.AdminScope ]));
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", [MaskinportenHelper.WriteScope]));
+        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", [MaskinportenHelper.ReadScope]));
+        options.AddPolicy("ServiceOwner", policy => policy.RequireClaim("scope", [MaskinportenHelper.AdminScope]));
     });
 
     services.Configure<KestrelServerOptions>(options =>
