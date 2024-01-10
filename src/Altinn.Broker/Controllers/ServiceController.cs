@@ -12,8 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Altinn.Broker.Controllers;
 
 [ApiController]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Route("broker/api/v1/service")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class ServiceController : Controller
 {
     private readonly IServiceRepository _serviceRepository;
@@ -27,7 +27,7 @@ public class ServiceController : Controller
 
     [HttpPost]
     [Authorize(Policy = "ServiceOwner")]
-    public async Task<ActionResult> CreateNewService([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
+    public async Task<ActionResult> CreateNewService([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, ServiceInitializeExt serviceInitializeExt)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
         if (serviceOwner is null)
@@ -35,19 +35,19 @@ public class ServiceController : Controller
             return Problem(detail: "Service owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
         }
 
-        var existingService = await _serviceRepository.GetService(token.Consumer);
+        var existingService = await _serviceRepository.GetService(serviceInitializeExt.MaskinportenClientId);
         if (existingService is not null)
         {
             return Problem(detail: "Service already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await _serviceRepository.InitializeService(serviceOwner.Id, token.Consumer, token.ClientId);
+        await _serviceRepository.InitializeService(serviceOwner.Id, serviceInitializeExt.OrganizationId, serviceInitializeExt.MaskinportenClientId);
 
         return Ok();
     }
 
     [HttpGet]
-    [Route("{serviceId}")]
+    [Route("{clientId}")]
     [Authorize(Policy = "ServiceOwner")]
     public async Task<ActionResult<ServiceOverviewExt>> GetService(string clientId)
     {
