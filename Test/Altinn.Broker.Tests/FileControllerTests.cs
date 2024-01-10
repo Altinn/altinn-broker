@@ -59,7 +59,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var fileAfterUpload = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(fileAfterUpload);
@@ -102,7 +102,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -140,7 +140,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -168,7 +168,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -196,7 +196,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -224,7 +224,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
