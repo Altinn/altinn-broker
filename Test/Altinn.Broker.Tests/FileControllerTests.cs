@@ -47,7 +47,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Initialize
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
-        Assert.Equal(System.Net.HttpStatusCode.OK, initializeFileResponse.StatusCode);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var fileAfterInitialize = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(fileAfterInitialize);
