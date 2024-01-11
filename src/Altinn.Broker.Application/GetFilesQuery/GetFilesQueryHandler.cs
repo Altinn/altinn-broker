@@ -36,7 +36,7 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         {
             return new List<Guid>();
         }
-        
+
         FileSearchEntity fileSearchEntity = new()
         {
             Actor = callingActor,
@@ -61,6 +61,6 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         else
         {
             return await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity);
-        }        
+        }
     }
 }

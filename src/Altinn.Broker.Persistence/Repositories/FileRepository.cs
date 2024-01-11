@@ -168,7 +168,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("SELECT DISTINCT afs.file_id_fk, 'Recipient'");
         commandString.AppendLine("FROM broker.actor_file_status afs ");
         commandString.AppendLine("INNER JOIN broker.file f on f.file_id_pk = afs.file_id_fk");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");        
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE afs.actor_id_fk = @actorId");
         if (fileSearch.Status.HasValue)
         {
@@ -266,7 +266,7 @@ public class FileRepository : IFileRepository
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
         commandString.AppendLine("FROM broker.file f");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");        
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus");
         if (fileSearch.Status.HasValue)

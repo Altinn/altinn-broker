@@ -241,8 +241,8 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Arrange
         string status = "Published";
-        string recipientStatus = "Initialized";       
-        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());        
+        string recipientStatus = "Initialized";
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -255,7 +255,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
-        // Act        
+        // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?status={status}&recipientStatus={recipientStatus}");
         string contentstring = await searchResult.Content.ReadAsStringAsync();
 
@@ -284,7 +284,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
-        // Act        
+        // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?status={status}&recipientStatus={recipientStatus}");
         string contentstring = await searchResult.Content.ReadAsStringAsync();
 
