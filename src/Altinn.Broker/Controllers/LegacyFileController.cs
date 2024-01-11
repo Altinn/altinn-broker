@@ -46,15 +46,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]        
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token, [FromServices] InitializeFileCommandHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Initializing file");
-            var commandRequest = InitializeFileMapper.MapToRequest(initializeExt, token);
-            var commandResult = await handler.Process(commandRequest);
-            return commandResult.Match(
-                fileId => Ok(fileId.ToString()),
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -70,20 +62,7 @@ namespace Altinn.Broker.Controllers
             [FromServices] UploadFileCommandHandler handler
         )
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Uploading file {fileId}", fileId.ToString());
-            Request.EnableBuffering();
-            var commandResult = await handler.Process(new UploadFileCommandRequest()
-            {
-                FileId = fileId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier,
-                Filestream = Request.Body
-            });
-            return commandResult.Match(
-                fileId => Ok(fileId.ToString()),
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -97,18 +76,7 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Getting file overview for {fileId}", fileId.ToString());
-            var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
-            {
-                FileId = fileId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
-            });
-            return queryResult.Match(
-                result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -122,22 +90,11 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Getting file details for {fileId}", fileId.ToString());
-            var queryResult = await handler.Process(new GetFileDetailsQueryRequest()
-            {
-                FileId = fileId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
-            });
-            return queryResult.Match(
-                result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
-        /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files.
+        /// Get files that can be accessed by the caller according to specified filters.
         /// </summary>
         /// <returns></returns>
         [HttpGet]
@@ -148,20 +105,7 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] GetFilesQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
-            var queryResult = await handler.Process(new GetFilesQueryRequest()
-            {
-                Consumer = token.Consumer,
-                Supplier = token.Supplier,
-                Status = status is not null ? (FileStatus)status : null,
-                From = from,
-                To = to
-            });
-            return queryResult.Match(
-                Ok,
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -175,18 +119,7 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] DownloadFileQueryHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
-            var queryResult = await handler.Process(new DownloadFileQueryRequest()
-            {
-                FileId = fileId,
-                Consumer = token.Consumer,
-                Supplier = token.Supplier
-            });
-            return queryResult.Match<ActionResult>(
-                result => File(result.Stream, "application/octet-stream", result.Filename),
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -200,18 +133,7 @@ namespace Altinn.Broker.Controllers
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {
-            LogContextHelpers.EnrichLogsWithMaskinporten(token);
-            _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
-            var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
-            {
-                FileId = fileId,
-                Supplier = token.Supplier,
-                Consumer = token.Consumer
-            });
-            return commandResult.Match(
-                Ok,
-                error => Problem(detail: error.Message, statusCode: (int)error.StatusCode)
-            );
+            throw new NotImplementedException();
         }
     }
 }
