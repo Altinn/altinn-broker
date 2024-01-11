@@ -43,7 +43,7 @@ namespace Altinn.Broker.Controllers
         /// Initialize a file upload
         /// </summary>
         /// <returns></returns>
-        [HttpPost]        
+        [HttpPost]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token, [FromServices] InitializeFileCommandHandler handler)
         {
             throw new NotImplementedException();
