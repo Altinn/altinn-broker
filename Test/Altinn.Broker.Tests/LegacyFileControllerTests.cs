@@ -22,17 +22,14 @@ namespace Altinn.Broker.Tests;
 public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
-    private readonly HttpClient _senderClient;
-    private readonly HttpClient _recipientClient;
+    private readonly HttpClient _legacyClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public LegacyFileControllerTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        _senderClient = factory.CreateClient();
-        _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
-        _recipientClient = factory.CreateClient();
-        _recipientClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _legacyClient = factory.CreateClient();
+        _legacyClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_LEGACY_TOKEN);
 
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
