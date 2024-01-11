@@ -100,6 +100,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Arrange
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -137,6 +138,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Arrange
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -165,6 +167,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -193,6 +196,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -221,6 +225,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
