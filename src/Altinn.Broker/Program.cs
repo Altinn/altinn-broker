@@ -141,8 +141,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddAuthorization(options =>
     {
-        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write", "altinn:broker.write altinn:broker.read"]));
         options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
+        options.AddPolicy("SenderOrRecipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write", "altinn:broker.write altinn:broker.read"]));
         options.AddPolicy("Legacy", policy => policy.RequireClaim("scope", ["altinn:broker.legacy"]));
     });
 

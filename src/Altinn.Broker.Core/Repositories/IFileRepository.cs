@@ -15,6 +15,7 @@ public interface IFileRepository
         string? checksum);
     Task<Domain.FileEntity?> GetFile(Guid fileId);
     Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch);
+    Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch);
     Task SetStorageReference(
         Guid fileId,
         long storageProviderId,

@@ -184,9 +184,10 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = "SenderOrRecipient")]
         public async Task<ActionResult<List<Guid>>> GetFiles(
             [FromQuery] FileStatusExt? status,
+            [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
@@ -199,6 +200,7 @@ namespace Altinn.Broker.Controllers
                 Consumer = token.Consumer,
                 Supplier = token.Supplier,
                 Status = status is not null ? (FileStatus)status : null,
+                RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
                 From = from,
                 To = to
             });
