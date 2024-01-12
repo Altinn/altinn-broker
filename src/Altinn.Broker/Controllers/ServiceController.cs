@@ -35,13 +35,13 @@ public class ServiceController : Controller
             return Problem(detail: "Service owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
         }
 
-        var existingService = await _serviceRepository.GetService(serviceInitializeExt.MaskinportenClientId);
+        var existingService = await _serviceRepository.GetService(serviceInitializeExt.OrganizationId);
         if (existingService is not null)
         {
             return Problem(detail: "Service already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await _serviceRepository.InitializeService(serviceOwner.Id, serviceInitializeExt.OrganizationId, serviceInitializeExt.MaskinportenClientId);
+        await _serviceRepository.InitializeService(serviceOwner.Id, serviceInitializeExt.OrganizationId);
 
         return Ok();
     }
@@ -49,9 +49,9 @@ public class ServiceController : Controller
     [HttpGet]
     [Route("{clientId}")]
     [Authorize(Policy = "ServiceOwner")]
-    public async Task<ActionResult<ServiceOverviewExt>> GetService(string clientId)
+    public async Task<ActionResult<ServiceOverviewExt>> GetService(string organizationNumber)
     {
-        var service = await _serviceRepository.GetService(clientId);
+        var service = await _serviceRepository.GetService(organizationNumber);
         if (service is null)
         {
             return NotFound();
@@ -59,7 +59,6 @@ public class ServiceController : Controller
 
         return new ServiceOverviewExt()
         {
-            ClientId = service.ClientId,
             Created = service.Created,
             OrganizationNumber = service.OrganizationNumber
         };

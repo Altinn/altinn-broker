@@ -21,6 +21,5 @@ public static class LogContextHelpers
         LogContext.PushProperty("consumer", token.Consumer);
         LogContext.PushProperty("supplier", token.Supplier);
         LogContext.PushProperty("scope", token.Scope);
-        LogContext.PushProperty("clientId", token.ClientId);
     }
 }

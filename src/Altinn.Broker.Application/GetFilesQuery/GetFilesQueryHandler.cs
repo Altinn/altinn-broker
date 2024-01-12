@@ -28,7 +28,7 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

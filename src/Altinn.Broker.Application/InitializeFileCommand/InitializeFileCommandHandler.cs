@@ -49,7 +49,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.WrongTokenForSender;
         }
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

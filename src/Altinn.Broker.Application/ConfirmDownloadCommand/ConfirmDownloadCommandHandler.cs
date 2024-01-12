@@ -34,7 +34,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
     }
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

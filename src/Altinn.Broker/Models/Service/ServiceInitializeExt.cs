@@ -4,7 +4,6 @@ namespace Altinn.Broker.Models.Service;
 
 public class ServiceInitializeExt
 {
-    public string MaskinportenClientId { get; set; }
     /// <summary>
     /// This should be on the form countrycode:organizationnumber. For instance 0192:922444555 for a Norwegian organization with org number 923 444 555. Corresponds to consumer.id in Maskinporten token.
     /// </summary>

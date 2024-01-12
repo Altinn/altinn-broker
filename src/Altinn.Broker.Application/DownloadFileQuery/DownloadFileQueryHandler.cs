@@ -28,7 +28,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

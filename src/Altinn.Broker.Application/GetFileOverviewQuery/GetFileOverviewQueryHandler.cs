@@ -25,7 +25,7 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
 
     public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

@@ -22,11 +22,11 @@ public class ServiceRepository : IServiceRepository
         return await GetServiceFromQuery(command);
     }
 
-    public async Task<ServiceEntity?> GetService(string clientId)
+    public async Task<ServiceEntity?> GetService(string organizationNumber)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT * FROM broker.service WHERE client_id = @clientId");
-        command.Parameters.AddWithValue("@clientId", clientId);
+            "SELECT * FROM broker.service WHERE organization_number = @organizationNumber");
+        command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
 
         return await GetServiceFromQuery(command);
     }
@@ -40,7 +40,6 @@ public class ServiceRepository : IServiceRepository
             service = new ServiceEntity
             {
                 Id = reader.GetInt64(reader.GetOrdinal("service_id_pk")),
-                ClientId = reader.GetString(reader.GetOrdinal("client_id")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
@@ -49,16 +48,15 @@ public class ServiceRepository : IServiceRepository
         return service;
     }
 
-    public async Task<long> InitializeService(string serviceOwnerId, string organizationNumber, string clientId)
+    public async Task<long> InitializeService(string serviceOwnerId, string organizationNumber)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "INSERT INTO broker.service (created, client_id, organization_number, service_owner_id_fk) " +
-                    "VALUES (@created, @clientId, @organizationNumber, @serviceOwnerId) " +
+                    "INSERT INTO broker.service (created, organization_number, service_owner_id_fk) " +
+                    "VALUES (@created, @organizationNumber, @serviceOwnerId) " +
                     "RETURNING service_id_pk");
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
         command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
-        command.Parameters.AddWithValue("@clientId", clientId);
 
         return (long)command.ExecuteScalar()!;
     }

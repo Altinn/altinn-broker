@@ -29,7 +29,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _serviceRepository.GetService(request.Token.Consumer);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

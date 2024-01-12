@@ -8,7 +8,7 @@ internal static class FileInitializeExtTestFactory
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],
-        Recipients = new List<string> { "0192:986252932" },
+        Recipients = new List<string> { "0192:991825832" },
         Sender = "0192:991825827",
         SendersFileReference = "test-data"
     };

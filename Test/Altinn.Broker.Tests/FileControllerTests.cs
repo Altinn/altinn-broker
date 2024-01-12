@@ -246,7 +246,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Assert
         Assert.Contains(fileId, contentstring);
     }
-    
+
     [Fact]
     public async Task Search_SearchFileWith_RecipientStatus_Success()
     {
@@ -306,7 +306,9 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task SendFile_UsingUnregisteredService_Fails()
     {
-        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.Sender = "0192:949494949"; // Same as consumer in _unregisteredClient token
+        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", file);
         Assert.False(initializeFileResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
