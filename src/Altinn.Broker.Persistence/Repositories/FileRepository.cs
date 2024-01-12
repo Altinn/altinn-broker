@@ -261,6 +261,57 @@ public class FileRepository : IFileRepository
         }
     }
 
+    public async Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch)
+    {
+        StringBuilder commandString = new StringBuilder();
+        commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
+        commandString.AppendLine("FROM broker.file f");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
+        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus");
+        if (fileSearch.Status.HasValue)
+        {
+            commandString.AppendLine("AND file_status_description_id_fk = @fileStatus");
+        }
+        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created between @from AND @to");
+        }
+        else if (fileSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
+
+        await using (var command = await _connectionProvider.CreateCommand(
+            commandString.ToString()))
+        {
+            command.Parameters.AddWithValue("@recipientId", fileSearch.Actor.ActorId);
+            if (fileSearch.From.HasValue)
+                command.Parameters.AddWithValue("@From", fileSearch.From);
+            if (fileSearch.To.HasValue)
+                command.Parameters.AddWithValue("@To", fileSearch.To);
+            if (fileSearch.Status.HasValue)
+                command.Parameters.AddWithValue("@fileStatus", (int)fileSearch.Status);
+            if (fileSearch.RecipientStatus.HasValue)
+                command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
+
+            var files = new List<Guid>();
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var fileId = reader.GetGuid(0);
+                    files.Add(fileId);
+                }
+            }
+            return files;
+        }
+    }
+
     public async Task SetStorageReference(Guid fileId, long storageProviderId, string fileLocation)
     {
         await using (var command = await _connectionProvider.CreateCommand(

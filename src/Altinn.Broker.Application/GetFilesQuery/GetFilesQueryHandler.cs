@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -52,7 +53,14 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
             fileSearchEntity.To = new DateTimeOffset(request.To.Value.UtcDateTime, TimeSpan.Zero);
         }
 
-        var files = await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity);
-        return files;
+        if (request.RecipientStatus.HasValue)
+        {
+            fileSearchEntity.RecipientStatus = request.RecipientStatus;
+            return await _fileRepository.GetFilesForRecipientWithRecipientStatus(fileSearchEntity);
+        }
+        else
+        {
+            return await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity);
+        }
     }
 }

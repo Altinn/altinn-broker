@@ -100,6 +100,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         public async Task<ActionResult<List<Guid>>> GetFiles(
             [FromQuery] FileStatusExt? status,
+            [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
             [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
