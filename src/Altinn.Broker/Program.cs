@@ -142,9 +142,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddAuthorization(options =>
     {
-        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", [MaskinportenHelper.WriteScope]));
-        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", [MaskinportenHelper.ReadScope]));
         options.AddPolicy("ServiceOwner", policy => policy.RequireClaim("scope", [MaskinportenHelper.AdminScope]));
+        options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write"]));
+        options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
+        options.AddPolicy("Legacy", policy => policy.RequireClaim("scope", ["altinn:broker.legacy"]));
     });
 
     services.Configure<KestrelServerOptions>(options =>
