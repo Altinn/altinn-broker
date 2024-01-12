@@ -5,6 +5,7 @@ using Altinn.Broker.Application.GetFileOverviewQuery;
 using Altinn.Broker.Application.GetFilesQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
 using Altinn.Broker.Application.UploadFileCommand;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
@@ -44,7 +45,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token, [FromServices] InitializeFileCommandHandler handler)
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
         {
             throw new NotImplementedException();
         }
@@ -58,7 +59,7 @@ namespace Altinn.Broker.Controllers
         [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler
         )
         {
@@ -73,7 +74,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}")]
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
             throw new NotImplementedException();
@@ -87,7 +88,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/details")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileDetailsQueryHandler handler)
         {
             throw new NotImplementedException();
@@ -102,7 +103,7 @@ namespace Altinn.Broker.Controllers
             [FromQuery] FileStatusExt? status,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFilesQueryHandler handler)
         {
             throw new NotImplementedException();
@@ -116,7 +117,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         public async Task<ActionResult> DownloadFile(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] DownloadFileQueryHandler handler)
         {
             throw new NotImplementedException();
@@ -130,7 +131,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(
             Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] MaskinportenToken token,
+            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {
             throw new NotImplementedException();
