@@ -3,10 +3,6 @@ version: '3.4'
 volumes:
     broker-storage:
 
-networks:
-  altinnplatform_network:
-    external: false
-
 services:
   storage:
     image: mcr.microsoft.com/azure-storage/azurite:latest
