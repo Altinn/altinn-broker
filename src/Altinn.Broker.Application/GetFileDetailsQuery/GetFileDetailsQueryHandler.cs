@@ -24,7 +24,7 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
 
     public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.Consumer);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
         if (service is null)
         {
             return Errors.ServiceNotConfigured;

@@ -26,7 +26,7 @@ public class MaskinportenModelBinder : IModelBinder
             supplierOrgNo = consumerOrgNo; // In the case where service owner uses his own token
         }
 
-        bindingContext.Result = ModelBindingResult.Success(new CallerIdentity(scope, consumerOrgNo, supplierOrgNo));
+        bindingContext.Result = ModelBindingResult.Success(new CallerIdentity(scope, consumerOrgNo, supplierOrgNo, clientId));
         await Task.CompletedTask;
     }
 }
