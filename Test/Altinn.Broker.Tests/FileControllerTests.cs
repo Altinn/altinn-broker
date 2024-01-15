@@ -246,7 +246,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Assert
         Assert.Contains(fileId, contentstring);
     }
-    
+
     [Fact]
     public async Task Search_SearchFileWith_RecipientStatus_Success()
     {
