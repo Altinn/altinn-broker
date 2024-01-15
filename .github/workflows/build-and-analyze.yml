@@ -46,7 +46,7 @@ jobs:
         run: |
           while [ $(docker-compose ps -q prepare_test_data | wc -l) -gt 0 ]; do
             echo "Waiting for test data to be prepared..."
-            eco $(docker-compose ps -q prepare_test_data | wc -l)
+            echo $(docker-compose ps -q prepare_test_data | wc -l)
             sleep 5
           done
       - name: Build & Test
