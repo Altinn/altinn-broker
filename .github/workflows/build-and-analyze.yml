@@ -44,8 +44,9 @@ jobs:
           docker-compose up -d
       - name: Wait for test data migration
         run: |
-          while [ $(docker-compose ps -q prepare_test_data-1 | wc -l) -gt 0 ]; do
+          while [ $(docker-compose ps -q prepare_test_data | wc -l) -gt 0 ]; do
             echo "Waiting for test data to be prepared..."
+            eco $(docker-compose ps -q prepare_test_data | wc -l)
             sleep 5
           done
       - name: Build & Test
