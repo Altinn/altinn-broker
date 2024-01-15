@@ -42,6 +42,12 @@ jobs:
       - name: Start dependencies for tests (docker-compose)
         run: |
           docker-compose up -d
+      - name: Wait for test data migration
+        run: |
+          while [ $(docker-compose ps -q prepare_test_data | wc -l) -gt 0 ]; do
+            echo "Waiting for test data to be prepared..."
+            sleep 5
+          done
       - name: Build & Test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
