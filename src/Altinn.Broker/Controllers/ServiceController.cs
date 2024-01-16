@@ -64,4 +64,17 @@ public class ServiceController : Controller
             OrganizationNumber = service.OrganizationNumber
         };
     }
+
+    [HttpGet]
+    [Authorize(Policy = "ServiceOwner")]
+    public async Task<ActionResult<List<string>>> GetAllServices([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
+    {
+        var services = await _serviceRepository.SearchServices(token.Consumer);
+        if (services is null)
+        {
+            return NotFound();
+        }
+
+        return services;
+    }
 }

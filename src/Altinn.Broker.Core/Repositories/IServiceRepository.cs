@@ -6,5 +6,6 @@ public interface IServiceRepository
 {
     Task<ServiceEntity?> GetService(long id);
     Task<ServiceEntity?> GetService(string clientId);
+    Task<List<string>> SearchServices(string serviceOwnerOrgNo);
     Task<long> InitializeService(string serviceOwnerId, string organizationNumber, string clientId);
 }

@@ -31,6 +31,24 @@ public class ServiceRepository : IServiceRepository
         return await GetServiceFromQuery(command);
     }
 
+    public async Task<List<string>> SearchServices(string serviceOwnerOrgNo)
+    {
+        using var command = await _connectionProvider.CreateCommand(
+            "SELECT client_id FROM broker.service WHERE service_owner_id_fk = @serviceOwnerOrgNo");
+        command.Parameters.AddWithValue("@serviceOwnerOrgNo", serviceOwnerOrgNo);
+
+        var services = new List<string>();
+        using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                var serviceExternalId = reader.GetString(0);
+                services.Add(serviceExternalId);
+            }
+        }
+        return services;
+    }
+
     private async Task<ServiceEntity?> GetServiceFromQuery(NpgsqlCommand command)
     {
         using NpgsqlDataReader reader = command.ExecuteReader();
