@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="DeleteFileCommand\" />
     <Folder Include="GetFileOverviewQuery\" />
     <Folder Include="GetFileDetailsQuery\" />
     <Folder Include="GetFilesQuery\" />

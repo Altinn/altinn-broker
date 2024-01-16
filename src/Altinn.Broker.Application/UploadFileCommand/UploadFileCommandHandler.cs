@@ -10,14 +10,16 @@ namespace Altinn.Broker.Application.UploadFileCommand;
 
 public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 {
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IServiceRepository serviceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
     {
+        _serviceRepository = serviceRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
@@ -27,7 +29,12 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
         if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -37,7 +44,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileNotFound;
         }
-        if (request.Consumer != file.Sender.ActorExternalId)
+        if (request.Token.Consumer != file.Sender.ActorExternalId)
         {
             return Errors.FileNotFound;
         }

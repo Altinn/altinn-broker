@@ -3,10 +3,6 @@ version: '3.4'
 volumes:
     broker-storage:
 
-networks:
-  altinnplatform_network:
-    external: false
-
 services:
   storage:
     image: mcr.microsoft.com/azure-storage/azurite:latest
@@ -42,22 +38,10 @@ services:
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
     volumes:
       - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
+      - ./Test/Altinn.Broker.Tests/Data/:/flyway/sql/R__Prepare_Test_Data.sql
     depends_on:
       - database
     entrypoint:
       [
         "flyway",
       ]
-  prepare_test_data:
-    image: flyway/flyway:latest
-    command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate
-    volumes:
-      - ./Test/Altinn.Broker.Tests/Data:/flyway/sql
-    depends_on:
-      - database
-      - database_migration
-    entrypoint:
-      [
-        "flyway",
-      ]
-  

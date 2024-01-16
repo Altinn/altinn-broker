@@ -39,4 +39,10 @@ public static class MaskinportenHelper
         }
         return scopeClaim.Value;
     }
+
+    public static string? GetClientIdFromToken(HttpContext httpContext) => httpContext.User.Claims.FirstOrDefault(claim => claim.Type == "client_id")?.Value;
+
+    public const string WriteScope = "altinn:broker.write";
+    public const string ReadScope = "altinn:broker.read";
+    public const string AdminScope = "altinn:broker.admin";
 }

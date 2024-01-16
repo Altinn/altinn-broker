@@ -9,14 +9,16 @@ using OneOf;
 namespace Altinn.Broker.Application.DownloadFileQuery;
 public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, DownloadFileQueryResponse>
 {
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
+    public DownloadFileQueryHandler(IServiceRepository serviceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
+        _serviceRepository = serviceRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _fileRepository = fileRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
@@ -26,7 +28,12 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -36,7 +43,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.FileNotFound;
         }
-        if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
+        if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;
         }
@@ -45,7 +52,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
             return Errors.NoFileUploaded;
         }
         var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, file);
-        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Consumer);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Token.Consumer);
         return new DownloadFileQueryResponse()
         {
             Filename = file.Filename,

@@ -1,5 +1,5 @@
-﻿using Altinn.Broker.Models;
-using Altinn.Broker.Models.Maskinporten;
+﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Models;
 
 using Serilog.Context;
 
@@ -16,10 +16,10 @@ public static class LogContextHelpers
         LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
 
-    public static void EnrichLogsWithMaskinporten(MaskinportenToken token)
+    public static void EnrichLogsWithToken(CallerIdentity token)
     {
         LogContext.PushProperty("consumer", token.Consumer);
-        LogContext.PushProperty("supplier", token.Supplier);
         LogContext.PushProperty("scope", token.Scope);
+        LogContext.PushProperty("clientId", token.ClientId);
     }
 }

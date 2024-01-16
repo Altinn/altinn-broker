@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -13,6 +14,8 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire.Common;
 using Hangfire.States;
+
+using Microsoft.AspNetCore.Mvc;
 
 using Moq;
 
@@ -24,6 +27,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
+    private readonly HttpClient _unregisteredClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public FileControllerTests(CustomWebApplicationFactory factory)
@@ -33,6 +37,8 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = factory.CreateClient();
         _recipientClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _unregisteredClient = factory.CreateClient();
+        _unregisteredClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_UNREGISTERED_TOKEN);
 
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
@@ -47,7 +53,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Initialize
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
-        Assert.Equal(System.Net.HttpStatusCode.OK, initializeFileResponse.StatusCode);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var fileAfterInitialize = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(fileAfterInitialize);
@@ -59,7 +65,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var fileAfterUpload = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(fileAfterUpload);
@@ -94,6 +100,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Arrange
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -102,7 +109,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -131,6 +138,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Arrange
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -140,7 +148,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -159,6 +167,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -168,7 +177,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -187,6 +196,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -196,7 +206,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -215,6 +225,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         string status = "Published";
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
@@ -224,7 +235,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
@@ -290,5 +301,15 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         // Assert
         Assert.DoesNotContain(fileId, contentstring);
+    }
+
+    [Fact]
+    public async Task SendFile_UsingUnregisteredService_Fails()
+    {
+        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.False(initializeFileResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ServiceNotConfigured.Message, parsedError.Detail);
     }
 }

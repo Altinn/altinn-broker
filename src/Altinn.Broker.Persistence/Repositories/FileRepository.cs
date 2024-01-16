@@ -27,7 +27,7 @@ public class FileRepository : IFileRepository
 
         using var command = await _connectionProvider.CreateCommand(
             @"
-                SELECT file_id_pk, service_owner_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
+                SELECT file_id_pk, service_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
                         sender.actor_external_id as senderActorExternalReference,
                     (
                         SELECT fs.file_status_description_id_fk 
@@ -54,7 +54,7 @@ public class FileRepository : IFileRepository
                 file = new FileEntity
                 {
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                    ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
+                    ServiceId = reader.GetInt64(reader.GetOrdinal("service_id_fk")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
@@ -120,7 +120,7 @@ public class FileRepository : IFileRepository
         return fileStatuses;
     }
 
-    public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
+    public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, ServiceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
     {
         if (serviceOwner.StorageProvider is null)
         {
@@ -142,11 +142,11 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file (file_id_pk, service_owner_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
-            "VALUES (@fileId, @serviceOwnerId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
+            "INSERT INTO broker.file (file_id_pk, service_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "VALUES (@fileId, @serviceId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
 
         command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwner.Id);
+        command.Parameters.AddWithValue("@serviceId", service.Id);
         command.Parameters.AddWithValue("@filename", filename);
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
         command.Parameters.AddWithValue("@senderActorId", actorId);
@@ -194,29 +194,6 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId ");
-        if (fileSearch.Status.HasValue)
-        {
-            commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
-        }
-        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
-        {
-            commandString.AppendLine("AND f.created between @from AND @to");
-        }
-        else if (fileSearch.From.HasValue)
-        {
-            commandString.AppendLine("AND f.created > @from");
-        }
-        else if (fileSearch.To.HasValue)
-        {
-            commandString.AppendLine("AND f.created < @to");
-        }
-
-        commandString.AppendLine("UNION");
-
-        commandString.AppendLine("SELECT f.file_id_pk, 'Service' ");
-        commandString.AppendLine("FROM broker.file f ");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE f.service_owner_id_fk = @actorExternalId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");

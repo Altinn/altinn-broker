@@ -8,21 +8,28 @@ namespace Altinn.Broker.Application.GetFileDetailsQuery;
 public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, GetFileDetailsQueryResponse>
 {
     private readonly IFileRepository _fileRepository;
+    private readonly IServiceRepository _serviceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
 
-    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceOwnerRepository serviceOwnerRepository)
+    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IServiceRepository serviceRepositor, IServiceOwnerRepository serviceOwnerRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
     {
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _fileRepository = fileRepository;
+        _serviceRepository = serviceRepositor;
         _serviceOwnerRepository = serviceOwnerRepository;
     }
 
     public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Supplier);
+        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        if (service is null)
+        {
+            return Errors.ServiceNotConfigured;
+        };
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
@@ -32,8 +39,8 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.FileNotFound;
         }
-        if (file.Sender.ActorExternalId != request.Consumer &&
-            !file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Consumer))
+        if (file.Sender.ActorExternalId != request.Token.Consumer &&
+            !file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;
         }

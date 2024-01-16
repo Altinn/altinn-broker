@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Application;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
@@ -141,6 +142,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddAuthorization(options =>
     {
+        options.AddPolicy("ServiceOwner", policy => policy.RequireClaim("scope", [MaskinportenHelper.AdminScope]));
         options.AddPolicy("Sender", policy => policy.RequireClaim("scope", ["altinn:broker.write", "altinn:broker.write altinn:broker.read"]));
         options.AddPolicy("Recipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write altinn:broker.read"]));
         options.AddPolicy("SenderOrRecipient", policy => policy.RequireClaim("scope", ["altinn:broker.read", "altinn:broker.write", "altinn:broker.write altinn:broker.read"]));

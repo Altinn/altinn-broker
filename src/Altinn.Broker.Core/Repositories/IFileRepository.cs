@@ -7,6 +7,7 @@ public interface IFileRepository
 {
     Task<Guid> AddFile(
         ServiceOwnerEntity serviceOwner,
+        ServiceEntity service,
         string filename,
         string sendersFileReference,
         string senderExternalId,
