@@ -34,7 +34,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
         if (serviceOwner?.StorageProvider is null)
         {
             return Errors.ServiceOwnerNotConfigured;

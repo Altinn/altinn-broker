@@ -11,15 +11,13 @@ namespace Altinn.Broker.Application.GetFilesQuery;
 
 public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 {
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IServiceRepository _serviceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public GetFilesQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IServiceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
+    public GetFilesQueryHandler(IServiceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
-        _serviceOwnerRepository = serviceOwnerRepository;
         _serviceRepository = serviceRepository;
         _fileRepository = fileRepository;
         _actorRepository = actorRepository;
@@ -32,11 +30,6 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         if (service is null)
         {
             return Errors.ServiceNotConfigured;
-        };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(request.Token.Supplier);
-        if (serviceOwner is null)
-        {
-            return Errors.ServiceOwnerNotConfigured;
         };
         var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer);
         if (callingActor is null)

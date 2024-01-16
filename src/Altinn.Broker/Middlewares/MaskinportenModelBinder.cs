@@ -20,13 +20,7 @@ public class MaskinportenModelBinder : IModelBinder
             throw new BadHttpRequestException("Malformed bearer token. It should contain the claims 'consumer', 'client_id' and 'scope'.");
         }
 
-        var supplierOrgNo = Helpers.MaskinportenHelper.GetSupplierFromToken(bindingContext.HttpContext);
-        if (string.IsNullOrWhiteSpace(supplierOrgNo))
-        {
-            supplierOrgNo = consumerOrgNo; // In the case where service owner uses his own token
-        }
-
-        bindingContext.Result = ModelBindingResult.Success(new CallerIdentity(scope, consumerOrgNo, supplierOrgNo, clientId));
+        bindingContext.Result = ModelBindingResult.Success(new CallerIdentity(scope, consumerOrgNo, clientId));
         await Task.CompletedTask;
     }
 }

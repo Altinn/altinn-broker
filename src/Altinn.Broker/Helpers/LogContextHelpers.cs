@@ -19,7 +19,6 @@ public static class LogContextHelpers
     public static void EnrichLogsWithToken(CallerIdentity token)
     {
         LogContext.PushProperty("consumer", token.Consumer);
-        LogContext.PushProperty("supplier", token.Supplier);
         LogContext.PushProperty("scope", token.Scope);
         LogContext.PushProperty("clientId", token.ClientId);
     }

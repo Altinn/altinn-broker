@@ -29,7 +29,7 @@ public class ServiceController : Controller
     [Authorize(Policy = "ServiceOwner")]
     public async Task<ActionResult> CreateNewService([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, ServiceInitializeExt serviceInitializeExt)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Supplier);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         if (serviceOwner is null)
         {
             return Problem(detail: "Service owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
