@@ -35,13 +35,15 @@ public class ResourceController : Controller
             return Problem(detail: "Resource owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
         }
 
-        var existingResource = await _resourceRepository.GetResource(resourceInitializeExt.MaskinportenClientId);
+        var existingResource = await _resourceRepository.GetResource(resourceInitializeExt.ResourceId);
         if (existingResource is not null)
         {
             return Problem(detail: "Resource already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await _resourceRepository.InitializeResource(resourceOwner.Id, resourceInitializeExt.OrganizationId, resourceInitializeExt.MaskinportenClientId);
+        await _resourceRepository.InitializeResource(resourceOwner.Id, resourceInitializeExt.OrganizationId, resourceInitializeExt.ResourceId);
+
+        // Todo, add permitted system users to ad hoc resource rights registry
 
         return Ok();
     }

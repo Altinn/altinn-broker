@@ -47,9 +47,8 @@ CREATE TABLE broker.resource_owner (
 );
 
 CREATE TABLE broker.resource (
-    service_id_pk bigserial PRIMARY KEY,
-    created timestamp without time zone NOT NULL,
-    client_id character varying(36) NOT NULL,
+    resource_id_pk bigserial PRIMARY KEY,
+    created timestamp without time zone NOT NULL,    
     organization_number character varying(14) NOT NULL,
     resource_owner_id_fk character varying(14) NOT NULL,
     FOREIGN KEY (resource_owner_id_fk) REFERENCES broker.resource_owner (resource_owner_id_pk),
@@ -119,7 +118,7 @@ CREATE TABLE broker.actor_file_status (
 );
 
 -- Create indexes
-CREATE INDEX ix_file_service_id ON broker.file (resource_id_fk);
+CREATE INDEX ix_file_resource_id ON broker.file (resource_id_fk);
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);
