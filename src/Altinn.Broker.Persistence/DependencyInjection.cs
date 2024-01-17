@@ -15,5 +15,6 @@ public static class DependencyInjection
         services.AddSingleton<IActorFileStatusRepository, ActorFileStatusRepository>();
         services.AddSingleton<IResourceOwnerRepository, ResourceOwnerRepository>();
         services.AddSingleton<IResourceRepository, ResourceRepository>();
+        services.AddSingleton<IResourceRightsRepository, ResourceRightsRepository>();
     }
 }
