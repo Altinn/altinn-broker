@@ -19,6 +19,14 @@ namespace Altinn.Broker.Models
         public string FileName { get; set; } = string.Empty;
 
         /// <summary>
+        /// The Altinn resource ID
+        /// </summary>
+        [JsonPropertyName("resourceId")]
+        [StringLength(255, MinimumLength = 1)]
+        [Required]
+        public string ResourceId { get; set; } = string.Empty;
+
+        /// <summary>
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
         [JsonPropertyName("sendersFileReference")]

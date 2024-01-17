@@ -32,7 +32,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         {
             return Errors.FileNotFound;
         }
-        var service = await _resourceRepository.GetResource(file.ServiceId);
+        var service = await _resourceRepository.GetResource(file.ResourceId);
         if (service is null)
         {
             return Errors.ResourceNotConfigured;

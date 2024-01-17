@@ -11,15 +11,17 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
+    private readonly IResourceRightsRepository _resourceRightsRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileQueryHandler(IResourceRepository serviceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
+    public DownloadFileQueryHandler(IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IResourceRightsRepository resourceRightsRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
-        _resourceRepository = serviceRepository;
+        _resourceRepository = resourceRepository;
         _resourceOwnerRepository = resourceOwnerRepository;
+        _resourceRightsRepository = resourceRightsRepository;
         _fileRepository = fileRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _brokerStorageService = brokerStorageService;
@@ -28,12 +30,12 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
     {
-        var service = await _resourceRepository.GetResource(request.Token.ClientId);
-        if (service is null)
+        var resource = await _resourceRepository.GetResource(request.Token.ClientId);
+        if (resource is null)
         {
             return Errors.ResourceNotConfigured;
         };
-        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resource.ResourceOwnerId);
         if (resourceOwner is null)
         {
             return Errors.ResourceOwnerNotConfigured;
@@ -51,6 +53,11 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.NoFileUploaded;
         }
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ExternalResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        if (!hasAccess)
+        {
+            return Errors.NoAccessToResource;
+        };
         var downloadStream = await _brokerStorageService.DownloadFile(resourceOwner, file);
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Token.Consumer);
         return new DownloadFileQueryResponse()

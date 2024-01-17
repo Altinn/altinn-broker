@@ -54,7 +54,7 @@ public class FileRepository : IFileRepository
                 file = new FileEntity
                 {
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                    ServiceId = reader.GetInt64(reader.GetOrdinal("service_id_fk")),
+                    ResourceId = reader.GetInt64(reader.GetOrdinal("service_id_fk")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),

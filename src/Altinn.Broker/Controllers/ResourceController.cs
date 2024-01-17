@@ -4,6 +4,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.Service;
+using Altinn.Broker.Persistence.Repositories;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -18,11 +19,13 @@ public class ResourceController : Controller
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
+    private readonly IResourceRightsRepository _resourceRightsRepository;
 
-    public ResourceController(IResourceRepository serviceRepository, IResourceOwnerRepository resourceOwnerRepository)
+    public ResourceController(IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IResourceRightsRepository resourceRightsRepository)
     {
-        _resourceRepository = serviceRepository;
+        _resourceRepository = resourceRepository;
         _resourceOwnerRepository = resourceOwnerRepository;
+        _resourceRightsRepository = resourceRightsRepository;
     }
 
     [HttpPost]
@@ -43,7 +46,10 @@ public class ResourceController : Controller
 
         await _resourceRepository.InitializeResource(resourceOwner.Id, resourceInitializeExt.OrganizationId, resourceInitializeExt.ResourceId);
 
-        // Todo, add permitted system users to ad hoc resource rights registry
+        resourceInitializeExt.PermittedMaskinportenUsers.ForEach(async user =>
+        {
+            await _resourceRightsRepository.GiveUserAccess(user.ClientId, resourceInitializeExt.ResourceId, user.AccessLevel.ToString(), user.OrganizationNumber);
+        }); 
 
         return Ok();
     }
@@ -53,17 +59,17 @@ public class ResourceController : Controller
     [Authorize(Policy = "ResourceOwner")]
     public async Task<ActionResult<ResourceOverviewExt>> GetResourceConfiguration(string resourceId)
     {
-        var service = await _resourceRepository.GetResource(resourceId);
-        if (service is null)
+        var resource = await _resourceRepository.GetResource(resourceId);
+        if (resource is null)
         {
             return NotFound();
         }
 
         return new ResourceOverviewExt()
         {
-            ClientId = service.ClientId,
-            Created = service.Created,
-            OrganizationNumber = service.OrganizationNumber
+            ClientId = resource.ClientId,
+            Created = resource.Created,
+            OrganizationNumber = resource.OrganizationNumber
         };
     }
 
@@ -71,12 +77,12 @@ public class ResourceController : Controller
     [Authorize(Policy = "ResourceOwner")]
     public async Task<ActionResult<List<string>>> GetAllResources([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
     {
-        var services = await _resourceRepository.SearchResources(token.Consumer);
-        if (services is null)
+        var resources = await _resourceRepository.SearchResources(token.Consumer);
+        if (resources is null)
         {
             return NotFound();
         }
 
-        return services;
+        return resources;
     }
 }

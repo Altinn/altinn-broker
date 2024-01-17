@@ -5,6 +5,7 @@ internal static class FileInitializeExtTestFactory
 {
     internal static FileInitalizeExt BasicFile() => new FileInitalizeExt()
     {
+        ResourceId = "1",
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],

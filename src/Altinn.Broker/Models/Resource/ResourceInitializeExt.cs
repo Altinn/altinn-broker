@@ -22,9 +22,15 @@ public class ResourceInitializeExt
     public List<MaskinportenUser> PermittedMaskinportenUsers { get; set; }
 }
 
+public enum AccessLevel
+{
+    Read,
+    Write
+}
+
 public class MaskinportenUser
 {
     public string ClientId { get; set; }
-    public List<string> PermittedScopes { get; set; }
+    public AccessLevel AccessLevel { get; set; }
     public string OrganizationNumber { get; set; }
 }

@@ -11,14 +11,16 @@ namespace Altinn.Broker.Application.GetFilesQuery;
 
 public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 {
+    private readonly IResourceRightsRepository _resourceRightsRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public GetFilesQueryHandler(IResourceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
+    public GetFilesQueryHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
-        _resourceRepository = serviceRepository;
+        _resourceRightsRepository = resourceRightsRepository;
+        _resourceRepository = resourceRepository;
         _fileRepository = fileRepository;
         _actorRepository = actorRepository;
         _logger = logger;
@@ -26,6 +28,15 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request)
     {
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write);
+        if (!hasAccess)
+        {
+            hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        }
+        if (!hasAccess)
+        {
+            return Errors.NoAccessToResource;
+        };
         var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {

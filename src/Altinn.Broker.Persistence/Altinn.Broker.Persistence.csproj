@@ -11,14 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Migrations\V0003__ad_hoc_resource_rights.sql" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="Migrations\V0003__ad_hoc_resource_rights.sql" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.10.4" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.5" />

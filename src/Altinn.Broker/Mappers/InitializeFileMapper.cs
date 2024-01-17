@@ -12,6 +12,7 @@ internal static class InitializeFileMapper
         return new InitializeFileCommandRequest()
         {
             Token = token,
+            ResourceId = fileInitializeExt.ResourceId,
             Filename = fileInitializeExt.FileName,
             SenderExternalId = fileInitializeExt.Sender,
             SendersFileReference = fileInitializeExt.SendersFileReference,
