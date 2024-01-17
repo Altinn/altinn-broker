@@ -177,6 +177,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Authorize(Policy = "SenderOrRecipient")]
         public async Task<ActionResult<List<Guid>>> GetFiles(
+            [FromQuery] string resourceId,
             [FromQuery] FileStatusExt? status,
             [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
@@ -189,6 +190,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFilesQueryRequest()
             {
                 Token = token,
+                ResourceId = resourceId,
                 Status = status is not null ? (FileStatus)status : null,
                 RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
                 From = from,

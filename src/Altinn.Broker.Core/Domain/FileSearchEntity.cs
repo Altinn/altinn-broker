@@ -9,4 +9,5 @@ public class FileSearchEntity
     public ActorFileStatus? RecipientStatus { get; set; }
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
+    public string ResourceId { get; set; }
 }

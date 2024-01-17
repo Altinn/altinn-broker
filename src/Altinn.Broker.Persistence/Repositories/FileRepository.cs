@@ -169,7 +169,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.actor_file_status afs ");
         commandString.AppendLine("INNER JOIN broker.file f on f.file_id_pk = afs.file_id_fk");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId");
+        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId AND f.resource_id_fk = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
@@ -193,7 +193,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.file f ");
         commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId ");
+        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId AND resource_id_fk = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
@@ -217,6 +217,7 @@ public class FileRepository : IFileRepository
             commandString.ToString()))
         {
             command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
+            command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
             command.Parameters.AddWithValue("@actorExternalId", fileSearch.Actor.ActorExternalId);
             if (fileSearch.From.HasValue)
                 command.Parameters.AddWithValue("@From", fileSearch.From);
@@ -245,7 +246,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.file f");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus");
+        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus AND resource_id_fk = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND file_status_description_id_fk = @fileStatus");
@@ -267,6 +268,7 @@ public class FileRepository : IFileRepository
             commandString.ToString()))
         {
             command.Parameters.AddWithValue("@recipientId", fileSearch.Actor.ActorId);
+            command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
             if (fileSearch.From.HasValue)
                 command.Parameters.AddWithValue("@From", fileSearch.From);
             if (fileSearch.To.HasValue)

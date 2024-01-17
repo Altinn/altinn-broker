@@ -37,7 +37,7 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         {
             return Errors.NoAccessToResource;
         };
-        var service = await _resourceRepository.GetResource(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.ResourceId);
         if (service is null)
         {
             return Errors.ResourceNotConfigured;
@@ -51,6 +51,7 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         FileSearchEntity fileSearchEntity = new()
         {
             Actor = callingActor,
+            ResourceId = request.ResourceId,
             Status = request.Status
         };
 

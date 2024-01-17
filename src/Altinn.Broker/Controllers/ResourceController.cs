@@ -49,7 +49,7 @@ public class ResourceController : Controller
         resourceInitializeExt.PermittedMaskinportenUsers.ForEach(async user =>
         {
             await _resourceRightsRepository.GiveUserAccess(user.ClientId, resourceInitializeExt.ResourceId, user.AccessLevel.ToString(), user.OrganizationNumber);
-        }); 
+        });
 
         return Ok();
     }

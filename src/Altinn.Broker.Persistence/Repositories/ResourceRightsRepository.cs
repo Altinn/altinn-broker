@@ -18,7 +18,7 @@ public class ResourceRightsRepository : IResourceRightsRepository
             "WHERE organization_number = ANY(@organizationNumbers))");
         command.Parameters.AddWithValue("@organizationNumbers", organizationNumbers);
 
-        var result = (bool) (command.ExecuteScalar() ?? false);
+        var result = (bool)(command.ExecuteScalar() ?? false);
         return result;
     }
 
