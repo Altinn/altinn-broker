@@ -2,7 +2,7 @@
 
 public class ResourceOverviewExt
 {
-    public string ClientId { get; set; }
+    public string Id { get; set; }
     public string OrganizationNumber { get; set; }
     public DateTimeOffset Created { get; set; }
 }

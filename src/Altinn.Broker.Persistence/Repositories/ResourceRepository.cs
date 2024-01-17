@@ -13,22 +13,13 @@ public class ResourceRepository : IResourceRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<ResourceEntity?> GetResource(long id)
+    public async Task<ResourceEntity?> GetResource(string resourceId)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT * FROM broker.service WHERE service_id_pk = @id");
-        command.Parameters.AddWithValue("@id", id);
+            "SELECT * FROM broker.resource WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
 
-        return await GetServiceFromQuery(command);
-    }
-
-    public async Task<ResourceEntity?> GetResource(string clientId)
-    {
-        using var command = await _connectionProvider.CreateCommand(
-            "SELECT * FROM broker.service WHERE client_id = @clientId");
-        command.Parameters.AddWithValue("@clientId", clientId);
-
-        return await GetServiceFromQuery(command);
+        return await GetResourceFromQuery(command);
     }
 
     public async Task<List<string>> SearchResources(string resourceOwnerOrgNo)
@@ -49,7 +40,7 @@ public class ResourceRepository : IResourceRepository
         return services;
     }
 
-    private async Task<ResourceEntity?> GetServiceFromQuery(NpgsqlCommand command)
+    private async Task<ResourceEntity?> GetResourceFromQuery(NpgsqlCommand command)
     {
         using NpgsqlDataReader reader = command.ExecuteReader();
         ResourceEntity? service = null;
@@ -57,8 +48,7 @@ public class ResourceRepository : IResourceRepository
         {
             service = new ResourceEntity
             {
-                Id = reader.GetInt64(reader.GetOrdinal("service_id_pk")),
-                ClientId = reader.GetString(reader.GetOrdinal("client_id")),
+                Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 ResourceOwnerId = reader.GetString(reader.GetOrdinal("resource_owner_id_fk"))
@@ -67,16 +57,16 @@ public class ResourceRepository : IResourceRepository
         return service;
     }
 
-    public async Task<long> InitializeResource(string resourceOwnerId, string organizationNumber, string clientId)
+    public async Task<long> InitializeResource(string resourceOwnerId, string organizationNumber, string resourceId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "INSERT INTO broker.service (created, client_id, organization_number, resource_owner_id_fk) " +
-                    "VALUES (@created, @clientId, @organizationNumber, @resourceOwnerId) " +
+                    "INSERT INTO broker.service (resource_id_pk, created, organization_number, resource_owner_id_fk) " +
+                    "VALUES (@resourceId, @created, @organizationNumber, @resourceOwnerId) " +
                     "RETURNING service_id_pk");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@resourceOwnerId", resourceOwnerId);
         command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
-        command.Parameters.AddWithValue("@clientId", clientId);
 
         return (long)command.ExecuteScalar()!;
     }

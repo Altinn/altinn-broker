@@ -38,7 +38,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ExternalResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
         if (!hasAccess)
         {
             return Errors.FileNotFound;

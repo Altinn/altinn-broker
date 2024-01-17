@@ -47,7 +47,7 @@ CREATE TABLE broker.resource_owner (
 );
 
 CREATE TABLE broker.resource (
-    resource_id_pk bigserial PRIMARY KEY,
+    resource_id_pk character varying(100) NOT NULL PRIMARY KEY,
     created timestamp without time zone NOT NULL,    
     organization_number character varying(14) NOT NULL,
     resource_owner_id_fk character varying(14) NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE broker.file_status_description (
 
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
-    resource_id_fk bigint,
+    resource_id_fk character varying(100) NOT NULL,
     created timestamp without time zone NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,

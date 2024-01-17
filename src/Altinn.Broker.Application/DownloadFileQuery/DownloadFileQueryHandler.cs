@@ -30,16 +30,6 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
     {
-        var resource = await _resourceRepository.GetResource(request.Token.ClientId);
-        if (resource is null)
-        {
-            return Errors.ResourceNotConfigured;
-        };
-        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resource.ResourceOwnerId);
-        if (resourceOwner is null)
-        {
-            return Errors.ResourceOwnerNotConfigured;
-        };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
@@ -53,10 +43,20 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.NoFileUploaded;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ExternalResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
+        };
+        var resource = await _resourceRepository.GetResource(file.ResourceId);
+        if (resource is null)
+        {
+            return Errors.ResourceNotConfigured;
+        };
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resource.ResourceOwnerId);
+        if (resourceOwner is null)
+        {
+            return Errors.ResourceOwnerNotConfigured;
         };
         var downloadStream = await _brokerStorageService.DownloadFile(resourceOwner, file);
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Token.Consumer);

@@ -67,7 +67,7 @@ public class ResourceController : Controller
 
         return new ResourceOverviewExt()
         {
-            ClientId = resource.ClientId,
+            Id = resource.Id,
             Created = resource.Created,
             OrganizationNumber = resource.OrganizationNumber
         };

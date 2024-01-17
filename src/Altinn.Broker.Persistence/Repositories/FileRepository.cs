@@ -27,7 +27,7 @@ public class FileRepository : IFileRepository
 
         using var command = await _connectionProvider.CreateCommand(
             @"
-                SELECT file_id_pk, service_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
+                SELECT file_id_pk, resource_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
                         sender.actor_external_id as senderActorExternalReference,
                     (
                         SELECT fs.file_status_description_id_fk 
@@ -54,7 +54,7 @@ public class FileRepository : IFileRepository
                 file = new FileEntity
                 {
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                    ResourceId = reader.GetInt64(reader.GetOrdinal("service_id_fk")),
+                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id_fk")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
@@ -142,7 +142,7 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file (file_id_pk, service_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "INSERT INTO broker.file (file_id_pk, resource_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
             "VALUES (@fileId, @serviceId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
 
         command.Parameters.AddWithValue("@fileId", fileId);

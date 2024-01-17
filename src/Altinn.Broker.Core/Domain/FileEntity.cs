@@ -5,8 +5,7 @@ namespace Altinn.Broker.Core.Domain;
 public class FileEntity
 {
     public Guid FileId { get; set; }
-    public long ResourceId { get; set; }
-    public string ExternalResourceId { get; set; }
+    public string ResourceId { get; set; }
     public ActorEntity Sender { get; set; } // Joined in
     public string SendersFileReference { get; set; }
     public FileStatus FileStatus { get; set; }
