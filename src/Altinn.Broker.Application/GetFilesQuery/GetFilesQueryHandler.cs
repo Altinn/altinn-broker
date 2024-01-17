@@ -11,14 +11,14 @@ namespace Altinn.Broker.Application.GetFilesQuery;
 
 public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 {
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceRepository _resourceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public GetFilesQueryHandler(IServiceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
+    public GetFilesQueryHandler(IResourceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
-        _serviceRepository = serviceRepository;
+        _resourceRepository = serviceRepository;
         _fileRepository = fileRepository;
         _actorRepository = actorRepository;
         _logger = logger;
@@ -26,10 +26,10 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
         var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer);
         if (callingActor is null)

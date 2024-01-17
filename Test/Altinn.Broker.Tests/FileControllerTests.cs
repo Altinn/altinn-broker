@@ -310,6 +310,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.False(initializeFileResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Equal(Errors.ServiceNotConfigured.Message, parsedError.Detail);
+        Assert.Equal(Errors.ResourceNotConfigured.Message, parsedError.Detail);
     }
 }

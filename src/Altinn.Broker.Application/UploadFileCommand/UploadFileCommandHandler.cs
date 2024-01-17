@@ -10,17 +10,17 @@ namespace Altinn.Broker.Application.UploadFileCommand;
 
 public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 {
-    private readonly IServiceRepository _serviceRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IResourceRepository _resourceRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IServiceRepository serviceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IResourceRepository serviceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
     {
-        _serviceRepository = serviceRepository;
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceRepository = serviceRepository;
+        _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _brokerStorageService = brokerStorageService;
@@ -29,15 +29,15 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
-        if (serviceOwner?.StorageProvider is null)
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        if (resourceOwner?.StorageProvider is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ResourceOwnerNotConfigured;
         };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
@@ -54,8 +54,8 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         }
 
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);
-        await _brokerStorageService.UploadFile(serviceOwner, file, request.Filestream);
-        await _fileRepository.SetStorageReference(request.FileId, serviceOwner.StorageProvider.Id, request.FileId.ToString());
+        await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream);
+        await _fileRepository.SetStorageReference(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString());
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
         // TODO, async jobs
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);

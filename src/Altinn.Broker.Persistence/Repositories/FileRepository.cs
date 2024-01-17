@@ -120,9 +120,9 @@ public class FileRepository : IFileRepository
         return fileStatuses;
     }
 
-    public async Task<Guid> AddFile(ServiceOwnerEntity serviceOwner, ServiceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
+    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ResourceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
     {
-        if (serviceOwner.StorageProvider is null)
+        if (resourceOwner.StorageProvider is null)
         {
             throw new ArgumentNullException("Storage provider must be set");
         }
@@ -153,8 +153,8 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@externalFileReference", sendersFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)FileStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
-        command.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.Add(serviceOwner.FileTimeToLive));
+        command.Parameters.AddWithValue("@storageProviderId", resourceOwner.StorageProvider.Id);
+        command.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.Add(resourceOwner.FileTimeToLive));
 
         command.ExecuteNonQuery();
 

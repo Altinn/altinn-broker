@@ -10,30 +10,30 @@ namespace Altinn.Broker.Application.GetFileOverviewQuery;
 
 public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest, GetFileOverviewQueryResponse>
 {
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
+    private readonly IResourceRepository _resourceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ILogger<GetFileOverviewQueryHandler> _logger;
 
-    public GetFileOverviewQueryHandler(IServiceOwnerRepository serviceOwnerRepository, IServiceRepository serviceRepositor, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
+    public GetFileOverviewQueryHandler(IResourceOwnerRepository resourceOwnerRepository, IResourceRepository serviceRepositor, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
     {
-        _serviceOwnerRepository = serviceOwnerRepository;
-        _serviceRepository = serviceRepositor;
+        _resourceOwnerRepository = resourceOwnerRepository;
+        _resourceRepository = serviceRepositor;
         _fileRepository = fileRepository;
         _logger = logger;
     }
 
     public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
-        if (serviceOwner is null)
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        if (resourceOwner is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ResourceOwnerNotConfigured;
         };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)

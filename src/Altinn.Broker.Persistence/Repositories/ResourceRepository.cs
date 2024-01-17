@@ -4,16 +4,16 @@ using Altinn.Broker.Core.Repositories;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ServiceRepository : IServiceRepository
+public class ResourceRepository : IResourceRepository
 {
     private readonly DatabaseConnectionProvider _connectionProvider;
 
-    public ServiceRepository(DatabaseConnectionProvider connectionProvider)
+    public ResourceRepository(DatabaseConnectionProvider connectionProvider)
     {
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<ServiceEntity?> GetService(long id)
+    public async Task<ResourceEntity?> GetResource(long id)
     {
         using var command = await _connectionProvider.CreateCommand(
             "SELECT * FROM broker.service WHERE service_id_pk = @id");
@@ -22,7 +22,7 @@ public class ServiceRepository : IServiceRepository
         return await GetServiceFromQuery(command);
     }
 
-    public async Task<ServiceEntity?> GetService(string clientId)
+    public async Task<ResourceEntity?> GetResource(string clientId)
     {
         using var command = await _connectionProvider.CreateCommand(
             "SELECT * FROM broker.service WHERE client_id = @clientId");
@@ -31,11 +31,11 @@ public class ServiceRepository : IServiceRepository
         return await GetServiceFromQuery(command);
     }
 
-    public async Task<List<string>> SearchServices(string serviceOwnerOrgNo)
+    public async Task<List<string>> SearchResources(string resourceOwnerOrgNo)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT client_id FROM broker.service WHERE service_owner_id_fk = @serviceOwnerOrgNo");
-        command.Parameters.AddWithValue("@serviceOwnerOrgNo", serviceOwnerOrgNo);
+            "SELECT client_id FROM broker.service WHERE resource_owner_id_fk = @resourceOwnerOrgNo");
+        command.Parameters.AddWithValue("@resourceOwnerOrgNo", resourceOwnerOrgNo);
 
         var services = new List<string>();
         using (var reader = await command.ExecuteReaderAsync())
@@ -49,32 +49,32 @@ public class ServiceRepository : IServiceRepository
         return services;
     }
 
-    private async Task<ServiceEntity?> GetServiceFromQuery(NpgsqlCommand command)
+    private async Task<ResourceEntity?> GetServiceFromQuery(NpgsqlCommand command)
     {
         using NpgsqlDataReader reader = command.ExecuteReader();
-        ServiceEntity? service = null;
+        ResourceEntity? service = null;
         if (reader.Read())
         {
-            service = new ServiceEntity
+            service = new ResourceEntity
             {
                 Id = reader.GetInt64(reader.GetOrdinal("service_id_pk")),
                 ClientId = reader.GetString(reader.GetOrdinal("client_id")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
-                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
+                ResourceOwnerId = reader.GetString(reader.GetOrdinal("resource_owner_id_fk"))
             };
         }
         return service;
     }
 
-    public async Task<long> InitializeService(string serviceOwnerId, string organizationNumber, string clientId)
+    public async Task<long> InitializeResource(string resourceOwnerId, string organizationNumber, string clientId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "INSERT INTO broker.service (created, client_id, organization_number, service_owner_id_fk) " +
-                    "VALUES (@created, @clientId, @organizationNumber, @serviceOwnerId) " +
+                    "INSERT INTO broker.service (created, client_id, organization_number, resource_owner_id_fk) " +
+                    "VALUES (@created, @clientId, @organizationNumber, @resourceOwnerId) " +
                     "RETURNING service_id_pk");
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
+        command.Parameters.AddWithValue("@resourceOwnerId", resourceOwnerId);
         command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
         command.Parameters.AddWithValue("@clientId", clientId);
 

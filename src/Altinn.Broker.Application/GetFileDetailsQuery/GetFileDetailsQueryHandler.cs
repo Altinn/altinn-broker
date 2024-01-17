@@ -8,31 +8,31 @@ namespace Altinn.Broker.Application.GetFileDetailsQuery;
 public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, GetFileDetailsQueryResponse>
 {
     private readonly IFileRepository _fileRepository;
-    private readonly IServiceRepository _serviceRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IResourceRepository _resourceRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
 
-    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IServiceRepository serviceRepositor, IServiceOwnerRepository serviceOwnerRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
+    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IResourceRepository serviceRepositor, IResourceOwnerRepository resourceOwnerRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
     {
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _fileRepository = fileRepository;
-        _serviceRepository = serviceRepositor;
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceRepository = serviceRepositor;
+        _resourceOwnerRepository = resourceOwnerRepository;
     }
 
     public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
-        if (serviceOwner is null)
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        if (resourceOwner is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ResourceOwnerNotConfigured;
         };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)

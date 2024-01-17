@@ -14,8 +14,8 @@ using OneOf;
 namespace Altinn.Broker.Application.InitializeFileCommand;
 public class InitializeFileCommandHandler : IHandler<InitializeFileCommandRequest, Guid>
 {
-    private readonly IServiceRepository _serviceRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IResourceRepository _resourceRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
@@ -24,8 +24,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
     public InitializeFileCommandHandler(
-        IServiceRepository serviceRepository,
-        IServiceOwnerRepository serviceOwnerRepository,
+        IResourceRepository serviceRepository,
+        IResourceOwnerRepository resourceOwnerRepository,
         IFileRepository fileRepository,
         IFileStatusRepository fileStatusRepository,
         IActorFileStatusRepository actorFileStatusRepository,
@@ -33,8 +33,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         IBackgroundJobClient backgroundJobClient,
         ILogger<InitializeFileCommandHandler> logger)
     {
-        _serviceRepository = serviceRepository;
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceRepository = serviceRepository;
+        _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
@@ -49,17 +49,17 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.WrongTokenForSender;
         }
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
-        if (serviceOwner?.StorageProvider is null)
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        if (resourceOwner?.StorageProvider is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ResourceOwnerNotConfigured;
         }
-        var fileId = await _fileRepository.AddFile(serviceOwner, service, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
+        var fileId = await _fileRepository.AddFile(resourceOwner, service, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
         try
@@ -70,7 +70,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             _logger.LogError("Failed when adding recipient initialized events.");
         }
-        _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId), serviceOwner.FileTimeToLive);
+        _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId), resourceOwner.FileTimeToLive);
 
         return fileId;
     }

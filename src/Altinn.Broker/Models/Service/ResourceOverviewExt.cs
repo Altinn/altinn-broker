@@ -1,6 +1,6 @@
 ﻿namespace Altinn.Broker.Models.Service;
 
-public class ServiceOverviewExt
+public class ResourceOverviewExt
 {
     public string ClientId { get; set; }
     public string OrganizationNumber { get; set; }

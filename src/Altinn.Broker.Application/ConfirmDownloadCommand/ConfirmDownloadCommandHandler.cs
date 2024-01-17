@@ -14,30 +14,30 @@ using OneOf;
 
 public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequest, Task>
 {
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceRepository _resourceRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceRepository serviceRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IResourceRepository serviceRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
     {
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
-        _serviceRepository = serviceRepository;
+        _resourceRepository = serviceRepository;
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var service = await _resourceRepository.GetResource(request.Token.ClientId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)

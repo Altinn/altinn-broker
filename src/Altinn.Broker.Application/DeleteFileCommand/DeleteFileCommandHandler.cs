@@ -10,16 +10,16 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
 {
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
+    private readonly IResourceRepository _resourceRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DeleteFileCommandHandler> _logger;
 
-    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, ILogger<DeleteFileCommandHandler> logger)
+    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceOwnerRepository resourceOwnerRepository, IBrokerStorageService brokerStorageService, ILogger<DeleteFileCommandHandler> logger)
     {
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceOwnerRepository = resourceOwnerRepository;
         _brokerStorageService = brokerStorageService;
         _logger = logger;
     }
@@ -32,15 +32,15 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         {
             return Errors.FileNotFound;
         }
-        var service = await _serviceRepository.GetService(file.ServiceId);
+        var service = await _resourceRepository.GetResource(file.ServiceId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(service.ServiceOwnerId);
-        if (serviceOwner is null)
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(service.ResourceOwnerId);
+        if (resourceOwner is null)
         {
-            return Errors.ServiceOwnerNotConfigured;
+            return Errors.ResourceOwnerNotConfigured;
         }
         if (file.FileStatus >= Core.Domain.Enums.FileStatus.Deleted)
         {
@@ -48,7 +48,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         }
 
         await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
-        await _brokerStorageService.DeleteFile(serviceOwner, file);
+        await _brokerStorageService.DeleteFile(resourceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
         foreach (var recipient in recipientsWhoHaveNotDownloaded)
         {
