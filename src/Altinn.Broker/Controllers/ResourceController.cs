@@ -27,7 +27,7 @@ public class ResourceController : Controller
 
     [HttpPost]
     [Authorize(Policy = "ResourceOwner")]
-    public async Task<ActionResult> RegisterResource([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, ResourceInitializeExt serviceInitializeExt)
+    public async Task<ActionResult> RegisterResource([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, ResourceInitializeExt resourceInitializeExt)
     {
         var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         if (resourceOwner is null)
@@ -35,23 +35,23 @@ public class ResourceController : Controller
             return Problem(detail: "Resource owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
         }
 
-        var existingResource = await _resourceRepository.GetResource(serviceInitializeExt.MaskinportenClientId);
+        var existingResource = await _resourceRepository.GetResource(resourceInitializeExt.MaskinportenClientId);
         if (existingResource is not null)
         {
             return Problem(detail: "Resource already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await _resourceRepository.InitializeResource(resourceOwner.Id, serviceInitializeExt.OrganizationId, serviceInitializeExt.MaskinportenClientId);
+        await _resourceRepository.InitializeResource(resourceOwner.Id, resourceInitializeExt.OrganizationId, resourceInitializeExt.MaskinportenClientId);
 
         return Ok();
     }
 
     [HttpGet]
-    [Route("{clientId}")]
+    [Route("{resourceId}")]
     [Authorize(Policy = "ResourceOwner")]
-    public async Task<ActionResult<ResourceOverviewExt>> GetResourceConfiguration(string clientId)
+    public async Task<ActionResult<ResourceOverviewExt>> GetResourceConfiguration(string resourceId)
     {
-        var service = await _resourceRepository.GetResource(clientId);
+        var service = await _resourceRepository.GetResource(resourceId);
         if (service is null)
         {
             return NotFound();
