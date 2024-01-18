@@ -13,9 +13,11 @@ namespace Altinn.Broker.Models
         public string FileName { get; set; } = string.Empty;
         public string SendersFileReference { get; set; } = string.Empty;
         public string? Checksum { get; set; } = string.Empty;
+        public long FileSize {  get; set; }
         public FileStatusExt FileStatus { get; set; }
         public string FileStatusText { get; set; } = string.Empty;
         public DateTimeOffset FileStatusChanged { get; set; }
+        public DateTimeOffset Created { get; set; }
         public DateTimeOffset ExpirationTime { get; set; }
 
         /// <summary>

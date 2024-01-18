@@ -16,6 +16,7 @@ public class FileEntity
     public StorageProviderEntity StorageProvider { get; set; }
     public string? FileLocation { get; set; }
     public string Filename { get; set; }
+    public long FileSize { get; set; }
     public string? Checksum { get; set; }
     public Dictionary<string, string> PropertyList { get; set; }
 }

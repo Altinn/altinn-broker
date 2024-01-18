@@ -59,7 +59,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileId = await _fileRepository.AddFile(serviceOwner, service, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum);
+        var fileId = await _fileRepository.AddFile(serviceOwner, service, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null);
         await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
         try
