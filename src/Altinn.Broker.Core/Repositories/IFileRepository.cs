@@ -13,13 +13,15 @@ public interface IFileRepository
         string senderExternalId,
         List<string> recipientIds,
         Dictionary<string, string> propertyList,
-        string? checksum);
+        string? checksum,
+        long? filesize);
     Task<Domain.FileEntity?> GetFile(Guid fileId);
     Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch);
     Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch);
-    Task SetStorageReference(
+    Task SetStorageDetails(
         Guid fileId,
         long storageProviderId,
-        string fileLocation
+        string fileLocation,
+        long fileSize
     );
 }

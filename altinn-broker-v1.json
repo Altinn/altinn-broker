@@ -73,6 +73,14 @@
                     }
                 },
                 {
+                    "name": "recipientStatus",
+                    "in": "query",
+                    "style": "form",
+                    "schema": {
+                        "$ref": "#/components/schemas/RecipientFileStatus"
+                    }
+                },
+                {
                     "name": "from",
                     "in": "query",
                     "style": "form",
@@ -470,6 +478,12 @@
               "description": "Checksum for verifying file integrity.",
               "nullable": true
             },
+            "filesize": {
+              "type": "integer",
+              "description": "The total size of the file in bytes",
+              "format": "int64",
+              "nullable": true
+            }
             "fileStatus": {
               "$ref": "#/components/schemas/FileStatus"
             },
@@ -481,6 +495,16 @@
             "fileStatusChanged": {
               "type": "string",
               "description": "Timestamp indicating the last change in file status.",
+              "format": "date-time"
+            },
+            "created": {
+              "type": "string",
+              "description": "Timestamp indicating when the file was created.",
+              "format": "date-time"
+            },
+            "expiryTime": {
+              "type": "string",
+              "description": "Timestamp indicating when the file will expire.",
               "format": "date-time"
             },
             "sender": {
@@ -527,6 +551,11 @@
                     "type": "string",
                     "nullable": true
                 },
+                "filesize": {
+                    "type": "integer",
+                    "format": "int64",
+                    "nullable": true
+                }
                 "fileStatus": {
                     "$ref": "#/components/schemas/FileStatus"
                 },
@@ -538,6 +567,14 @@
                     "type": "string",
                     "format": "date-time",
                     "nullable": false
+                },
+                "created": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "expiryTime": {
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "sender": {
                     "type": "string",

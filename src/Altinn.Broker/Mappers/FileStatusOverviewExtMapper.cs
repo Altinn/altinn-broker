@@ -15,6 +15,7 @@ internal static class FileStatusOverviewExtMapper
         return new FileOverviewExt()
         {
             Checksum = file.Checksum,
+            FileSize = file.FileSize,
             FileId = file.FileId,
             FileName = file.Filename,
             FileStatus = MapToExternalEnum(file.FileStatus),
@@ -24,6 +25,7 @@ internal static class FileStatusOverviewExtMapper
             PropertyList = file.PropertyList,
             Recipients = MapToRecipients(file.RecipientCurrentStatuses),
             SendersFileReference = file.SendersFileReference,
+            Created = file.Created,
             ExpirationTime = file.ExpirationTime
         };
     }
