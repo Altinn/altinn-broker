@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <Folder Include="DeleteFileCommand\" />
-    <Folder Include="GetFileOverviewQuery\" />
     <Folder Include="GetFileDetailsQuery\" />
     <Folder Include="GetFilesQuery\" />
     <Folder Include="UploadFileCommand\" />
