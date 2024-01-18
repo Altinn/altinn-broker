@@ -1,3 +1,4 @@
+using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileDetailsQuery;
@@ -72,12 +73,25 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
+        public async Task<ActionResult<LegacyFileOverviewExt>> GetFileOverview(
             Guid fileId,
+            [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
-            throw new NotImplementedException();
+            CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
+            var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
+            {
+                FileId = fileId,
+                Token = legacyToken
+            });
+            return queryResult.Match(
+                result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.File)),
+                Problem
+            );
         }
 
         /// <summary>
@@ -137,5 +151,12 @@ namespace Altinn.Broker.Controllers
         {
             throw new NotImplementedException();
         }
+
+        private static CallerIdentity CreateLegacyToken(string onBehalfOfConsumer, CallerIdentity callingToken)
+        {
+            return new CallerIdentity(callingToken.Scope, onBehalfOfConsumer, callingToken.ClientId);
+        }
+
+        private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
     }
 }
