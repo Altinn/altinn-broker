@@ -42,10 +42,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
-    public async Task GetFileSentByA3Sender_Success()
+    public async Task GetFileOverview_SentByA3Sender_Success()
     {
         // Arrange
         string status = "Published";
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
         DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -62,7 +63,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act        
-        var uploadedFile = await _legacyClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={FileInitializeExtTestFactory.BasicFile().Recipients[0]}", _responseSerializerOptions);
+        var uploadedFile = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
 
         // Assert
         Assert.NotNull(uploadedFile);
