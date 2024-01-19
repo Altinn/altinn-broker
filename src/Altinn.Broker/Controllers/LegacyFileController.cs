@@ -1,5 +1,4 @@
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileDetailsQuery;
 using Altinn.Broker.Application.GetFileOverviewQuery;
@@ -7,19 +6,16 @@ using Altinn.Broker.Application.GetFilesQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
 using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
-using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 namespace Altinn.Broker.Controllers
 {
@@ -33,12 +29,10 @@ namespace Altinn.Broker.Controllers
     public class LegacyFileController : Controller
     {
         private readonly ILogger<LegacyFileController> _logger;
-        private readonly ProblemDetailsFactory _problemDetailsFactory;
 
-        public LegacyFileController(ILogger<LegacyFileController> logger, ProblemDetailsFactory problemDetailsFactory)
+        public LegacyFileController(ILogger<LegacyFileController> logger)
         {
             _logger = logger;
-            _problemDetailsFactory = problemDetailsFactory;
         }
 
         /// <summary>
