@@ -13,7 +13,8 @@ public static class DependencyInjection
         services.AddSingleton<IFileRepository, FileRepository>();
         services.AddSingleton<IFileStatusRepository, FileStatusRepository>();
         services.AddSingleton<IActorFileStatusRepository, ActorFileStatusRepository>();
-        services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
-        services.AddSingleton<IServiceRepository, ServiceRepository>();
+        services.AddSingleton<IResourceOwnerRepository, ResourceOwnerRepository>();
+        services.AddSingleton<IResourceRepository, ResourceRepository>();
+        services.AddSingleton<IResourceRightsRepository, ResourceRightsRepository>();
     }
 }

@@ -11,14 +11,16 @@ namespace Altinn.Broker.Application.GetFilesQuery;
 
 public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 {
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IResourceRepository _resourceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public GetFilesQueryHandler(IServiceRepository serviceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
+    public GetFilesQueryHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
-        _serviceRepository = serviceRepository;
+        _resourceRightsRepository = resourceRightsRepository;
+        _resourceRepository = resourceRepository;
         _fileRepository = fileRepository;
         _actorRepository = actorRepository;
         _logger = logger;
@@ -26,10 +28,19 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write);
+        if (!hasAccess)
+        {
+            hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        }
+        if (!hasAccess)
+        {
+            return Errors.NoAccessToResource;
+        };
+        var service = await _resourceRepository.GetResource(request.ResourceId);
         if (service is null)
         {
-            return Errors.ServiceNotConfigured;
+            return Errors.ResourceNotConfigured;
         };
         var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer);
         if (callingActor is null)
@@ -40,6 +51,7 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         FileSearchEntity fileSearchEntity = new()
         {
             Actor = callingActor,
+            ResourceId = request.ResourceId,
             Status = request.Status
         };
 

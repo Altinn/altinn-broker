@@ -1,7 +1,6 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DeleteFileCommand;
-using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -14,36 +13,36 @@ using OneOf;
 
 public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequest, Task>
 {
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
-    private readonly IServiceRepository _serviceRepository;
+    private readonly IResourceRightsRepository _resourceRightsRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IServiceOwnerRepository serviceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IServiceRepository serviceRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IResourceRightsRepository resourceRightsRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
     {
-        _serviceOwnerRepository = serviceOwnerRepository;
+        _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
-        _serviceRepository = serviceRepository;
+        _resourceRightsRepository = resourceRightsRepository;
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
     {
-        var service = await _serviceRepository.GetService(request.Token.ClientId);
-        if (service is null)
-        {
-            return Errors.ServiceNotConfigured;
-        };
         var file = await _fileRepository.GetFile(request.FileId);
         if (file is null)
         {
             return Errors.FileNotFound;
         }
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        if (!hasAccess)
+        {
+            return Errors.FileNotFound;
+        };
         if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;

@@ -1,9 +1,9 @@
 ﻿using Altinn.Broker.Core.Domain;
 
 namespace Altinn.Broker.Core.Repositories;
-public interface IServiceOwnerRepository
+public interface IResourceOwnerRepository
 {
-    Task InitializeServiceOwner(string sub, string name, TimeSpan fileTimeToLive);
-    Task<ServiceOwnerEntity?> GetServiceOwner(string sub);
+    Task InitializeResourceOwner(string sub, string name, TimeSpan fileTimeToLive);
+    Task<ResourceOwnerEntity?> GetResourceOwner(string sub);
     Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType);
 }

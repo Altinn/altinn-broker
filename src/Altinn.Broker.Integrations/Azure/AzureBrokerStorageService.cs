@@ -21,31 +21,31 @@ public class AzureBrokerStorageService : IBrokerStorageService
         _logger = logger;
     }
 
-    public async Task UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity, Stream stream)
+    public async Task UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream)
     {
-        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        var connectionString = await GetConnectionString(resourceOwnerEntity);
         await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
     }
 
-    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity)
+    public async Task<Stream> DownloadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity)
     {
-        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        var connectionString = await GetConnectionString(resourceOwnerEntity);
         return await _fileStore.GetFileStream(fileEntity.FileId, connectionString);
     }
 
-    public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileEntity fileEntity)
+    public async Task DeleteFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity)
     {
-        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        var connectionString = await GetConnectionString(resourceOwnerEntity);
         await _fileStore.DeleteFile(fileEntity.FileId, connectionString);
     }
 
-    private async Task<string> GetConnectionString(ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<string> GetConnectionString(ResourceOwnerEntity resourceOwnerEntity)
     {
         if (_hostEnvironment.IsDevelopment())
         {
             _logger.LogInformation("Running in development. Using local development storage.");
             return AzureConstants.AzuriteUrl;
         }
-        return await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        return await _resourceManager.GetStorageConnectionString(resourceOwnerEntity);
     }
 }

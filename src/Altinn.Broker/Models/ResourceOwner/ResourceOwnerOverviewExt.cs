@@ -1,8 +1,8 @@
-﻿namespace Altinn.Broker.Models.ServiceOwner;
+﻿namespace Altinn.Broker.Models.ResourceOwner;
 
-public class ServiceOwnerOverviewExt
+public class ResourceOwnerOverviewExt
 {
-    public ServiceOwnerOverviewExt() { }
+    public ResourceOwnerOverviewExt() { }
 
     public string Name { get; set; }
 

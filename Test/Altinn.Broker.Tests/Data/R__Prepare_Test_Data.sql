@@ -1,11 +1,20 @@
-INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, file_time_to_live)
+INSERT INTO broker.resource_owner (resource_owner_id_pk, resource_owner_name, file_time_to_live)
 VALUES ('0192:991825827', 'Digitaliseringsdirektoratet Avd Oslo', '1 Days');
 
-INSERT INTO broker.storage_provider (storage_provider_id_pk, service_owner_id_fk, created, storage_provider_type, resource_name)
+INSERT INTO broker.storage_provider (storage_provider_id_pk, resource_owner_id_fk, created, storage_provider_type, resource_name)
 VALUES (DEFAULT, '0192:991825827', NOW(), 'Altinn3Azure', 'dummy-value');
 
-INSERT INTO broker.service (service_id_pk, created, client_id, organization_number, service_owner_id_fk)
-VALUES (DEFAULT, NOW(), '00000000-0000-0000-0000-000000000000', '0192:991825827', '0192:991825827');
+INSERT INTO broker.resource (resource_id_pk, created, organization_number, resource_owner_id_fk)
+VALUES ('resource-1', NOW(), '0192:991825827', '0192:991825827');
 
-INSERT INTO broker.service (service_id_pk, created, client_id, organization_number, service_owner_id_fk)
-VALUES (DEFAULT, NOW(), '11111111-1111-1111-1111-111111111111', '0192:991825832', '0192:991825827');
+INSERT INTO broker.user (client_id_pk, organization_number)
+VALUES ('00000000-0000-0000-0000-000000000000', '0192:991825827');				 
+
+INSERT INTO broker.user_right (resource_id_fk, user_id_fk, user_right_description_id_fk)
+VALUES ('resource-1', '00000000-0000-0000-0000-000000000000', 1);
+
+INSERT INTO broker.user (client_id_pk, organization_number)
+VALUES ('11111111-1111-1111-1111-111111111111', '0192:991825832');				 
+
+INSERT INTO broker.user_right (resource_id_fk, user_id_fk, user_right_description_id_fk)
+VALUES ('resource-1', '11111111-1111-1111-1111-111111111111', 0);

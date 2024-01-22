@@ -39,30 +39,29 @@ CREATE TABLE broker.actor (
     actor_external_id character varying(500) NOT NULL
 );
 
-CREATE TABLE broker.service_owner (
-    service_owner_id_pk character varying(14) NOT NULL PRIMARY KEY,
-    service_owner_name character varying(500) NOT NULL,
+CREATE TABLE broker.resource_owner (
+    resource_owner_id_pk character varying(14) NOT NULL PRIMARY KEY,
+    resource_owner_name character varying(500) NOT NULL,
     file_time_to_live interval NOT NULL,
-    CONSTRAINT service_owner_id_pk_format CHECK (service_owner_id_pk ~ '^\d{4}:\d{9}$')
+    CONSTRAINT resource_owner_id_pk_format CHECK (resource_owner_id_pk ~ '^\d{4}:\d{9}$')
 );
 
-CREATE TABLE broker.service (
-    service_id_pk bigserial PRIMARY KEY,
-    created timestamp without time zone NOT NULL,
-    client_id character varying(36) NOT NULL,
+CREATE TABLE broker.resource (
+    resource_id_pk character varying(100) NOT NULL PRIMARY KEY,
+    created timestamp without time zone NOT NULL,    
     organization_number character varying(14) NOT NULL,
-    service_owner_id_fk character varying(14) NOT NULL,
-    FOREIGN KEY (service_owner_id_fk) REFERENCES broker.service_owner (service_owner_id_pk),
+    resource_owner_id_fk character varying(14) NOT NULL,
+    FOREIGN KEY (resource_owner_id_fk) REFERENCES broker.resource_owner (resource_owner_id_pk),
     CONSTRAINT organization_number_format CHECK (organization_number ~ '^\d{4}:\d{9}$')
 );
 
 CREATE TABLE broker.storage_provider (
     storage_provider_id_pk bigserial PRIMARY KEY,    
-    service_owner_id_fk character varying(14) NOT NULL,
+    resource_owner_id_fk character varying(14) NOT NULL,
     created timestamp without time zone NOT NULL,
     storage_provider_type character varying(50) NOT NULL CHECK (storage_provider_type = 'Altinn3Azure'),
     resource_name character varying(500) NOT NULL,
-    FOREIGN KEY (service_owner_id_fk) REFERENCES broker.service_owner (service_owner_id_pk)
+    FOREIGN KEY (resource_owner_id_fk) REFERENCES broker.resource_owner (resource_owner_id_pk)
 );
 
 CREATE TABLE broker.file_status_description (
@@ -72,7 +71,7 @@ CREATE TABLE broker.file_status_description (
 
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
-    service_id_fk bigint,
+    resource_id_fk character varying(100) NOT NULL,
     created timestamp without time zone NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,
@@ -82,7 +81,7 @@ CREATE TABLE broker.file (
     expiration_time timestamp without time zone NOT NULL,
     storage_provider_id_fk bigint NOT NULL,
     file_location character varying(600) NULL,
-    FOREIGN KEY (service_id_fk) REFERENCES broker.service (service_id_pk),
+    FOREIGN KEY (resource_id_fk) REFERENCES broker.resource (resource_id_pk),
     FOREIGN KEY (storage_provider_id_fk) REFERENCES broker.storage_provider (storage_provider_id_pk)
 );
 
@@ -120,7 +119,7 @@ CREATE TABLE broker.actor_file_status (
 );
 
 -- Create indexes
-CREATE INDEX ix_file_service_id ON broker.file (service_id_fk);
+CREATE INDEX ix_file_resource_id ON broker.file (resource_id_fk);
 CREATE INDEX ix_file_external_reference ON broker.file (external_file_reference);
 CREATE INDEX ix_file_status_id ON broker.file_status (file_id_fk);
 CREATE INDEX ix_actor_file_status_id ON broker.actor_file_status (file_id_fk);
