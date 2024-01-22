@@ -120,7 +120,7 @@ public class FileRepository : IFileRepository
         return fileStatuses;
     }
 
-    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ServiceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? filesize)
+    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ResourceEntity resource, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? filesize)
     {
         if (resourceOwner.StorageProvider is null)
         {
@@ -143,10 +143,10 @@ public class FileRepository : IFileRepository
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
             "INSERT INTO broker.file (file_id_pk, resource_id_fk, filename, checksum, filesize, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
-            "VALUES (@fileId, @serviceId, @filename, @checksum, @filesize, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
+            "VALUES (@fileId, @resourceId, @filename, @checksum, @filesize, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
 
         command.Parameters.AddWithValue("@fileId", fileId);
-        command.Parameters.AddWithValue("@serviceId", service.Id);
+        command.Parameters.AddWithValue("@resourceId", resource.Id);
         command.Parameters.AddWithValue("@filename", filename);
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
         command.Parameters.AddWithValue("@filesize", filesize is null ? DBNull.Value : filesize);
