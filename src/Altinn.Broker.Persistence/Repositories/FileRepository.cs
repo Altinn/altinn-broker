@@ -120,7 +120,7 @@ public class FileRepository : IFileRepository
         return fileStatuses;
     }
 
-    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ResourceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum)
+    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ServiceEntity service, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? filesize)
     {
         if (resourceOwner.StorageProvider is null)
         {
@@ -142,13 +142,14 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file (file_id_pk, resource_id_fk, filename, checksum, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
-            "VALUES (@fileId, @serviceId, @filename, @checksum, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
+            "INSERT INTO broker.file (file_id_pk, resource_id_fk, filename, checksum, filesize, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "VALUES (@fileId, @serviceId, @filename, @checksum, @filesize, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
 
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@serviceId", service.Id);
         command.Parameters.AddWithValue("@filename", filename);
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
+        command.Parameters.AddWithValue("@filesize", filesize is null ? DBNull.Value : filesize);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileReference", sendersFileReference);
         command.Parameters.AddWithValue("@fileStatusId", (int)FileStatus.Initialized); // TODO, remove?
@@ -291,18 +292,20 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task SetStorageReference(Guid fileId, long storageProviderId, string fileLocation)
+    public async Task SetStorageDetails(Guid fileId, long storageProviderId, string fileLocation, long filesize)
     {
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.file " +
             "SET " +
                 "file_location = @fileLocation, " +
+                "filesize = @filesize, " +
                 "storage_provider_id_fk = @storageProviderId " +
             "WHERE file_id_pk = @fileId"))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
+            command.Parameters.AddWithValue("@filesize", filesize);
             command.ExecuteNonQuery();
         }
     }

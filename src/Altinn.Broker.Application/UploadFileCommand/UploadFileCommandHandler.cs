@@ -62,7 +62,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);
         await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream);
-        await _fileRepository.SetStorageReference(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString());
+        await _fileRepository.SetStorageReference(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length);
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
         // TODO, async jobs
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);

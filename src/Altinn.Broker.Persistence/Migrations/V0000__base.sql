@@ -75,6 +75,7 @@ CREATE TABLE broker.file (
     created timestamp without time zone NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,
+    filesize bigint,
     sender_actor_id_fk bigint,
     external_file_reference character varying(500) NOT NULL,
     expiration_time timestamp without time zone NOT NULL,
