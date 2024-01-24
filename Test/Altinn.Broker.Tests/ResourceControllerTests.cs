@@ -31,26 +31,26 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public void Authentication_CorrectToken_Success()
+    public async Task Authentication_CorrectToken_Success()
     {
         // Arrange
         var request = new HttpRequestMessage(HttpMethod.Get, "broker/api/v1/resource");
 
         // Act
-        var response = _resourceOwnerClient.SendAsync(request).Result;
+        var response = await _resourceOwnerClient.SendAsync(request);
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public void Authentication_NonAdminToken_Failure()
+    public async Task Authentication_NonAdminToken_Failure()
     {
         // Arrange
         var request = new HttpRequestMessage(HttpMethod.Get, "broker/api/v1/resource");
 
         // Act
-        var response = _senderClient.SendAsync(request).Result;
+        var response = await _senderClient.SendAsync(request);
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
