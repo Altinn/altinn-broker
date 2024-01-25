@@ -25,7 +25,7 @@ public class ResourceRepository : IResourceRepository
     public async Task<List<string>> SearchResources(string resourceOwnerOrgNo)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT client_id FROM broker.service WHERE resource_owner_id_fk = @resourceOwnerOrgNo");
+            "SELECT resource_id_pk FROM broker.resource WHERE resource_owner_id_fk = @resourceOwnerOrgNo");
         command.Parameters.AddWithValue("@resourceOwnerOrgNo", resourceOwnerOrgNo);
 
         var services = new List<string>();
@@ -57,18 +57,18 @@ public class ResourceRepository : IResourceRepository
         return service;
     }
 
-    public async Task<long> InitializeResource(string resourceOwnerId, string organizationNumber, string resourceId)
+    public async Task InitializeResource(string resourceOwnerId, string organizationNumber, string resourceId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "INSERT INTO broker.service (resource_id_pk, created, organization_number, resource_owner_id_fk) " +
+                    "INSERT INTO broker.resource (resource_id_pk, created, organization_number, resource_owner_id_fk) " +
                     "VALUES (@resourceId, @created, @organizationNumber, @resourceOwnerId) " +
-                    "RETURNING service_id_pk");
+                    "RETURNING resource_id_pk");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@resourceOwnerId", resourceOwnerId);
         command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
 
-        return (long)command.ExecuteScalar()!;
+        command.ExecuteNonQuery();
     }
 }
 
