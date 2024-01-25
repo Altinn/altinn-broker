@@ -84,10 +84,9 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Ac
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
-        
-        // Assert        
+
+        // Assert
         Assert.Equal(System.Net.HttpStatusCode.NotFound, getResponse.StatusCode);
-        
     }
 
     [Fact]
@@ -99,8 +98,8 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
-        
-        // Assert        
+
+        // Assert
         Assert.Equal(System.Net.HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 }
