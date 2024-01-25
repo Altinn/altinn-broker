@@ -37,7 +37,6 @@ public class ResourceController : Controller
         {
             return Problem(detail: "Resource owner not registered to use the broker API. Contact Altinn.", statusCode: (int)HttpStatusCode.Unauthorized);
         }
-
         var existingResource = await _resourceRepository.GetResource(resourceInitializeExt.ResourceId);
         if (existingResource is not null)
         {
@@ -45,7 +44,6 @@ public class ResourceController : Controller
         }
 
         await _resourceRepository.InitializeResource(resourceOwner.Id, resourceInitializeExt.OrganizationId, resourceInitializeExt.ResourceId);
-
         resourceInitializeExt.PermittedMaskinportenUsers.ForEach(async user =>
         {
             await _resourceRightsRepository.GiveUserAccess(user.ClientId, resourceInitializeExt.ResourceId, user.AccessLevel.ToString(), user.OrganizationNumber);
