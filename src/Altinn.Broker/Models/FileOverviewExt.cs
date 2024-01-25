@@ -11,6 +11,7 @@ namespace Altinn.Broker.Models
     {
         public Guid FileId { get; set; }
         public string FileName { get; set; } = string.Empty;
+        public string ResourceId { get; set; } = string.Empty;
         public string SendersFileReference { get; set; } = string.Empty;
         public string? Checksum { get; set; } = string.Empty;
         public long FileSize { get; set; }

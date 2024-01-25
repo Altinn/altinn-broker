@@ -80,7 +80,8 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
             {
                 FileId = fileId,
-                Token = legacyToken
+                Token = legacyToken,
+                IsLegacy = true
             });
             return queryResult.Match(
                 result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.File)),

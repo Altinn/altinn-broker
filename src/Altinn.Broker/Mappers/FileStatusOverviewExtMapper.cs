@@ -15,9 +15,10 @@ internal static class FileStatusOverviewExtMapper
         return new FileOverviewExt()
         {
             Checksum = file.Checksum,
+            ResourceId = file.ResourceId,
             FileSize = file.FileSize,
             FileId = file.FileId,
-            FileName = file.Filename,
+            FileName = file.Filename,            
             FileStatus = MapToExternalEnum(file.FileStatus),
             Sender = file.Sender.ActorExternalId,
             FileStatusChanged = file.FileStatusChanged,

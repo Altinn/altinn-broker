@@ -13,13 +13,13 @@ namespace Altinn.Broker.Models
         /// <summary>
         /// The filename including extension
         /// </summary>
-        [JsonPropertyName("filename")]        
+        [JsonPropertyName("fileId")]        
         public Guid FileId { get; set; }
 
         /// <summary>
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
-        [JsonPropertyName("sendersFileReference")]        
+        [JsonPropertyName("filename")]        
         public string FileName { get; set; } = string.Empty;
 
         /// <summary>

@@ -15,6 +15,7 @@ internal static class LegacyFileStatusOverviewExtMapper
         return new LegacyFileOverviewExt()
         {
             Checksum = file.Checksum,
+            ResourceId = file.ResourceId,
             FileSize = file.FileSize,
             FileId = file.FileId,
             FileName = file.Filename,
