@@ -43,7 +43,7 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         {
             hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write);
         }
-        
+
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
