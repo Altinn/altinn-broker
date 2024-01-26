@@ -1,4 +1,5 @@
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileDetailsQuery;
 using Altinn.Broker.Application.GetFileOverviewQuery;
@@ -25,7 +26,7 @@ namespace Altinn.Broker.Controllers
     [ApiController]
     [Route("broker/api/legacy/v1/file")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    [Authorize(Policy = "Legacy")]
+    [Authorize(Policy = "Sender")]
     public class LegacyFileController : Controller
     {
         private readonly ILogger<LegacyFileController> _logger;
@@ -109,14 +110,31 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<List<Guid>>> GetFiles(
-            [FromQuery] FileStatusExt? status,
             [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
+            [FromQuery] string? resourceId,
+            [FromQuery] string? onBehalfOfConsumer,
+            [FromQuery] string[]? recipients,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFilesQueryHandler handler)
+            [FromServices] LegacyGetFilesQueryHandler handler)
         {
-            throw new NotImplementedException();
+            // HasAvailableFiles
+            //TODO: Enrich token
+            _logger.LogInformation("Getting files with status {status} created {from} to {to}", recipientStatus?.ToString(), from?.ToString(), to?.ToString());
+            var queryResult = await handler.Process(new LegacyGetFilesQueryRequest()
+            {
+                Token = token,
+                ResourceId = resourceId ?? string.Empty,
+                RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
+                From = from,
+                To = to,
+                Recipients = recipients
+            });
+            return queryResult.Match(
+                Ok,
+                Problem
+            );
         }
 
         /// <summary>
@@ -146,6 +164,8 @@ namespace Altinn.Broker.Controllers
         {
             throw new NotImplementedException();
         }
+
+        private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
 
         private static CallerIdentity CreateLegacyToken(string onBehalfOfConsumer, CallerIdentity callingToken)
         {
