@@ -21,5 +21,6 @@ public static class DependencyInjection
         services.AddScoped<ConfirmDownloadCommandHandler>();
         services.AddScoped<GetFilesQueryHandler>();
         services.AddScoped<DeleteFileCommandHandler>();
+        services.AddScoped<LegacyGetFilesQueryHandler>();
     }
 }

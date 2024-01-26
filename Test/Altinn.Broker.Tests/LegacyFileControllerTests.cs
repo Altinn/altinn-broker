@@ -2,7 +2,9 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
@@ -30,6 +32,41 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             PropertyNameCaseInsensitive = true
         });
         _responseSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    }
+
+    [Fact]
+    public async Task GetFiles_SentByA3Sender_Success()
+    {
+        // Arrange
+        DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
+        DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
+        ActorFileStatus status = ActorFileStatus.Initialized;
+        string serviceReference = "resource-1";
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        +$"&serviceReference={serviceReference}"
+        +$"&onBehalfOfConsumer={onBehalfOfConsumer}");
+        
+        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+
+        // Assert        
+        Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Contains(Guid.Parse(fileId), result);
     }
 
     [Fact]

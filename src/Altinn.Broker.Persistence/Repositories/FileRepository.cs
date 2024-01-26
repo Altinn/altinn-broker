@@ -168,17 +168,20 @@ public class FileRepository : IFileRepository
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
         commandString.AppendLine("FROM broker.file f");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus AND resource_id_fk = @resourceId");         
+        commandString.AppendLine("INNER JOIN LATERAL ");
+        commandString.AppendLine("(SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs ");
+        commandString.AppendLine("WHERE afs.file_id_fk = f.file_id_pk ");
         if(fileSearch.Actors?.Count > 0)
         {
-            commandString.AppendLine($"WHERE afs.actor_id_fk in ({string.Join(',', fileSearch.Actors.Select(a => a.ActorId))})");
+            commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileSearch.Actors.Select(a => a.ActorId))})");
         }
         else
         {
-            commandString.AppendLine("WHERE afs.actor_id_fk = @actorId");
-        }       
+            commandString.AppendLine("AND afs.actor_id_fk = @actorId");
+        }   
+        commandString.AppendLine("ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
+        commandString.AppendLine("WHERE 1 = 1");
         if (fileSearch.From.HasValue && fileSearch.To.HasValue)
         {
             commandString.AppendLine("AND f.created between @from AND @to");
@@ -193,7 +196,11 @@ public class FileRepository : IFileRepository
         }
         if(!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
         {
-            commandString.Append(" AND f.resource_id_fk = @resourceId");
+            commandString.AppendLine("AND resource_id_fk = @resourceId");
+        }
+        if(fileSearch.RecipientStatus.HasValue)
+        {
+            commandString.AppendLine("AND actor_file_status_id_fk = @recipientFileStatus");
         }
 
         commandString.AppendLine(";");
@@ -201,19 +208,20 @@ public class FileRepository : IFileRepository
         await using (var command = await _connectionProvider.CreateCommand(
             commandString.ToString()))
         {
-            if(!(fileSearch.Actors?.Count > 0))
+            if(!(fileSearch.Actor is null))
             {
                 command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
             }
             
-            command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
-            command.Parameters.AddWithValue("@actorExternalId", fileSearch.Actor.ActorExternalId);
+            if(!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
+            {
+                command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
+            }
+
             if (fileSearch.From.HasValue)
                 command.Parameters.AddWithValue("@From", fileSearch.From);
             if (fileSearch.To.HasValue)
                 command.Parameters.AddWithValue("@To", fileSearch.To);
-            if (fileSearch.RecipientStatus.HasValue)
-                command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
             if (fileSearch.RecipientStatus.HasValue)
                 command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
 

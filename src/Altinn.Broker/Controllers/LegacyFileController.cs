@@ -7,6 +7,7 @@ using Altinn.Broker.Application.GetFilesQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
 using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
@@ -26,7 +27,7 @@ namespace Altinn.Broker.Controllers
     [ApiController]
     [Route("broker/api/legacy/v1/file")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    [Authorize(Policy = "Sender")]
+    [Authorize(Policy = "Legacy")]
     public class LegacyFileController : Controller
     {
         private readonly ILogger<LegacyFileController> _logger;
@@ -113,20 +114,37 @@ namespace Altinn.Broker.Controllers
             [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
-            [FromQuery] string? resourceId,
+            [FromQuery] string? serviceReference,
             [FromQuery] string? onBehalfOfConsumer,
             [FromQuery] string[]? recipients,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] LegacyGetFilesQueryHandler handler)
         {
-            // HasAvailableFiles
-            //TODO: Enrich token
-            _logger.LogInformation("Getting files with status {status} created {from} to {to}", recipientStatus?.ToString(), from?.ToString(), to?.ToString());
+            // HasAvailableFiles calls are not made on behalf of any consumer.
+            CallerIdentity? legacyToken = null; 
+            if(!string.IsNullOrWhiteSpace(onBehalfOfConsumer))
+            {
+                legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+            }
+            
+            LogContextHelpers.EnrichLogsWithToken(legacyToken ?? token);
+            string recipientsString = string.Empty;
+            if(recipients?.Length > 0)
+            { 
+                recipientsString = string.Join(',', recipients);
+                _logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
+            }
+            else
+            {
+                _logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer);
+            }
+
             var queryResult = await handler.Process(new LegacyGetFilesQueryRequest()
             {
-                Token = token,
-                ResourceId = resourceId ?? string.Empty,
+                Token = legacyToken ?? token,
+                ResourceId = serviceReference ?? string.Empty,
                 RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
+                OnBehalfOfConsumer = onBehalfOfConsumer,
                 From = from,
                 To = to,
                 Recipients = recipients
@@ -171,7 +189,5 @@ namespace Altinn.Broker.Controllers
         {
             return new CallerIdentity(callingToken.Scope, onBehalfOfConsumer, callingToken.ClientId);
         }
-
-        private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
     }
 }
