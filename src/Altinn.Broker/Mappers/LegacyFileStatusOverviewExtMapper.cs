@@ -8,11 +8,11 @@ using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers;
 
-internal static class FileStatusOverviewExtMapper
+internal static class LegacyFileStatusOverviewExtMapper
 {
-    internal static FileOverviewExt MapToExternalModel(FileEntity file)
+    internal static LegacyFileOverviewExt MapToExternalModel(FileEntity file)
     {
-        return new FileOverviewExt()
+        return new LegacyFileOverviewExt()
         {
             Checksum = file.Checksum,
             ResourceId = file.ResourceId,
@@ -31,18 +31,18 @@ internal static class FileStatusOverviewExtMapper
         };
     }
 
-    internal static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
+    internal static LegacyFileStatusExt MapToExternalEnum(FileStatus domainEnum)
     {
         return domainEnum switch
         {
-            FileStatus.Initialized => FileStatusExt.Initialized,
-            FileStatus.UploadStarted => FileStatusExt.UploadStarted,
-            FileStatus.UploadProcessing => FileStatusExt.UploadProcessing,
-            FileStatus.Published => FileStatusExt.Published,
-            FileStatus.Cancelled => FileStatusExt.Cancelled,
-            FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
-            FileStatus.Deleted => FileStatusExt.Deleted,
-            FileStatus.Failed => FileStatusExt.Failed,
+            FileStatus.Initialized => LegacyFileStatusExt.Initialized,
+            FileStatus.UploadStarted => LegacyFileStatusExt.UploadStarted,
+            FileStatus.UploadProcessing => LegacyFileStatusExt.UploadProcessing,
+            FileStatus.Published => LegacyFileStatusExt.Published,
+            FileStatus.Cancelled => LegacyFileStatusExt.Cancelled,
+            FileStatus.AllConfirmedDownloaded => LegacyFileStatusExt.AllConfirmedDownloaded,
+            FileStatus.Deleted => LegacyFileStatusExt.Deleted,
+            FileStatus.Failed => LegacyFileStatusExt.Failed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
@@ -63,14 +63,14 @@ internal static class FileStatusOverviewExtMapper
         };
     }
 
-    internal static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> recipientEvents)
+    internal static List<LegacyRecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> recipientEvents)
     {
         var lastStatusForEveryRecipient = recipientEvents
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
             .ToList();
-        return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileStatusDetailsExt()
+        return lastStatusForEveryRecipient.Select(statusEvent => new LegacyRecipientFileStatusDetailsExt()
         {
             Recipient = statusEvent.Actor.ActorExternalId,
             CurrentRecipientFileStatusChanged = statusEvent.Date,
@@ -79,13 +79,13 @@ internal static class FileStatusOverviewExtMapper
         }).ToList();
     }
 
-    internal static RecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
+    internal static LegacyRecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
-            ActorFileStatus.DownloadStarted => RecipientFileStatusExt.DownloadStarted,
-            ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed,
+            ActorFileStatus.Initialized => LegacyRecipientFileStatusExt.Initialized,
+            ActorFileStatus.DownloadStarted => LegacyRecipientFileStatusExt.DownloadStarted,
+            ActorFileStatus.DownloadConfirmed => LegacyRecipientFileStatusExt.DownloadConfirmed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
