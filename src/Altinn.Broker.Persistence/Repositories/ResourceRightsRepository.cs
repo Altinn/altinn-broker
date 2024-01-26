@@ -24,7 +24,7 @@ public class ResourceRightsRepository : IResourceRightsRepository
 
     public async Task<bool> CheckUserAccess(string resourceId, string userId, ResourceAccessLevel right, bool IsLegacyUser = false)
     {
-        if(IsLegacyUser)
+        if (IsLegacyUser)
         {
             return true; // Legacy users are already authorized in Altinn 2
         }
