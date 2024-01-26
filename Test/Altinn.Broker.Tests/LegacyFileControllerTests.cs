@@ -36,12 +36,9 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task GetFileOverview_SentByA3Sender_Success()
     {
         // Arrange
-        string status = "Published";
         string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
-        DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
-        DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -56,6 +53,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
         var fileData = await getResponse.Content.ReadAsAsync<LegacyFileOverviewExt>();
+
         // Assert        
         Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
         Assert.Equal(fileId, fileData.FileId.ToString());
@@ -65,12 +63,9 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task GetFileOverview_ConsumerIsNotPartOfFile_FileNotFound()
     {
         // Arrange
-        string status = "Published";
         string onBehalfOfConsumer = "0199:999999999";
-        DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
-        DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -82,7 +77,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
 
-        // Ac
+        // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
 
         // Assert

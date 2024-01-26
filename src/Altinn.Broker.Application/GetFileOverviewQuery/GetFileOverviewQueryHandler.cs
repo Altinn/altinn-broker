@@ -34,16 +34,7 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = false;
-        if (request.IsLegacy)
-        {
-            hasAccess = true; // Legacy has authorized in Altinn 2 before call
-        }
-        else
-        {
-            hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write);
-        }
-
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
