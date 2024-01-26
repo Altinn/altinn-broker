@@ -47,7 +47,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
 
     public async Task<OneOf<Guid, Error>> Process(InitializeFileCommandRequest request)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

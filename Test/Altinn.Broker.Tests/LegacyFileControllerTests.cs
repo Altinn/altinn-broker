@@ -3,10 +3,10 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
-
 using Xunit;
 
 namespace Altinn.Broker.Tests;
@@ -30,6 +30,31 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             PropertyNameCaseInsensitive = true
         });
         _responseSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    }
+
+    [Fact]
+    public async Task InitializeAndUpload_Success()
+    {
+        // Initialize
+        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/legacy/v1/file", FileInitializeExtTestFactory.BasicFile());
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Sender;
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        Assert.NotNull(fileAfterInitialize);
+        Assert.Equal(LegacyFileStatusExt.Initialized, fileAfterInitialize.FileStatus);
+
+        // Upload
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        Assert.NotNull(fileAfterUpload);
+        Assert.Equal(LegacyFileStatusExt.Published, fileAfterUpload.FileStatus); // When running integration test this happens instantly as of now.
     }
 
     [Fact]

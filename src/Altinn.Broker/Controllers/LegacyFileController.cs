@@ -40,9 +40,19 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
+        public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
         {
-            throw new NotImplementedException();
+            CallerIdentity legacyToken = CreateLegacyToken(initializeExt.Sender, token);
+
+            LogContextHelpers.EnrichLogsWithLegacyInitializeFile(initializeExt);
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Legacy - Initializing file");
+            var commandRequest = LegacyInitializeFileMapper.MapToRequest(initializeExt, token);
+            var commandResult = await handler.Process(commandRequest);
+            return commandResult.Match(
+                fileId => Ok(fileId.ToString()),
+                Problem
+            );
         }
 
         /// <summary>
@@ -54,11 +64,27 @@ namespace Altinn.Broker.Controllers
         [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId,
+            [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler
         )
         {
-            throw new NotImplementedException();
+            CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Legacy - Uploading file {fileId}", fileId.ToString());
+            Request.EnableBuffering();
+            var commandResult = await handler.Process(new UploadFileCommandRequest()
+            {
+                FileId = fileId,
+                Token = token,
+                Filestream = Request.Body,
+                IsLegacy = true
+            });
+            return commandResult.Match(
+                fileId => Ok(fileId.ToString()),
+                Problem
+            );
         }
 
         /// <summary>

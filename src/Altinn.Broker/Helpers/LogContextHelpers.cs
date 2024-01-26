@@ -16,6 +16,15 @@ public static class LogContextHelpers
         LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
 
+    public static void EnrichLogsWithLegacyInitializeFile(LegacyFileInitalizeExt fileInitalizeExt)
+    {
+        LogContext.PushProperty("sender", fileInitalizeExt.Sender);
+        LogContext.PushProperty("filename", fileInitalizeExt.FileName);
+        LogContext.PushProperty("recipients", string.Join(',', fileInitalizeExt.Recipients));
+        LogContext.PushProperty("sendersFileReference", fileInitalizeExt.SendersFileReference);
+        LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
+    }
+
     public static void EnrichLogsWithToken(CallerIdentity token)
     {
         LogContext.PushProperty("consumer", token.Consumer);
