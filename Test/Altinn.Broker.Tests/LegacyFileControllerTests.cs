@@ -41,7 +41,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
         DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
         ActorFileStatus status = ActorFileStatus.Initialized;
-        string serviceReference = "resource-1";
+        string serviceReference = "resource-2";
         string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
         string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
@@ -78,7 +78,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
         DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
         ActorFileStatus status = ActorFileStatus.Initialized;
-        string serviceReference = "resource-1";
+        string serviceReference = "resource-2";
         string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
         string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
@@ -114,7 +114,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
         DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
         ActorFileStatus status = ActorFileStatus.Initialized;
-        string serviceReference = "resource-1";
+        string serviceReference = "resource-2";
         string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
         string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
@@ -151,8 +151,8 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
         ActorFileStatus status = ActorFileStatus.Initialized;
         string serviceReference = "resource-1";
-        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
-        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
