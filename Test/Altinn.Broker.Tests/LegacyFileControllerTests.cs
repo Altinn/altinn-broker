@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Web;
 
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
