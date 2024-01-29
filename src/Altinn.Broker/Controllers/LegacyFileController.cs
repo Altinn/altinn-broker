@@ -121,16 +121,16 @@ namespace Altinn.Broker.Controllers
             [FromServices] LegacyGetFilesQueryHandler handler)
         {
             // HasAvailableFiles calls are not made on behalf of any consumer.
-            CallerIdentity? legacyToken = null; 
-            if(!string.IsNullOrWhiteSpace(onBehalfOfConsumer))
+            CallerIdentity? legacyToken = null;
+            if (!string.IsNullOrWhiteSpace(onBehalfOfConsumer))
             {
                 legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
             }
-            
+
             LogContextHelpers.EnrichLogsWithToken(legacyToken ?? token);
             string recipientsString = string.Empty;
-            if(recipients?.Length > 0)
-            { 
+            if (recipients?.Length > 0)
+            {
                 recipientsString = string.Join(',', recipients);
                 _logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
             }

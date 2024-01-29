@@ -171,14 +171,14 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("INNER JOIN LATERAL ");
         commandString.AppendLine("(SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs ");
         commandString.AppendLine("WHERE afs.file_id_fk = f.file_id_pk ");
-        if(fileSearch.Actors?.Count > 0)
+        if (fileSearch.Actors?.Count > 0)
         {
             commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileSearch.Actors.Select(a => a.ActorId))})");
         }
         else
         {
             commandString.AppendLine("AND afs.actor_id_fk = @actorId");
-        }   
+        }
         commandString.AppendLine("ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
         commandString.AppendLine("WHERE 1 = 1");
@@ -194,11 +194,11 @@ public class FileRepository : IFileRepository
         {
             commandString.AppendLine("AND f.created < @to");
         }
-        if(!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
+        if (!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
         {
             commandString.AppendLine("AND resource_id_fk = @resourceId");
         }
-        if(fileSearch.RecipientStatus.HasValue)
+        if (fileSearch.RecipientStatus.HasValue)
         {
             commandString.AppendLine("AND actor_file_status_id_fk = @recipientFileStatus");
         }
@@ -208,12 +208,12 @@ public class FileRepository : IFileRepository
         await using (var command = await _connectionProvider.CreateCommand(
             commandString.ToString()))
         {
-            if(!(fileSearch.Actor is null))
+            if (!(fileSearch.Actor is null))
             {
                 command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
             }
-            
-            if(!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
+
+            if (!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
             {
                 command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
             }
@@ -235,7 +235,7 @@ public class FileRepository : IFileRepository
                 }
             }
             return files;
-        }        
+        }
     }
 
     public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)

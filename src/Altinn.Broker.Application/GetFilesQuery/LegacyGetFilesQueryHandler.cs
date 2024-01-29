@@ -29,7 +29,7 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
     private async Task<List<ActorEntity>> GetActors(string[] recipients)
     {
         List<ActorEntity> actors = new();
-        foreach(string recipient in recipients)
+        foreach (string recipient in recipients)
         {
             ActorEntity entity = await _actorRepository.GetActorAsync(recipient);
             actors.Add(entity);
@@ -49,7 +49,7 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
         {
             fileSearch.Actors = await GetActors(request.Recipients);
         }
-        else 
+        else
         {
             fileSearch.Actor = await _actorRepository.GetActorAsync(request.OnBehalfOfConsumer ?? string.Empty);
             if (fileSearch.Actor is null)

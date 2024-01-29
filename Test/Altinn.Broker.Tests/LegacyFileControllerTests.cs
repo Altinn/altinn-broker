@@ -59,11 +59,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
-        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&resourceId={serviceReference}"
-        +$"&recipients={recipient1}"
-        +$"&recipients={recipient2}");
-        
+        + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        + $"&resourceId={serviceReference}"
+        + $"&recipients={recipient1}"
+        + $"&recipients={recipient2}");
+
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
 
         // Assert        
@@ -96,10 +96,10 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
-        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&resourceId={serviceReference}"
-        +$"&recipients={recipient1}");
-        
+        + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        + $"&resourceId={serviceReference}"
+        + $"&recipients={recipient1}");
+
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
 
         // Assert        
@@ -132,10 +132,10 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
-        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&resourceId={serviceReference}"
-        +$"&recipients={recipient2}");
-        
+        + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        + $"&resourceId={serviceReference}"
+        + $"&recipients={recipient2}");
+
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
 
         // Assert        
@@ -167,10 +167,10 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
-        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&resourceId={serviceReference}"
-        +$"&onBehalfOfConsumer={onBehalfOfConsumer}");
-        
+        + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        + $"&resourceId={serviceReference}"
+        + $"&onBehalfOfConsumer={onBehalfOfConsumer}");
+
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
 
         // Assert        
