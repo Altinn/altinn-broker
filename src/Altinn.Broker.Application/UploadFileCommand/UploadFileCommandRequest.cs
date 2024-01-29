@@ -8,4 +8,5 @@ public class UploadFileCommandRequest
     public Guid FileId { get; set; }
     public CallerIdentity Token { get; set; }
     public Stream Filestream { get; set; }
+    public bool IsLegacy { get; set; }
 }
