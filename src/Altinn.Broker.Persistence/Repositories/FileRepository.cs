@@ -163,6 +163,81 @@ public class FileRepository : IFileRepository
         return fileId;
     }
 
+    public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch)
+    {
+        StringBuilder commandString = new StringBuilder();
+        commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
+        commandString.AppendLine("FROM broker.file f");
+        commandString.AppendLine("INNER JOIN LATERAL ");
+        commandString.AppendLine("(SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs ");
+        commandString.AppendLine("WHERE afs.file_id_fk = f.file_id_pk ");
+        if (fileSearch.Actors?.Count > 0)
+        {
+            commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileSearch.Actors.Select(a => a.ActorId))})");
+        }
+        else
+        {
+            commandString.AppendLine("AND afs.actor_id_fk = @actorId");
+        }
+        commandString.AppendLine("ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
+        commandString.AppendLine("WHERE 1 = 1");
+        if (fileSearch.From.HasValue && fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created between @from AND @to");
+        }
+        else if (fileSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
+        if (!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
+        {
+            commandString.AppendLine("AND resource_id_fk = @resourceId");
+        }
+        if (fileSearch.RecipientStatus.HasValue)
+        {
+            commandString.AppendLine("AND actor_file_status_id_fk = @recipientFileStatus");
+        }
+
+        commandString.AppendLine(";");
+
+        await using (var command = await _connectionProvider.CreateCommand(
+            commandString.ToString()))
+        {
+            if (!(fileSearch.Actor is null))
+            {
+                command.Parameters.AddWithValue("@actorId", fileSearch.Actor.ActorId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
+            {
+                command.Parameters.AddWithValue("@resourceId", fileSearch.ResourceId);
+            }
+
+            if (fileSearch.From.HasValue)
+                command.Parameters.AddWithValue("@From", fileSearch.From);
+            if (fileSearch.To.HasValue)
+                command.Parameters.AddWithValue("@To", fileSearch.To);
+            if (fileSearch.RecipientStatus.HasValue)
+                command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
+
+            var files = new List<Guid>();
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var fileId = reader.GetGuid(0);
+                    files.Add(fileId);
+                }
+            }
+            return files;
+        }
+    }
+
     public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)
     {
         StringBuilder commandString = new StringBuilder();
