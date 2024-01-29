@@ -35,15 +35,124 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
-    public async Task GetFiles_SentByA3Sender_Success()
+    public async Task GetFiles_GetByMultipleRecipient_Success()
     {
         // Arrange
         DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
         DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
         ActorFileStatus status = ActorFileStatus.Initialized;
         string serviceReference = "resource-1";
-        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
-        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
+        string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        +$"&serviceReference={serviceReference}"
+        +$"&recipients={recipient1}"
+        +$"&recipients={recipient2}");
+        
+        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+
+        // Assert        
+        Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Contains(Guid.Parse(fileId), result);
+    }
+
+    [Fact]
+    public async Task GetFiles_GetByMultipleRecipient_Recipient1_Success()
+    {
+        // Arrange
+        DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
+        DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
+        ActorFileStatus status = ActorFileStatus.Initialized;
+        string serviceReference = "resource-1";
+        string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
+        string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        +$"&serviceReference={serviceReference}"
+        +$"&recipients={recipient1}");
+        
+        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+
+        // Assert        
+        Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Contains(Guid.Parse(fileId), result);
+    }
+
+    [Fact]
+    public async Task GetFiles_GetByMultipleRecipient_Recipient2_Success()
+    {
+        // Arrange
+        DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
+        DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
+        ActorFileStatus status = ActorFileStatus.Initialized;
+        string serviceReference = "resource-1";
+        string recipient1 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
+        string recipient2 = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[1];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
+        +$"&serviceReference={serviceReference}"
+        +$"&recipients={recipient2}");
+        
+        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+
+        // Assert        
+        Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Contains(Guid.Parse(fileId), result);
+    }
+
+    [Fact]
+    public async Task GetFiles_GetBySingleRecipient_Success()
+    {
+        // Arrange
+        DateTimeOffset from = DateTimeOffset.Now.AddHours(-1);
+        DateTimeOffset to = DateTimeOffset.Now.AddHours(1);
+        ActorFileStatus status = ActorFileStatus.Initialized;
+        string serviceReference = "resource-1";
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile_MultipleRecipients().Recipients[0];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile_MultipleRecipients());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
