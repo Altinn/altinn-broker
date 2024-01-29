@@ -114,7 +114,7 @@ namespace Altinn.Broker.Controllers
             [FromQuery] RecipientFileStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
-            [FromQuery] string? serviceReference,
+            [FromQuery] string? resourceId,
             [FromQuery] string? onBehalfOfConsumer,
             [FromQuery] string[]? recipients,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -142,7 +142,7 @@ namespace Altinn.Broker.Controllers
             var queryResult = await handler.Process(new LegacyGetFilesQueryRequest()
             {
                 Token = legacyToken ?? token,
-                ResourceId = serviceReference ?? string.Empty,
+                ResourceId = resourceId ?? string.Empty,
                 RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
                 OnBehalfOfConsumer = onBehalfOfConsumer,
                 From = from,

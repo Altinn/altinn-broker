@@ -60,7 +60,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
         +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&serviceReference={serviceReference}"
+        +$"&resourceId={serviceReference}"
         +$"&recipients={recipient1}"
         +$"&recipients={recipient2}");
         
@@ -97,7 +97,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
         +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&serviceReference={serviceReference}"
+        +$"&resourceId={serviceReference}"
         +$"&recipients={recipient1}");
         
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
@@ -133,7 +133,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
         +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&serviceReference={serviceReference}"
+        +$"&resourceId={serviceReference}"
         +$"&recipients={recipient2}");
         
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
@@ -168,7 +168,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
         +$"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
-        +$"&serviceReference={serviceReference}"
+        +$"&resourceId={serviceReference}"
         +$"&onBehalfOfConsumer={onBehalfOfConsumer}");
         
         var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
