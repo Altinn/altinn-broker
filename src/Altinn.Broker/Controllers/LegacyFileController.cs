@@ -1,4 +1,4 @@
-using Altinn.Broker.Application.ConfirmDownloadCommand;
+using Altinn.Broker.Application;
 using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileDetailsQuery;
 using Altinn.Broker.Application.GetFileOverviewQuery;
@@ -6,19 +6,16 @@ using Altinn.Broker.Application.GetFilesQuery;
 using Altinn.Broker.Application.InitializeFileCommand;
 using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
-using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 namespace Altinn.Broker.Controllers
 {
@@ -32,12 +29,10 @@ namespace Altinn.Broker.Controllers
     public class LegacyFileController : Controller
     {
         private readonly ILogger<LegacyFileController> _logger;
-        private readonly ProblemDetailsFactory _problemDetailsFactory;
 
-        public LegacyFileController(ILogger<LegacyFileController> logger, ProblemDetailsFactory problemDetailsFactory)
+        public LegacyFileController(ILogger<LegacyFileController> logger)
         {
             _logger = logger;
-            _problemDetailsFactory = problemDetailsFactory;
         }
 
         /// <summary>
@@ -72,12 +67,26 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
+        public async Task<ActionResult<LegacyFileOverviewExt>> GetFileOverview(
             Guid fileId,
+            [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileOverviewQueryHandler handler)
         {
-            throw new NotImplementedException();
+            CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
+            var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
+            {
+                FileId = fileId,
+                Token = legacyToken,
+                IsLegacy = true
+            });
+            return queryResult.Match(
+                result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.File)),
+                Problem
+            );
         }
 
         /// <summary>
@@ -137,5 +146,12 @@ namespace Altinn.Broker.Controllers
         {
             throw new NotImplementedException();
         }
+
+        private static CallerIdentity CreateLegacyToken(string onBehalfOfConsumer, CallerIdentity callingToken)
+        {
+            return new CallerIdentity(callingToken.Scope, onBehalfOfConsumer, callingToken.ClientId);
+        }
+
+        private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
     }
 }

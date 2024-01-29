@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Enums;
@@ -5,11 +6,21 @@ using Altinn.Broker.Enums;
 namespace Altinn.Broker.Models
 {
     /// <summary>
-    /// Overview of a broker file
+    /// Overview of a broker file for use by the LegacyFileController
     /// </summary>
-    public class FileOverviewExt
+    public class LegacyFileOverviewExt
     {
+        /// <summary>
+        /// The filename including extension
+        /// </summary>
+        [JsonPropertyName("fileId")]
         public Guid FileId { get; set; }
+
+        /// <summary>
+        /// Used by senders and receivers to identify specific file using external identification methods.
+        /// </summary>
+        [JsonPropertyName("filename")]
+        public string FileName { get; set; } = string.Empty;
 
         /// <summary>
         /// The Altinn resource ID for the broker service 
@@ -18,33 +29,33 @@ namespace Altinn.Broker.Models
         public string ResourceId { get; set; } = string.Empty;
 
         /// <summary>
-        /// The filename including extension
-        /// </summary>
-        public string FileName { get; set; } = string.Empty;
-
-        /// <summary>
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
+        [JsonPropertyName("sendersFileReference")]
         public string SendersFileReference { get; set; } = string.Empty;
 
         /// <summary>
         /// MD5 checksum for file data.
         /// </summary>
+        [JsonPropertyName("checksum")]
         public string? Checksum { get; set; } = string.Empty;
 
         /// <summary>
         /// File size in bytes
         /// </summary>
+        [JsonPropertyName("filesize")]
         public long FileSize { get; set; }
 
         /// <summary>
-        /// Current file status
+        /// Current overall File Status
         /// </summary>
-        public FileStatusExt FileStatus { get; set; }
+        [JsonPropertyName("fileStatus")]
+        public LegacyFileStatusExt FileStatus { get; set; }
 
         /// <summary>
-        /// Current file status text description
+        /// Current overall File Status Text
         /// </summary>
+        [JsonPropertyName("fileStatusText")]
         public string FileStatusText { get; set; } = string.Empty;
 
         /// <summary>
@@ -72,10 +83,10 @@ namespace Altinn.Broker.Models
         public string Sender { get; set; } = string.Empty;
 
         /// <summary>
-        /// Recipients of the file
+        /// Rcipients of the file
         /// </summary>
         [JsonPropertyName("recipients")]
-        public List<RecipientFileStatusDetailsExt> Recipients { get; set; } = new List<RecipientFileStatusDetailsExt>();
+        public List<LegacyRecipientFileStatusDetailsExt> Recipients { get; set; } = new List<LegacyRecipientFileStatusDetailsExt>();
 
         /// <summary>
         /// Up to ten arbitrary key value pairs
