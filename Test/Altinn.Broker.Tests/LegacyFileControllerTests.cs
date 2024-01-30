@@ -270,7 +270,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.NotFound, getResponse.StatusCode);
     }
-    
+
     [Fact]
     public async Task Download_DownloadFile_Success()
     {
@@ -300,7 +300,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Assert
         Assert.Equal(uploadedFileBytes, downloadedFileBytes);
     }
-    
+
     [Fact]
     public async Task Download_ConfirmDownloaded_Success()
     {
