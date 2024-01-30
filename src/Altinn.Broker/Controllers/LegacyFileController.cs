@@ -189,10 +189,23 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/download")]
         public async Task<ActionResult> DownloadFile(
             Guid fileId,
+            [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] DownloadFileQueryHandler handler)
         {
-            throw new NotImplementedException();
+            CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
+            var queryResult = await handler.Process(new DownloadFileQueryRequest()
+            {
+                FileId = fileId,
+                Token = legacyToken,
+                IsLegacy = true
+            });
+            return queryResult.Match<ActionResult>(
+                result => File(result.Stream, "application/octet-stream", result.Filename),
+                Problem
+            );
         }
 
         /// <summary>
@@ -203,10 +216,23 @@ namespace Altinn.Broker.Controllers
         [Route("{fileId}/confirmdownload")]
         public async Task<ActionResult> ConfirmDownload(
             Guid fileId,
+            [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] ConfirmDownloadCommandHandler handler)
         {
-            throw new NotImplementedException();
+            CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
+            LogContextHelpers.EnrichLogsWithToken(legacyToken);
+            _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
+            var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
+            {
+                FileId = fileId,
+                Token = legacyToken,
+                IsLegacy = true
+            });
+            return commandResult.Match(
+                Ok,
+                Problem
+            );
         }
 
         private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
