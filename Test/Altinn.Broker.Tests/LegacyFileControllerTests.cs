@@ -298,6 +298,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
 
         // Assert
+        Assert.True(downloadedFileBytes?.Length > 0);
         Assert.Equal(uploadedFileBytes, downloadedFileBytes);
     }
 
