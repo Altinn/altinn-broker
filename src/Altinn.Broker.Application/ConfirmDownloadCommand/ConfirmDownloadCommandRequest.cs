@@ -6,4 +6,5 @@ public class ConfirmDownloadCommandRequest
 {
     public CallerIdentity Token { get; set; }
     public Guid FileId { get; set; }
+    public bool IsLegacy { get; set; }
 }

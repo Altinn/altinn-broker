@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -268,5 +269,64 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.NotFound, getResponse.StatusCode);
+    }
+    
+    [Fact]
+    public async Task Download_DownloadFile_Success()
+    {
+        // Arrange
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
+
+        // Arrange - initialize file
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+
+        // Arrange - upload file
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}/download?onBehalfOfConsumer={onBehalfOfConsumer}");
+        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
+
+        // Assert
+        Assert.Equal(uploadedFileBytes, downloadedFileBytes);
+    }
+    
+    [Fact]
+    public async Task Download_ConfirmDownloaded_Success()
+    {
+        // Arrange
+        string onBehalfOfConsumer = FileInitializeExtTestFactory.BasicFile().Recipients[0];
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        var getResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/confirmdownload?onBehalfOfConsumer={onBehalfOfConsumer}", null);
+        var statusResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
+        var result = await statusResponse.Content.ReadAsAsync<LegacyFileOverviewExt>();
+
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+        Assert.Equal(LegacyRecipientFileStatusExt.DownloadConfirmed, result?.Recipients[0]?.CurrentRecipientFileStatusCode);
+        Assert.Equal(LegacyFileStatusExt.AllConfirmedDownloaded, result?.FileStatus);
     }
 }
