@@ -104,13 +104,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
+        await UploadDummyFileAsync(fileId);
         var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act
@@ -144,13 +138,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}");
@@ -173,13 +161,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -201,13 +183,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -229,13 +205,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -256,13 +226,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&status={status}&recipientStatus={recipientStatus}");
@@ -282,13 +246,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode);
-        }
+        await UploadDummyFileAsync(fileId);
 
         // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?status={status}&recipientStatus={recipientStatus}");
@@ -306,5 +264,16 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
+    }
+
+    private async Task UploadDummyFileAsync(string fileId)
+    {
+        var fileContents = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(fileContents))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
     }
 }
