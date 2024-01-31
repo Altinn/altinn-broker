@@ -45,7 +45,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileNotFound;
         }
-        if (file.FileStatus > FileStatus.UploadStarted)
+        if (file.FileStatusEntity.Status > FileStatus.UploadStarted)
         {
             return Errors.FileAlreadyUploaded;
         }

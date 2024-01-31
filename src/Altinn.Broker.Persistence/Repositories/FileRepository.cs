@@ -81,7 +81,6 @@ public class FileRepository : IFileRepository
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
-                    FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                     FileStatusEntity = new FileStatusEntity()
                     {
                         FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),

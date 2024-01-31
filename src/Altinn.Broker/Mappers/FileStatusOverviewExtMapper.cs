@@ -19,7 +19,7 @@ internal static class FileStatusOverviewExtMapper
             FileSize = file.FileSize,
             FileId = file.FileId,
             FileName = file.Filename,
-            FileStatus = MapToExternalEnum(file.FileStatus),
+            FileStatus = MapToExternalEnum(file.FileStatusEntity.Status),
             Sender = file.Sender.ActorExternalId,
             FileStatusChanged = file.FileStatusChanged,
             FileStatusText = MapToFileStatusText(file.FileStatusEntity),
