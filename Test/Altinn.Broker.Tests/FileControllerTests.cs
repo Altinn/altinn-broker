@@ -32,14 +32,10 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
     public FileControllerTests(CustomWebApplicationFactory factory)
     {
-        _factory = factory;
-        _senderClient = factory.CreateClient();
-        _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
-        _recipientClient = factory.CreateClient();
-        _recipientClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RECIPIENT_TOKEN);
-        _unregisteredClient = factory.CreateClient();
-        _unregisteredClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_UNREGISTERED_TOKEN);
-
+        _factory = factory;        
+        _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _unregisteredClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_UNREGISTERED_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true
@@ -293,7 +289,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode);
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?status={status}&recipientStatus={recipientStatus}");

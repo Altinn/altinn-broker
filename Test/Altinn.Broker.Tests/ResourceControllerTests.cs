@@ -1,5 +1,4 @@
-﻿using System.Net.Http.Headers;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
@@ -12,17 +11,13 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _resourceOwnerClient;
     private readonly HttpClient _senderClient;
-    private readonly HttpClient _unregisteredClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public ResourceControllerTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        _resourceOwnerClient = factory.CreateClient();
-        _resourceOwnerClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_RESOURCEOWNER_TOKEN);
-        _senderClient = factory.CreateClient();
-        _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
-
+        _resourceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RESOURCEOWNER_TOKEN);
+        _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true

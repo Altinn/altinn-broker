@@ -24,10 +24,8 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public LegacyFileControllerTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        _senderClient = factory.CreateClient();
-        _senderClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_SENDER_TOKEN);
-        _legacyClient = factory.CreateClient();
-        _legacyClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestConstants.DUMMY_LEGACY_TOKEN);
+        _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _legacyClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_LEGACY_TOKEN);
 
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
