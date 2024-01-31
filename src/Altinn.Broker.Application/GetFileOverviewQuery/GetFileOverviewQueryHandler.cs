@@ -34,7 +34,8 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy)
+                     || await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read, request.IsLegacy);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

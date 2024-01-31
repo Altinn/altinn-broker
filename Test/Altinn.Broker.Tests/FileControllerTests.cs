@@ -32,7 +32,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
     public FileControllerTests(CustomWebApplicationFactory factory)
     {
-        _factory = factory;        
+        _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _unregisteredClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_UNREGISTERED_TOKEN);
