@@ -134,7 +134,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         await UploadDummyFileAsync(fileId);
 
         // Act        
-        var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}");
+        var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={initializedFile.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}");
         string contentstring = await searchResult.Content.ReadAsStringAsync();
 
         // Assert
@@ -173,7 +173,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         await UploadDummyFileAsync(fileId);
 
         // Act        
-        var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
+        var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={initializedFile.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
         string contentstring = await searchResult.Content.ReadAsStringAsync();
 
         // Assert
