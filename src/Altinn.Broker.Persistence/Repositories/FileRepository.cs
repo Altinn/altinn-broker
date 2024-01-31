@@ -35,7 +35,8 @@ public class FileRepository : IFileRepository
                     f.sender_actor_id_fk, 
                     f.external_file_reference, 
                     f.created, 
-                    f.file_location, 
+                    f.file_location,
+                    f.filesize,
                     f.expiration_time, 
                     sender.actor_external_id as senderActorExternalReference,
                     fs_latest.file_status_description_id_fk, 
@@ -92,6 +93,7 @@ public class FileRepository : IFileRepository
                     Created = reader.GetDateTime(reader.GetOrdinal("created")),
                     ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                    FileSize = reader.IsDBNull(reader.GetOrdinal("filesize")) ? 0 : reader.GetInt64(reader.GetOrdinal("filesize")),
                     Sender = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
