@@ -14,4 +14,5 @@ public static class Errors
     public static Error FileAlreadyUploaded = new Error(6, "A file has already been, or attempted to be, uploaded. Create a new file resource to try again.", HttpStatusCode.Conflict);
     public static Error ResourceNotConfigured = new Error(7, "Resource needs to be configured to use the broker API", HttpStatusCode.Unauthorized);
     public static Error NoAccessToResource = new Error(8, "You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry", HttpStatusCode.Unauthorized);
+    public static Error FileNotAvailable = new Error(9, "The requested file is not ready for download. See file status.", HttpStatusCode.Forbidden);
 }
