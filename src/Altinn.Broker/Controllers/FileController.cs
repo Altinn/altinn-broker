@@ -247,7 +247,7 @@ namespace Altinn.Broker.Controllers
                 Token = token
             });
             return commandResult.Match(
-                Ok,
+                (_) => Ok(null),
                 Problem
             );
         }
