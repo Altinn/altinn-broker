@@ -45,7 +45,9 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         if (file.FileStatusEntity.Status == Core.Domain.Enums.FileStatus.Deleted)
         {
             _logger.LogInformation("File has already been set to deleted");
-        } else { 
+        }
+        else
+        {
             await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
         }
         await _brokerStorageService.DeleteFile(resourceOwner, file);
