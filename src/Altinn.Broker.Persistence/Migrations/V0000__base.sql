@@ -90,6 +90,7 @@ CREATE TABLE broker.file_status (
     file_id_fk uuid NOT NULL,
     file_status_description_id_fk integer NOT NULL,
     file_status_date timestamp without time zone NOT NULL,
+    file_status_detailed_description text NULL,
     FOREIGN KEY (file_status_description_id_fk) REFERENCES broker.file_status_description (file_status_description_id_pk),
     FOREIGN KEY (file_id_fk) REFERENCES broker.file (file_id_pk) ON DELETE CASCADE
 );

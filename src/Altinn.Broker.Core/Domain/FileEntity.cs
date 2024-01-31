@@ -9,6 +9,7 @@ public class FileEntity
     public ActorEntity Sender { get; set; } // Joined in
     public string SendersFileReference { get; set; }
     public FileStatus FileStatus { get; set; }
+    public FileStatusEntity FileStatusEntity { get; set; } // Joined in
     public DateTimeOffset FileStatusChanged { get; set; }
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset ExpirationTime { get; set; }

@@ -42,12 +42,12 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         {
             return Errors.ResourceOwnerNotConfigured;
         }
-        if (file.FileStatus >= Core.Domain.Enums.FileStatus.Deleted)
+        if (file.FileStatusEntity.Status == Core.Domain.Enums.FileStatus.Deleted)
         {
             _logger.LogInformation("File has already been set to deleted");
+        } else { 
+            await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
         }
-
-        await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
         await _brokerStorageService.DeleteFile(resourceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
         foreach (var recipient in recipientsWhoHaveNotDownloaded)

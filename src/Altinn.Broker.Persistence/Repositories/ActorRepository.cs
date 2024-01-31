@@ -17,7 +17,7 @@ public class ActorRepository : IActorRepository
     public async Task<ActorEntity?> GetActorAsync(string actorExternalId)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT * FROM broker.actor WHERE actor_external_id = @actorExternalId");
+            "SELECT actor_id_pk, actor_external_id FROM broker.actor WHERE actor_external_id = @actorExternalId");
         command.Parameters.AddWithValue("@actorExternalId", actorExternalId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
