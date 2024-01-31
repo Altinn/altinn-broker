@@ -15,11 +15,12 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DeleteFileCommandHandler> _logger;
 
-    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceOwnerRepository resourceOwnerRepository, IBrokerStorageService brokerStorageService, ILogger<DeleteFileCommandHandler> logger)
+    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceOwnerRepository resourceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<DeleteFileCommandHandler> logger)
     {
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _resourceOwnerRepository = resourceOwnerRepository;
+        _resourceRepository = resourceRepository;
         _brokerStorageService = brokerStorageService;
         _logger = logger;
     }
