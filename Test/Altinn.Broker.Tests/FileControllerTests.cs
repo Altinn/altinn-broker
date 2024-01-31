@@ -1,5 +1,4 @@
-﻿using System.Collections.Specialized;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -156,7 +155,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}");
@@ -186,7 +184,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -205,7 +202,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var file = FileInitializeExtTestFactory.BasicFile();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
-        DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -216,7 +212,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&from={dateTimeFrom.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -231,7 +226,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         // Arrange
         string status = "Published";
-        DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var file = FileInitializeExtTestFactory.BasicFile();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -246,7 +240,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act        
         var searchResult = await _senderClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&to={dateTimeTo.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat)}&status={status}");
@@ -274,7 +267,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode);
         }
-        var uploadedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
 
         // Act
         var searchResult = await _recipientClient.GetAsync($"broker/api/v1/file?resourceId={file.ResourceId}&status={status}&recipientStatus={recipientStatus}");
@@ -290,9 +282,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Arrange
         string status = "Published";
         string recipientStatus = "DownloadConfirmed";
-        DateTimeOffset dateTimeFrom = DateTime.Now.AddMinutes(-2);
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
-        DateTimeOffset dateTimeTo = DateTime.Now.AddMinutes(2);
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
