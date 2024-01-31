@@ -1,5 +1,6 @@
 ﻿using System.Collections.Specialized;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -88,6 +89,10 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(confirmedFileDetails);
         Assert.True(confirmedFileDetails.FileStatus == FileStatusExt.AllConfirmedDownloaded);
         Assert.Contains(confirmedFileDetails.RecipientFileStatusHistory, recipient => recipient.RecipientFileStatusCode == RecipientFileStatusExt.DownloadConfirmed);
+
+        // Attempt re-download
+        var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/file/{fileId}/download");
+        Assert.Equal(HttpStatusCode.Forbidden, secondDownloadAttempt.StatusCode);
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
