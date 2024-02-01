@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <ProjectReference Include="..\..\src\Altinn.Broker.API\Altinn.Broker.API.csproj" />
+	  <ProjectReference Include="..\..\src\Altinn.Broker\Altinn.Broker.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>
