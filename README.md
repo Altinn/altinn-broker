@@ -13,7 +13,7 @@ The services required to support local development are run using docker compose:
 ```docker compose up -d```
 
 To support features like hot reload etc, the app itself is run directly. Either in IDE like Visual Studio or by running:
-```dotnet watch --project ./src/Altinn.Broker/Altinn.Broker.csproj```
+```dotnet watch --project ./src/Altinn.Broker.API/Altinn.Broker.API.csproj```
 
 ### Azurite
 
