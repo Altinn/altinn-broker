@@ -15,11 +15,12 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DeleteFileCommandHandler> _logger;
 
-    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceOwnerRepository resourceOwnerRepository, IBrokerStorageService brokerStorageService, ILogger<DeleteFileCommandHandler> logger)
+    public DeleteFileCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IResourceOwnerRepository resourceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<DeleteFileCommandHandler> logger)
     {
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _resourceOwnerRepository = resourceOwnerRepository;
+        _resourceRepository = resourceRepository;
         _brokerStorageService = brokerStorageService;
         _logger = logger;
     }
@@ -42,12 +43,14 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         {
             return Errors.ResourceOwnerNotConfigured;
         }
-        if (file.FileStatus >= Core.Domain.Enums.FileStatus.Deleted)
+        if (file.FileStatusEntity.Status == Core.Domain.Enums.FileStatus.Deleted)
         {
             _logger.LogInformation("File has already been set to deleted");
         }
-
-        await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
+        else
+        {
+            await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
+        }
         await _brokerStorageService.DeleteFile(resourceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
         foreach (var recipient in recipientsWhoHaveNotDownloaded)

@@ -32,7 +32,7 @@ internal static class FileStatusDetailsExtMapper
     {
         FileStatus = FileStatusOverviewExtMapper.MapToExternalEnum(entity.Status),
         FileStatusChanged = entity.Date,
-        FileStatusText = FileStatusOverviewExtMapper.MapToFileStatusText(entity.Status)
+        FileStatusText = FileStatusOverviewExtMapper.MapToFileStatusText(entity)
     }).ToList();
 
     private static List<RecipientFileStatusEventExt> MapToRecipientEvents(List<ActorFileStatusEntity> actorEvents)

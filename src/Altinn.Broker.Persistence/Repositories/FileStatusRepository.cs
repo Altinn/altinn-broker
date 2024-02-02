@@ -12,16 +12,14 @@ public class FileStatusRepository : IFileStatusRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task InsertFileStatus(Guid fileId, FileStatus status)
+    public async Task InsertFileStatus(Guid fileId, FileStatus status, string? detailedFileStatus = null)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date) " +
-            "VALUES (@fileId, @statusId, NOW()) RETURNING file_status_id_pk;");
-        command.CommandText =
-            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date) " +
-            "VALUES (@fileId, @statusId, NOW()) RETURNING file_status_id_pk;";
+            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date, file_status_detailed_description) " +
+            "VALUES (@fileId, @statusId, NOW(), @detailedFileStatus) RETURNING file_status_id_pk;");
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@statusId", (int)status);
+        command.Parameters.AddWithValue("@detailedFileStatus", detailedFileStatus is null ? DBNull.Value : detailedFileStatus);
 
         var fileStatusId = await command.ExecuteScalarAsync();
         if (fileStatusId == null)
@@ -34,7 +32,7 @@ public class FileStatusRepository : IFileStatusRepository
     {
 
         using (var command = await _connectionProvider.CreateCommand(
-            "SELECT * " +
+            "SELECT file_id_fk, file_status_description_id_fk, file_status_date, file_status_detailed_description " +
             "FROM broker.file_status fis " +
             "WHERE fis.file_id_fk = @fileId"))
         {
@@ -49,6 +47,7 @@ public class FileStatusRepository : IFileStatusRepository
                         FileId = reader.GetGuid(reader.GetOrdinal("file_id_fk")),
                         Status = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
                         Date = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
+                        DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_status_detailed_description"))
                     });
                 }
             }

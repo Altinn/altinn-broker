@@ -19,10 +19,10 @@ internal static class FileStatusOverviewExtMapper
             FileSize = file.FileSize,
             FileId = file.FileId,
             FileName = file.Filename,
-            FileStatus = MapToExternalEnum(file.FileStatus),
+            FileStatus = MapToExternalEnum(file.FileStatusEntity.Status),
             Sender = file.Sender.ActorExternalId,
             FileStatusChanged = file.FileStatusChanged,
-            FileStatusText = MapToFileStatusText(file.FileStatus),
+            FileStatusText = MapToFileStatusText(file.FileStatusEntity),
             PropertyList = file.PropertyList,
             Recipients = MapToRecipients(file.RecipientCurrentStatuses),
             SendersFileReference = file.SendersFileReference,
@@ -47,9 +47,13 @@ internal static class FileStatusOverviewExtMapper
         };
     }
 
-    internal static string MapToFileStatusText(FileStatus domainEnum)
+    internal static string MapToFileStatusText(FileStatusEntity fileStatusEntity)
     {
-        return domainEnum switch
+        if (!string.IsNullOrWhiteSpace(fileStatusEntity.DetailedStatus))
+        {
+            return fileStatusEntity.DetailedStatus;
+        }
+        return fileStatusEntity.Status switch
         {
             FileStatus.Initialized => "Ready for upload",
             FileStatus.UploadStarted => "Upload started",

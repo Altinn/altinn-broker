@@ -27,25 +27,49 @@ public class FileRepository : IFileRepository
 
         using var command = await _connectionProvider.CreateCommand(
             @"
-                SELECT file_id_pk, resource_id_fk, filename, checksum, sender_actor_id_fk, external_file_reference, created, file_location, expiration_time, 
-                        sender.actor_external_id as senderActorExternalReference,
+                SELECT 
+                    f.file_id_pk, 
+                    f.resource_id_fk, 
+                    f.filename, 
+                    f.checksum, 
+                    f.sender_actor_id_fk, 
+                    f.external_file_reference, 
+                    f.created, 
+                    f.file_location,
+                    f.filesize,
+                    f.expiration_time, 
+                    sender.actor_external_id as senderActorExternalReference,
+                    fs_latest.file_status_description_id_fk, 
+                    fs_latest.file_status_date, 
+                    fs_latest.file_status_detailed_description
+                FROM 
+                    broker.file f
+                INNER JOIN 
+                    broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+                LEFT JOIN 
                     (
-                        SELECT fs.file_status_description_id_fk 
-                        FROM broker.file_status fs 
-                        WHERE fs.file_id_fk = @fileId 
-                        ORDER BY fs.file_status_date desc 
-                        LIMIT 1
-                    ) as file_status_description_id_fk, 
-                    (
-                        SELECT fs.file_status_date 
-                        FROM broker.file_status fs 
-                        WHERE fs.file_id_fk = @fileId 
-                        ORDER BY fs.file_status_date desc 
-                        LIMIT 1
-                    ) as file_status_date 
-                FROM broker.file 
-                INNER JOIN broker.actor sender on sender.actor_id_pk = sender_actor_id_fk 
-                WHERE file_id_pk = @fileId");
+                        SELECT 
+                            fs.file_id_fk,
+                            fs.file_status_description_id_fk,
+                            fs.file_status_date,
+                            fs.file_status_detailed_description
+                        FROM 
+                            broker.file_status fs
+                        INNER JOIN 
+                            (
+                                SELECT 
+                                    file_id_fk, 
+                                    MAX(file_status_date) as max_date
+                                FROM 
+                                    broker.file_status 
+                                GROUP BY 
+                                    file_id_fk
+                            ) fs_max ON fs.file_id_fk = fs_max.file_id_fk AND fs.file_status_date = fs_max.max_date
+                        WHERE 
+                            fs.file_id_fk = @fileId
+                    ) fs_latest ON f.file_id_pk = fs_latest.file_id_fk
+                WHERE 
+                    f.file_id_pk = @fileId;");
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             using NpgsqlDataReader reader = command.ExecuteReader();
@@ -58,11 +82,18 @@ public class FileRepository : IFileRepository
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
-                    FileStatus = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
+                    FileStatusEntity = new FileStatusEntity()
+                    {
+                        FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
+                        Status = (FileStatus)reader.GetInt32(reader.GetOrdinal("file_status_description_id_fk")),
+                        Date = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
+                        DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_status_detailed_description"))
+                    },
                     FileStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_status_date")),
                     Created = reader.GetDateTime(reader.GetOrdinal("created")),
                     ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                    FileSize = reader.IsDBNull(reader.GetOrdinal("filesize")) ? 0 : reader.GetInt64(reader.GetOrdinal("filesize")),
                     Sender = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),

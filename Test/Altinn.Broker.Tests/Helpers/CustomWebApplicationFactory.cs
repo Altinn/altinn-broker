@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+
 using Hangfire;
 using Hangfire.MemoryStorage;
 
@@ -51,5 +53,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
         });
+    }
+
+    public HttpClient CreateClientWithAuthorization(string token)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
     }
 }

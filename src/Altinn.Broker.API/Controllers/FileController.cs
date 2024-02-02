@@ -126,7 +126,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = "SenderOrRecipient")]
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -151,7 +151,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = "SenderOrRecipient")]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -247,7 +247,7 @@ namespace Altinn.Broker.Controllers
                 Token = token
             });
             return commandResult.Match(
-                Ok,
+                (_) => Ok(null),
                 Problem
             );
         }

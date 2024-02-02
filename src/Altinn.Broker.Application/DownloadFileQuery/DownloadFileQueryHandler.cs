@@ -35,6 +35,10 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.FileNotFound;
         }
+        if (file.FileStatusEntity.Status != FileStatus.Published)
+        {
+            return Errors.FileNotAvailable;
+        }
         if (!file.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
         {
             return Errors.FileNotFound;
