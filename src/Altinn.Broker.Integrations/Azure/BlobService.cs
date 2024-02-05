@@ -1,3 +1,5 @@
+using Altinn.Broker.Repositories;
+
 using Azure;
 using Azure.Storage;
 using Azure.Storage.Blobs;
@@ -8,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService : Repositories.IFileStore
+public class BlobService : IFileStore
 {
 
     private readonly ILogger<BlobService> _logger;
@@ -40,7 +42,7 @@ public class BlobService : Repositories.IFileStore
         }
     }
 
-    public async Task UploadFile(Stream stream, Guid fileId, string connectionString)
+    public async Task<string> UploadFile(Stream stream, Guid fileId, string connectionString)
     {
         BlobClient blobClient = GetBlobClient(fileId, connectionString);
         var blobLeaseClient = blobClient.GetBlobLeaseClient();
@@ -59,7 +61,10 @@ public class BlobService : Repositories.IFileStore
                 },
                 TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 },
             };
-            await blobClient.UploadAsync(stream, options);
+            var blobMetadata = await blobClient.UploadAsync(stream, options);
+            var metadata = blobMetadata.Value;
+            var hash = Convert.ToHexString(metadata.ContentHash).ToLowerInvariant();
+            return hash;
         }
         catch (RequestFailedException requestFailedException)
         {

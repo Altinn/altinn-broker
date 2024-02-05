@@ -21,10 +21,10 @@ public class AzureBrokerStorageService : IBrokerStorageService
         _logger = logger;
     }
 
-    public async Task UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream)
+    public async Task<string> UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream)
     {
         var connectionString = await GetConnectionString(resourceOwnerEntity);
-        await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
+        return await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
     }
 
     public async Task<Stream> DownloadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity)
