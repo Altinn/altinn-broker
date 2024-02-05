@@ -246,6 +246,105 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
     }
+    
+    [Fact]
+    public async Task UploadFile_ChecksumCorrect_Succeeds()
+    {
+        // Arrange
+        var fileId = await InitializeAndAssertBasicFile();
+        var fileContent = "This is the contents of the uploaded file";
+        var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
+        var checksum = CalculateChecksum(fileContentBytes);
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.Checksum = checksum;
+
+        // Act
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var uploadResponse = await UploadTextFile(fileId, fileContent);
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task UploadFile_MismatchChecksum_Fails()
+    {
+        // Arrange
+        var fileContent = "This is the contents of the uploaded file";
+        var incorrectChecksumContent = "NOT THE CONTENTS OF UPLOADED FILE";
+        var incorrectChecksumContentBytes = Encoding.UTF8.GetBytes(incorrectChecksumContent);
+        var incorrectChecksum = CalculateChecksum(incorrectChecksumContentBytes);
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.Checksum = incorrectChecksum;
+
+        // Act
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var uploadResponse = await UploadTextFile(fileId, fileContent);
+
+        // Assert
+        Assert.False(uploadResponse.IsSuccessStatusCode);
+        Assert.True(uploadResponse.StatusCode == HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UploadFile_NoChecksumSetWhenInitialized_ChecksumSetAfterUpload()
+    {
+        // Arrange
+        var fileId = await InitializeAndAssertBasicFile();
+        var fileContent = "This is the contents of the uploaded file";
+        var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
+        var checksum = CalculateChecksum(fileContentBytes);
+
+        // Act
+        var uploadResponse = await UploadTextFile(fileId, fileContent);
+
+        // Assert
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+
+        // Check if the checksum is set in the file details
+        var fileDetails = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(fileDetails);
+        Assert.NotNull(fileDetails.Checksum);
+        Assert.Equal(checksum, fileDetails.Checksum);
+    }
+
+    [Fact]
+    public async Task UploadFile_ChecksumSetWhenInitialized_SameChecksumSetAfterUpload()
+    {
+        // Arrange
+        var fileContent = "This is the contents of the uploaded file";
+        var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
+        var checksum = CalculateChecksum(fileContentBytes);
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.Checksum = checksum;
+
+        // Act
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var uploadResponse = await UploadTextFile(fileId, fileContent);
+
+        // Assert
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+
+        // Check if the checksum is unchanged in the file details
+        var fileDetails = await _senderClient.GetFromJsonAsync<FileOverviewExt>($"broker/api/v1/file/{fileId}", _responseSerializerOptions);
+        Assert.NotNull(fileDetails);
+        Assert.NotNull(fileDetails.Checksum);
+        Assert.Equal(checksum, fileDetails.Checksum);
+    }
+
+    private async Task<HttpResponseMessage> UploadTextFile(string fileId, string fileContent)
+    {
+        var fileContents = Encoding.UTF8.GetBytes(fileContent);
+        using (var content = new ByteArrayContent(fileContents))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/file/{fileId}/upload", content);
+            return uploadResponse;
+        }
+    }
 
     private async Task UploadDummyFileAsync(string fileId)
     {
@@ -263,5 +362,14 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         return await initializeFileResponse.Content.ReadAsStringAsync();
+    }
+
+    private string CalculateChecksum(byte[] data)
+    {
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+        {
+            byte[] hash = md5.ComputeHash(data);
+            return BitConverter.ToString(hash).Replace("-", "").ToLower();
+        }
     }
 }
