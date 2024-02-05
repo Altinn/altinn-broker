@@ -246,7 +246,7 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
     }
-    
+
     [Fact]
     public async Task UploadFile_ChecksumCorrect_Succeeds()
     {
