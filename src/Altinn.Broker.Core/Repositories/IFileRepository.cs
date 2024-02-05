@@ -19,6 +19,7 @@ public interface IFileRepository
     Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch);
     Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch);
     Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch);
+    Task SetChecksum(Guid fileId, string checksum);
     Task SetStorageDetails(
         Guid fileId,
         long storageProviderId,
