@@ -2,6 +2,8 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
+using Hangfire;
+
 using Microsoft.Extensions.Logging;
 
 using OneOf;
@@ -16,9 +18,10 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
+    private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, ILogger<UploadFileCommandHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;
@@ -26,6 +29,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _brokerStorageService = brokerStorageService;
+        _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
 
@@ -61,7 +65,26 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         };
 
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted);
-        await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream);
+        try
+        {
+            var checksum = await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream);
+            if (string.IsNullOrWhiteSpace(file.Checksum))
+            {
+                await _fileRepository.SetChecksum(request.FileId, checksum);
+            }
+            else if (!string.Equals(checksum, file.Checksum, StringComparison.InvariantCultureIgnoreCase))
+            {
+                await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Checksum mismatch");
+                _backgroundJobClient.Enqueue(() => _brokerStorageService.DeleteFile(resourceOwner, file));
+                return Errors.ChecksumMismatch;
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
+            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.");
+            return Errors.UploadFailed;
+        }
         await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length);
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
         // TODO, async jobs
