@@ -470,4 +470,18 @@ public class FileRepository : IFileRepository
             throw;
         }
     }
+
+    public async Task SetChecksum(Guid fileId, string checksum)
+    {
+        await using (var command = await _connectionProvider.CreateCommand(
+            "UPDATE broker.file " +
+            "SET " +
+                "checksum = @checksum " +
+            "WHERE file_id_pk = @fileId"))
+        {
+            command.Parameters.AddWithValue("@fileId", fileId);
+            command.Parameters.AddWithValue("@checksum", checksum);
+            command.ExecuteNonQuery();
+        }
+    }
 }
