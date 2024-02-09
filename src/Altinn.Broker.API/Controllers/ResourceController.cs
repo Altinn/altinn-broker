@@ -1,10 +1,10 @@
 ﻿using System.Net;
 
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.Service;
-using Altinn.Broker.Persistence.Repositories;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +15,7 @@ namespace Altinn.Broker.Controllers;
 [ApiController]
 [Route("broker/api/v1/resource")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+[Authorize(Policy = AuthorizationConstants.ResourceOwner)]
 public class ResourceController : Controller
 {
     private readonly IResourceRepository _resourceRepository;
@@ -29,7 +30,6 @@ public class ResourceController : Controller
     }
 
     [HttpPost]
-    [Authorize(Policy = "ResourceOwner")]
     public async Task<ActionResult> RegisterResource([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, ResourceInitializeExt resourceInitializeExt)
     {
         var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
@@ -54,7 +54,6 @@ public class ResourceController : Controller
 
     [HttpGet]
     [Route("{resourceId}")]
-    [Authorize(Policy = "ResourceOwner")]
     public async Task<ActionResult<ResourceOverviewExt>> GetResourceConfiguration(string resourceId)
     {
         var resource = await _resourceRepository.GetResource(resourceId);
@@ -72,7 +71,6 @@ public class ResourceController : Controller
     }
 
     [HttpGet]
-    [Authorize(Policy = "ResourceOwner")]
     public async Task<ActionResult<List<string>>> GetAllResources([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
     {
         var resources = await _resourceRepository.SearchResources(token.Consumer);

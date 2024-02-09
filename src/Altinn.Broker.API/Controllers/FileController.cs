@@ -1,3 +1,4 @@
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
@@ -38,7 +39,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = AuthorizationConstants.Sender)]
         public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
         {
             LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
@@ -59,7 +60,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         [Route("{fileId}/upload")]
         [Consumes("application/octet-stream")]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = AuthorizationConstants.Sender)]
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -88,7 +89,7 @@ namespace Altinn.Broker.Controllers
         [HttpPost]
         [Route("upload")]
         [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
-        [Authorize(Policy = "Sender")]
+        [Authorize(Policy = AuthorizationConstants.Sender)]
         public async Task<ActionResult> InitializeAndUpload(
             [FromForm] FileInitializeAndUploadExt form,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -126,7 +127,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}")]
-        [Authorize(Policy = "SenderOrRecipient")]
+        [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -151,7 +152,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
-        [Authorize(Policy = "SenderOrRecipient")]
+        [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -175,7 +176,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [Authorize(Policy = "SenderOrRecipient")]
+        [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
         public async Task<ActionResult<List<Guid>>> GetFiles(
             [FromQuery] string resourceId,
             [FromQuery] FileStatusExt? status,
@@ -208,7 +209,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/download")]
-        [Authorize(Policy = "Recipient")]
+        [Authorize(Policy = AuthorizationConstants.Recipient)]
         public async Task<ActionResult> DownloadFile(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
@@ -233,7 +234,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{fileId}/confirmdownload")]
-        [Authorize(Policy = "Recipient")]
+        [Authorize(Policy = AuthorizationConstants.Recipient)]
         public async Task<ActionResult> ConfirmDownload(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
