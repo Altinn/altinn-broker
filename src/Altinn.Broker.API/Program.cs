@@ -7,14 +7,15 @@ using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Middlewares;
-using Altinn.Broker.Models.Maskinporten;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
+using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
@@ -121,13 +122,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         };
     });
 
+    services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.ResourceOwner, policy => policy.RequireClaim("scope", [ AuthorizationConstants.AdminScope ]));
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.RequireClaim("scope", [ AuthorizationConstants.SenderScope ]));
-        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.RequireClaim("scope", [ AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope ] ));
-        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.RequireClaim("scope", [ AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope ]));
-        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.RequireClaim("scope", [ AuthorizationConstants.Legacy ]));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)));
+        options.AddPolicy(AuthorizationConstants.ResourceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.AdminScope)));
+        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)));
+        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])));
+        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)));
     });
 
     services.Configure<KestrelServerOptions>(options =>

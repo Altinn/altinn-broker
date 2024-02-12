@@ -11,4 +11,5 @@ public static class AuthorizationConstants
     public const string SenderScope = "altinn:broker.write";
     public const string RecipientScope = "altinn:broker.read";
     public const string AdminScope = "altinn:broker.admin";
+    public const string LegacyScope = "altinn:broker.legacy";
 }
