@@ -10,12 +10,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.ResourceRegistry;
-internal class AltinnResourceRegistryRepository : IResourceRepository
+public class AltinnResourceRegistryRepository : IResourceRepository
 {
     private readonly HttpClient _client;
     private readonly ILogger<AltinnResourceRegistryRepository> _logger;
 
-    internal AltinnResourceRegistryRepository(HttpClient httpClient, IOptions<AltinnOptions> options, ILogger<AltinnResourceRegistryRepository> logger)
+    public AltinnResourceRegistryRepository(HttpClient httpClient, IOptions<AltinnOptions> options, ILogger<AltinnResourceRegistryRepository> logger)
     {
         httpClient.BaseAddress = new Uri(options.Value.PlatformGatewayUrl);
         _client = httpClient;
