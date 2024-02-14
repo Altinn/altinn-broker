@@ -29,7 +29,7 @@ public class FileRepository : IFileRepository
             @"
                 SELECT 
                     f.file_id_pk, 
-                    f.resource_id_fk, 
+                    f.resource_id, 
                     f.filename, 
                     f.checksum, 
                     f.sender_actor_id_fk, 
@@ -78,7 +78,7 @@ public class FileRepository : IFileRepository
                 file = new FileEntity
                 {
                     FileId = reader.GetGuid(reader.GetOrdinal("file_id_pk")),
-                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id_fk")),
+                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
                     Filename = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileReference = reader.GetString(reader.GetOrdinal("external_file_reference")),
@@ -173,7 +173,7 @@ public class FileRepository : IFileRepository
 
         var fileId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file (file_id_pk, resource_id_fk, filename, checksum, filesize, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
+            "INSERT INTO broker.file (file_id_pk, resource_id, filename, checksum, filesize, external_file_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
             "VALUES (@fileId, @resourceId, @filename, @checksum, @filesize, @externalFileReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
 
         command.Parameters.AddWithValue("@fileId", fileId);
@@ -227,7 +227,7 @@ public class FileRepository : IFileRepository
         }
         if (!string.IsNullOrWhiteSpace(fileSearch.ResourceId))
         {
-            commandString.AppendLine("AND resource_id_fk = @resourceId");
+            commandString.AppendLine("AND resource_id = @resourceId");
         }
         if (fileSearch.RecipientStatus.HasValue)
         {
@@ -276,7 +276,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.actor_file_status afs ");
         commandString.AppendLine("INNER JOIN broker.file f on f.file_id_pk = afs.file_id_fk");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId AND f.resource_id_fk = @resourceId");
+        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId AND f.resource_id = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
@@ -300,7 +300,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.file f ");
         commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId AND resource_id_fk = @resourceId");
+        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND filestatus.file_status_Description_id_fk = @fileStatus");
@@ -353,7 +353,7 @@ public class FileRepository : IFileRepository
         commandString.AppendLine("FROM broker.file f");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_status_id_fk FROM broker.actor_file_status afs WHERE afs.file_id_fk = f.file_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_status_description_id_fk FROM broker.file_status fs where fs.file_id_fk = f.file_id_pk ORDER BY fs.file_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus AND resource_id_fk = @resourceId");
+        commandString.AppendLine("WHERE actor_file_status_id_fk = @recipientFileStatus AND resource_id = @resourceId");
         if (fileSearch.Status.HasValue)
         {
             commandString.AppendLine("AND file_status_description_id_fk = @fileStatus");

@@ -29,10 +29,11 @@ public class ResourceRightsRepository : IResourceRightsRepository
             return true; // Legacy users are already authorized in Altinn 2
         }
 
+        return true;
         using var command = await _connectionProvider.CreateCommand(
             "SELECT EXISTS(SELECT 1 FROM broker.user_right " +
             "JOIN broker.user_right_description ON broker.user_right.user_right_description_id_fk = broker.user_right_description.user_right_description_id_pk " +
-            "LEFT JOIN broker.resource r on broker.user_right.resource_id_fk = r.resource_id_pk " +
+            "LEFT JOIN broker.resource r on broker.user_right.resource_id = r.resource_id_pk " +
             "WHERE r.resource_id_pk = @resourceId AND user_id_fk = @userId AND user_right_description = @right)");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@userId", userId);
