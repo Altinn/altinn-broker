@@ -114,7 +114,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            ValidateIssuer = false,
+            ValidateIssuer = true,
             ValidateAudience = false,
             RequireExpirationTime = true,
             ValidateLifetime = true,
