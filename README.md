@@ -5,7 +5,9 @@ Formidlingstjenesten
 
 ## Postman
 
-Example requests using postman can be found in [Altinn3 Broker.postman_collection_examples.json](Altinn3 Broker.postman_collection_examples.json). 
+Example requests using postman can be found in [altinn3-broker-postman-collection.json](/altinn3-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
+
+You also need to register a resource in the Resource Registry, and use its id in the resource_id variable. You can use the requests in the Resource Registry folder with [the test policy](/Test/Altinn.Broker.Tests/Data/BasePolicy.xml) to do this. 
 
 ## Local Development
 
