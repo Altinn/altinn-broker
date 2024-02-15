@@ -10,7 +10,7 @@ CREATE TABLE broker.user_right_description (
 );
 
 CREATE TABLE broker.user_right (
-    resource_id character varying(100) NOT NULL,
+    resource_id text NOT NULL,
     user_id_fk character varying(36) NOT NULL,
     user_right_description_id_fk int,
     PRIMARY KEY (resource_id, user_id_fk, user_right_description_id_fk),
