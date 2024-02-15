@@ -117,7 +117,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             ValidateIssuer = true,
             ValidateAudience = false,
             RequireExpirationTime = true,
-            ValidateLifetime = true,
+            ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
             ClockSkew = TimeSpan.Zero
         };
     });
