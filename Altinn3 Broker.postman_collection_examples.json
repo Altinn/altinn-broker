@@ -724,7 +724,7 @@
 								{
 									"key": "policyFile",
 									"type": "file",
-									"src": "/C:/Workspace/altinn-broker/Test/Altinn.Broker.Tests/Data/BasePolicy.xml"
+									"src": "./Test/Altinn.Broker.Tests/Data/BasePolicy.xml"
 								}
 							]
 						},
