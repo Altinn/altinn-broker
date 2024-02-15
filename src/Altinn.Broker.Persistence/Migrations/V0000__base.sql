@@ -62,7 +62,7 @@ CREATE TABLE broker.file_status_description (
 
 CREATE TABLE broker.file (
     file_id_pk uuid PRIMARY KEY,
-    resource_id character varying(100) NOT NULL,
+    resource_id text NOT NULL,
     created timestamp without time zone NOT NULL,
     filename character varying(500) NOT NULL,
     checksum character varying(500) NULL,
