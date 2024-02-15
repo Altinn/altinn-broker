@@ -1,3 +1,4 @@
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
@@ -27,7 +28,7 @@ namespace Altinn.Broker.Controllers
     [ApiController]
     [Route("broker/api/legacy/v1/file")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    [Authorize(Policy = "Legacy")]
+    [Authorize(Policy = AuthorizationConstants.Legacy)]
     public class LegacyFileController : Controller
     {
         private readonly ILogger<LegacyFileController> _logger;
