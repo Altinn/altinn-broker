@@ -16,5 +16,5 @@ public static class Errors
     public static Error NoAccessToResource = new Error(8, "You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry", HttpStatusCode.Unauthorized);
     public static Error FileNotAvailable = new Error(9, "The requested file is not ready for download. See file status.", HttpStatusCode.Forbidden);
     public static Error UploadFailed = new Error(10, "Error occurred while uploading file. See /details for more information.", HttpStatusCode.InternalServerError);
-    public static Error ChecksumMismatch = new Error(12, "The checksum of uploaded file did not match the checksum specified in initialize call.", HttpStatusCode.BadRequest);
+    public static Error ChecksumMismatch = new Error(11, "The checksum of uploaded file did not match the checksum specified in initialize call.", HttpStatusCode.BadRequest);
 }

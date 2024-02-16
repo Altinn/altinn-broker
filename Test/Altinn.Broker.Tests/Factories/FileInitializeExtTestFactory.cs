@@ -5,7 +5,7 @@ internal static class FileInitializeExtTestFactory
 {
     internal static FileInitalizeExt BasicFile() => new FileInitalizeExt()
     {
-        ResourceId = "resource-1",
+        ResourceId = "altinn-broker-test-resource-1",
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],
@@ -15,7 +15,7 @@ internal static class FileInitializeExtTestFactory
     };
     internal static FileInitalizeExt BasicFile_MultipleRecipients() => new FileInitalizeExt()
     {
-        ResourceId = "resource-2",
+        ResourceId = "altinn-broker-test-resource-2",
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],

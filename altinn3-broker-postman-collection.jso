@@ -1,0 +1,1131 @@
+{
+	"info": {
+		"_postman_id": "a372d772-482c-4859-b0e3-93e049f6c2ce",
+		"name": "Altinn.Broker",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "32732086"
+	},
+	"item": [
+		{
+			"name": "Broker",
+			"item": [
+				{
+					"name": "{fileId}",
+					"item": [
+						{
+							"name": "Upload",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{sender_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/octet-stream",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "file",
+									"file": {
+										"src": "/C:/Users/roarm/Downloads/reskit-win64.zip"
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file",
+										"{{fileId}}",
+										"upload"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Success",
+									"originalRequest": {
+										"method": "POST",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"file",
+												":fileId",
+												"upload"
+											],
+											"variable": [
+												{
+													"key": "fileId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [],
+									"cookie": [],
+									"body": ""
+								}
+							]
+						},
+						{
+							"name": "Details",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{sender_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/details",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file",
+										"{{fileId}}",
+										"details"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Success",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "text/plain"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/details",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"file",
+												":fileId",
+												"details"
+											],
+											"variable": [
+												{
+													"key": "fileId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Published\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"nulla_e\": \"<string>\"\n  },\n  \"fileStatusHistory\": [\n    {\n      \"fileStatus\": \"AllConfirmedDownloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"fileStatus\": \"Downloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"recipientFileStatusHistory\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ]\n}"
+								}
+							]
+						},
+						{
+							"name": "Download",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{recipient_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file",
+										"{{fileId}}",
+										"download"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Success",
+									"originalRequest": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/download",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"file",
+												":fileId",
+												"download"
+											],
+											"variable": [
+												{
+													"key": "fileId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [],
+									"cookie": [],
+									"body": ""
+								},
+								{
+									"name": "/broker/api/v1/file/:fileId/download",
+									"originalRequest": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"file",
+												"{{fileId}}",
+												"download"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "raw",
+									"header": [
+										{
+											"key": "Content-Length",
+											"value": "0"
+										},
+										{
+											"key": "Content-Type",
+											"value": "application/octet-stream"
+										},
+										{
+											"key": "Date",
+											"value": "Mon, 06 Nov 2023 16:58:12 GMT"
+										},
+										{
+											"key": "Server",
+											"value": "Kestrel"
+										},
+										{
+											"key": "Content-Disposition",
+											"value": "attachment; filename=document.pdf; filename*=UTF-8''document.pdf"
+										}
+									],
+									"cookie": [],
+									"body": ""
+								}
+							]
+						},
+						{
+							"name": "Confirm Download",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{recipient_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/confirmdownload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file",
+										"{{fileId}}",
+										"confirmdownload"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Success",
+									"originalRequest": {
+										"method": "POST",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/confirmdownload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"file",
+												":fileId",
+												"confirmdownload"
+											],
+											"variable": [
+												{
+													"key": "fileId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [],
+									"cookie": [],
+									"body": ""
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Overview",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{sender_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"file",
+								"{{fileId}}"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file/:fileId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file",
+										":fileId"
+									],
+									"variable": [
+										{
+											"key": "fileId"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Initialize",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
+									"pm.collectionVariables.set(\"fileId\", fileId);\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{sender_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"filename\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"sender\": \"0192:991825827\",\n  \"recipients\": [\n    \"0192:986252932\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/file",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"file"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"filename\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    \"<string>\",\n    \"<string>\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"<string>\",\n    \"veniam_1d\": \"<string>\"\n  }\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "<uuid>"
+						}
+					]
+				},
+				{
+					"name": "Search",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{sender_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/file?resourceId={{resource_id}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"file"
+							],
+							"query": [
+								{
+									"key": "resourceId",
+									"value": "{{resource_id}}"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/file",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"file"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n  \"<string>\",\n  \"<string>\"\n]"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Resource Registry",
+			"item": [
+				{
+					"name": "Create resource",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{resourceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"identifier\": \"{{resource_id}}\",\r\n    \"title\": {\r\n        \"en\": \"Altinn Broker - Test\",\r\n        \"nb-no\": \"Altinn Broker - Test\",\r\n        \"nn-no\": \"Altinn Broker - Test\"\r\n    },\r\n    \"description\": {\r\n        \"en\": \"Altinn Broker test resource\",\r\n        \"nb-no\": \"Altinn Broker testressurs\",\r\n        \"nn-no\": \"Altinn Broker testressurs\"\r\n    },\r\n    \"rightDescription\": {\r\n        \"en\": \"Access to Altinn Broker test resource\",\r\n        \"nb-no\": \"Tilgang til Altinn Broker testressurs\",\r\n        \"nn-no\": \"Tilgang til Altinn Broker testressurs\"\r\n    },\r\n    \"homepage\": \"https://www.digdir.no/\",\r\n    \"status\": \"Active\",\r\n    \"contactPoints\": [],\r\n    \"isPartOf\": \"Altinn\",\r\n    \"resourceReferences\": [],\r\n    \"delegable\": false,\r\n    \"visible\": false,\r\n    \"hasCompetentAuthority\": {\r\n        \"organization\": \"991825827\",\r\n        \"orgcode\": \"TTD\",\r\n        \"name\": {\r\n            \"en\": \"Testdepartementet\",\r\n            \"nb-no\": \"Testdepartementet\",\r\n            \"nn-no\": \"Testdepartementet\"\r\n        }\r\n    },\r\n    \"keywords\": [],\r\n    \"limitedByRRR\": false,\r\n    \"selfIdentifiedUserEnabled\": false,\r\n    \"enterpriseUserEnabled\": false,\r\n    \"resourceType\": \"GenericAccessResource\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource",
+							"protocol": "https",
+							"host": [
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
+							],
+							"path": [
+								"resourceregistry",
+								"api",
+								"v1",
+								"resource"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Resource",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}",
+							"protocol": "https",
+							"host": [
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
+							],
+							"path": [
+								"resourceregistry",
+								"api",
+								"v1",
+								"resource",
+								"{{resource_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Resource Policy",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{resourceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "policyFile",
+									"type": "file",
+									"src": "./Test/Altinn.Broker.Tests/Data/BasePolicy.xml"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}/policy",
+							"protocol": "https",
+							"host": [
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
+							],
+							"path": [
+								"resourceregistry",
+								"api",
+								"v1",
+								"resource",
+								"{{resource_id}}",
+								"policy"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authenticator",
+			"item": [
+				{
+					"name": "Install Postman Utility (Initialize)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code should be 200\", function () {",
+									"    pm.response.to.have.status(200)",
+									"    pm.globals.set(\"pmlib_code\", responseBody)",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://joolfe.github.io/postman-util-lib/dist/bundle.js",
+							"protocol": "https",
+							"host": [
+								"joolfe",
+								"github",
+								"io"
+							],
+							"path": [
+								"postman-util-lib",
+								"dist",
+								"bundle.js"
+							]
+						},
+						"description": "Load the postman-util-lib from github.io and load into postman global variable."
+					},
+					"response": []
+				},
+				{
+					"name": "Login to Maskinporten (Initialize)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const jwt = pmlib.jwtSign(\r",
+									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")), \r",
+									"    payload = {\r",
+									"        \"aud\": \"https://test.maskinporten.no/\",\r",
+									"        \"scope\": \"altinn:testtools/tokengenerator/enterprise\",\r",
+									"        \"iss\": pm.variables.get(\"client_id\")\r",
+									"    }, \r",
+									"    header = {\r",
+									"        \"kid\": pm.variables.get(\"client_kid\")\r",
+									"    }, \r",
+									"    exp = 120, \r",
+									"    alg = 'RS256');\r",
+									"pm.variables.set('sender_jwt', jwt);\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var responseData = JSON.parse(responseBody);\r",
+									"pm.globals.set(\"test_token\", responseData.access_token);\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+									"type": "text"
+								},
+								{
+									"key": "assertion",
+									"value": "{{sender_jwt}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://test.maskinporten.no/token",
+							"protocol": "https",
+							"host": [
+								"test",
+								"maskinporten",
+								"no"
+							],
+							"path": [
+								"token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Authenticate as new sender",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"sender_token\", responseBody);\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write&org=digdir&orgNo=991825827",
+							"protocol": "https",
+							"host": [
+								"altinn-testtools-token-generator",
+								"azurewebsites",
+								"net"
+							],
+							"path": [
+								"api",
+								"GetEnterpriseToken"
+							],
+							"query": [
+								{
+									"key": "env",
+									"value": "tt02"
+								},
+								{
+									"key": "scopes",
+									"value": "altinn:broker.write"
+								},
+								{
+									"key": "org",
+									"value": "digdir"
+								},
+								{
+									"key": "orgNo",
+									"value": "991825827"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Authenticate as new recipient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"recipient_token\", responseBody);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read altinn:events.publish&org=ttd&orgNo=986252932",
+							"protocol": "https",
+							"host": [
+								"altinn-testtools-token-generator",
+								"azurewebsites",
+								"net"
+							],
+							"path": [
+								"api",
+								"GetEnterpriseToken"
+							],
+							"query": [
+								{
+									"key": "env",
+									"value": "tt02"
+								},
+								{
+									"key": "scopes",
+									"value": "altinn:broker.read altinn:events.publish"
+								},
+								{
+									"key": "org",
+									"value": "ttd"
+								},
+								{
+									"key": "orgNo",
+									"value": "986252932"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Authenticate as resource owner (tjeneste-eier)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"resourceowner_token\", responseBody);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:resourceregistry/resource.write&org=digdir&orgNo=991825827",
+							"protocol": "https",
+							"host": [
+								"altinn-testtools-token-generator",
+								"azurewebsites",
+								"net"
+							],
+							"path": [
+								"api",
+								"GetEnterpriseToken"
+							],
+							"query": [
+								{
+									"key": "env",
+									"value": "tt02"
+								},
+								{
+									"key": "scopes",
+									"value": "altinn:resourceregistry/resource.write"
+								},
+								{
+									"key": "org",
+									"value": "digdir"
+								},
+								{
+									"key": "orgNo",
+									"value": "991825827"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "client_id",
+			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.samarbeid.digdir.no/integrations)",
+			"type": "string"
+		},
+		{
+			"key": "client_kid",
+			"value": "Your Maskinporten client key kid. Can also be found in the JWK.",
+			"type": "string"
+		},
+		{
+			"key": "client_jwk",
+			"value": "\nInput your Maskinporten JWK here. Should be on the form: \n{\n        \"p\": \"....\",\n        \"kty\": \"RSA\",\n        \"q\": \"....\",\n        \"d\": \"...\",\n        \"e\": \"AQAB\",\n        \"use\": \"sig\",\n        \"kid\": \"client_kid\",\n        \"qi\": \"....\",\n        \"dp\": \"...\",\n        \"alg\": \"RS256\",\n        \"dq\": \"....\",\n        \"n\": \"....\"\n    }",
+			"type": "string"
+		},
+		{
+			"key": "resource_id",
+			"value": "Set resource id here",
+			"type": "string"
+		},
+		{
+			"key": "baseUrl",
+			"value": "https://platform.tt02.altinn.no",
+			"type": "string"
+		}
+	]
+}

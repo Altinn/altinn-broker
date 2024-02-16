@@ -30,4 +30,14 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Data\altinn-broker-test-resource-1.json" />
+    <None Remove="Data\altinn-broker-test-resource-2.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Data\altinn-broker-test-resource-1.json" />
+    <Content Include="Data\altinn-broker-test-resource-2.json" />
+  </ItemGroup>
+
 </Project>

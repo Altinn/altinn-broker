@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Configuration;
-using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
@@ -114,10 +114,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            ValidateIssuer = false,
+            ValidateIssuer = true,
             ValidateAudience = false,
             RequireExpirationTime = true,
-            ValidateLifetime = true,
+            ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
             ClockSkew = TimeSpan.Zero
         };
     });
@@ -126,7 +126,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddAuthorization(options =>
     {
         options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)));
-        options.AddPolicy(AuthorizationConstants.ResourceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.AdminScope)));
         options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)));
         options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])));
         options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)));

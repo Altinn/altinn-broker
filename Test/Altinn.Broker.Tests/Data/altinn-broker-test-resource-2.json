@@ -1,0 +1,39 @@
+{
+  "identifier": "altinn-broker-test-resource-2",
+  "title": {
+    "en": "Altinn Broker - Delete",
+    "nb-no": "Altinn Broker - Slett",
+    "nn-no": "Altinn Broker - Slett"
+  },
+  "description": {
+    "en": "Altinn Broker test resource",
+    "nb-no": "Altinn Broker testressurs",
+    "nn-no": "Altinn Broker testressurs"
+  },
+  "rightDescription": {
+    "en": "Access to Altinn Broker test resource 2",
+    "nb-no": "Tilgang til Altinn Broker testressurs 2",
+    "nn-no": "Tilgang til Altinn Broker testressurs 2"
+  },
+  "homepage": "https://www.digdir.no/",
+  "status": "Active",
+  "contactPoints": [],
+  "isPartOf": "Altinn",
+  "resourceReferences": [],
+  "delegable": false,
+  "visible": false,
+  "hasCompetentAuthority": {
+    "organization": "991825827",
+    "orgcode": "TTD",
+    "name": {
+      "en": "Testdepartementet",
+      "nb-no": "Testdepartementet",
+      "nn-no": "Testdepartementet"
+    }
+  },
+  "keywords": [],
+  "limitedByRRR": false,
+  "selfIdentifiedUserEnabled": false,
+  "enterpriseUserEnabled": false,
+  "resourceType": "GenericAccessResource"
+}
