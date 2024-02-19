@@ -57,7 +57,8 @@ public static class XacmlMappers
         {
             Attribute = new List<XacmlJsonAttribute>
                 {
-                    DecisionHelper.CreateXacmlJsonAttribute(MatchAttributeIdentifiers.ActionId, actionType, DefaultType, DefaultIssuer, includeResult)
+                    DecisionHelper.CreateXacmlJsonAttribute(MatchAttributeIdentifiers.ActionId, actionType, DefaultType, DefaultIssuer, includeResult),
+                    DecisionHelper.CreateXacmlJsonAttribute(MatchAttributeIdentifiers.ActionId, "publish", DefaultType, DefaultIssuer, includeResult) // Permission to publish events is always required
                 }
         };
         return actionAttributes;
@@ -74,6 +75,7 @@ public static class XacmlMappers
         XacmlJsonCategory resourceCategory = new() { Attribute = new List<XacmlJsonAttribute>() };
 
         resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceId, resourceEntity.Id, DefaultType, DefaultIssuer));
+        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.AppId, "altinn-broker", DefaultType, DefaultIssuer));
 
         return resourceCategory;
     }

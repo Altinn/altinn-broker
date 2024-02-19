@@ -46,7 +46,7 @@ public class AltinnAuthorizationService : IResourceRightsRepository
             _logger.LogError("Unexpected null value. User was null when checking access to resource");
             return false;
         }
-        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, "publish", resource);
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, GetActionId(right), resource);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/decision", jsonRequest);
         if (!response.IsSuccessStatusCode)
         {
@@ -75,6 +75,8 @@ public class AltinnAuthorizationService : IResourceRightsRepository
         subjectCategory.Attribute = subjectCategory.Attribute.Where(attribute => attribute.AttributeId != "urn:altinn:authlevel").ToList(); // Temp fix as xcaml int32 not implemented
         request.AccessSubject.Add(subjectCategory);
         request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
+        request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
+        request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
         request.Resource.Add(XacmlMappers.CreateResourceCategory(resourceEntity));
 
         XacmlJsonRequestRoot jsonRequest = new() { Request = request };
@@ -89,5 +91,15 @@ public class AltinnAuthorizationService : IResourceRightsRepository
         }
 
         return false;
+    }
+
+    private string GetActionId(ResourceAccessLevel right)
+    {
+        return right switch
+        {
+            ResourceAccessLevel.Read => "read",
+            ResourceAccessLevel.Write => "write",
+            _ => throw new NotImplementedException()
+        };
     }
 }
