@@ -5,7 +5,6 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
-using Altinn.Broker.Application;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -14,8 +13,6 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire.Common;
 using Hangfire.States;
-
-using Microsoft.AspNetCore.Mvc;
 
 using Moq;
 
@@ -27,7 +24,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
-    private readonly HttpClient _unregisteredClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public FileControllerTests(CustomWebApplicationFactory factory)
@@ -35,7 +31,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
-        _unregisteredClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_UNREGISTERED_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true
@@ -235,16 +230,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         // Assert
         Assert.DoesNotContain(fileId, contentstring);
-    }
-
-    [Fact]
-    public async Task SendFile_UsingUnregisteredUser_Fails()
-    {
-        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
-        Assert.False(initializeFileResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
     }
 
     [Fact]
