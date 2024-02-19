@@ -22,11 +22,10 @@ public class AltinnAuthorizationService : IResourceRightsRepository
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
 
-    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IOptions<PlatformSettings> platformSettings, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
+    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
     {
         httpClient.BaseAddress = new Uri(altinnOptions.Value.PlatformGatewayUrl);
-        httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", platformSettings.Value.SubscriptionKey);
-        //httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
+        httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
         _resourceRepository = resourceRepository;
@@ -47,7 +46,7 @@ public class AltinnAuthorizationService : IResourceRightsRepository
             return false;
         }
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, GetActionId(right), resource);
-        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/decision", jsonRequest);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest);
         if (!response.IsSuccessStatusCode)
         {
             return false;
