@@ -51,7 +51,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             return false;
         }
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, GetActionId(right), resource);
-        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/decision", jsonRequest);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest);
         if (!response.IsSuccessStatusCode)
         {
             return false;
