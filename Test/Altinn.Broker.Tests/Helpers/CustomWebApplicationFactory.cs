@@ -1,5 +1,8 @@
 using System.Net.Http.Headers;
 
+using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Repositories;
+
 using Hangfire;
 using Hangfire.MemoryStorage;
 
@@ -52,6 +55,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             );
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
+
+            var authorizationService = new Mock<IResourceRightsRepository>();
+            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(true);
+            services.AddSingleton(authorizationService.Object);
         });
     }
 
