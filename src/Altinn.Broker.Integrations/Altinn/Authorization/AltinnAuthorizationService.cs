@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
@@ -22,7 +23,7 @@ public class AltinnAuthorizationService : IResourceRightsRepository
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
 
-    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
+    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IOptions<PlatformSettings> platformSettings, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
     {
         httpClient.BaseAddress = new Uri(altinnOptions.Value.PlatformGatewayUrl);
         httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
@@ -34,6 +35,10 @@ public class AltinnAuthorizationService : IResourceRightsRepository
 
     public async Task<bool> CheckUserAccess(string resourceId, string userId, ResourceAccessLevel right, bool IsLegacyUser = false)
     {
+        if (IsLegacyUser)
+        {
+            return true;
+        }
         var resource = await _resourceRepository.GetResource(resourceId);
         if (resource is null)
         {
@@ -46,7 +51,7 @@ public class AltinnAuthorizationService : IResourceRightsRepository
             return false;
         }
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, GetActionId(right), resource);
-        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/decision", jsonRequest);
         if (!response.IsSuccessStatusCode)
         {
             return false;
