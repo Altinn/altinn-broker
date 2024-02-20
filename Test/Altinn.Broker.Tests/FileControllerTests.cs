@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -13,6 +14,8 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire.Common;
 using Hangfire.States;
+
+using Microsoft.AspNetCore.Mvc;
 
 using Moq;
 
@@ -318,6 +321,18 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(fileDetails);
         Assert.NotNull(fileDetails.Checksum);
         Assert.Equal(checksum, fileDetails.Checksum);
+    }
+
+    [Fact]
+    public async Task SendFile_UsingUnregisteredUser_Fails()
+    {
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.ResourceId = TestConstants.RESOURCE_WITH_NO_ACCESS;
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
+        Assert.False(initializeFileResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFile(string fileId, string fileContent)

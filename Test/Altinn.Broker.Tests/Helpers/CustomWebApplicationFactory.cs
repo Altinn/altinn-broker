@@ -1,7 +1,9 @@
 using System.Net.Http.Headers;
 
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
@@ -56,8 +58,22 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
 
+            var resourceRegistryRepository = new Mock<IResourceRepository>();
+            string capturedId = "";
+            resourceRegistryRepository.Setup(x => x.GetResource(It.IsAny<string>()))
+                .Callback((string id) => capturedId = id)
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = capturedId,
+                    Created = DateTime.UtcNow,
+                    ResourceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
+            services.AddSingleton(resourceRegistryRepository.Object);
+
             var authorizationService = new Mock<IAuthorizationService>();
             authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckUserAccess(TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(false);
             services.AddSingleton(authorizationService.Object);
         });
     }
