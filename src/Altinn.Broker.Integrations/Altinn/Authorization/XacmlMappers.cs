@@ -46,7 +46,7 @@ public static class XacmlMappers
     internal const string ResourceId = "r";
 
     /// <summary>
-    /// Creates an action category with the porovided action type as an attribute
+    /// Creates an action category with the provided action type as an attribute
     /// </summary>
     /// <param name="actionType">Action type represented as a string</param>
     /// <param name="includeResult">A value indicating whether the value should be included in the result</param>
