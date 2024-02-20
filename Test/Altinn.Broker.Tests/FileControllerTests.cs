@@ -329,10 +329,10 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Arrange
         var file = FileInitializeExtTestFactory.BasicFile();
         file.ResourceId = TestConstants.RESOURCE_WITH_NO_ACCESS;
-        
+
         // Act
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
-        
+
         // Assert
         Assert.False(initializeFileResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
