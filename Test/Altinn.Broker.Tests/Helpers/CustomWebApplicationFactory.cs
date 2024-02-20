@@ -56,7 +56,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
 
-            var authorizationService = new Mock<IResourceRightsRepository>();
+            var authorizationService = new Mock<IAuthorizationService>();
             authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(true);
             services.AddSingleton(authorizationService.Object);
         });

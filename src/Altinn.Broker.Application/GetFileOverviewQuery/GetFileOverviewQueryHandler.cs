@@ -11,11 +11,11 @@ namespace Altinn.Broker.Application.GetFileOverviewQuery;
 
 public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest, GetFileOverviewQueryResponse>
 {
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IFileRepository _fileRepository;
     private readonly ILogger<GetFileOverviewQueryHandler> _logger;
 
-    public GetFileOverviewQueryHandler(IResourceOwnerRepository resourceOwnerRepository, IResourceRightsRepository resourceRightsRepository, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
+    public GetFileOverviewQueryHandler(IResourceOwnerRepository resourceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileRepository fileRepository, IResourceManager resourceManager, ILogger<GetFileOverviewQueryHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _fileRepository = fileRepository;

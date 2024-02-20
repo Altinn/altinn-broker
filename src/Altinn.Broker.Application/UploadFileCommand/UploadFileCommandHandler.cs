@@ -12,7 +12,7 @@ namespace Altinn.Broker.Application.UploadFileCommand;
 
 public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 {
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
@@ -21,7 +21,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, ILogger<UploadFileCommandHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;

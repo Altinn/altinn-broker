@@ -16,6 +16,6 @@ public static class DependencyInjection
         services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
         services.AddSingleton<IFileStore, BlobService>();
         services.AddScoped<IResourceRepository, AltinnResourceRegistryRepository>();
-        services.AddScoped<IResourceRightsRepository, AltinnAuthorizationService>();
+        services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
     }
 }

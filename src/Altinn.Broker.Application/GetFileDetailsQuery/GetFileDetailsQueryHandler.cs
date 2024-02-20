@@ -9,11 +9,11 @@ namespace Altinn.Broker.Application.GetFileDetailsQuery;
 public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, GetFileDetailsQueryResponse>
 {
     private readonly IFileRepository _fileRepository;
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
 
-    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IResourceRightsRepository resourceRightsRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
+    public GetFileDetailsQueryHandler(IFileRepository fileRepository, IAuthorizationService resourceRightsRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository)
     {
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;

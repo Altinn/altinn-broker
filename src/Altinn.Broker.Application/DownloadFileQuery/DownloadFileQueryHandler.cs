@@ -11,13 +11,13 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileQueryHandler(IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IResourceRightsRepository resourceRightsRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
+    public DownloadFileQueryHandler(IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileRepository fileRepository, IActorFileStatusRepository actorFileStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
         _resourceRepository = resourceRepository;
         _resourceOwnerRepository = resourceOwnerRepository;

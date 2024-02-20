@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.Authorization;
-public class AltinnAuthorizationService : IResourceRightsRepository
+public class AltinnAuthorizationService : IAuthorizationService
 {
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;
