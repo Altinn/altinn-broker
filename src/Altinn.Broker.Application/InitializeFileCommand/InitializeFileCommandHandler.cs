@@ -3,6 +3,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
@@ -19,8 +20,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
-    private readonly IResourceManager _resourceManager;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
     public InitializeFileCommandHandler(
@@ -30,8 +31,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         IFileRepository fileRepository,
         IFileStatusRepository fileStatusRepository,
         IActorFileStatusRepository actorFileStatusRepository,
-        IResourceManager resourceManager,
         IBackgroundJobClient backgroundJobClient,
+        IEventBus eventBus,
         ILogger<InitializeFileCommandHandler> logger)
     {
         _resourceRepository = resourceRepository;
@@ -40,8 +41,8 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
-        _resourceManager = resourceManager;
         _backgroundJobClient = backgroundJobClient;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -78,6 +79,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
             _logger.LogError("Failed when adding recipient initialized events.");
         }
         _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId), resourceOwner.FileTimeToLive);
+        await _eventBus.Publish(AltinnEventType.FileInitialized, request.ResourceId, fileId.ToString());
 
         return fileId;
     }

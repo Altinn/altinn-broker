@@ -1,6 +1,8 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services.Enums;
+using Altinn.Broker.Core.Services;
 
 using Hangfire;
 
@@ -19,9 +21,10 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileCommandHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;
@@ -30,6 +33,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         _fileStatusRepository = fileStatusRepository;
         _brokerStorageService = brokerStorageService;
         _backgroundJobClient = backgroundJobClient;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -83,12 +87,17 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.");
+            await _eventBus.Publish(AltinnEventType.UploadFailed, file.ResourceId, request.FileId.ToString());
             return Errors.UploadFailed;
         }
         await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length);
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing);
-        // TODO, async jobs
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);
+        await _eventBus.Publish(AltinnEventType.UploadProcessing, file.ResourceId, request.FileId.ToString());
+        if (resourceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+        {
+            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);
+            await _eventBus.Publish(AltinnEventType.Published, file.ResourceId, request.FileId.ToString());
+        }
         return file.FileId;
     }
 }

@@ -4,6 +4,8 @@ using Altinn.Broker.Application.DeleteFileCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
+using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
@@ -13,22 +15,22 @@ using OneOf;
 
 public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequest, Task>
 {
-    private readonly IResourceOwnerRepository _resourceOwnerRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<ConfirmDownloadCommandHandler> logger)
     {
-        _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _resourceRightsRepository = resourceRightsRepository;
         _backgroundJobClient = backgroundJobClient;
+        _eventBus = eventBus;
         _logger = logger;
     }
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
@@ -51,13 +53,19 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             return Errors.NoFileUploaded;
         }
+        if (file.FileStatusEntity.Status != FileStatus.Published)
+        {
+            return Errors.FileNotPublished;
+        }
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer);
+        await _eventBus.Publish(AltinnEventType.DownloadConfirmed, file.ResourceId, file.FileId.ToString());
         bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
         if (shouldConfirmAll)
         {
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
             _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId));
+            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, file.ResourceId, file.FileId.ToString());
         }
 
         return Task.CompletedTask;
