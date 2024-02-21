@@ -40,7 +40,7 @@ public class ResourceOwnerController : Controller
             return Problem(detail: "Resource owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTimeToLive = XmlConvert.ToTimeSpan(resourceOwnerInitializeExt.DeletionTime); 
+        var fileTimeToLive = XmlConvert.ToTimeSpan(resourceOwnerInitializeExt.DeletionTime);
         await _resourceOwnerRepository.InitializeResourceOwner(token.Consumer, resourceOwnerInitializeExt.Name, fileTimeToLive);
         var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         BackgroundJob.Enqueue(
