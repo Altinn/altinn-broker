@@ -33,6 +33,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
         _resourceRepository = resourceRepository;
+        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
