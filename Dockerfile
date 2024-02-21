@@ -26,4 +26,4 @@ RUN addgroup -g 3000 dotnet && adduser -u 1000 -G dotnet -D -s /bin/false dotnet
 RUN mkdir -p /mnt/storage
 run chown -R dotnet:dotnet /mnt/storage
 USER dotnet
-ENTRYPOINT [ "dotnet", "Altinn.Broker.dll" ]
+ENTRYPOINT [ "dotnet", "Altinn.Broker.API.dll" ]
