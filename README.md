@@ -5,9 +5,11 @@ Formidlingstjenesten
 
 ## Postman
 
-Example requests using postman can be found in [altinn3-broker-postman-collection.json](/altinn3-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
+Example requests using postman can be found in [altinn3-broker-postman-collection.json](/altinn3-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". Also set the variable "resourceowner_orgnumber". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
 
-You also need to register a resource in the Resource Registry, and use its id in the resource_id variable. You can use the requests in the Resource Registry folder with [the test policy](/Test/Altinn.Broker.Tests/Data/BasePolicy.xml) to do this. 
+The first time you start testing in an environment, you need to register a resource owner in Broker so that we can provision the necessary storage resources for you. Use the "Register Resource Owner" request in the Postman collection to do this. Make sure you have run the Authenticator/"Authenticate as resource owner (tjeneste-eier)" request first. 
+
+Finally, you need to register a resource in the Resource Registry. First set the Postman variable resource_id to some unique ID. You can then use the requests in the Resource Registry folder with [the test policy](/Test/Altinn.Broker.Tests/Data/BasePolicy.xml) to create and manage the resource. As with registering a resource owner, you need to have authenticated as a resource owner to make these requests.
 
 ## Local Development
 
