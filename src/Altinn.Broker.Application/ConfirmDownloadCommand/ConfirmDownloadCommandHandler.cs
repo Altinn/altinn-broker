@@ -17,11 +17,11 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<ConfirmDownloadCommandHandler> _logger;
 
-    public ConfirmDownloadCommandHandler(IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IResourceRightsRepository resourceRightsRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
+    public ConfirmDownloadCommandHandler(IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IActorFileStatusRepository actorFileStatusRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, ILogger<ConfirmDownloadCommandHandler> logger)
     {
         _resourceOwnerRepository = resourceOwnerRepository;
         _fileRepository = fileRepository;

@@ -11,13 +11,13 @@ namespace Altinn.Broker.Application.GetFilesQuery;
 
 public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, List<Guid>>
 {
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IActorRepository _actorRepository;
     private readonly ILogger<GetFilesQueryHandler> _logger;
 
-    public LegacyGetFilesQueryHandler(IResourceRightsRepository resourceRightsRepository, IResourceRepository resourceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
+    public LegacyGetFilesQueryHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileRepository fileRepository, IActorRepository actorRepository, ILogger<GetFilesQueryHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;

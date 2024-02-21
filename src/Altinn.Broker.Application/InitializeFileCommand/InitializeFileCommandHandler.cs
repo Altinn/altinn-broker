@@ -15,7 +15,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
-    private readonly IResourceRightsRepository _resourceRightsRepository;
+    private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
@@ -26,7 +26,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     public InitializeFileCommandHandler(
         IResourceRepository resourceRepository,
         IResourceOwnerRepository resourceOwnerRepository,
-        IResourceRightsRepository resourceRightsRepository,
+        IAuthorizationService resourceRightsRepository,
         IFileRepository fileRepository,
         IFileStatusRepository fileStatusRepository,
         IActorFileStatusRepository actorFileStatusRepository,

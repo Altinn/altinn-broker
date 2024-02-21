@@ -27,7 +27,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
-    private readonly HttpClient _unregisteredClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public FileControllerTests(CustomWebApplicationFactory factory)
@@ -35,7 +34,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
-        _unregisteredClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_UNREGISTERED_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true
@@ -238,16 +236,6 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task SendFile_UsingUnregisteredUser_Fails()
-    {
-        var initializeFileResponse = await _unregisteredClient.PostAsJsonAsync("broker/api/v1/file", FileInitializeExtTestFactory.BasicFile());
-        Assert.False(initializeFileResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
-    }
-
-    [Fact]
     public async Task UploadFile_ChecksumCorrect_Succeeds()
     {
         // Arrange
@@ -333,6 +321,23 @@ public class FileControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(fileDetails);
         Assert.NotNull(fileDetails.Checksum);
         Assert.Equal(checksum, fileDetails.Checksum);
+    }
+
+    [Fact]
+    public async Task SendFile_UsingUnregisteredUser_Fails()
+    {
+        // Arrange
+        var file = FileInitializeExtTestFactory.BasicFile();
+        file.ResourceId = TestConstants.RESOURCE_WITH_NO_ACCESS;
+
+        // Act
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/file", file);
+
+        // Assert
+        Assert.False(initializeFileResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFile(string fileId, string fileContent)

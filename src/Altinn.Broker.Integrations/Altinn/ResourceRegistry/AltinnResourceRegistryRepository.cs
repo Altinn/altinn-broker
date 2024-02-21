@@ -44,7 +44,8 @@ public class AltinnResourceRegistryRepository : IResourceRepository
         return new ResourceEntity()
         {
             Id = altinnResourceResponse.Identifier,
-            ResourceOwnerId = $"0192:{altinnResourceResponse.HasCompetentAuthority.Organization}"
+            ResourceOwnerId = $"0192:{altinnResourceResponse.HasCompetentAuthority.Organization}",
+            OrganizationNumber = altinnResourceResponse.HasCompetentAuthority.Organization,
         };
     }
 }
