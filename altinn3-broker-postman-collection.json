@@ -820,7 +820,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"name\": \"TestResourceOwner\",\r\n    \"deletionTime\": \"30D\"\r\n}",
+							"raw": "{\r\n    \"name\": \"TestResourceOwner\",\r\n    \"deletionTime\": \"P30D\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
