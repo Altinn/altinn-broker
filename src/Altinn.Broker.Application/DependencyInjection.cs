@@ -22,5 +22,6 @@ public static class DependencyInjection
         services.AddScoped<GetFilesQueryHandler>();
         services.AddScoped<DeleteFileCommandHandler>();
         services.AddScoped<LegacyGetFilesQueryHandler>();
+        services.AddScoped<MalwareScanningResultHandler>();
     }
 }

@@ -3,6 +3,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
+using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Repositories;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -17,5 +18,6 @@ public static class DependencyInjection
         services.AddSingleton<IFileStore, BlobService>();
         services.AddScoped<IResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
+        services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
     }
 }
