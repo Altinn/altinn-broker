@@ -1,18 +1,25 @@
 ﻿using System.Net;
 using System.Xml;
 
+using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.ResourceOwner;
 
 using Hangfire;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/resourceowner")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+[Authorize(Policy = AuthorizationConstants.ResourceOwner)]
 public class ResourceOwnerController : Controller
 {
     private readonly IResourceOwnerRepository _resourceOwnerRepository;
@@ -25,17 +32,17 @@ public class ResourceOwnerController : Controller
     }
 
     [HttpPost]
-    public async Task<ActionResult> CreateNewResourceOwner([FromBody] ResourceOwnerInitializeExt resourceOwnerInitializeExt)
+    public async Task<ActionResult> InitializeResourceOwner([FromBody] ResourceOwnerInitializeExt resourceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
     {
-        var existingResourceOwner = await _resourceOwnerRepository.GetResourceOwner(resourceOwnerInitializeExt.OrganizationId);
+        var existingResourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         if (existingResourceOwner is not null)
         {
             return Problem(detail: "Resource owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTimeToLive = XmlConvert.ToTimeSpan(resourceOwnerInitializeExt.DeletionTime); // ISO8601 Duration
-        await _resourceOwnerRepository.InitializeResourceOwner(resourceOwnerInitializeExt.OrganizationId, resourceOwnerInitializeExt.Name, fileTimeToLive);
-        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resourceOwnerInitializeExt.OrganizationId);
+        var fileTimeToLive = XmlConvert.ToTimeSpan(resourceOwnerInitializeExt.DeletionTime);
+        await _resourceOwnerRepository.InitializeResourceOwner(token.Consumer, resourceOwnerInitializeExt.Name, fileTimeToLive);
+        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(resourceOwner!)
         );
