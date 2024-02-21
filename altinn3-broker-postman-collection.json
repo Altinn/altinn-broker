@@ -814,7 +814,8 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"const jwt = pmlib.jwtSign(\r",
+									"    eval(pm.variables.get(\"pmlib_code\"))",
+									"    const jwt = pmlib.jwtSign(\r",
 									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")), \r",
 									"    payload = {\r",
 									"        \"aud\": \"https://test.maskinporten.no/\",\r",
