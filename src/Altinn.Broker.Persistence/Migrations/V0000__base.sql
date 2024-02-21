@@ -50,7 +50,7 @@ CREATE TABLE broker.storage_provider (
     storage_provider_id_pk bigserial PRIMARY KEY,    
     resource_owner_id_fk character varying(14) NOT NULL,
     created timestamp without time zone NOT NULL,
-    storage_provider_type character varying(50) NOT NULL CHECK (storage_provider_type = 'Altinn3Azure'),
+    storage_provider_type character varying(50) NOT NULL CHECK (storage_provider_type IN ('Altinn3Azure', 'Azurite')),
     resource_name character varying(500) NOT NULL,
     FOREIGN KEY (resource_owner_id_fk) REFERENCES broker.resource_owner (resource_owner_id_pk)
 );
