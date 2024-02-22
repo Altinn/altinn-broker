@@ -105,22 +105,38 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-    {
-        var altinnOptions = new AltinnOptions();
-        config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
-        options.SaveToken = true;
-        options.MetadataAddress = altinnOptions.OpenIdWellKnown;
-        options.TokenValidationParameters = new TokenValidationParameters
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            ValidateIssuerSigningKey = true,
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            RequireExpirationTime = true,
-            ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = altinnOptions.OpenIdWellKnown;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ClockSkew = TimeSpan.Zero
+            };
+        })
+        .AddJwtBearer("Legacy", options => { // To support "overgangslosningen"
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = altinnOptions.LegacyOpenIdWellKnown;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ClockSkew = TimeSpan.Zero
+            };
+        });
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
