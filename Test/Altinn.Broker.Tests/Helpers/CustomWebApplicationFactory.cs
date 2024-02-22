@@ -22,6 +22,7 @@ using Moq;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     internal Mock<IBackgroundJobClient>? HangfireBackgroundJobClient;
+    internal Mock<IRecurringJobManager>? HangfireRecurringJobClient;
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
@@ -57,6 +58,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             );
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
             services.AddSingleton(HangfireBackgroundJobClient.Object);
+            HangfireRecurringJobClient = new Mock<IRecurringJobManager>();
+            services.AddSingleton(HangfireRecurringJobClient.Object);
+
 
             var resourceRegistryRepository = new Mock<IResourceRepository>();
             string capturedId = "";

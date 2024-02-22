@@ -27,9 +27,19 @@ public class WebhookEventRepository : IWebhookEventRepository
     public async Task DeleteWebhookEventAsync(Guid WebhookEventId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "DELETE FROM broker.webhook_event" +
+                    "DELETE FROM broker.webhook_event " +
                     "WHERE webhook_event_id_pk = @webhook_event_id_pk");
         command.Parameters.AddWithValue("@webhook_event_id_pk", WebhookEventId);
+
+        await command.ExecuteNonQueryAsync();
+    }
+    public async Task DeleteOldWebhookEvents()
+    {
+        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+                    "DELETE FROM broker.webhook_event " +
+                    "WHERE created < @created");
+
+        command.Parameters.AddWithValue("@created", DateTime.UtcNow.AddDays(-1));
 
         await command.ExecuteNonQueryAsync();
     }

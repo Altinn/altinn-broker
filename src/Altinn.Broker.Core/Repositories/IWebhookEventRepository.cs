@@ -4,5 +4,6 @@ namespace Altinn.Broker.Core.Repositories
     {
         Task AddWebhookEventAsync(Guid id);
         Task DeleteWebhookEventAsync(Guid id);
+        Task DeleteOldWebhookEvents();
     }
 }
