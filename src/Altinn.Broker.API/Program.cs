@@ -121,9 +121,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
                 ClockSkew = TimeSpan.Zero
             };
-        });
-
-    services.AddAuthentication(AuthorizationConstants.Legacy)
+        })
         .AddJwtBearer(AuthorizationConstants.Legacy, options => { // To support "overgangslosningen"
             var altinnOptions = new AltinnOptions();
             config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
