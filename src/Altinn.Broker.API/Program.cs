@@ -105,11 +105,11 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
-    var altinnOptions = new AltinnOptions();
-    config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
             options.MetadataAddress = altinnOptions.OpenIdWellKnown;
             options.TokenValidationParameters = new TokenValidationParameters
@@ -121,10 +121,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
                 ClockSkew = TimeSpan.Zero
             };
-        })
-        .AddJwtBearer("Legacy", options => { // To support "overgangslosningen"
+        });
+
+    services.AddAuthentication(AuthorizationConstants.Legacy)
+        .AddJwtBearer(AuthorizationConstants.Legacy, options => { // To support "overgangslosningen"
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
-            options.MetadataAddress = altinnOptions.LegacyOpenIdWellKnown;
+            options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
