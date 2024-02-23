@@ -1,6 +1,7 @@
-using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Application;
+using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Repositories;
+
 using OneOf;
 
 namespace Altinn.Broker.Helpers;
@@ -34,7 +35,7 @@ public class WebhookEventHelper
                 // We are already processing or processed this webhook, return silently
                 return Task.CompletedTask;
             }
-            else throw e;
+            else throw;
 
         }
     }
