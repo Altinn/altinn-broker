@@ -27,7 +27,7 @@ namespace Altinn.Broker.Controllers
     /// </summary>
     [ApiController]
     [Route("broker/api/legacy/v1/file")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = AuthorizationConstants.Legacy)]
     [Authorize(Policy = AuthorizationConstants.Legacy)]
     public class LegacyFileController : Controller
     {
