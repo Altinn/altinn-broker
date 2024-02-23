@@ -12,7 +12,6 @@ using Altinn.Common.PEP.Configuration;
 using Altinn.Common.PEP.Helpers;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,24 +21,21 @@ public class AltinnAuthorizationService : IAuthorizationService
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IResourceRepository _resourceRepository;
-    private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<AltinnAuthorizationService> _logger;
 
-    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<AltinnAuthorizationService> logger)
+    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IOptions<PlatformSettings> platformSettings, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
     {
         httpClient.BaseAddress = new Uri(altinnOptions.Value.PlatformGatewayUrl);
         httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
-        httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", altinnOptions.Value.PlatformSubscriptionKey);
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
         _resourceRepository = resourceRepository;
-        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
     public async Task<bool> CheckUserAccess(string resourceId, string userId, ResourceAccessLevel right, bool IsLegacyUser = false)
     {
-        if (IsLegacyUser || _hostEnvironment.IsDevelopment())
+        if (IsLegacyUser)
         {
             return true;
         }
