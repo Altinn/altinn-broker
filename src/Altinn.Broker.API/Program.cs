@@ -106,7 +106,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.ConfigureHangfire();
 
     services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             var altinnOptions = new AltinnOptions();
             config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
@@ -122,7 +122,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ClockSkew = TimeSpan.Zero
             };
         })
-        .AddJwtBearer(AuthorizationConstants.Legacy, options => { // To support "overgangslosningen"
+        .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+        { 
             var altinnOptions = new AltinnOptions();
             config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
@@ -133,7 +134,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateIssuer = true,
                 ValidateAudience = false,
                 RequireExpirationTime = true,
-                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ValidateLifetime = !hostEnvironment.IsDevelopment(),
                 ClockSkew = TimeSpan.Zero
             };
         });
