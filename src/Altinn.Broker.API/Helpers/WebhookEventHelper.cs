@@ -13,7 +13,7 @@ public class WebhookEventHelper
         {
 
             // Create a new entry for that webhook id
-            await webhookEventRepository.AddWebhookEventAsync(data.CorrelationId);
+            await webhookEventRepository.AddWebhookEventAsync(data.ETag);
             try
             {
                 // Call you method
@@ -21,21 +21,13 @@ public class WebhookEventHelper
             }
             catch (Exception e)
             {
-
-                Console.WriteLine("Error: " + e.Message);
-                Console.WriteLine("Error: " + e.StackTrace);
-                Console.WriteLine("Error: " + e.InnerException?.Message);
                 // Delete the entry on error to make sure the next one isn't ignored
-                await webhookEventRepository.DeleteWebhookEventAsync(data.CorrelationId);
+                await webhookEventRepository.DeleteWebhookEventAsync(data.ETag);
                 return Task.CompletedTask;
             }
         }
         catch (Npgsql.PostgresException e)
         {
-
-            Console.WriteLine("Error: " + e.Message);
-            Console.WriteLine("Error code : " + e.ErrorCode);
-
             // PostgreSQL code for unique violation
             if (e.SqlState == "23505")
             {

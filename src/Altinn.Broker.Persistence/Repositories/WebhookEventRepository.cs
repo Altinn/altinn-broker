@@ -14,7 +14,7 @@ public class WebhookEventRepository : IWebhookEventRepository
     }
 
 
-    public async Task AddWebhookEventAsync(Guid WebhookEventId)
+    public async Task AddWebhookEventAsync(string WebhookEventId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "INSERT INTO broker.webhook_event (webhook_event_id_pk, created)" +
@@ -24,7 +24,7 @@ public class WebhookEventRepository : IWebhookEventRepository
 
         await command.ExecuteNonQueryAsync();
     }
-    public async Task DeleteWebhookEventAsync(Guid WebhookEventId)
+    public async Task DeleteWebhookEventAsync(string WebhookEventId)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "DELETE FROM broker.webhook_event " +
