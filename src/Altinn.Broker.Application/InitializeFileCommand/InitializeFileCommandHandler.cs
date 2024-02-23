@@ -19,7 +19,6 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly IFileRepository _fileRepository;
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
-    private readonly IResourceManager _resourceManager;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
@@ -30,7 +29,6 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         IFileRepository fileRepository,
         IFileStatusRepository fileStatusRepository,
         IActorFileStatusRepository actorFileStatusRepository,
-        IResourceManager resourceManager,
         IBackgroundJobClient backgroundJobClient,
         ILogger<InitializeFileCommandHandler> logger)
     {
@@ -40,7 +38,6 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         _fileRepository = fileRepository;
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
-        _resourceManager = resourceManager;
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
@@ -52,10 +49,6 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.NoAccessToResource;
         };
-        if (request.Token.Consumer != request.SenderExternalId)
-        {
-            return Errors.NoAccessToResource;
-        }
         var resource = await _resourceRepository.GetResource(request.ResourceId);
         if (resource is null)
         {
