@@ -1,7 +1,9 @@
 using System.Net.Http.Headers;
 
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
@@ -14,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -34,24 +37,43 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 o.SchemeMap.Clear();
                 ((IList<AuthenticationSchemeBuilder>)o.Schemes).Clear();
             });
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(async options =>
-            {
-                options.RequireHttpsMetadata = false;
-                options.SaveToken = true;
-                options.TokenValidationParameters = new TokenValidationParameters
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(async options =>
                 {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = false,
-                    RequireExpirationTime = false,
-                    RequireSignedTokens = false,
-                    SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+                    options.RequireHttpsMetadata = false;
+                    options.SaveToken = true;
+                    options.TokenValidationParameters = new TokenValidationParameters
                     {
-                        var jwt = new JsonWebToken(token);
-                        return jwt;
-                    }
-                };
-            });
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ValidateLifetime = false,
+                        RequireExpirationTime = false,
+                        RequireSignedTokens = false,
+                        SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+                        {
+                            var jwt = new JsonWebToken(token);
+                            return jwt;
+                        }
+                    };
+                }).AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+                {
+                    options.RequireHttpsMetadata = false;
+                    options.SaveToken = true;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ValidateLifetime = false,
+                        RequireExpirationTime = false,
+                        RequireSignedTokens = false,
+                        SignatureValidator = delegate (string token, TokenValidationParameters parameters)
+                        {
+                            var jwt = new JsonWebToken(token);
+                            return jwt;
+                        }
+                    };
+                });
+
             services.AddHangfire(config =>
                 config.UseMemoryStorage()
             );

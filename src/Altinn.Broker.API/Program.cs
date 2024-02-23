@@ -105,22 +105,39 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-    {
-        var altinnOptions = new AltinnOptions();
-        config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
-        options.SaveToken = true;
-        options.MetadataAddress = altinnOptions.OpenIdWellKnown;
-        options.TokenValidationParameters = new TokenValidationParameters
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
-            ValidateIssuerSigningKey = true,
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            RequireExpirationTime = true,
-            ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = altinnOptions.OpenIdWellKnown;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ClockSkew = TimeSpan.Zero
+            };
+        })
+        .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+        {
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
