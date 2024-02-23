@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Persistence;
+﻿using Altinn.Broker.Application;
+using Altinn.Broker.Persistence;
 
 using Hangfire;
 using Hangfire.PostgreSql;
