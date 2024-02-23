@@ -123,7 +123,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             };
         })
         .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
-        { 
+        {
             var altinnOptions = new AltinnOptions();
             config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
