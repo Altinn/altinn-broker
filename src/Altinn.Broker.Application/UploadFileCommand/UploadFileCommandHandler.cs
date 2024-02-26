@@ -1,8 +1,8 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
