@@ -78,6 +78,7 @@ static void BuildAndRun(string[] args)
     app.MapControllers();
 
     app.UseHangfireDashboard();
+    app.Services.GetService<IRecurringJobManager>().AddOrUpdate<MalwareScanningResultHandler>("Delete old webhook events", handler => handler.DeleteOldWebhookEvents(), Cron.Weekly());
 
     app.Run();
 }
@@ -105,22 +106,39 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
-    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-    {
-        var altinnOptions = new AltinnOptions();
-        config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
-        options.SaveToken = true;
-        options.MetadataAddress = altinnOptions.OpenIdWellKnown;
-        options.TokenValidationParameters = new TokenValidationParameters
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
-            ValidateIssuerSigningKey = true,
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            RequireExpirationTime = true,
-            ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = altinnOptions.OpenIdWellKnown;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ClockSkew = TimeSpan.Zero
+            };
+        })
+        .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+        {
+            var altinnOptions = new AltinnOptions();
+            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+            options.SaveToken = true;
+            options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
@@ -129,6 +147,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)));
         options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])));
         options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)));
+        options.AddPolicy(AuthorizationConstants.ResourceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ResourceOwnerScope)));
     });
 
     services.Configure<KestrelServerOptions>(options =>

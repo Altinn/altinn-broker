@@ -36,7 +36,7 @@
 								"body": {
 									"mode": "file",
 									"file": {
-										"src": "/C:/Users/roarm/Downloads/reskit-win64.zip"
+										"src": "/C:/Windows/winhlp32.exe"
 									}
 								},
 								"url": {
@@ -748,6 +748,99 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Get Resource Policy",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{resourceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "policyFile",
+									"type": "file",
+									"src": "/C:/Workspace/altinn-broker/Test/Altinn.Broker.Tests/Data/BasePolicy.xml"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}/policy",
+							"protocol": "https",
+							"host": [
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
+							],
+							"path": [
+								"resourceregistry",
+								"api",
+								"v1",
+								"resource",
+								"{{resource_id}}",
+								"policy"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Register Resource Owner",
+			"item": [
+				{
+					"name": "Register Resource Owner",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{resourceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"name\": \"TestResourceOwner\",\r\n    \"deletionTime\": \"P30D\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/resourceowner",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"resourceowner"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -906,7 +999,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write&org=digdir&orgNo=991825827",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:authorization:pdp&org=ttd&orgNo={{resourceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -924,11 +1017,11 @@
 								},
 								{
 									"key": "scopes",
-									"value": "altinn:broker.write"
+									"value": "altinn:broker.write altinn:authorization:pdp"
 								},
 								{
 									"key": "org",
-									"value": "digdir"
+									"value": "ttd"
 								},
 								{
 									"key": "orgNo",
@@ -966,7 +1059,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read altinn:events.publish&org=ttd&orgNo=986252932",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read altinn:events.publish altinn:authorization:pdp&org=ttd&orgNo=986252932",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -984,7 +1077,7 @@
 								},
 								{
 									"key": "scopes",
-									"value": "altinn:broker.read altinn:events.publish"
+									"value": "altinn:broker.read altinn:authorization:pdp"
 								},
 								{
 									"key": "org",
@@ -1026,7 +1119,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:resourceregistry/resource.write&org=digdir&orgNo=991825827",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp&org=ttd&orgNo={{resourceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1044,7 +1137,7 @@
 								},
 								{
 									"key": "scopes",
-									"value": "altinn:resourceregistry/resource.write"
+									"value": "altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp"
 								},
 								{
 									"key": "org",
@@ -1058,26 +1151,6 @@
 						}
 					},
 					"response": []
-				}
-			],
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
 				}
 			]
 		}
@@ -1103,6 +1176,11 @@
 		}
 	],
 	"variable": [
+		{
+			"key": "resourceowner_orgnumber",
+			"value": "Organization number of resource owner / \"tjeneste-eier\". Nine digits, no prefix.",
+			"type": "string"
+		},
 		{
 			"key": "client_id",
 			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.samarbeid.digdir.no/integrations)",

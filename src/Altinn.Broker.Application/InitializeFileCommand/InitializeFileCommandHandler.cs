@@ -53,10 +53,6 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.NoAccessToResource;
         };
-        if (request.Token.Consumer != request.SenderExternalId)
-        {
-            return Errors.NoAccessToResource;
-        }
         var resource = await _resourceRepository.GetResource(request.ResourceId);
         if (resource is null)
         {
