@@ -5,6 +5,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
@@ -101,6 +102,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(true);
             authorizationService.Setup(x => x.CheckUserAccess(TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(false);
             services.AddSingleton(authorizationService.Object);
+
+            var eventBus = new Mock<IEventBus>();
+            services.AddSingleton(eventBus.Object);
         });
     }
 
