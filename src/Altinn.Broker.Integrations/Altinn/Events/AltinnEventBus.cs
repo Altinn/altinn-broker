@@ -15,6 +15,7 @@ public class AltinnEventBus : IEventBus
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly HttpClient _httpClient;
+    private readonly AltinnOptions _altinnOptions;
     private readonly ILogger<AltinnEventBus> _logger;
 
     public AltinnEventBus(HttpClient httpClient, IHttpContextAccessor httpContextAccessor, IOptions<AltinnOptions> options, ILogger<AltinnEventBus> logger)
@@ -22,6 +23,7 @@ public class AltinnEventBus : IEventBus
         httpClient.BaseAddress = new Uri(options.Value.PlatformGatewayUrl);
         httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
         _httpClient = httpClient;
+        _altinnOptions = options.Value;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
     }
@@ -56,7 +58,7 @@ public class AltinnEventBus : IEventBus
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
-            Source = _httpContextAccessor.HttpContext?.Request.PathBase.Value + _httpContextAccessor.HttpContext?.Request.Path.Value
+            Source = _altinnOptions.PlatformGatewayUrl.TrimEnd('/') + _httpContextAccessor.HttpContext?.Request.Path.Value
         };
 
         return cloudEvent;
