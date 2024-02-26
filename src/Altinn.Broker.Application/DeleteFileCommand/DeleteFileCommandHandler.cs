@@ -54,7 +54,6 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         else
         {
             await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
-            //await _eventBus.Publish(AltinnEventType.Deleted, file.ResourceId, file.FileId.ToString()); // TODO, got no authorization header
         }
         await _brokerStorageService.DeleteFile(resourceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
