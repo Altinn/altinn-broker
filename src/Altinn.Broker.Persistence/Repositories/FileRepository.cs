@@ -21,7 +21,7 @@ public class FileRepository : IFileRepository
         _actorRepository = actorRepository;
     }
 
-    public async Task<FileEntity?> GetFile(Guid fileId)
+    public async Task<FileEntity?> GetFile(Guid fileId, CancellationToken ct)
     {
         var file = new FileEntity();
 
@@ -72,8 +72,8 @@ public class FileRepository : IFileRepository
                     f.file_id_pk = @fileId;");
         {
             command.Parameters.AddWithValue("@fileId", fileId);
-            using NpgsqlDataReader reader = command.ExecuteReader();
-            if (reader.Read())
+            using NpgsqlDataReader reader = await command.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
             {
                 file = new FileEntity
                 {
@@ -106,8 +106,8 @@ public class FileRepository : IFileRepository
                 return null;
             }
         }
-        file.RecipientCurrentStatuses = await GetLatestRecipientFileStatuses(fileId);
-        file.PropertyList = await GetMetadata(fileId);
+        file.RecipientCurrentStatuses = await GetLatestRecipientFileStatuses(fileId, ct);
+        file.PropertyList = await GetMetadata(fileId, ct);
         return file;
     }
 
@@ -115,7 +115,7 @@ public class FileRepository : IFileRepository
     /*
      * Get the current status of file recipients along wiith the last time their status changed.  
      * */
-    private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId)
+    private async Task<List<ActorFileStatusEntity>> GetLatestRecipientFileStatuses(Guid fileId, CancellationToken ct)
     {
         var fileStatuses = new List<ActorFileStatusEntity>();
         await using (var command = await _connectionProvider.CreateCommand(
@@ -130,9 +130,9 @@ public class FileRepository : IFileRepository
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var commandText = command.CommandText;
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     fileStatuses.Add(new ActorFileStatusEntity()
                     {
@@ -151,20 +151,20 @@ public class FileRepository : IFileRepository
         return fileStatuses;
     }
 
-    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ResourceEntity resource, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? filesize)
+    public async Task<Guid> AddFile(ResourceOwnerEntity resourceOwner, ResourceEntity resource, string filename, string sendersFileReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? filesize, CancellationToken ct = default)
     {
         if (resourceOwner.StorageProvider is null)
         {
             throw new ArgumentNullException("Storage provider must be set");
         }
         long actorId;
-        var actor = await _actorRepository.GetActorAsync(senderExternalId);
+        var actor = await _actorRepository.GetActorAsync(senderExternalId, ct);
         if (actor is null)
         {
             actorId = await _actorRepository.AddActorAsync(new ActorEntity()
             {
                 ActorExternalId = senderExternalId
-            });
+            }, ct);
         }
         else
         {
@@ -188,13 +188,13 @@ public class FileRepository : IFileRepository
         command.Parameters.AddWithValue("@storageProviderId", resourceOwner.StorageProvider.Id);
         command.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.Add(resourceOwner.FileTimeToLive));
 
-        command.ExecuteNonQuery();
+        await command.ExecuteNonQueryAsync(ct);
 
-        await SetMetadata(fileId, propertyList);
+        await SetMetadata(fileId, propertyList, ct);
         return fileId;
     }
 
-    public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch)
+    public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch, CancellationToken ct)
     {
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
@@ -257,9 +257,9 @@ public class FileRepository : IFileRepository
                 command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
 
             var files = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     var fileId = reader.GetGuid(0);
                     files.Add(fileId);
@@ -269,7 +269,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch)
+    public async Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch, CancellationToken ct)
     {
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT afs.file_id_fk, 'Recipient'");
@@ -334,9 +334,9 @@ public class FileRepository : IFileRepository
                 command.Parameters.AddWithValue("@fileStatus", (int)fileSearch.Status);
 
             var files = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     var fileId = reader.GetGuid(0);
                     files.Add(fileId);
@@ -346,7 +346,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch)
+    public async Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch, CancellationToken ct)
     {
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_id_pk");
@@ -386,9 +386,9 @@ public class FileRepository : IFileRepository
                 command.Parameters.AddWithValue("@recipientFileStatus", (int)fileSearch.RecipientStatus);
 
             var files = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     var fileId = reader.GetGuid(0);
                     files.Add(fileId);
@@ -398,7 +398,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task SetStorageDetails(Guid fileId, long storageProviderId, string fileLocation, long filesize)
+    public async Task SetStorageDetails(Guid fileId, long storageProviderId, string fileLocation, long filesize, CancellationToken ct)
     {
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.file " +
@@ -412,11 +412,11 @@ public class FileRepository : IFileRepository
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
             command.Parameters.AddWithValue("@filesize", filesize);
-            command.ExecuteNonQuery();
+            await command.ExecuteNonQueryAsync(ct);
         }
     }
 
-    private async Task<Dictionary<string, string>> GetMetadata(Guid fileId)
+    private async Task<Dictionary<string, string>> GetMetadata(Guid fileId, CancellationToken ct)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -427,9 +427,9 @@ public class FileRepository : IFileRepository
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var property = new Dictionary<string, string>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     property.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
                 }
@@ -438,7 +438,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    private async Task SetMetadata(Guid fileId, Dictionary<string, string> property)
+    private async Task SetMetadata(Guid fileId, Dictionary<string, string> property, CancellationToken ct)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
         using var transaction = connection.BeginTransaction();
@@ -471,7 +471,7 @@ public class FileRepository : IFileRepository
         }
     }
 
-    public async Task SetChecksum(Guid fileId, string checksum)
+    public async Task SetChecksum(Guid fileId, string checksum, CancellationToken ct)
     {
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.file " +

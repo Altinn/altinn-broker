@@ -21,22 +21,22 @@ public class AzureBrokerStorageService : IBrokerStorageService
         _logger = logger;
     }
 
-    public async Task<string> UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream)
+    public async Task<string> UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream, CancellationToken ct)
     {
         var connectionString = await GetConnectionString(resourceOwnerEntity);
-        return await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString);
+        return await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString, ct);
     }
 
-    public async Task<Stream> DownloadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity)
+    public async Task<Stream> DownloadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, CancellationToken ct)
     {
         var connectionString = await GetConnectionString(resourceOwnerEntity);
-        return await _fileStore.GetFileStream(fileEntity.FileId, connectionString);
+        return await _fileStore.GetFileStream(fileEntity.FileId, connectionString, ct);
     }
 
-    public async Task DeleteFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity)
+    public async Task DeleteFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, CancellationToken ct)
     {
         var connectionString = await GetConnectionString(resourceOwnerEntity);
-        await _fileStore.DeleteFile(fileEntity.FileId, connectionString);
+        await _fileStore.DeleteFile(fileEntity.FileId, connectionString, ct);
     }
 
     private async Task<string> GetConnectionString(ResourceOwnerEntity resourceOwnerEntity)

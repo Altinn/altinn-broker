@@ -12,25 +12,24 @@ public class FileStatusRepository : IFileStatusRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task InsertFileStatus(Guid fileId, FileStatus status, string? detailedFileStatus = null)
+    public async Task InsertFileStatus(Guid fileId, FileStatus status, string? detailedFileStatus = null, CancellationToken ct = default)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date, file_status_detailed_description) " +
-            "VALUES (@fileId, @statusId, NOW(), @detailedFileStatus) RETURNING file_status_id_pk;");
+                    "INSERT INTO broker.file_status (file_id_fk, file_status_description_id_fk, file_status_date, file_status_detailed_description) " +
+                    "VALUES (@fileId, @statusId, NOW(), @detailedFileStatus) RETURNING file_status_id_pk;");
         command.Parameters.AddWithValue("@fileId", fileId);
         command.Parameters.AddWithValue("@statusId", (int)status);
         command.Parameters.AddWithValue("@detailedFileStatus", detailedFileStatus is null ? DBNull.Value : detailedFileStatus);
 
-        var fileStatusId = await command.ExecuteScalarAsync();
+        var fileStatusId = await command.ExecuteScalarAsync(ct);
         if (fileStatusId == null)
         {
             throw new InvalidOperationException("No file_status_id_pk was returned after insert.");
         }
     }
 
-    public async Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId)
+    public async Task<List<FileStatusEntity>> GetFileStatusHistory(Guid fileId, CancellationToken ct)
     {
-
         using (var command = await _connectionProvider.CreateCommand(
             "SELECT file_id_fk, file_status_description_id_fk, file_status_date, file_status_detailed_description " +
             "FROM broker.file_status fis " +
@@ -38,9 +37,9 @@ public class FileStatusRepository : IFileStatusRepository
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var fileStatuses = new List<FileStatusEntity>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(ct))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(ct))
                 {
                     fileStatuses.Add(new FileStatusEntity()
                     {

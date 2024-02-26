@@ -14,16 +14,18 @@ public interface IFileRepository
         List<string> recipientIds,
         Dictionary<string, string> propertyList,
         string? checksum,
-        long? filesize);
-    Task<Domain.FileEntity?> GetFile(Guid fileId);
-    Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch);
-    Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch);
-    Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch);
-    Task SetChecksum(Guid fileId, string checksum);
+        long? filesize,
+        CancellationToken ct);
+    Task<Domain.FileEntity?> GetFile(Guid fileId, CancellationToken ct);
+    Task<List<Guid>> GetFilesAssociatedWithActor(FileSearchEntity fileSearch, CancellationToken ct);
+    Task<List<Guid>> GetFilesForRecipientWithRecipientStatus(FileSearchEntity fileSearch, CancellationToken ct);
+    Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileSearch, CancellationToken ct);
+    Task SetChecksum(Guid fileId, string checksum, CancellationToken ct);
     Task SetStorageDetails(
         Guid fileId,
         long storageProviderId,
         string fileLocation,
-        long fileSize
+        long fileSize,
+        CancellationToken ct
     );
 }

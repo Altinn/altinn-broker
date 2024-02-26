@@ -42,14 +42,14 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         _logger = logger;
     }
 
-    public async Task<OneOf<Guid, Error>> Process(InitializeFileCommandRequest request)
+    public async Task<OneOf<Guid, Error>> Process(InitializeFileCommandRequest request, CancellationToken ct)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, ct);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var resource = await _resourceRepository.GetResource(request.ResourceId);
+        var resource = await _resourceRepository.GetResource(request.ResourceId, ct);
         if (resource is null)
         {
             return Errors.ResourceNotConfigured;
@@ -59,9 +59,9 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             return Errors.ResourceOwnerNotConfigured;
         }
-        var fileId = await _fileRepository.AddFile(resourceOwner, resource, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null);
-        await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized);
-        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId));
+        var fileId = await _fileRepository.AddFile(resourceOwner, resource, request.Filename, request.SendersFileReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null, ct);
+        await _fileStatusRepository.InsertFileStatus(fileId, FileStatus.Initialized, ct: ct);
+        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileStatusRepository.InsertActorFileStatus(fileId, ActorFileStatus.Initialized, recipientId, ct));
         try
         {
             await Task.WhenAll(addRecipientEventTasks);
@@ -70,7 +70,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         {
             _logger.LogError("Failed when adding recipient initialized events.");
         }
-        _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId), resourceOwner.FileTimeToLive);
+        _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId, ct), resourceOwner.FileTimeToLive);
 
         return fileId;
     }
