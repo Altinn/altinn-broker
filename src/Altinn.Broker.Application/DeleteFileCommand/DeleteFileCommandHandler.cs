@@ -1,7 +1,7 @@
 ﻿using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Core.Services.Enums;
 
 using Microsoft.Extensions.Logging;
 
@@ -54,7 +54,7 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         else
         {
             await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
-            await _eventBus.Publish(AltinnEventType.Deleted, file.ResourceId, file.FileId.ToString());
+            //await _eventBus.Publish(AltinnEventType.Deleted, file.ResourceId, file.FileId.ToString()); // TODO, got no authorization header
         }
         await _brokerStorageService.DeleteFile(resourceOwner, file);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
