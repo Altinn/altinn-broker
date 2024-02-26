@@ -37,13 +37,13 @@ public class AltinnAuthorizationService : IAuthorizationService
         _logger = logger;
     }
 
-    public async Task<bool> CheckUserAccess(string resourceId, string userId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken ct = default)
+    public async Task<bool> CheckUserAccess(string resourceId, string userId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default)
     {
         if (IsLegacyUser || _hostEnvironment.IsDevelopment())
         {
             return true;
         }
-        var resource = await _resourceRepository.GetResource(resourceId, ct);
+        var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
             return false;
@@ -56,12 +56,12 @@ public class AltinnAuthorizationService : IAuthorizationService
         }
         var actionIds = rights.Select(GetActionId).ToList();
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, actionIds, resource);
-        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, ct);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return false;
         }
-        var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: ct);
+        var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: cancellationToken);
         if (user is null)
         {
             _logger.LogError("Unexpected null or invalid json response from Authorization.");

@@ -22,9 +22,9 @@ public class AltinnResourceRegistryRepository : IResourceRepository
         _logger = logger;
     }
 
-    public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken ct)
+    public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", ct);
+        var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -32,10 +32,10 @@ public class AltinnResourceRegistryRepository : IResourceRepository
         if (response.StatusCode != HttpStatusCode.OK)
         {
             _logger.LogError("Failed to get resource from Altinn Resource Registry. Status code: {StatusCode}", response.StatusCode);
-            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(ct));
+            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(cancellationToken));
             throw new BadHttpRequestException("Failed to get resource from Altinn Resource Registry");
         }
-        var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: ct);
+        var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: cancellationToken);
         if (altinnResourceResponse is null)
         {
             _logger.LogError("Failed to deserialize response from Altinn Resource Registry");

@@ -33,14 +33,14 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         _logger = logger;
     }
 
-    public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request, CancellationToken ct)
+    public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId, ct);
+        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, ct);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileNotFound;
@@ -53,7 +53,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileAlreadyUploaded;
         }
-        var resource = await _resourceRepository.GetResource(file.ResourceId, ct);
+        var resource = await _resourceRepository.GetResource(file.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.ResourceNotConfigured;
@@ -64,31 +64,31 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
             return Errors.ResourceOwnerNotConfigured;
         };
 
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted, ct: ct);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted, cancellationToken: cancellationToken);
         try
         {
-            var checksum = await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream, ct);
+            var checksum = await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream, cancellationToken);
             if (string.IsNullOrWhiteSpace(file.Checksum))
             {
-                await _fileRepository.SetChecksum(request.FileId, checksum, ct);
+                await _fileRepository.SetChecksum(request.FileId, checksum, cancellationToken);
             }
             else if (!string.Equals(checksum, file.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Checksum mismatch", ct);
-                _backgroundJobClient.Enqueue(() => _brokerStorageService.DeleteFile(resourceOwner, file, ct));
+                await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Checksum mismatch", cancellationToken);
+                _backgroundJobClient.Enqueue(() => _brokerStorageService.DeleteFile(resourceOwner, file, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
         }
         catch (Exception e)
         {
             _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
-            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.", ct);
+            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.", cancellationToken);
             return Errors.UploadFailed;
         }
-        await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length, ct);
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing, ct: ct);
+        await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length, cancellationToken);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing, cancellationToken: cancellationToken);
         // TODO, async jobs
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published, ct: ct);
+        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published, cancellationToken: cancellationToken);
         return file.FileId;
     }
 }

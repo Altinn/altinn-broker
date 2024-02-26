@@ -51,7 +51,7 @@ public class AzureResourceManagerService : IResourceManager
         _logger = logger;
     }
 
-    public async Task Deploy(ResourceOwnerEntity resourceOwnerEntity, CancellationToken ct)
+    public async Task Deploy(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Starting deployment for {resourceOwnerEntity.Name}");
         var resourceGroupName = GetResourceGroupName(resourceOwnerEntity);
@@ -68,24 +68,24 @@ public class AzureResourceManagerService : IResourceManager
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
         resourceGroupData.Tags.Add("customer_id", resourceOwnerEntity.Id);
 
-        var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, ct);
+        var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
 
         // Create or get the storage account
         var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
         storageAccountData.Tags.Add("customer_id", resourceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, ct);
+        var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
         var blobService = storageAccount.Value.GetBlobService();
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
         {
-            await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, "brokerfiles", new BlobContainerData(), ct);
+            await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, "brokerfiles", new BlobContainerData(), cancellationToken);
         }
 
         _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 
-    public async Task<DeploymentStatus> GetDeploymentStatus(ResourceOwnerEntity resourceOwnerEntity, CancellationToken ct)
+    public async Task<DeploymentStatus> GetDeploymentStatus(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken)
     {
         if (_hostEnvironment.IsDevelopment())
         {
@@ -94,16 +94,16 @@ public class AzureResourceManagerService : IResourceManager
         var subscription = GetSubscription();
         _logger.LogInformation($"Looking up {GetResourceGroupName(resourceOwnerEntity)} in {subscription.Id}");
         var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(resourceOwnerEntity), ct);
+        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(resourceOwnerEntity), cancellationToken);
         if (!resourceGroupExists)
         {
             _logger.LogInformation($"Could not find resource group for {resourceOwnerEntity.Name}");
             return DeploymentStatus.NotStarted;
         }
 
-        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(resourceOwnerEntity), ct);
+        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(resourceOwnerEntity), cancellationToken);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(resourceOwnerEntity), cancellationToken: ct);
+        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(resourceOwnerEntity), cancellationToken: cancellationToken);
         if (!storageAccountExists)
         {
             _logger.LogInformation($"Could not find storage account for {resourceOwnerEntity.Name}");

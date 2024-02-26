@@ -14,7 +14,7 @@ public class WebhookEventRepository : IWebhookEventRepository
     }
 
 
-    public async Task AddWebhookEventAsync(string WebhookEventId, CancellationToken ct)
+    public async Task AddWebhookEventAsync(string WebhookEventId, CancellationToken cancellationToken)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "INSERT INTO broker.webhook_event (webhook_event_id_pk, created)" +
@@ -22,16 +22,16 @@ public class WebhookEventRepository : IWebhookEventRepository
         command.Parameters.AddWithValue("@webhook_event_id_pk", WebhookEventId);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
-    public async Task DeleteWebhookEventAsync(string WebhookEventId, CancellationToken ct)
+    public async Task DeleteWebhookEventAsync(string WebhookEventId, CancellationToken cancellationToken)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "DELETE FROM broker.webhook_event " +
                     "WHERE webhook_event_id_pk = @webhook_event_id_pk");
         command.Parameters.AddWithValue("@webhook_event_id_pk", WebhookEventId);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
     public async Task DeleteOldWebhookEvents()
     {

@@ -26,19 +26,19 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         _logger = logger;
     }
 
-    public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request, CancellationToken ct)
+    public async Task<OneOf<List<Guid>, Error>> Process(GetFilesQueryRequest request, CancellationToken cancellationToken)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, ct: ct);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var service = await _resourceRepository.GetResource(request.ResourceId, ct);
+        var service = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (service is null)
         {
             return Errors.ResourceNotConfigured;
         };
-        var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer, ct);
+        var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
         if (callingActor is null)
         {
             return new List<Guid>();
@@ -64,11 +64,11 @@ public class GetFilesQueryHandler : IHandler<GetFilesQueryRequest, List<Guid>>
         if (request.RecipientStatus.HasValue)
         {
             fileSearchEntity.RecipientStatus = request.RecipientStatus;
-            return await _fileRepository.GetFilesForRecipientWithRecipientStatus(fileSearchEntity, ct);
+            return await _fileRepository.GetFilesForRecipientWithRecipientStatus(fileSearchEntity, cancellationToken);
         }
         else
         {
-            return await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity, ct);
+            return await _fileRepository.GetFilesAssociatedWithActor(fileSearchEntity, cancellationToken);
         }
     }
 }

@@ -4,5 +4,5 @@ using Altinn.Broker.Core.Domain;
 namespace Altinn.Broker.Core.Repositories;
 public interface IResourceRepository
 {
-    Task<ResourceEntity?> GetResource(string resourceId, CancellationToken ct = default);
+    Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken = default);
 }

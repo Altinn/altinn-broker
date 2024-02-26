@@ -27,12 +27,12 @@ public class BlobService : IFileStore
         return blobClient;
     }
 
-    public async Task<Stream> GetFileStream(Guid fileId, string connectionString, CancellationToken ct)
+    public async Task<Stream> GetFileStream(Guid fileId, string connectionString, CancellationToken cancellationToken)
     {
         BlobClient blobClient = GetBlobClient(fileId, connectionString);
         try
         {
-            var content = await blobClient.DownloadContentAsync(ct);
+            var content = await blobClient.DownloadContentAsync(cancellationToken);
             return content.Value.Content.ToStream();
         }
         catch (RequestFailedException requestFailedException)
@@ -42,17 +42,17 @@ public class BlobService : IFileStore
         }
     }
 
-    public async Task<string> UploadFile(Stream stream, Guid fileId, string connectionString, CancellationToken ct)
+    public async Task<string> UploadFile(Stream stream, Guid fileId, string connectionString, CancellationToken cancellationToken)
     {
         BlobClient blobClient = GetBlobClient(fileId, connectionString);
         var blobLeaseClient = blobClient.GetBlobLeaseClient();
         try
         {
-            if (!await blobClient.ExistsAsync(ct))
+            if (!await blobClient.ExistsAsync(cancellationToken))
             {
                 await blobClient.UploadAsync(new MemoryStream());
             }
-            BlobLease blobLease = await blobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(-1), cancellationToken: ct);
+            BlobLease blobLease = await blobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(-1), cancellationToken: cancellationToken);
             BlobUploadOptions options = new BlobUploadOptions()
             {
                 Conditions = new BlobRequestConditions()
@@ -61,7 +61,7 @@ public class BlobService : IFileStore
                 },
                 TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 },
             };
-            var blobMetadata = await blobClient.UploadAsync(stream, options, ct);
+            var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
             var metadata = blobMetadata.Value;
             var hash = Convert.ToHexString(metadata.ContentHash).ToLowerInvariant();
             return hash;
@@ -69,7 +69,7 @@ public class BlobService : IFileStore
         catch (RequestFailedException requestFailedException)
         {
             _logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
-            await blobClient.DeleteIfExistsAsync(cancellationToken: ct);
+            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
         finally
@@ -78,12 +78,12 @@ public class BlobService : IFileStore
         }
     }
 
-    public async Task DeleteFile(Guid fileId, string connectionString, CancellationToken ct)
+    public async Task DeleteFile(Guid fileId, string connectionString, CancellationToken cancellationToken)
     {
         BlobClient blobClient = GetBlobClient(fileId, connectionString);
         try
         {
-            await blobClient.DeleteIfExistsAsync(cancellationToken: ct);
+            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
         }
         catch (RequestFailedException requestFailedException)
         {

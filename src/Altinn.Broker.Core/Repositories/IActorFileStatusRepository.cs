@@ -8,7 +8,7 @@ public interface IActorFileStatusRepository
         Guid fileId,
         Domain.Enums.ActorFileStatus status,
         string actorExternalReference,
-        CancellationToken ct
+        CancellationToken cancellationToken
     );
-    Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId, CancellationToken ct);
+    Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId, CancellationToken cancellationToken);
 }
