@@ -32,7 +32,7 @@ public class ResourceOwnerController : Controller
     }
 
     [HttpPost]
-    public async Task<ActionResult> InitializeResourceOwner([FromBody] ResourceOwnerInitializeExt resourceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token)
+    public async Task<ActionResult> InitializeResourceOwner([FromBody] ResourceOwnerInitializeExt resourceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
     {
         var existingResourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         if (existingResourceOwner is not null)
@@ -44,7 +44,7 @@ public class ResourceOwnerController : Controller
         await _resourceOwnerRepository.InitializeResourceOwner(token.Consumer, resourceOwnerInitializeExt.Name, fileTimeToLive);
         var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(token.Consumer);
         BackgroundJob.Enqueue(
-            () => _resourceManager.Deploy(resourceOwner!)
+            () => _resourceManager.Deploy(resourceOwner!, cancellationToken)
         );
 
         return Ok();
@@ -52,7 +52,7 @@ public class ResourceOwnerController : Controller
 
     [HttpGet]
     [Route("{resourceOwnerId}")]
-    public async Task<ActionResult<ResourceOwnerOverviewExt>> GetResourceOwner(string resourceOwnerId)
+    public async Task<ActionResult<ResourceOwnerOverviewExt>> GetResourceOwner(string resourceOwnerId, CancellationToken cancellationToken)
     {
         var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resourceOwnerId);
         if (resourceOwner is null)
@@ -60,7 +60,7 @@ public class ResourceOwnerController : Controller
             return NotFound();
         }
 
-        var deploymentStatus = await _resourceManager.GetDeploymentStatus(resourceOwner);
+        var deploymentStatus = await _resourceManager.GetDeploymentStatus(resourceOwner, cancellationToken);
 
         return new ResourceOwnerOverviewExt()
         {

@@ -3,5 +3,5 @@
 namespace Altinn.Broker.Core.Repositories;
 public interface IAuthorizationService
 {
-    Task<bool> CheckUserAccess(string resourceId, string userId, ResourceAccessLevel right, bool IsLegacyUser = false);
+    Task<bool> CheckUserAccess(string resourceId, string userId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default);
 }
