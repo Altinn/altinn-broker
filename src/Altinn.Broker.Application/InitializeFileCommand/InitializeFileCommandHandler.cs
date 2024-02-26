@@ -3,6 +3,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
@@ -20,6 +21,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
     private readonly IFileStatusRepository _fileStatusRepository;
     private readonly IActorFileStatusRepository _actorFileStatusRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<InitializeFileCommandHandler> _logger;
 
     public InitializeFileCommandHandler(
@@ -30,6 +32,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         IFileStatusRepository fileStatusRepository,
         IActorFileStatusRepository actorFileStatusRepository,
         IBackgroundJobClient backgroundJobClient,
+        IEventBus eventBus,
         ILogger<InitializeFileCommandHandler> logger)
     {
         _resourceRepository = resourceRepository;
@@ -39,6 +42,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
         _fileStatusRepository = fileStatusRepository;
         _actorFileStatusRepository = actorFileStatusRepository;
         _backgroundJobClient = backgroundJobClient;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -71,6 +75,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
             _logger.LogError("Failed when adding recipient initialized events.");
         }
         _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId, cancellationToken), resourceOwner.FileTimeToLive);
+        await _eventBus.Publish(AltinnEventType.FileInitialized, request.ResourceId, fileId.ToString(), cancellationToken);
 
         return fileId;
     }
