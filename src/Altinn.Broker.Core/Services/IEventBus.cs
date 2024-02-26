@@ -4,5 +4,5 @@ namespace Altinn.Broker.Core.Services;
 
 public interface IEventBus
 {
-    Task Publish(AltinnEventType type, string resourceId, string fileId);
+    Task Publish(AltinnEventType type, string resourceId, string fileId, CancellationToken cancellationToken);
 }

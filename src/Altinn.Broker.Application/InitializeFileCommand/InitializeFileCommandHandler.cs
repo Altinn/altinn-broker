@@ -75,7 +75,7 @@ public class InitializeFileCommandHandler : IHandler<InitializeFileCommandReques
             _logger.LogError("Failed when adding recipient initialized events.");
         }
         _backgroundJobClient.Schedule<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(fileId, cancellationToken), resourceOwner.FileTimeToLive);
-        await _eventBus.Publish(AltinnEventType.FileInitialized, request.ResourceId, fileId.ToString());
+        await _eventBus.Publish(AltinnEventType.FileInitialized, request.ResourceId, fileId.ToString(), cancellationToken);
 
         return fileId;
     }

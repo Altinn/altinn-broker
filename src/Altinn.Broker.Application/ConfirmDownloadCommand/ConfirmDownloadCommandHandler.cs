@@ -59,13 +59,13 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         }
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
-        await _eventBus.Publish(AltinnEventType.DownloadConfirmed, file.ResourceId, file.FileId.ToString());
+        await _eventBus.Publish(AltinnEventType.DownloadConfirmed, file.ResourceId, file.FileId.ToString(), cancellationToken);
         bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
         if (shouldConfirmAll)
         {
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
-            _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId), cancellationToken);
-            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, file.ResourceId, file.FileId.ToString());
+            _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId, cancellationToken));
+            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, file.ResourceId, file.FileId.ToString(), cancellationToken);
         }
 
         return Task.CompletedTask;

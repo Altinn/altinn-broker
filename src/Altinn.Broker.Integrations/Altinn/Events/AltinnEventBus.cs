@@ -26,7 +26,7 @@ public class AltinnEventBus : IEventBus
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileId)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileId, CancellationToken cancellationToken)
     {
         if (_httpContextAccessor.HttpContext?.User.HasClaim(c => c.Type == "scope" && c.Value == "altinn:events.publish") ?? false)
         {
