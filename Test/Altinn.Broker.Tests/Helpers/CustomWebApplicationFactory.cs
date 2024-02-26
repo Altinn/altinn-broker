@@ -86,8 +86,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var resourceRegistryRepository = new Mock<IResourceRepository>();
             string capturedId = "";
-            resourceRegistryRepository.Setup(x => x.GetResource(It.IsAny<string>()))
-                .Callback((string id) => capturedId = id)
+            resourceRegistryRepository.Setup(x => x.GetResource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback((string id, CancellationToken _) => capturedId = id)
                 .ReturnsAsync(() => new ResourceEntity
                 {
                     Id = capturedId,
@@ -98,8 +98,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(resourceRegistryRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
-            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(true);
-            authorizationService.Setup(x => x.CheckUserAccess(TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<string>(), It.IsAny<ResourceAccessLevel>(), It.IsAny<bool>())).ReturnsAsync(false);
+            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckUserAccess(TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
             services.AddSingleton(authorizationService.Object);
         });
     }

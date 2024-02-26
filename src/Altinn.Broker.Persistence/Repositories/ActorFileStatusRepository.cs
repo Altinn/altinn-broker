@@ -14,20 +14,19 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId)
+    public async Task<List<ActorFileStatusEntity>> GetActorEvents(Guid fileId, CancellationToken cancellationToken)
     {
-
         await using (var command = await _connectionProvider.CreateCommand(
-            "SELECT *, a.actor_external_id " +
-            "FROM broker.actor_file_status afs " +
-            "INNER JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
-            "WHERE afs.file_id_fk = @fileId"))
+       "SELECT *, a.actor_external_id " +
+       "FROM broker.actor_file_status afs " +
+       "INNER JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
+       "WHERE afs.file_id_fk = @fileId"))
         {
             command.Parameters.AddWithValue("@fileId", fileId);
             var fileStatuses = new List<ActorFileStatusEntity>();
-            using (var reader = await command.ExecuteReaderAsync())
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(cancellationToken))
                 {
                     fileStatuses.Add(new Core.Domain.ActorFileStatusEntity()
                     {
@@ -46,16 +45,16 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
         }
     }
 
-    public async Task InsertActorFileStatus(Guid fileId, ActorFileStatus status, string actorExternalReference)
+    public async Task InsertActorFileStatus(Guid fileId, ActorFileStatus status, string actorExternalReference, CancellationToken cancellationToken)
     {
-        var actor = await _actorRepository.GetActorAsync(actorExternalReference);
+        var actor = await _actorRepository.GetActorAsync(actorExternalReference, cancellationToken);
         long actorId = 0;
         if (actor is null)
         {
             actorId = await _actorRepository.AddActorAsync(new ActorEntity()
             {
                 ActorExternalId = actorExternalReference
-            });
+            }, cancellationToken);
         }
         else
         {
@@ -70,7 +69,7 @@ internal class ActorFileStatusRepository : IActorFileStatusRepository
             command.Parameters.AddWithValue("@fileId", fileId);
             command.Parameters.AddWithValue("@actorFileStatusId", (int)status);
             var commandText = command.CommandText;
-            command.ExecuteNonQuery();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

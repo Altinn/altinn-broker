@@ -37,13 +37,13 @@ public class AltinnAuthorizationService : IAuthorizationService
         _logger = logger;
     }
 
-    public async Task<bool> CheckUserAccess(string resourceId, string userId, ResourceAccessLevel right, bool IsLegacyUser = false)
+    public async Task<bool> CheckUserAccess(string resourceId, string userId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default)
     {
         if (IsLegacyUser || _hostEnvironment.IsDevelopment())
         {
             return true;
         }
-        var resource = await _resourceRepository.GetResource(resourceId);
+        var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
             return false;
@@ -54,13 +54,14 @@ public class AltinnAuthorizationService : IAuthorizationService
             _logger.LogError("Unexpected null value. User was null when checking access to resource");
             return false;
         }
-        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, GetActionId(right), resource);
-        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest);
+        var actionIds = rights.Select(GetActionId).ToList();
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, actionIds, resource);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return false;
         }
-        var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>();
+        var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: cancellationToken);
         if (user is null)
         {
             _logger.LogError("Unexpected null or invalid json response from Authorization.");
@@ -70,7 +71,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         return validationResult;
     }
 
-    private XacmlJsonRequestRoot CreateDecisionRequest(ClaimsPrincipal user, string actionType, ResourceEntity resourceEntity)
+    private XacmlJsonRequestRoot CreateDecisionRequest(ClaimsPrincipal user, List<string> actionTypes, ResourceEntity resourceEntity)
     {
         XacmlJsonRequest request = new()
         {
@@ -82,9 +83,10 @@ public class AltinnAuthorizationService : IAuthorizationService
         var subjectCategory = DecisionHelper.CreateSubjectCategory(user.Claims);
         subjectCategory.Attribute = subjectCategory.Attribute.Where(attribute => attribute.AttributeId != "urn:altinn:authlevel").ToList(); // Temp fix as xcaml int32 not implemented
         request.AccessSubject.Add(subjectCategory);
-        request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
-        request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
-        request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
+        foreach (var actionType in actionTypes)
+        {
+            request.Action.Add(XacmlMappers.CreateActionCategory(actionType));
+        }
         request.Resource.Add(XacmlMappers.CreateResourceCategory(resourceEntity));
 
         XacmlJsonRequestRoot jsonRequest = new() { Request = request };

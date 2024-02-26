@@ -21,9 +21,9 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         _resourceRightsRepository = resourceRightsRepository;
     }
 
-    public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request)
+    public async Task<OneOf<GetFileDetailsQueryResponse, Error>> Process(GetFileDetailsQueryRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
@@ -33,14 +33,13 @@ public class GetFileDetailsQueryHandler : IHandler<GetFileDetailsQueryRequest, G
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write)
-                     || await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var fileEvents = await _fileStatusRepository.GetFileStatusHistory(request.FileId);
-        var actorEvents = await _actorFileStatusRepository.GetActorEvents(request.FileId);
+        var fileEvents = await _fileStatusRepository.GetFileStatusHistory(request.FileId, cancellationToken);
+        var actorEvents = await _actorFileStatusRepository.GetActorEvents(request.FileId, cancellationToken);
         return new GetFileDetailsQueryResponse()
         {
             File = file,

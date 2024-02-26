@@ -43,7 +43,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
+        public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler, CancellationToken cancellationToken)
         {
             CallerIdentity legacyToken = CreateLegacyToken(initializeExt.Sender, token);
 
@@ -51,7 +51,7 @@ namespace Altinn.Broker.Controllers
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
             _logger.LogInformation("Legacy - Initializing file");
             var commandRequest = LegacyInitializeFileMapper.MapToRequest(initializeExt, token);
-            var commandResult = await handler.Process(commandRequest);
+            var commandResult = await handler.Process(commandRequest, cancellationToken);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
                 Problem
@@ -69,7 +69,8 @@ namespace Altinn.Broker.Controllers
             Guid fileId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] UploadFileCommandHandler handler
+            [FromServices] UploadFileCommandHandler handler,
+            CancellationToken cancellationToken
         )
         {
             CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
@@ -83,7 +84,7 @@ namespace Altinn.Broker.Controllers
                 Token = token,
                 Filestream = Request.Body,
                 IsLegacy = true
-            });
+            }, cancellationToken);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
                 Problem
@@ -100,7 +101,8 @@ namespace Altinn.Broker.Controllers
             Guid fileId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileOverviewQueryHandler handler)
+            [FromServices] GetFileOverviewQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
@@ -111,7 +113,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
-            });
+            }, cancellationToken);
             return queryResult.Match(
                 result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.File)),
                 Problem
@@ -127,7 +129,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileDetailsQueryHandler handler)
+            [FromServices] GetFileDetailsQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
         }
@@ -145,7 +148,8 @@ namespace Altinn.Broker.Controllers
             [FromQuery] string? onBehalfOfConsumer,
             [FromQuery] string[]? recipients,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] LegacyGetFilesQueryHandler handler)
+            [FromServices] LegacyGetFilesQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             // HasAvailableFiles calls are not made on behalf of any consumer.
             CallerIdentity? legacyToken = null;
@@ -175,7 +179,7 @@ namespace Altinn.Broker.Controllers
                 From = from,
                 To = to,
                 Recipients = recipients
-            });
+            }, cancellationToken);
             return queryResult.Match(
                 Ok,
                 Problem
@@ -189,10 +193,11 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Route("{fileId}/download")]
         public async Task<ActionResult> DownloadFile(
-            Guid fileId,
+             Guid fileId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] DownloadFileQueryHandler handler)
+            [FromServices] DownloadFileQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
@@ -202,7 +207,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
-            });
+            }, cancellationToken);
             return queryResult.Match<ActionResult>(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
                 Problem
@@ -219,7 +224,8 @@ namespace Altinn.Broker.Controllers
             Guid fileId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] ConfirmDownloadCommandHandler handler)
+            [FromServices] ConfirmDownloadCommandHandler handler,
+             CancellationToken cancellationToken)
         {
             CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
@@ -229,7 +235,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
-            });
+            }, cancellationToken);
             return commandResult.Match(
                 Ok,
                 Problem

@@ -26,19 +26,19 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
         _logger = logger;
     }
 
-    private async Task<List<ActorEntity>> GetActors(string[] recipients)
+    private async Task<List<ActorEntity>> GetActors(string[] recipients, CancellationToken cancellationToken)
     {
         List<ActorEntity> actors = new();
         foreach (string recipient in recipients)
         {
-            ActorEntity entity = await _actorRepository.GetActorAsync(recipient);
+            ActorEntity entity = await _actorRepository.GetActorAsync(recipient, cancellationToken);
             actors.Add(entity);
         }
 
         return actors;
     }
 
-    public async Task<OneOf<List<Guid>, Error>> Process(LegacyGetFilesQueryRequest request)
+    public async Task<OneOf<List<Guid>, Error>> Process(LegacyGetFilesQueryRequest request, CancellationToken cancellationToken)
     {
         LegacyFileSearchEntity fileSearch = new()
         {
@@ -47,11 +47,11 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
         // TODO: should we just call GetFiles for each recipient or should we gather everything into 1 single SQL request.
         if (request.Recipients?.Length > 0)
         {
-            fileSearch.Actors = await GetActors(request.Recipients);
+            fileSearch.Actors = await GetActors(request.Recipients, cancellationToken);
         }
         else
         {
-            fileSearch.Actor = await _actorRepository.GetActorAsync(request.OnBehalfOfConsumer ?? string.Empty);
+            fileSearch.Actor = await _actorRepository.GetActorAsync(request.OnBehalfOfConsumer ?? string.Empty, cancellationToken);
             if (fileSearch.Actor is null)
             {
                 return new List<Guid>();
@@ -73,6 +73,6 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
             fileSearch.RecipientStatus = request.RecipientStatus;
         }
 
-        return await _fileRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch);
+        return await _fileRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
     }
 }

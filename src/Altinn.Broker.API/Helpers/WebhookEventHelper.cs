@@ -8,22 +8,22 @@ namespace Altinn.Broker.Helpers;
 
 public class WebhookEventHelper
 {
-    public static async Task<OneOf<Task, Error>> ProcessMalwareEvent(ScanResultData data, MalwareScanningResultHandler handler, IWebhookEventRepository webhookEventRepository)
+    public static async Task<OneOf<Task, Error>> ProcessMalwareEvent(ScanResultData data, MalwareScanningResultHandler handler, IWebhookEventRepository webhookEventRepository, CancellationToken cancellationToken)
     {
         try
         {
 
             // Create a new entry for that webhook id
-            await webhookEventRepository.AddWebhookEventAsync(data.ETag);
+            await webhookEventRepository.AddWebhookEventAsync(data.ETag, cancellationToken);
             try
             {
                 // Call you method
-                return await handler.Process(data);
+                return await handler.Process(data, cancellationToken);
             }
             catch (Exception e)
             {
                 // Delete the entry on error to make sure the next one isn't ignored
-                await webhookEventRepository.DeleteWebhookEventAsync(data.ETag);
+                await webhookEventRepository.DeleteWebhookEventAsync(data.ETag, cancellationToken);
                 return Task.CompletedTask;
             }
         }

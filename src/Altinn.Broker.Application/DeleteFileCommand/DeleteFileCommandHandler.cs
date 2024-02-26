@@ -25,15 +25,15 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         _logger = logger;
     }
 
-    public async Task<OneOf<Task, Error>> Process(Guid fileId)
+    public async Task<OneOf<Task, Error>> Process(Guid fileId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Deleting file with id {fileId}", fileId.ToString());
-        var file = await _fileRepository.GetFile(fileId);
+        var file = await _fileRepository.GetFile(fileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
         }
-        var service = await _resourceRepository.GetResource(file.ResourceId);
+        var service = await _resourceRepository.GetResource(file.ResourceId, cancellationToken);
         if (service is null)
         {
             return Errors.ResourceNotConfigured;
@@ -49,9 +49,9 @@ public class DeleteFileCommandHandler : IHandler<Guid, Task>
         }
         else
         {
-            await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted);
+            await _fileStatusRepository.InsertFileStatus(fileId, Core.Domain.Enums.FileStatus.Deleted, cancellationToken: cancellationToken);
         }
-        await _brokerStorageService.DeleteFile(resourceOwner, file);
+        await _brokerStorageService.DeleteFile(resourceOwner, file, cancellationToken);
         var recipientsWhoHaveNotDownloaded = file.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileStatus.DownloadConfirmed).ToList();
         foreach (var recipient in recipientsWhoHaveNotDownloaded)
         {

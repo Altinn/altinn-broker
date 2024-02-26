@@ -14,15 +14,15 @@ public class ActorRepository : IActorRepository
         _connectionProvider = connectionProvider;
     }
 
-    public async Task<ActorEntity?> GetActorAsync(string actorExternalId)
+    public async Task<ActorEntity?> GetActorAsync(string actorExternalId, CancellationToken cancellationToken)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT actor_id_pk, actor_external_id FROM broker.actor WHERE actor_external_id = @actorExternalId");
+        "SELECT actor_id_pk, actor_external_id FROM broker.actor WHERE actor_external_id = @actorExternalId");
         command.Parameters.AddWithValue("@actorExternalId", actorExternalId);
 
-        using NpgsqlDataReader reader = command.ExecuteReader();
+        using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         ActorEntity? actor = null;
-        while (reader.Read())
+        while (await reader.ReadAsync(cancellationToken))
         {
             actor = new ActorEntity
             {
@@ -31,16 +31,17 @@ public class ActorRepository : IActorRepository
             };
         }
         return actor;
+
     }
 
-    public async Task<long> AddActorAsync(ActorEntity actor)
+    public async Task<long> AddActorAsync(ActorEntity actor, CancellationToken cancellationToken)
     {
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-                    "INSERT INTO broker.actor (actor_external_id) " +
-                    "VALUES (@actorExternalId) " +
-                    "RETURNING actor_id_pk");
+                "INSERT INTO broker.actor (actor_external_id) " +
+                "VALUES (@actorExternalId) " +
+                "RETURNING actor_id_pk");
         command.Parameters.AddWithValue("@actorExternalId", actor.ActorExternalId);
 
-        return (long)command.ExecuteScalar()!;
+        return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 }

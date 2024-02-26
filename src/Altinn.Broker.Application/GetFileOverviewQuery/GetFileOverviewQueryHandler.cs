@@ -22,9 +22,9 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         _logger = logger;
     }
 
-    public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request)
+    public async Task<OneOf<GetFileOverviewQueryResponse, Error>> Process(GetFileOverviewQueryRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
@@ -34,8 +34,7 @@ public class GetFileOverviewQueryHandler : IHandler<GetFileOverviewQueryRequest,
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Write, request.IsLegacy)
-                     || await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read, request.IsLegacy);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

@@ -31,14 +31,14 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
-    public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request)
+    public async Task<OneOf<Task, Error>> Process(ConfirmDownloadCommandRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read, request.IsLegacy);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileNotFound;
@@ -52,12 +52,12 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
             return Errors.NoFileUploaded;
         }
 
-        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
         bool shouldConfirmAll = file.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileStatus.DownloadConfirmed);
         if (shouldConfirmAll)
         {
-            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded);
-            _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId));
+            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.AllConfirmedDownloaded, cancellationToken: cancellationToken);
+            _backgroundJobClient.Enqueue<DeleteFileCommandHandler>((deleteFileCommandHandler) => deleteFileCommandHandler.Process(request.FileId, cancellationToken));
         }
 
         return Task.CompletedTask;

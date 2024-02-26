@@ -28,9 +28,9 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         _logger = logger;
     }
 
-    public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request)
+    public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId);
+        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
         if (file is null)
         {
             return Errors.FileNotFound;
@@ -47,12 +47,12 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.NoFileUploaded;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, ResourceAccessLevel.Read, request.IsLegacy);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var resource = await _resourceRepository.GetResource(file.ResourceId);
+        var resource = await _resourceRepository.GetResource(file.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.ResourceNotConfigured;
@@ -62,8 +62,8 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
         {
             return Errors.ResourceOwnerNotConfigured;
         };
-        var downloadStream = await _brokerStorageService.DownloadFile(resourceOwner, file);
-        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Token.Consumer);
+        var downloadStream = await _brokerStorageService.DownloadFile(resourceOwner, file, cancellationToken);
+        await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
         return new DownloadFileQueryResponse()
         {
             Filename = file.Filename,

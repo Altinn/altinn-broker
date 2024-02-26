@@ -40,13 +40,13 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpPost]
         [Authorize(Policy = AuthorizationConstants.Sender)]
-        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler)
+        public async Task<ActionResult<Guid>> InitializeFile(FileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler, CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Initializing file");
             var commandRequest = InitializeFileMapper.MapToRequest(initializeExt, token);
-            var commandResult = await handler.Process(commandRequest);
+            var commandResult = await handler.Process(commandRequest, cancellationToken);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
                 Problem
@@ -64,7 +64,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> UploadFileStreamed(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] UploadFileCommandHandler handler
+            [FromServices] UploadFileCommandHandler handler,
+            CancellationToken cancellationToken
         )
         {
             LogContextHelpers.EnrichLogsWithToken(token);
@@ -75,7 +76,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = token,
                 Filestream = Request.Body
-            });
+            }, cancellationToken);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),
                 Problem
@@ -94,14 +95,15 @@ namespace Altinn.Broker.Controllers
             [FromForm] FileInitializeAndUploadExt form,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] InitializeFileCommandHandler initializeFileCommandHandler,
-            [FromServices] UploadFileCommandHandler uploadFileCommandHandler
+            [FromServices] UploadFileCommandHandler uploadFileCommandHandler,
+            CancellationToken cancellationToken
         )
         {
             LogContextHelpers.EnrichLogsWithInitializeFile(form.Metadata);
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Initializing and uploading file");
             var initializeRequest = InitializeFileMapper.MapToRequest(form.Metadata, token);
-            var initializeResult = await initializeFileCommandHandler.Process(initializeRequest);
+            var initializeResult = await initializeFileCommandHandler.Process(initializeRequest, cancellationToken);
             if (initializeResult.IsT1)
             {
                 Problem(initializeResult.AsT1);
@@ -114,7 +116,7 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = token,
                 Filestream = Request.Body
-            });
+            }, cancellationToken);
             return uploadResult.Match(
                 fileId => Ok(fileId.ToString()),
                 Problem
@@ -131,7 +133,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult<FileOverviewExt>> GetFileOverview(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileOverviewQueryHandler handler)
+            [FromServices] GetFileOverviewQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting file overview for {fileId}", fileId.ToString());
@@ -139,7 +142,7 @@ namespace Altinn.Broker.Controllers
             {
                 FileId = fileId,
                 Token = token
-            });
+            }, cancellationToken);
             return queryResult.Match(
                 result => Ok(FileStatusOverviewExtMapper.MapToExternalModel(result.File)),
                 Problem
@@ -156,7 +159,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileDetailsQueryHandler handler)
+            [FromServices] GetFileDetailsQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting file details for {fileId}", fileId.ToString());
@@ -164,11 +168,12 @@ namespace Altinn.Broker.Controllers
             {
                 FileId = fileId,
                 Token = token
-            });
+            }, cancellationToken);
             return queryResult.Match(
                 result => Ok(FileStatusDetailsExtMapper.MapToExternalModel(result.File, result.FileEvents, result.ActorEvents)),
                 Problem
             );
+
         }
 
         /// <summary>
@@ -184,7 +189,8 @@ namespace Altinn.Broker.Controllers
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFilesQueryHandler handler)
+            [FromServices] GetFilesQueryHandler handler,
+            CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Getting files with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
@@ -196,7 +202,7 @@ namespace Altinn.Broker.Controllers
                 RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
                 From = from,
                 To = to
-            });
+            }, cancellationToken);
             return queryResult.Match(
                 Ok,
                 Problem
@@ -213,7 +219,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> DownloadFile(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] DownloadFileQueryHandler handler)
+            [FromServices] DownloadFileQueryHandler handler,
+             CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
@@ -221,7 +228,7 @@ namespace Altinn.Broker.Controllers
             {
                 FileId = fileId,
                 Token = token
-            });
+            }, cancellationToken);
             return queryResult.Match<ActionResult>(
                 result => File(result.Stream, "application/octet-stream", result.Filename),
                 Problem
@@ -238,7 +245,8 @@ namespace Altinn.Broker.Controllers
         public async Task<ActionResult> ConfirmDownload(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] ConfirmDownloadCommandHandler handler)
+            [FromServices] ConfirmDownloadCommandHandler handler,
+            CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
@@ -246,7 +254,7 @@ namespace Altinn.Broker.Controllers
             {
                 FileId = fileId,
                 Token = token
-            });
+            }, cancellationToken);
             return commandResult.Match(
                 (_) => Ok(null),
                 Problem
