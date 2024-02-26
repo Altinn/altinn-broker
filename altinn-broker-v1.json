@@ -119,25 +119,6 @@
             }
           }
         }
-      },
-      "no.altinn.broker.deleted": {
-        "post": {
-          "requestBody": {
-            "description": "The file has been deleted",
-            "content": {
-              "application/cloudevents+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CloudEvent"
-                }
-              }
-            }
-          },
-          "responses": {
-            "200": {
-              "description": "Ok"
-            }
-          }
-        }
       }
     },
     "paths": {
