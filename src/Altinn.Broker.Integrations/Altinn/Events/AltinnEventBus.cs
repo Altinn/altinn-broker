@@ -55,7 +55,7 @@ public class AltinnEventBus : IEventBus
             Time = DateTime.UtcNow,
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileId,
-            Type = "no.altinn.broker." + type.ToString(),
+            Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
             Source = _httpContextAccessor.HttpContext?.Request.PathBase.Value + _httpContextAccessor.HttpContext?.Request.Path.Value
         };
 
