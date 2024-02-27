@@ -260,9 +260,9 @@ namespace Altinn.Broker.Controllers
                 FileId = fileId,
                 Token = token
             };
-            var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, cancellationToken));
+            var processingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, cancellationToken));
             var uniqueString = $"confirmDownload_{fileId}_{token.Consumer}";
-            var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, _idempotencyEventRepository, cancellationToken);
+            var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, processingFunction, _idempotencyEventRepository, cancellationToken);
             return commandResult.Match(
                 (_) => Ok(null),
                 Problem
