@@ -25,7 +25,7 @@ public class IdempotencyEventHelper
             {
                 // Delete the entry on error to make sure the next one isn't ignored
                 await idempotencyEventRepository.DeleteIdempotencyEventAsync(uniqueString, cancellationToken);
-                return Task.CompletedTask;
+                throw;
             }
         }
         catch (Npgsql.PostgresException e)
