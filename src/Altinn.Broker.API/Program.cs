@@ -78,7 +78,7 @@ static void BuildAndRun(string[] args)
     app.MapControllers();
 
     app.UseHangfireDashboard();
-    app.Services.GetService<IRecurringJobManager>().AddOrUpdate<MalwareScanningResultHandler>("Delete old webhook events", handler => handler.DeleteOldWebhookEvents(), Cron.Weekly());
+    app.Services.GetService<IRecurringJobManager>().AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
 
     app.Run();
 }
