@@ -57,6 +57,10 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             return Errors.FileNotPublished;
         }
+        if (file.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == request.Token.Consumer).Status == ActorFileStatus.DownloadConfirmed)
+        {
+            return Task.CompletedTask;
+        }
 
         await _actorFileStatusRepository.InsertActorFileStatus(request.FileId, ActorFileStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
         await _eventBus.Publish(AltinnEventType.DownloadConfirmed, file.ResourceId, file.FileId.ToString(), cancellationToken);

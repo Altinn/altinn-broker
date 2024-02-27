@@ -19,7 +19,7 @@ public static class DependencyInjection
         services.AddSingleton<IFileStore, BlobService>();
         services.AddScoped<IResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
-        services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
+        services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
         services.AddScoped<IEventBus, AltinnEventBus>();
     }
 }

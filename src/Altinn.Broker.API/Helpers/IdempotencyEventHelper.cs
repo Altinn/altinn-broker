@@ -1,4 +1,5 @@
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
@@ -6,25 +7,25 @@ using OneOf;
 
 namespace Altinn.Broker.Helpers;
 
-public class WebhookEventHelper
+public class IdempotencyEventHelper
 {
-    public static async Task<OneOf<Task, Error>> ProcessMalwareEvent(ScanResultData data, MalwareScanningResultHandler handler, IWebhookEventRepository webhookEventRepository, CancellationToken cancellationToken)
+    public static async Task<OneOf<Task, Error>> ProcessEvent(string uniqueString, Func<Task<OneOf<Task, Error>>> process, IIdempotencyEventRepository idempotencyEventRepository, CancellationToken cancellationToken)
     {
         try
         {
 
             // Create a new entry for that webhook id
-            await webhookEventRepository.AddWebhookEventAsync(data.ETag, cancellationToken);
+            await idempotencyEventRepository.AddIdempotencyEventAsync(uniqueString, cancellationToken);
             try
             {
                 // Call you method
-                return await handler.Process(data, cancellationToken);
+                return await process();
             }
             catch (Exception e)
             {
                 // Delete the entry on error to make sure the next one isn't ignored
-                await webhookEventRepository.DeleteWebhookEventAsync(data.ETag, cancellationToken);
-                return Task.CompletedTask;
+                await idempotencyEventRepository.DeleteIdempotencyEventAsync(uniqueString, cancellationToken);
+                throw;
             }
         }
         catch (Npgsql.PostgresException e)
