@@ -100,7 +100,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
 
     services.AddApplicationHandlers();
-    services.AddIntegrations(config);
+    services.AddIntegrations(config, hostEnvironment.IsDevelopment());
     services.AddPersistence();
 
     services.AddHttpClient();

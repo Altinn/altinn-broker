@@ -34,11 +34,18 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
-        services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions!.PlatformGatewayUrl))
-            .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>(x => x.ClientSettings.ExhangeToAltinnToken = true);
-        services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnRegisterService).FullName, maskinportenSettings);
-        services.AddHttpClient<IAltinnRegisterService, AltinnRegisterService>((client) => client.BaseAddress = new Uri(altinnOptions!.PlatformGatewayUrl))
-            .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnRegisterService>(x => x.ClientSettings.ExhangeToAltinnToken = true);
+        if (isDevelopment) 
+        { 
+            services.AddSingleton<IEventBus, ConsoleLogEventBus>();
+        } 
+        else
+        {
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
+            services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions!.PlatformGatewayUrl))
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>(x => x.ClientSettings.ExhangeToAltinnToken = true);
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnRegisterService).FullName, maskinportenSettings);
+            services.AddHttpClient<IAltinnRegisterService, AltinnRegisterService>((client) => client.BaseAddress = new Uri(altinnOptions!.PlatformGatewayUrl))
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnRegisterService>(x => x.ClientSettings.ExhangeToAltinnToken = true);
+        }
     }
 }
