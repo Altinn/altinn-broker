@@ -87,16 +87,16 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.", cancellationToken);
-            await _eventBus.Publish(AltinnEventType.UploadFailed, file.ResourceId, request.FileId.ToString(), cancellationToken);
+            await _eventBus.Publish(AltinnEventType.UploadFailed, file.ResourceId, request.FileId.ToString(), file.Sender.ActorExternalId, cancellationToken);
             return Errors.UploadFailed;
         }
         await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length, cancellationToken);
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing, cancellationToken: cancellationToken);
-        await _eventBus.Publish(AltinnEventType.UploadProcessing, file.ResourceId, request.FileId.ToString(), cancellationToken);
+        await _eventBus.Publish(AltinnEventType.UploadProcessing, file.ResourceId, request.FileId.ToString(), file.Sender.ActorExternalId, cancellationToken);
         if (resourceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
         {
             await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);
-            await _eventBus.Publish(AltinnEventType.Published, file.ResourceId, request.FileId.ToString(), cancellationToken);
+            await _eventBus.Publish(AltinnEventType.Published, file.ResourceId, request.FileId.ToString(), file.Sender.ActorExternalId, cancellationToken);
         }
         await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published, cancellationToken: cancellationToken);
         return file.FileId;

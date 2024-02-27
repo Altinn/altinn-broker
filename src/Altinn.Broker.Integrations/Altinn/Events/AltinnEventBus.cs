@@ -6,7 +6,6 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Integrations.Altinn.Events.Helpers;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,18 +14,26 @@ public class AltinnEventBus : IEventBus
 {
     private readonly AltinnOptions _altinnOptions;
     private readonly HttpClient _httpClient;
+    private readonly IAltinnRegisterService _altinnRegisterService;
     private readonly ILogger<AltinnEventBus> _logger;
 
-    public AltinnEventBus(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger)
+    public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger)
     {
         _httpClient = httpClient;
         _altinnOptions = altinnOptions.Value;
+        _altinnRegisterService = altinnRegisterService;
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileId, CancellationToken cancellationToken)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileId, string? organizationId = null, CancellationToken cancellationToken = default)
     {
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileId);
+        string? partyId = null;
+        if (organizationId != null)
+        {
+            partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
+        }
+
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileId, partyId);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -39,7 +46,7 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileId)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileId, string? partyId)
     {
         CloudEvent cloudEvent = new CloudEvent()
         {
@@ -49,7 +56,8 @@ public class AltinnEventBus : IEventBus
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
-            Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/file"
+            Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/file",
+            Subject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null
         };
 
         return cloudEvent;
