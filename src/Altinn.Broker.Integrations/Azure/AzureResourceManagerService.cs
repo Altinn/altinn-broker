@@ -29,8 +29,8 @@ public class AzureResourceManagerService : IResourceManager
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly ILogger<AzureResourceManagerService> _logger;
-    public string GetResourceGroupName(ResourceOwnerEntity resourceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{resourceOwnerEntity.Id.Replace(":", "-")}-rg";
-    public string GetStorageAccountName(ResourceOwnerEntity resourceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{resourceOwnerEntity.Id.Replace(":", "")}sa";
+    public string GetResourceGroupName(ResourceOwnerEntity resourceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{resourceOwnerEntity.ResourceGroupName}-rg";
+    public string GetStorageAccountName(ResourceOwnerEntity resourceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{resourceOwnerEntity.ResourceGroupName}sa";
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 

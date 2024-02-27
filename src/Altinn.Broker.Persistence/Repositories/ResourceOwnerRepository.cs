@@ -51,12 +51,13 @@ public class ResourceOwnerRepository : IResourceOwnerRepository
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.resource_owner (resource_owner_id_pk, resource_owner_name, file_time_to_live) " +
-            "VALUES (@sub, @name, @fileTimeToLive)"))
+            "INSERT INTO broker.resource_owner (resource_owner_id_pk, resource_owner_name, file_time_to_live, resource_group_name) " +
+            "VALUES (@sub, @name, @fileTimeToLive, @resourceGroupName)"))
         {
             command.Parameters.AddWithValue("@sub", sub);
             command.Parameters.AddWithValue("@name", name);
             command.Parameters.AddWithValue("@fileTimeToLive", fileTimeToLive);
+            command.Parameters.AddWithValue("@resourceGroupName", Guid.NewGuid());
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }
