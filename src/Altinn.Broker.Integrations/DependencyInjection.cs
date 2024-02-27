@@ -34,10 +34,10 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        if (isDevelopment) 
-        { 
+        if (isDevelopment)
+        {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
-        } 
+        }
         else
         {
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
