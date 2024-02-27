@@ -1,7 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Hangfire;
+
 using Altinn.Broker.Core.Repositories;
+
+using Hangfire;
+
 using Microsoft.Extensions.Logging;
 
 public class IdempotencyService
