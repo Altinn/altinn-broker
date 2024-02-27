@@ -7,5 +7,7 @@ public enum AltinnEventType
     Published,
     UploadFailed,
     DownloadConfirmed,
-    AllConfirmedDownloaded
+    AllConfirmedDownloaded,
+    FileDeleted,
+    FileNeverConfirmedDownloaded
 }
