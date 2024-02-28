@@ -73,7 +73,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
             _backgroundJobClient.Enqueue<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(request.FileTransferId, cancellationToken));
-            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, file.ResourceId, fileTransfer.FileTransferId.ToString(), file.Sender.ActorExternalId, cancellationToken);
+            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
         }
 
         return Task.CompletedTask;
