@@ -18,14 +18,14 @@ public class IdempotencyEventHelper
             await idempotencyEventRepository.AddIdempotencyEventAsync(uniqueString, cancellationToken);
             try
             {
-                // Call you method¨
+                // Call you method
                 return await process();
             }
             catch (Exception e)
             {
                 // Delete the entry on error to make sure the next one isn't ignored
                 await idempotencyEventRepository.DeleteIdempotencyEventAsync(uniqueString, cancellationToken);
-                return Task.CompletedTask;
+                throw;
             }
         }
         catch (Npgsql.PostgresException e)

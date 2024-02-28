@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 
 using Altinn.Broker.Core.Repositories;
