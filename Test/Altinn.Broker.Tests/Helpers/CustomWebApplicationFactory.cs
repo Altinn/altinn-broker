@@ -93,7 +93,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 {
                     Id = capturedId,
                     Created = DateTime.UtcNow,
-                    ResourceOwnerId = $"0192:991825827",
+                    ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
             services.AddSingleton(resourceRegistryRepository.Object);

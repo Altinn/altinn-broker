@@ -3,18 +3,18 @@
 namespace Altinn.Broker.Core.Services;
 public interface IResourceManager
 {
-    Task<DeploymentStatus> GetDeploymentStatus(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken);
+    Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Deploys the required resources for the ResourceOwner. Must be idempotent.
+    /// Deploys the required resources for the ServiceOwner. Must be idempotent.
     /// </summary>
-    /// <param name="resourceOwnerEntity"></param>
+    /// <param name="serviceOwnerEntity"></param>
     /// <returns></returns>
-    Task Deploy(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken);
+    Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
-    Task<string> GetStorageConnectionString(ResourceOwnerEntity resourceOwnerEntity);
+    Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity);
 
-    string GetResourceGroupName(ResourceOwnerEntity resourceOwnerEntity);
+    string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity);
 
-    string GetStorageAccountName(ResourceOwnerEntity resourceOwnerEntity);
+    string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity);
 }

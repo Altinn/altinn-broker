@@ -10,60 +10,60 @@ namespace Altinn.Broker.Mappers;
 
 internal static class LegacyFileStatusOverviewExtMapper
 {
-    internal static LegacyFileOverviewExt MapToExternalModel(FileEntity file)
+    internal static LegacyFileOverviewExt MapToExternalModel(FileTransferEntity fileTransfer)
     {
         return new LegacyFileOverviewExt()
         {
-            Checksum = file.Checksum,
-            ResourceId = file.ResourceId,
-            FileSize = file.FileSize,
-            FileId = file.FileId,
-            FileName = file.Filename,
-            FileStatus = MapToExternalEnum(file.FileStatusEntity.Status),
-            Sender = file.Sender.ActorExternalId,
-            FileStatusChanged = file.FileStatusChanged,
-            FileStatusText = MapToFileStatusText(file.FileStatusEntity.Status),
-            PropertyList = file.PropertyList,
-            Recipients = MapToRecipients(file.RecipientCurrentStatuses),
-            SendersFileReference = file.SendersFileReference,
-            Created = file.Created,
-            ExpirationTime = file.ExpirationTime
+            Checksum = fileTransfer.Checksum,
+            ResourceId = fileTransfer.ResourceId,
+            FileSize = fileTransfer.FileTransferSize,
+            FileId = fileTransfer.FileTransferId,
+            FileName = fileTransfer.FileName,
+            FileStatus = MapToExternalEnum(fileTransfer.FileTransferStatusEntity.Status),
+            Sender = fileTransfer.Sender.ActorExternalId,
+            FileStatusChanged = fileTransfer.FileTransferStatusChanged,
+            FileStatusText = MapToFileStatusText(fileTransfer.FileTransferStatusEntity.Status),
+            PropertyList = fileTransfer.PropertyList,
+            Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
+            SendersFileReference = fileTransfer.SendersFileTransferReference,
+            Created = fileTransfer.Created,
+            ExpirationTime = fileTransfer.ExpirationTime
         };
     }
 
-    internal static LegacyFileStatusExt MapToExternalEnum(FileStatus domainEnum)
+    internal static LegacyFileStatusExt MapToExternalEnum(FileTransferStatus domainEnum)
     {
         return domainEnum switch
         {
-            FileStatus.Initialized => LegacyFileStatusExt.Initialized,
-            FileStatus.UploadStarted => LegacyFileStatusExt.UploadStarted,
-            FileStatus.UploadProcessing => LegacyFileStatusExt.UploadProcessing,
-            FileStatus.Published => LegacyFileStatusExt.Published,
-            FileStatus.Cancelled => LegacyFileStatusExt.Cancelled,
-            FileStatus.AllConfirmedDownloaded => LegacyFileStatusExt.AllConfirmedDownloaded,
-            FileStatus.Deleted => LegacyFileStatusExt.Deleted,
-            FileStatus.Failed => LegacyFileStatusExt.Failed,
+            FileTransferStatus.Initialized => LegacyFileStatusExt.Initialized,
+            FileTransferStatus.UploadStarted => LegacyFileStatusExt.UploadStarted,
+            FileTransferStatus.UploadProcessing => LegacyFileStatusExt.UploadProcessing,
+            FileTransferStatus.Published => LegacyFileStatusExt.Published,
+            FileTransferStatus.Cancelled => LegacyFileStatusExt.Cancelled,
+            FileTransferStatus.AllConfirmedDownloaded => LegacyFileStatusExt.AllConfirmedDownloaded,
+            FileTransferStatus.Deleted => LegacyFileStatusExt.Deleted,
+            FileTransferStatus.Failed => LegacyFileStatusExt.Failed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static string MapToFileStatusText(FileStatus domainEnum)
+    internal static string MapToFileStatusText(FileTransferStatus domainEnum)
     {
         return domainEnum switch
         {
-            FileStatus.Initialized => "Ready for upload",
-            FileStatus.UploadStarted => "Upload started",
-            FileStatus.UploadProcessing => "Processing upload",
-            FileStatus.Published => "Ready for download",
-            FileStatus.Cancelled => "File cancelled",
-            FileStatus.AllConfirmedDownloaded => "All downloaded",
-            FileStatus.Deleted => "File has been deleted",
-            FileStatus.Failed => "Upload failed",
+            FileTransferStatus.Initialized => "Ready for upload",
+            FileTransferStatus.UploadStarted => "Upload started",
+            FileTransferStatus.UploadProcessing => "Processing upload",
+            FileTransferStatus.Published => "Ready for download",
+            FileTransferStatus.Cancelled => "File cancelled",
+            FileTransferStatus.AllConfirmedDownloaded => "All downloaded",
+            FileTransferStatus.Deleted => "File has been deleted",
+            FileTransferStatus.Failed => "Upload failed",
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static List<LegacyRecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> recipientEvents)
+    internal static List<LegacyRecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileTransferStatusEntity> recipientEvents)
     {
         var lastStatusForEveryRecipient = recipientEvents
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
@@ -79,24 +79,24 @@ internal static class LegacyFileStatusOverviewExtMapper
         }).ToList();
     }
 
-    internal static LegacyRecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
+    internal static LegacyRecipientFileStatusExt MapToExternalRecipientStatus(ActorFileTransferStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            ActorFileStatus.Initialized => LegacyRecipientFileStatusExt.Initialized,
-            ActorFileStatus.DownloadStarted => LegacyRecipientFileStatusExt.DownloadStarted,
-            ActorFileStatus.DownloadConfirmed => LegacyRecipientFileStatusExt.DownloadConfirmed,
+            ActorFileTransferStatus.Initialized => LegacyRecipientFileStatusExt.Initialized,
+            ActorFileTransferStatus.DownloadStarted => LegacyRecipientFileStatusExt.DownloadStarted,
+            ActorFileTransferStatus.DownloadConfirmed => LegacyRecipientFileStatusExt.DownloadConfirmed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static string MapToRecipientStatusText(ActorFileStatus actorFileStatus)
+    internal static string MapToRecipientStatusText(ActorFileTransferStatus actorFileStatus)
     {
         return actorFileStatus switch
         {
-            ActorFileStatus.Initialized => "Initialized",
-            ActorFileStatus.DownloadStarted => "Recipient has attempted to download file",
-            ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file",
+            ActorFileTransferStatus.Initialized => "Initialized",
+            ActorFileTransferStatus.DownloadStarted => "Recipient has attempted to download file",
+            ActorFileTransferStatus.DownloadConfirmed => "Recipient has downloaded file",
             _ => throw new InvalidEnumArgumentException()
         };
 

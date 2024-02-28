@@ -7,21 +7,21 @@ namespace Altinn.Broker.Helpers;
 
 public static class LogContextHelpers
 {
-    public static void EnrichLogsWithInitializeFile(FileInitalizeExt fileInitalizeExt)
+    public static void EnrichLogsWithInitializeFile(FileTransferInitalizeExt fileTransferInitalizeExt)
     {
-        LogContext.PushProperty("sender", fileInitalizeExt.Sender);
-        LogContext.PushProperty("filename", fileInitalizeExt.FileName);
-        LogContext.PushProperty("recipients", string.Join(',', fileInitalizeExt.Recipients));
-        LogContext.PushProperty("sendersFileReference", fileInitalizeExt.SendersFileReference);
-        LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
+        LogContext.PushProperty("sender", fileTransferInitalizeExt.Sender);
+        LogContext.PushProperty("FileName", fileTransferInitalizeExt.FileName);
+        LogContext.PushProperty("recipients", string.Join(',', fileTransferInitalizeExt.Recipients));
+        LogContext.PushProperty("sendersFileTransferReference", fileTransferInitalizeExt.SendersFileTransferReference);
+        LogContext.PushProperty("checksum", fileTransferInitalizeExt.Checksum);
     }
 
     public static void EnrichLogsWithLegacyInitializeFile(LegacyFileInitalizeExt fileInitalizeExt)
     {
         LogContext.PushProperty("sender", fileInitalizeExt.Sender);
-        LogContext.PushProperty("filename", fileInitalizeExt.FileName);
+        LogContext.PushProperty("FileName", fileInitalizeExt.FileName);
         LogContext.PushProperty("recipients", string.Join(',', fileInitalizeExt.Recipients));
-        LogContext.PushProperty("sendersFileReference", fileInitalizeExt.SendersFileReference);
+        LogContext.PushProperty("sendersFileTransferReference", fileInitalizeExt.SendersFileTransferReference);
         LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
 

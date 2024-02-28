@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Altinn.Broker.Models.ResourceOwner;
+namespace Altinn.Broker.Models.ServiceOwner;
 
-public class ResourceOwnerInitializeExt
+public class ServiceOwnerInitializeExt
 {
     public string Name { get; set; }
     public string DeletionTime { get; set; } // ISO8601 Duration

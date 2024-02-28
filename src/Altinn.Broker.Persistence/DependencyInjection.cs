@@ -10,10 +10,10 @@ public static class DependencyInjection
     {
         services.AddSingleton<DatabaseConnectionProvider>();
         services.AddSingleton<IActorRepository, ActorRepository>();
-        services.AddSingleton<IFileRepository, FileRepository>();
-        services.AddSingleton<IFileStatusRepository, FileStatusRepository>();
-        services.AddSingleton<IActorFileStatusRepository, ActorFileStatusRepository>();
-        services.AddSingleton<IResourceOwnerRepository, ResourceOwnerRepository>();
+        services.AddSingleton<IFileTransferRepository, FileTransferRepository>();
+        services.AddSingleton<IFileTransferStatusRepository, FileTransferStatusRepository>();
+        services.AddSingleton<IActorFileTransferStatusRepository, ActorFileTransferStatusRepository>();
+        services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
         services.AddSingleton<IIdempotencyEventRepository, IdempotencyEventRepository>();
     }
 }

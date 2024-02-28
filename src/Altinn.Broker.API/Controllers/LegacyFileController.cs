@@ -2,10 +2,10 @@ using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
 using Altinn.Broker.Application.DownloadFileQuery;
-using Altinn.Broker.Application.GetFileDetailsQuery;
-using Altinn.Broker.Application.GetFileOverviewQuery;
-using Altinn.Broker.Application.GetFilesQuery;
-using Altinn.Broker.Application.InitializeFileCommand;
+using Altinn.Broker.Application.GetFileTransferDetailsQuery;
+using Altinn.Broker.Application.GetFileTransferOverviewQuery;
+using Altinn.Broker.Application.GetFileTransfersQuery;
+using Altinn.Broker.Application.InitializeFileTransferCommand;
 using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
@@ -43,7 +43,7 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileCommandHandler handler, CancellationToken cancellationToken)
+        public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferCommandHandler handler, CancellationToken cancellationToken)
         {
             CallerIdentity legacyToken = CreateLegacyToken(initializeExt.Sender, token);
 
@@ -63,10 +63,10 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [Route("{fileId}/upload")]
+        [Route("{fileTransferId}/upload")]
         [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
-            Guid fileId,
+            Guid fileTransferId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler,
@@ -76,13 +76,13 @@ namespace Altinn.Broker.Controllers
             CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
-            _logger.LogInformation("Legacy - Uploading file {fileId}", fileId.ToString());
+            _logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
             Request.EnableBuffering();
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileTransferId,
                 Token = token,
-                Filestream = Request.Body,
+                UploadStream = Request.Body,
                 IsLegacy = true
             }, cancellationToken);
             return commandResult.Match(
@@ -101,21 +101,21 @@ namespace Altinn.Broker.Controllers
             Guid fileId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileOverviewQueryHandler handler,
+            [FromServices] GetFileTransferOverviewQueryHandler handler,
             CancellationToken cancellationToken)
         {
             CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
             _logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
-            var queryResult = await handler.Process(new GetFileOverviewQueryRequest()
+            var queryResult = await handler.Process(new GetFileTransferOverviewQueryRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
             }, cancellationToken);
             return queryResult.Match(
-                result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.File)),
+                result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
                 Problem
             );
         }
@@ -126,10 +126,10 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("{fileId}/details")]
-        public async Task<ActionResult<FileStatusDetailsExt>> GetFileDetails(
+        public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
             Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileDetailsQueryHandler handler,
+            [FromServices] GetFileTransferDetailsQueryHandler handler,
             CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
@@ -141,7 +141,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<List<Guid>>> GetFiles(
-            [FromQuery] RecipientFileStatusExt? recipientStatus,
+            [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
             [FromQuery] string? resourceId,
@@ -174,7 +174,7 @@ namespace Altinn.Broker.Controllers
             {
                 Token = legacyToken ?? token,
                 ResourceId = resourceId ?? string.Empty,
-                RecipientStatus = recipientStatus is not null ? (ActorFileStatus)recipientStatus : null,
+                RecipientStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
                 OnBehalfOfConsumer = onBehalfOfConsumer,
                 From = from,
                 To = to,
@@ -204,12 +204,12 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
             }, cancellationToken);
             return queryResult.Match<ActionResult>(
-                result => File(result.Stream, "application/octet-stream", result.Filename),
+                result => File(result.DownloadStream, "application/octet-stream", result.FileName),
                 Problem
             );
         }
@@ -232,7 +232,7 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
             var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
             }, cancellationToken);

@@ -2,7 +2,7 @@
 
 public enum AltinnEventType
 {
-    FileInitialized,
+    FileTransferInitialized,
     UploadProcessing,
     Published,
     UploadFailed,
