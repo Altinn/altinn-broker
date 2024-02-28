@@ -10,7 +10,7 @@
 			"name": "Broker",
 			"item": [
 				{
-					"name": "{fileTransferId}",
+					"name": "{fileId}",
 					"item": [
 						{
 							"name": "Upload",
@@ -40,7 +40,7 @@
 									}
 								},
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/upload",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileId}}/upload",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -49,7 +49,7 @@
 										"api",
 										"v1",
 										"filetransfer",
-										"{{fileTransferId}}",
+										"{{fileId}}",
 										"upload"
 									]
 								}
@@ -61,7 +61,7 @@
 										"method": "POST",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/upload",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileId/upload",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -70,12 +70,12 @@
 												"api",
 												"v1",
 												"filetransfer",
-												":fileTransferId",
+												":fileId",
 												"upload"
 											],
 											"variable": [
 												{
-													"key": "fileTransferId"
+													"key": "fileId"
 												}
 											]
 										}
@@ -185,7 +185,7 @@
 								"method": "GET",
 								"header": [],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileId}}/download",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -194,7 +194,7 @@
 										"api",
 										"v1",
 										"filetransfer",
-										"{{fileTransferId}}",
+										"{{fileId}}",
 										"download"
 									]
 								}
@@ -206,7 +206,7 @@
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/download",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileId/download",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -215,12 +215,12 @@
 												"api",
 												"v1",
 												"filetransfer",
-												":fileTransferId",
+												":fileId",
 												"download"
 											],
 											"variable": [
 												{
-													"key": "fileTransferId"
+													"key": "fileId"
 												}
 											]
 										}
@@ -233,12 +233,12 @@
 									"body": ""
 								},
 								{
-									"name": "/broker/api/v1/filetransfer/:fileTransferId/download",
+									"name": "/broker/api/v1/filetransfer/:fileId/download",
 									"originalRequest": {
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileId}}/download",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -247,7 +247,7 @@
 												"api",
 												"v1",
 												"filetransfer",
-												"{{fileTransferId}}",
+												"{{fileId}}",
 												"download"
 											]
 										}

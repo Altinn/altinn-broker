@@ -7,17 +7,17 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
-namespace Altinn.Broker.Application.DeleteFileTransferCommand;
-public class DeleteFileTransferCommandHandler : IHandler<Guid, Task>
+namespace Altinn.Broker.Application.ExpireFileTransferCommand;
+public class ExpireFileTransferCommandHandler : IHandler<Guid, Task>
 {
     private readonly IFileTransferRepository _fileTransferRepository;
     private readonly IFileTransferStatusRepository _fileTransferStatusRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IBrokerStorageService _brokerStorageService;
-    private readonly ILogger<DeleteFileTransferCommandHandler> _logger;
+    private readonly ILogger<ExpireFileTransferCommandHandler> _logger;
 
-    public DeleteFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<DeleteFileTransferCommandHandler> logger)
+    public ExpireFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<ExpireFileTransferCommandHandler> logger)
     {
         _fileTransferRepository = fileTransferRepository;
         _fileTransferStatusRepository = fileTransferStatusRepository;

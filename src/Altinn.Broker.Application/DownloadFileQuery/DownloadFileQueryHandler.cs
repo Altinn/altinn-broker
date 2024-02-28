@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
-namespace Altinn.Broker.Application.DownloadFileTransferQuery;
-public class DownloadFileTransferQueryHandler : IHandler<DownloadFileTransferQueryRequest, DownloadFileTransferQueryResponse>
+namespace Altinn.Broker.Application.DownloadFileQuery;
+public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, DownloadFileQueryResponse>
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
@@ -15,9 +15,9 @@ public class DownloadFileTransferQueryHandler : IHandler<DownloadFileTransferQue
     private readonly IFileTransferRepository _fileTransferRepository;
     private readonly IActorFileTransferStatusRepository _actorFileTransferStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
-    private readonly ILogger<DownloadFileTransferQueryHandler> _logger;
+    private readonly ILogger<DownloadFileQueryHandler> _logger;
 
-    public DownloadFileTransferQueryHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileTransferQueryHandler> logger)
+    public DownloadFileQueryHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileQueryHandler> logger)
     {
         _resourceRepository = resourceRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
@@ -28,9 +28,9 @@ public class DownloadFileTransferQueryHandler : IHandler<DownloadFileTransferQue
         _logger = logger;
     }
 
-    public async Task<OneOf<DownloadFileTransferQueryResponse, Error>> Process(DownloadFileTransferQueryRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request, CancellationToken cancellationToken)
     {
-        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileId, cancellationToken);
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
@@ -63,11 +63,11 @@ public class DownloadFileTransferQueryHandler : IHandler<DownloadFileTransferQue
             return Errors.ServiceOwnerNotConfigured;
         };
         var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
-        await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
-        return new DownloadFileTransferQueryResponse()
+        await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
+        return new DownloadFileQueryResponse()
         {
             FileName = fileTransfer.FileName,
-            Stream = downloadStream
+            DownloadStream = downloadStream
         };
     }
 }

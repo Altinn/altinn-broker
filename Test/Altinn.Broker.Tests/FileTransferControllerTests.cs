@@ -87,7 +87,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "DeleteFileTransferCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileTransferId))),
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileTransferId))),
             It.IsAny<EnqueuedState>()));
     }
 

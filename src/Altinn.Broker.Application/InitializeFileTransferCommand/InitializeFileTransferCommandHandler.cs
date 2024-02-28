@@ -1,4 +1,4 @@
-﻿using Altinn.Broker.Application.DeleteFileTransferCommand;
+﻿using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -74,7 +74,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             _logger.LogError("Failed when adding recipient initialized events.");
         }
-        _backgroundJobClient.Schedule<DeleteFileTransferCommandHandler>((deleteFileTransferCommandHandler) => deleteFileTransferCommandHandler.Process(fileTransferId, cancellationToken), serviceOwner.FileTransferTimeToLive);
+        _backgroundJobClient.Schedule<ExpireFileTransferCommandHandler>((ExpireFileTransferCommandHandler) => ExpireFileTransferCommandHandler.Process(fileTransferId, cancellationToken), serviceOwner.FileTransferTimeToLive);
         await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), cancellationToken);
 
         return fileTransferId;

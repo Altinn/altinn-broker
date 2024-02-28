@@ -1,12 +1,12 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
-using Altinn.Broker.Application.DownloadFileTransferQuery;
+using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.GetFileTransferDetailsQuery;
 using Altinn.Broker.Application.GetFileTransferOverviewQuery;
 using Altinn.Broker.Application.GetFileTransfersQuery;
 using Altinn.Broker.Application.InitializeFileTransferCommand;
-using Altinn.Broker.Application.UploadFileTransferCommand;
+using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
@@ -64,27 +64,27 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [Route("{fileTransferId}/upload")]
+        [Route("{fileId}/upload")]
         [Consumes("application/octet-stream")]
         [Authorize(Policy = AuthorizationConstants.Sender)]
-        public async Task<ActionResult> UploadFileTransferStreamed(
-            Guid fileTransferId,
+        public async Task<ActionResult> UploadUploadStreamed(
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] UploadFileTransferCommandHandler handler,
+            [FromServices] UploadFileCommandHandler handler,
             CancellationToken cancellationToken
         )
         {
             LogContextHelpers.EnrichLogsWithToken(token);
-            _logger.LogInformation("Uploading file {fileTransferId} for file transfer", fileTransferId.ToString());
+            _logger.LogInformation("Uploading file {fileId} for file transfer", fileId.ToString());
             Request.EnableBuffering();
-            var commandResult = await handler.Process(new UploadFileTransferCommandRequest()
+            var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
-                FileTransferId = fileTransferId,
+                FileId = fileId,
                 Token = token,
-                FileTransferStream = Request.Body
+                UploadStream = Request.Body
             }, cancellationToken);
             return commandResult.Match(
-                fileTransferId => Ok(fileTransferId.ToString()),
+                fileId => Ok(fileId.ToString()),
                 Problem
             );
         }
@@ -101,7 +101,7 @@ namespace Altinn.Broker.Controllers
             [FromForm] FileTransferInitializeAndUploadExt form,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] InitializeFileTransferCommandHandler initializeFileTransferCommandHandler,
-            [FromServices] UploadFileTransferCommandHandler uploadFileTransferCommandHandler,
+            [FromServices] UploadFileCommandHandler UploadFileCommandHandler,
             CancellationToken cancellationToken
         )
         {
@@ -117,14 +117,14 @@ namespace Altinn.Broker.Controllers
             var fileTransferId = initializeResult.AsT0;
 
             Request.EnableBuffering();
-            var uploadResult = await uploadFileTransferCommandHandler.Process(new UploadFileTransferCommandRequest()
+            var uploadResult = await UploadFileCommandHandler.Process(new UploadFileCommandRequest()
             {
-                FileTransferId = fileTransferId,
+                FileId = fileTransferId,
                 Token = token,
-                FileTransferStream = Request.Body
+                UploadStream = Request.Body
             }, cancellationToken);
             return uploadResult.Match(
-                fileTransferId => Ok(fileTransferId.ToString()),
+                FileId => Ok(FileId.ToString()),
                 Problem
             );
         }
@@ -220,23 +220,23 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet]
-        [Route("{fileTransferId}/download")]
+        [Route("{fileId}/download")]
         [Authorize(Policy = AuthorizationConstants.Recipient)]
         public async Task<ActionResult> DownloadFileTransfer(
-            Guid fileTransferId,
+            Guid fileId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] DownloadFileTransferQueryHandler handler,
+            [FromServices] DownloadFileQueryHandler handler,
              CancellationToken cancellationToken)
         {
             LogContextHelpers.EnrichLogsWithToken(token);
-            _logger.LogInformation("Downloading fileTransfer {fileTransferId}", fileTransferId.ToString());
-            var queryResult = await handler.Process(new DownloadFileTransferQueryRequest()
+            _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
+            var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
-                FileTransferId = fileTransferId,
+                FileId = fileId,
                 Token = token
             }, cancellationToken);
             return queryResult.Match<ActionResult>(
-                result => File(result.Stream, "application/octet-stream", result.FileName),
+                result => File(result.DownloadStream, "application/octet-stream", result.FileName),
                 Problem
             );
         }

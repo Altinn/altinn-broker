@@ -1,6 +1,6 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownloadCommand;
-using Altinn.Broker.Application.DeleteFileTransferCommand;
+using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -72,7 +72,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         if (shouldConfirmAll)
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
-            _backgroundJobClient.Enqueue<DeleteFileTransferCommandHandler>((deleteFileTransferCommandHandler) => deleteFileTransferCommandHandler.Process(request.FileTransferId, cancellationToken));
+            _backgroundJobClient.Enqueue<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(request.FileTransferId, cancellationToken));
             await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), cancellationToken);
         }
 
