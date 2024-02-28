@@ -80,5 +80,19 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
             command.ExecuteNonQuery();
         }
     }
+    public async Task UpdateFileRetention(string sub, TimeSpan fileTransferTimeToLive)
+    {
+        await using var connection = await _connectionProvider.GetConnectionAsync();
+
+        await using (var command = await _connectionProvider.CreateCommand(
+            "UPDATE broker.service_owner " +
+            "SET file_transfer_time_to_live = @fileTransferTimeToLive " +
+            "WHERE service_owner_id_pk = @sub"))
+        {
+            command.Parameters.AddWithValue("@sub", sub);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
+            command.ExecuteNonQuery();
+        }
+    }
 }
 

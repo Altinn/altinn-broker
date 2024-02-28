@@ -8,5 +8,5 @@ public class ServiceOwnerOverviewExt
 
     public DeploymentStatusExt DeploymentStatus { get; set; }
 
-    public TimeSpan FileTimeToLive { get; set; }
+    public TimeSpan FileTransferTimeToLive { get; set; }
 }

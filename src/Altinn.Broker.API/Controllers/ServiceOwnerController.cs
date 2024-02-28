@@ -40,8 +40,8 @@ public class ServiceOwnerController : Controller
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
-        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name, fileTimeToLive);
+        var fileTransferTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
+        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name, fileTransferTimeToLive);
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner!, cancellationToken)
@@ -66,8 +66,24 @@ public class ServiceOwnerController : Controller
         {
             Name = serviceOwner.Name,
             DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
-            FileTimeToLive = serviceOwner.FileTransferTimeToLive
+            FileTransferTimeToLive = serviceOwner.FileTransferTimeToLive
         };
     }
+    [HttpPut]
+    [Route("{serviceOwnerId}/fileretention")]
+    public async Task<ActionResult> UpdateFileRetention(string serviceOwnerId, [FromBody] ServiceOwnerUpdateFileRetentionExt serviceOwnerUpdateFileRetentionExt, CancellationToken cancellationToken)
+    {
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
+        if (serviceOwner is null)
+        {
+            return NotFound();
+        }
+
+        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerUpdateFileRetentionExt.FileTransferTimeToLive);
+        await _serviceOwnerRepository.UpdateFileRetention(serviceOwnerId, fileTimeToLive);
+
+        return Ok();
+    }
+
 }
 
