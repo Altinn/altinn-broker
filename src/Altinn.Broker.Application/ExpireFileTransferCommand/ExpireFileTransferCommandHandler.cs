@@ -54,7 +54,7 @@ public class ExpireFileTransferCommandHandler : IHandler<Guid, Task>
         else
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, Core.Domain.Enums.FileTransferStatus.Deleted, cancellationToken: cancellationToken);
-            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransferId.ToString(), null, cancellationToken);
         }
         await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken);
         var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();

@@ -25,7 +25,7 @@ public class AltinnEventBus : IEventBus
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string organizationId, CancellationToken cancellationToken = default)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? organizationId = null, CancellationToken cancellationToken = default)
     {
         string? partyId = null;
         if (organizationId != null)
