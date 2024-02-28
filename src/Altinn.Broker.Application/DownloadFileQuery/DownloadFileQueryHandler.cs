@@ -30,7 +30,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
 
     public async Task<OneOf<DownloadFileQueryResponse, Error>> Process(DownloadFileQueryRequest request, CancellationToken cancellationToken)
     {
-        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileId, cancellationToken);
+        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
@@ -63,7 +63,7 @@ public class DownloadFileQueryHandler : IHandler<DownloadFileQueryRequest, Downl
             return Errors.ServiceOwnerNotConfigured;
         };
         var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
-        await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
+        await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
         return new DownloadFileQueryResponse()
         {
             FileName = fileTransfer.FileName,

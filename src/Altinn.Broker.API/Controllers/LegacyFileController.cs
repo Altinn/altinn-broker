@@ -63,10 +63,10 @@ namespace Altinn.Broker.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [Route("{fileId}/upload")]
+        [Route("{fileTransferId}/upload")]
         [Consumes("application/octet-stream")]
         public async Task<ActionResult> UploadFileStreamed(
-            Guid fileId,
+            Guid fileTransferId,
             [FromQuery] string onBehalfOfConsumer,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler,
@@ -76,11 +76,11 @@ namespace Altinn.Broker.Controllers
             CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
             LogContextHelpers.EnrichLogsWithToken(legacyToken);
-            _logger.LogInformation("Legacy - Uploading file {fileId}", fileId.ToString());
+            _logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
             Request.EnableBuffering();
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileTransferId,
                 Token = token,
                 UploadStream = Request.Body,
                 IsLegacy = true
@@ -204,7 +204,7 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
             var queryResult = await handler.Process(new DownloadFileQueryRequest()
             {
-                FileId = fileId,
+                FileTransferId = fileId,
                 Token = legacyToken,
                 IsLegacy = true
             }, cancellationToken);
