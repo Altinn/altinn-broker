@@ -48,7 +48,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file",
+										"filetransfer",
 										"{{fileTransferId}}",
 										"upload"
 									]
@@ -69,7 +69,7 @@
 												"broker",
 												"api",
 												"v1",
-												"file",
+												"filetransfer",
 												":fileTransferId",
 												"upload"
 											],
@@ -118,7 +118,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file",
+										"filetransfer",
 										"{{fileTransferId}}",
 										"details"
 									]
@@ -144,7 +144,7 @@
 												"broker",
 												"api",
 												"v1",
-												"file",
+												"filetransfer",
 												":fileTransferId",
 												"details"
 											],
@@ -193,7 +193,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file",
+										"filetransfer",
 										"{{fileTransferId}}",
 										"download"
 									]
@@ -214,7 +214,7 @@
 												"broker",
 												"api",
 												"v1",
-												"file",
+												"filetransfer",
 												":fileTransferId",
 												"download"
 											],
@@ -246,7 +246,7 @@
 												"broker",
 												"api",
 												"v1",
-												"file",
+												"filetransfer",
 												"{{fileTransferId}}",
 												"download"
 											]
@@ -306,7 +306,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file",
+										"filetransfer",
 										"{{fileTransferId}}",
 										"confirmdownload"
 									]
@@ -327,7 +327,7 @@
 												"broker",
 												"api",
 												"v1",
-												"file",
+												"filetransfer",
 												":fileTransferId",
 												"confirmdownload"
 											],
@@ -378,7 +378,7 @@
 								"broker",
 								"api",
 								"v1",
-								"file",
+								"filetransfer",
 								"{{fileTransferId}}"
 							]
 						}
@@ -403,7 +403,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file",
+										"filetransfer",
 										":fileTransferId"
 									],
 									"variable": [
@@ -483,7 +483,7 @@
 								"broker",
 								"api",
 								"v1",
-								"file"
+								"filetransfer"
 							]
 						}
 					},
@@ -521,7 +521,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file"
+										"filetransfer"
 									]
 								}
 							},
@@ -568,7 +568,7 @@
 								"broker",
 								"api",
 								"v1",
-								"file"
+								"filetransfer"
 							],
 							"query": [
 								{
@@ -598,7 +598,7 @@
 										"broker",
 										"api",
 										"v1",
-										"file"
+										"filetransfer"
 									]
 								}
 							},
