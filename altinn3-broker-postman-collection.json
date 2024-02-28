@@ -10,7 +10,7 @@
 			"name": "Broker",
 			"item": [
 				{
-					"name": "{fileId}",
+					"name": "{fileTransferId}",
 					"item": [
 						{
 							"name": "Upload",
@@ -40,7 +40,7 @@
 									}
 								},
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/upload",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/upload",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -49,7 +49,7 @@
 										"api",
 										"v1",
 										"file",
-										"{{fileId}}",
+										"{{fileTransferId}}",
 										"upload"
 									]
 								}
@@ -61,7 +61,7 @@
 										"method": "POST",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/upload",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/upload",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -70,12 +70,12 @@
 												"api",
 												"v1",
 												"file",
-												":fileId",
+												":fileTransferId",
 												"upload"
 											],
 											"variable": [
 												{
-													"key": "fileId"
+													"key": "fileTransferId"
 												}
 											]
 										}
@@ -110,7 +110,7 @@
 									}
 								],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/details",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/details",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -119,7 +119,7 @@
 										"api",
 										"v1",
 										"file",
-										"{{fileId}}",
+										"{{fileTransferId}}",
 										"details"
 									]
 								}
@@ -136,7 +136,7 @@
 											}
 										],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/details",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/details",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -145,12 +145,12 @@
 												"api",
 												"v1",
 												"file",
-												":fileId",
+												":fileTransferId",
 												"details"
 											],
 											"variable": [
 												{
-													"key": "fileId"
+													"key": "fileTransferId"
 												}
 											]
 										}
@@ -165,7 +165,7 @@
 										}
 									],
 									"cookie": [],
-									"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Published\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"nulla_e\": \"<string>\"\n  },\n  \"fileStatusHistory\": [\n    {\n      \"fileStatus\": \"AllConfirmedDownloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"fileStatus\": \"Downloaded\",\n      \"fileStatusText\": \"<string>\",\n      \"fileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"recipientFileStatusHistory\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Downloaded\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ]\n}"
+									"body": "{\n  \"fileTransferId\": \"<uuid>\",\n  \"FileName\": \"<string>\",\n  \"sendersFileTransferReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileTransferStatus\": \"Published\",\n  \"fileTransferStatusText\": \"<string>\",\n  \"fileTransferStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Cancelled\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Downloaded\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"nulla_e\": \"<string>\"\n  },\n  \"fileTransferStatusHistory\": [\n    {\n      \"fileTransferStatus\": \"AllConfirmedDownloaded\",\n      \"fileTransferStatusText\": \"<string>\",\n      \"fileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"fileTransferStatus\": \"Downloaded\",\n      \"fileTransferStatusText\": \"<string>\",\n      \"fileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"recipientFileTransferStatusHistory\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Initialized\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Downloaded\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ]\n}"
 								}
 							]
 						},
@@ -185,7 +185,7 @@
 								"method": "GET",
 								"header": [],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -194,7 +194,7 @@
 										"api",
 										"v1",
 										"file",
-										"{{fileId}}",
+										"{{fileTransferId}}",
 										"download"
 									]
 								}
@@ -206,7 +206,7 @@
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/download",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/download",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -215,12 +215,12 @@
 												"api",
 												"v1",
 												"file",
-												":fileId",
+												":fileTransferId",
 												"download"
 											],
 											"variable": [
 												{
-													"key": "fileId"
+													"key": "fileTransferId"
 												}
 											]
 										}
@@ -233,12 +233,12 @@
 									"body": ""
 								},
 								{
-									"name": "/broker/api/v1/file/:fileId/download",
+									"name": "/broker/api/v1/filetransfer/:fileTransferId/download",
 									"originalRequest": {
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/download",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -247,7 +247,7 @@
 												"api",
 												"v1",
 												"file",
-												"{{fileId}}",
+												"{{fileTransferId}}",
 												"download"
 											]
 										}
@@ -298,7 +298,7 @@
 								"method": "POST",
 								"header": [],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}/confirmdownload",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/confirmdownload",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -307,7 +307,7 @@
 										"api",
 										"v1",
 										"file",
-										"{{fileId}}",
+										"{{fileTransferId}}",
 										"confirmdownload"
 									]
 								}
@@ -319,7 +319,7 @@
 										"method": "POST",
 										"header": [],
 										"url": {
-											"raw": "{{baseUrl}}/broker/api/v1/file/:fileId/confirmdownload",
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId/confirmdownload",
 											"host": [
 												"{{baseUrl}}"
 											],
@@ -328,12 +328,12 @@
 												"api",
 												"v1",
 												"file",
-												":fileId",
+												":fileTransferId",
 												"confirmdownload"
 											],
 											"variable": [
 												{
-													"key": "fileId"
+													"key": "fileTransferId"
 												}
 											]
 										}
@@ -370,7 +370,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/file/{{fileId}}",
+							"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -379,7 +379,7 @@
 								"api",
 								"v1",
 								"file",
-								"{{fileId}}"
+								"{{fileTransferId}}"
 							]
 						}
 					},
@@ -395,7 +395,7 @@
 									}
 								],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file/:fileId",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -404,11 +404,11 @@
 										"api",
 										"v1",
 										"file",
-										":fileId"
+										":fileTransferId"
 									],
 									"variable": [
 										{
-											"key": "fileId"
+											"key": "fileTransferId"
 										}
 									]
 								}
@@ -423,7 +423,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "{\n  \"fileId\": \"<uuid>\",\n  \"fileName\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Initialized\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileStatusCode\": \"Cancelled\",\n      \"recipientFileStatusText\": \"<string>\",\n      \"recipientFileStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
+							"body": "{\n  \"fileTransferId\": \"<uuid>\",\n  \"FileName\": \"<string>\",\n  \"sendersFileTransferReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Initialized\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Cancelled\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
 						}
 					]
 				},
@@ -434,8 +434,8 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"var fileId = pm.response.text().replace(/\\\"/g, \"\")\r",
-									"pm.collectionVariables.set(\"fileId\", fileId);\r",
+									"var fileTransferId = pm.response.text().replace(/\\\"/g, \"\")\r",
+									"pm.collectionVariables.set(\"fileTransferId\", fileTransferId);\r",
 									""
 								],
 								"type": "text/javascript"
@@ -466,7 +466,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"filename\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileReference\": \"archiveno-20425\",\n  \"sender\": \"0192:991825827\",\n  \"recipients\": [\n    \"0192:986252932\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
+							"raw": "{\n  \"FileName\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileTransferReference\": \"archiveno-20425\",\n  \"sender\": \"0192:991825827\",\n  \"recipients\": [\n    \"0192:986252932\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
 							"options": {
 								"raw": {
 									"headerFamily": "json",
@@ -475,7 +475,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/file",
+							"raw": "{{baseUrl}}/broker/api/v1/filetransfer",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -504,7 +504,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"filename\": \"<string>\",\n  \"sendersFileReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    \"<string>\",\n    \"<string>\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"<string>\",\n    \"veniam_1d\": \"<string>\"\n  }\n}",
+									"raw": "{\n  \"FileName\": \"<string>\",\n  \"sendersFileTransferReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    \"<string>\",\n    \"<string>\"\n  ],\n  \"metadata\": {\n    \"deseruntde\": \"<string>\",\n    \"veniam_1d\": \"<string>\"\n  }\n}",
 									"options": {
 										"raw": {
 											"headerFamily": "json",
@@ -513,7 +513,7 @@
 									}
 								},
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -560,7 +560,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/file?resourceId={{resource_id}}",
+							"raw": "{{baseUrl}}/broker/api/v1/filetransfer?resourceId={{resource_id}}",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -590,7 +590,7 @@
 									}
 								],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/file",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -640,7 +640,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{resourceowner_token}}",
+									"value": "{{serviceowner_token}}",
 									"type": "string"
 								}
 							]
@@ -711,7 +711,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{resourceowner_token}}",
+									"value": "{{serviceowner_token}}",
 									"type": "string"
 								}
 							]
@@ -760,7 +760,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{resourceowner_token}}",
+									"value": "{{serviceowner_token}}",
 									"type": "string"
 								}
 							]
@@ -801,17 +801,17 @@
 			]
 		},
 		{
-			"name": "Register Resource Owner",
+			"name": "Register Service Owner",
 			"item": [
 				{
-					"name": "Register Resource Owner",
+					"name": "Register Service Owner",
 					"request": {
 						"auth": {
 							"type": "bearer",
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{resourceowner_token}}",
+									"value": "{{serviceowner_token}}",
 									"type": "string"
 								}
 							]
@@ -820,7 +820,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"name\": \"TestResourceOwner\",\r\n    \"deletionTime\": \"P30D\"\r\n}",
+							"raw": "{\r\n    \"name\": \"TestServiceOwner\",\r\n    \"deletionTime\": \"P30D\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -828,7 +828,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/resourceowner",
+							"raw": "{{baseUrl}}/broker/api/v1/serviceowner",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -836,7 +836,7 @@
 								"broker",
 								"api",
 								"v1",
-								"resourceowner"
+								"serviceowner"
 							]
 						}
 					},
@@ -999,7 +999,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:authorization:pdp&org=ttd&orgNo={{resourceowner_orgnumber}}",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:authorization:pdp&org=ttd&orgNo={{serviceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1093,13 +1093,13 @@
 					"response": []
 				},
 				{
-					"name": "Authenticate as resource owner (tjeneste-eier)",
+					"name": "Authenticate as service owner (tjeneste-eier)",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.globals.set(\"resourceowner_token\", responseBody);"
+									"pm.globals.set(\"serviceowner_token\", responseBody);"
 								],
 								"type": "text/javascript"
 							}
@@ -1119,7 +1119,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp&org=ttd&orgNo={{resourceowner_orgnumber}}",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp&org=ttd&orgNo={{serviceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1177,8 +1177,8 @@
 	],
 	"variable": [
 		{
-			"key": "resourceowner_orgnumber",
-			"value": "Organization number of resource owner / \"tjeneste-eier\". Nine digits, no prefix.",
+			"key": "serviceowner_orgnumber",
+			"value": "Organization number of service owner / \"tjeneste-eier\". Nine digits, no prefix.",
 			"type": "string"
 		},
 		{

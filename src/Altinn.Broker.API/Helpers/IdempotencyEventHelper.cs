@@ -15,12 +15,10 @@ public class IdempotencyEventHelper
         {
 
             // Create a new entry for that webhook id
-            Console.WriteLine("Adding idempotency event");
             await idempotencyEventRepository.AddIdempotencyEventAsync(uniqueString, cancellationToken);
             try
             {
                 // Call you method¨
-                Console.WriteLine("Processing event");
                 return await process();
             }
             catch (Exception e)

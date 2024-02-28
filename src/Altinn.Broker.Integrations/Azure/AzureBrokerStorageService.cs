@@ -21,31 +21,31 @@ public class AzureBrokerStorageService : IBrokerStorageService
         _logger = logger;
     }
 
-    public async Task<string> UploadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, Stream stream, CancellationToken cancellationToken)
+    public async Task<string> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
-        var connectionString = await GetConnectionString(resourceOwnerEntity);
-        return await _fileStore.UploadFile(stream, fileEntity.FileId, connectionString, cancellationToken);
+        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        return await _fileStore.UploadFile(stream, fileTransferEntity.FileTransferId, connectionString, cancellationToken);
     }
 
-    public async Task<Stream> DownloadFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, CancellationToken cancellationToken)
+    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
-        var connectionString = await GetConnectionString(resourceOwnerEntity);
-        return await _fileStore.GetFileStream(fileEntity.FileId, connectionString, cancellationToken);
+        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        return await _fileStore.GetFileStream(fileTransferEntity.FileTransferId, connectionString, cancellationToken);
     }
 
-    public async Task DeleteFile(ResourceOwnerEntity resourceOwnerEntity, FileEntity fileEntity, CancellationToken cancellationToken)
+    public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
-        var connectionString = await GetConnectionString(resourceOwnerEntity);
-        await _fileStore.DeleteFile(fileEntity.FileId, connectionString, cancellationToken);
+        var connectionString = await GetConnectionString(serviceOwnerEntity);
+        await _fileStore.DeleteFile(fileTransferEntity.FileTransferId, connectionString, cancellationToken);
     }
 
-    private async Task<string> GetConnectionString(ResourceOwnerEntity resourceOwnerEntity)
+    private async Task<string> GetConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
         if (_hostEnvironment.IsDevelopment())
         {
             _logger.LogInformation("Running in development. Using local development storage.");
             return AzureConstants.AzuriteUrl;
         }
-        return await _resourceManager.GetStorageConnectionString(resourceOwnerEntity);
+        return await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
     }
 }

@@ -24,17 +24,17 @@ public class AzureResourceManagerService : IResourceManager
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
-    private readonly IResourceOwnerRepository _resourceOwnerRepository;
+    private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly ILogger<AzureResourceManagerService> _logger;
-    public string GetResourceGroupName(ResourceOwnerEntity resourceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{resourceOwnerEntity.Id.Replace(":", "-")}-rg";
-    public string GetStorageAccountName(ResourceOwnerEntity resourceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{resourceOwnerEntity.Id.Replace(":", "")}sa";
+    public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
+    public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.Id.Replace(":", "")}sa";
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
-    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IResourceOwnerRepository resourceOwnerRepository, ILogger<AzureResourceManagerService> logger)
+    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _hostEnvironment = hostingEnvironment;
@@ -47,32 +47,32 @@ public class AzureResourceManagerService : IResourceManager
             var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
             _armClient = new ArmClient(credentials);
         }
-        _resourceOwnerRepository = resourceOwnerRepository;
+        _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
     }
 
-    public async Task Deploy(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken)
+    public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
-        _logger.LogInformation($"Starting deployment for {resourceOwnerEntity.Name}");
-        var resourceGroupName = GetResourceGroupName(resourceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(resourceOwnerEntity);
+        _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
+        var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
 
         _logger.LogInformation($"Resource group: {resourceGroupName}");
         _logger.LogInformation($"Storage account: {storageAccountName}");
 
-        await _resourceOwnerRepository.InitializeStorageProvider(resourceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
+        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
-        resourceGroupData.Tags.Add("customer_id", resourceOwnerEntity.Id);
+        resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
 
         var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
 
         // Create or get the storage account
         var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
-        storageAccountData.Tags.Add("customer_id", resourceOwnerEntity.Id);
+        storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
         var blobService = storageAccount.Value.GetBlobService();
@@ -85,45 +85,45 @@ public class AzureResourceManagerService : IResourceManager
         _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 
-    public async Task<DeploymentStatus> GetDeploymentStatus(ResourceOwnerEntity resourceOwnerEntity, CancellationToken cancellationToken)
+    public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
         if (_hostEnvironment.IsDevelopment())
         {
             return DeploymentStatus.Ready;
         }
         var subscription = GetSubscription();
-        _logger.LogInformation($"Looking up {GetResourceGroupName(resourceOwnerEntity)} in {subscription.Id}");
+        _logger.LogInformation($"Looking up {GetResourceGroupName(serviceOwnerEntity)} in {subscription.Id}");
         var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(resourceOwnerEntity), cancellationToken);
+        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
         if (!resourceGroupExists)
         {
-            _logger.LogInformation($"Could not find resource group for {resourceOwnerEntity.Name}");
+            _logger.LogInformation($"Could not find resource group for {serviceOwnerEntity.Name}");
             return DeploymentStatus.NotStarted;
         }
 
-        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(resourceOwnerEntity), cancellationToken);
+        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(resourceOwnerEntity), cancellationToken: cancellationToken);
+        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(serviceOwnerEntity), cancellationToken: cancellationToken);
         if (!storageAccountExists)
         {
-            _logger.LogInformation($"Could not find storage account for {resourceOwnerEntity.Name}");
+            _logger.LogInformation($"Could not find storage account for {serviceOwnerEntity.Name}");
             return DeploymentStatus.DeployingResources;
         }
 
         return DeploymentStatus.Ready;
     }
 
-    public async Task<string> GetStorageConnectionString(ResourceOwnerEntity resourceOwnerEntity)
+    public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
-        _logger.LogInformation($"Retrieving connection string for {resourceOwnerEntity.Name}");
-        var sasToken = await GetSasToken(resourceOwnerEntity);
-        return $"BlobEndpoint=https://{GetStorageAccountName(resourceOwnerEntity)}.blob.core.windows.net/brokerfiles?{sasToken}";
+        _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
+        var sasToken = await GetSasToken(serviceOwnerEntity);
+        return $"BlobEndpoint=https://{GetStorageAccountName(serviceOwnerEntity)}.blob.core.windows.net/brokerfiles?{sasToken}";
     }
 
 
-    private async Task<string> GetSasToken(ResourceOwnerEntity resourceOwnerEntity)
+    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity)
     {
-        var storageAccountName = GetStorageAccountName(resourceOwnerEntity);
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
         {
             return sasToken.Token;
@@ -140,7 +140,7 @@ public class AzureResourceManagerService : IResourceManager
             }
             (DateTime Created, string Token) newSasToken = default;
             newSasToken.Created = DateTime.UtcNow;
-            newSasToken.Token = await CreateSasToken(resourceOwnerEntity);
+            newSasToken.Token = await CreateSasToken(serviceOwnerEntity);
 
             _sasTokens.TryAdd(storageAccountName, newSasToken);
 
@@ -151,11 +151,11 @@ public class AzureResourceManagerService : IResourceManager
             _semaphore.Release();
         }
     }
-    private async Task<string> CreateSasToken(ResourceOwnerEntity resourceOwnerEntity)
+    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity)
     {
-        _logger.LogInformation("Creating new SAS token for " + resourceOwnerEntity.Name);
-        var resourceGroupName = GetResourceGroupName(resourceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(resourceOwnerEntity);
+        _logger.LogInformation("Creating new SAS token for " + serviceOwnerEntity.Name);
+        var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);

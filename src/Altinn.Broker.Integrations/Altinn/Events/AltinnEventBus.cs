@@ -26,14 +26,14 @@ public class AltinnEventBus : IEventBus
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileId, CancellationToken cancellationToken)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, CancellationToken cancellationToken)
     {
         if (_httpContextAccessor.HttpContext?.User.HasClaim(c => c.Type == "scope" && c.Value == "altinn:events.publish") ?? false)
         {
             _logger.LogInformation("Skipping event publish because token does not include the scope \"altinn:events.publish\"");
             return;
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileId);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -41,12 +41,12 @@ public class AltinnEventBus : IEventBus
         var response = await _httpClient.PostAsync("events/api/v1/events", JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json")));
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with file id {fileId}.", type, resourceId, fileId);
+            _logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with filetransfer id {fileTransferId}.", type, resourceId, fileTransferId);
             _logger.LogError("Statuscode was: {}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileId)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId)
     {
         CloudEvent cloudEvent = new CloudEvent()
         {
@@ -54,7 +54,7 @@ public class AltinnEventBus : IEventBus
             SpecVersion = "1.0",
             Time = DateTime.UtcNow,
             Resource = "urn:altinn:resource:" + resourceId,
-            ResourceInstance = fileId,
+            ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
             Source = _httpContextAccessor.HttpContext?.Request.PathBase.Value + _httpContextAccessor.HttpContext?.Request.Path.Value
         };
