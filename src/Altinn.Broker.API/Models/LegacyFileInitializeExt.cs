@@ -29,9 +29,9 @@ namespace Altinn.Broker.Models
         /// <summary>
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
-        [JsonPropertyName("sendersFileReference")]
+        [JsonPropertyName("sendersFileTransferReference")]
         [StringLength(4096, MinimumLength = 1)]
-        public string SendersFileReference { get; set; } = string.Empty;
+        public string SendersFileTransferReference { get; set; } = string.Empty;
 
         /// <summary>
         /// The sender organization of the file

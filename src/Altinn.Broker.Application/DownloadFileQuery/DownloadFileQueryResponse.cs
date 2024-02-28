@@ -1,6 +1,6 @@
 namespace Altinn.Broker.Application.DownloadFileQuery;
 public class DownloadFileQueryResponse
 {
-    public string Filename { get; set; }
-    public Stream Stream { get; set; }
+    public string FileName { get; set; }
+    public Stream DownloadStream { get; set; }
 }

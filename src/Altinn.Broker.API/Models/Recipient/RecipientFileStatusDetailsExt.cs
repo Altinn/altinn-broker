@@ -2,11 +2,11 @@ using Altinn.Broker.Enums;
 
 namespace Altinn.Broker.Models
 {
-    public class RecipientFileStatusDetailsExt
+    public class RecipientFileTransferStatusDetailsExt
     {
         public string Recipient { get; set; } = string.Empty;
-        public RecipientFileStatusExt CurrentRecipientFileStatusCode { get; set; }
-        public string CurrentRecipientFileStatusText { get; set; } = string.Empty;
-        public DateTimeOffset CurrentRecipientFileStatusChanged { get; set; }
+        public RecipientFileTransferStatusExt CurrentRecipientFileTransferStatusCode { get; set; }
+        public string CurrentRecipientFileTransferStatusText { get; set; } = string.Empty;
+        public DateTimeOffset CurrentRecipientFileTransferStatusChanged { get; set; }
     }
 }

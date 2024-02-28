@@ -1,9 +1,9 @@
-﻿using Altinn.Broker.Application.DeleteFileCommand;
-using Altinn.Broker.Application.DownloadFileQuery;
-using Altinn.Broker.Application.GetFileDetailsQuery;
-using Altinn.Broker.Application.GetFileOverviewQuery;
-using Altinn.Broker.Application.GetFilesQuery;
-using Altinn.Broker.Application.InitializeFileCommand;
+﻿using Altinn.Broker.Application.DownloadFileQuery;
+using Altinn.Broker.Application.ExpireFileTransferCommand;
+using Altinn.Broker.Application.GetFileTransferDetailsQuery;
+using Altinn.Broker.Application.GetFileTransferOverviewQuery;
+using Altinn.Broker.Application.GetFileTransfersQuery;
+using Altinn.Broker.Application.InitializeFileTransferCommand;
 using Altinn.Broker.Application.UploadFileCommand;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -13,14 +13,14 @@ public static class DependencyInjection
 {
     public static void AddApplicationHandlers(this IServiceCollection services)
     {
-        services.AddScoped<InitializeFileCommandHandler>();
+        services.AddScoped<InitializeFileTransferCommandHandler>();
         services.AddScoped<UploadFileCommandHandler>();
-        services.AddScoped<GetFileOverviewQueryHandler>();
-        services.AddScoped<GetFileDetailsQueryHandler>();
+        services.AddScoped<GetFileTransferOverviewQueryHandler>();
+        services.AddScoped<GetFileTransferDetailsQueryHandler>();
         services.AddScoped<DownloadFileQueryHandler>();
         services.AddScoped<ConfirmDownloadCommandHandler>();
-        services.AddScoped<GetFilesQueryHandler>();
-        services.AddScoped<DeleteFileCommandHandler>();
+        services.AddScoped<GetFileTransfersQueryHandler>();
+        services.AddScoped<ExpireFileTransferCommandHandler>();
         services.AddScoped<LegacyGetFilesQueryHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
     }

@@ -8,99 +8,99 @@ using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers;
 
-internal static class FileStatusOverviewExtMapper
+internal static class FileTransferStatusOverviewExtMapper
 {
-    internal static FileOverviewExt MapToExternalModel(FileEntity file)
+    internal static FileTransferOverviewExt MapToExternalModel(FileTransferEntity fileTransfer)
     {
-        return new FileOverviewExt()
+        return new FileTransferOverviewExt()
         {
-            Checksum = file.Checksum,
-            ResourceId = file.ResourceId,
-            FileSize = file.FileSize,
-            FileId = file.FileId,
-            FileName = file.Filename,
-            FileStatus = MapToExternalEnum(file.FileStatusEntity.Status),
-            Sender = file.Sender.ActorExternalId,
-            FileStatusChanged = file.FileStatusChanged,
-            FileStatusText = MapToFileStatusText(file.FileStatusEntity),
-            PropertyList = file.PropertyList,
-            Recipients = MapToRecipients(file.RecipientCurrentStatuses),
-            SendersFileReference = file.SendersFileReference,
-            Created = file.Created,
-            ExpirationTime = file.ExpirationTime
+            Checksum = fileTransfer.Checksum,
+            ResourceId = fileTransfer.ResourceId,
+            FileTransferSize = fileTransfer.FileTransferSize,
+            FileTransferId = fileTransfer.FileTransferId,
+            FileName = fileTransfer.FileName,
+            FileTransferStatus = MapToExternalEnum(fileTransfer.FileTransferStatusEntity.Status),
+            Sender = fileTransfer.Sender.ActorExternalId,
+            FileTransferStatusChanged = fileTransfer.FileTransferStatusChanged,
+            FileTransferStatusText = MapToFileTransferStatusText(fileTransfer.FileTransferStatusEntity),
+            PropertyList = fileTransfer.PropertyList,
+            Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
+            SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
+            Created = fileTransfer.Created,
+            ExpirationTime = fileTransfer.ExpirationTime
         };
     }
 
-    internal static FileStatusExt MapToExternalEnum(FileStatus domainEnum)
+    internal static FileTransferStatusExt MapToExternalEnum(FileTransferStatus domainEnum)
     {
         return domainEnum switch
         {
-            FileStatus.Initialized => FileStatusExt.Initialized,
-            FileStatus.UploadStarted => FileStatusExt.UploadStarted,
-            FileStatus.UploadProcessing => FileStatusExt.UploadProcessing,
-            FileStatus.Published => FileStatusExt.Published,
-            FileStatus.Cancelled => FileStatusExt.Cancelled,
-            FileStatus.AllConfirmedDownloaded => FileStatusExt.AllConfirmedDownloaded,
-            FileStatus.Deleted => FileStatusExt.Deleted,
-            FileStatus.Failed => FileStatusExt.Failed,
+            FileTransferStatus.Initialized => FileTransferStatusExt.Initialized,
+            FileTransferStatus.UploadStarted => FileTransferStatusExt.UploadStarted,
+            FileTransferStatus.UploadProcessing => FileTransferStatusExt.UploadProcessing,
+            FileTransferStatus.Published => FileTransferStatusExt.Published,
+            FileTransferStatus.Cancelled => FileTransferStatusExt.Cancelled,
+            FileTransferStatus.AllConfirmedDownloaded => FileTransferStatusExt.AllConfirmedDownloaded,
+            FileTransferStatus.Deleted => FileTransferStatusExt.Deleted,
+            FileTransferStatus.Failed => FileTransferStatusExt.Failed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static string MapToFileStatusText(FileStatusEntity fileStatusEntity)
+    internal static string MapToFileTransferStatusText(FileTransferStatusEntity fileTransferStatusEntity)
     {
-        if (!string.IsNullOrWhiteSpace(fileStatusEntity.DetailedStatus))
+        if (!string.IsNullOrWhiteSpace(fileTransferStatusEntity.DetailedStatus))
         {
-            return fileStatusEntity.DetailedStatus;
+            return fileTransferStatusEntity.DetailedStatus;
         }
-        return fileStatusEntity.Status switch
+        return fileTransferStatusEntity.Status switch
         {
-            FileStatus.Initialized => "Ready for upload",
-            FileStatus.UploadStarted => "Upload started",
-            FileStatus.UploadProcessing => "Processing upload",
-            FileStatus.Published => "Ready for download",
-            FileStatus.Cancelled => "File cancelled",
-            FileStatus.AllConfirmedDownloaded => "All downloaded",
-            FileStatus.Deleted => "File has been deleted",
-            FileStatus.Failed => "Upload failed",
+            FileTransferStatus.Initialized => "Ready for upload",
+            FileTransferStatus.UploadStarted => "Upload started",
+            FileTransferStatus.UploadProcessing => "Processing upload",
+            FileTransferStatus.Published => "Ready for download",
+            FileTransferStatus.Cancelled => "FileTransfer cancelled",
+            FileTransferStatus.AllConfirmedDownloaded => "All downloaded",
+            FileTransferStatus.Deleted => "FileTransfer has been deleted",
+            FileTransferStatus.Failed => "Upload failed",
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static List<RecipientFileStatusDetailsExt> MapToRecipients(List<ActorFileStatusEntity> recipientEvents)
+    internal static List<RecipientFileTransferStatusDetailsExt> MapToRecipients(List<ActorFileTransferStatusEntity> recipientEvents)
     {
         var lastStatusForEveryRecipient = recipientEvents
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
             .ToList();
-        return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileStatusDetailsExt()
+        return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileTransferStatusDetailsExt()
         {
             Recipient = statusEvent.Actor.ActorExternalId,
-            CurrentRecipientFileStatusChanged = statusEvent.Date,
-            CurrentRecipientFileStatusCode = MapToExternalRecipientStatus(statusEvent.Status),
-            CurrentRecipientFileStatusText = MapToRecipientStatusText(statusEvent.Status)
+            CurrentRecipientFileTransferStatusChanged = statusEvent.Date,
+            CurrentRecipientFileTransferStatusCode = MapToExternalRecipientStatus(statusEvent.Status),
+            CurrentRecipientFileTransferStatusText = MapToRecipientStatusText(statusEvent.Status)
         }).ToList();
     }
 
-    internal static RecipientFileStatusExt MapToExternalRecipientStatus(ActorFileStatus actorFileStatus)
+    internal static RecipientFileTransferStatusExt MapToExternalRecipientStatus(ActorFileTransferStatus actorFileTransferStatus)
     {
-        return actorFileStatus switch
+        return actorFileTransferStatus switch
         {
-            ActorFileStatus.Initialized => RecipientFileStatusExt.Initialized,
-            ActorFileStatus.DownloadStarted => RecipientFileStatusExt.DownloadStarted,
-            ActorFileStatus.DownloadConfirmed => RecipientFileStatusExt.DownloadConfirmed,
+            ActorFileTransferStatus.Initialized => RecipientFileTransferStatusExt.Initialized,
+            ActorFileTransferStatus.DownloadStarted => RecipientFileTransferStatusExt.DownloadStarted,
+            ActorFileTransferStatus.DownloadConfirmed => RecipientFileTransferStatusExt.DownloadConfirmed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static string MapToRecipientStatusText(ActorFileStatus actorFileStatus)
+    internal static string MapToRecipientStatusText(ActorFileTransferStatus actorFileTransferStatus)
     {
-        return actorFileStatus switch
+        return actorFileTransferStatus switch
         {
-            ActorFileStatus.Initialized => "Initialized",
-            ActorFileStatus.DownloadStarted => "Recipient has attempted to download file",
-            ActorFileStatus.DownloadConfirmed => "Recipient has downloaded file",
+            ActorFileTransferStatus.Initialized => "Initialized",
+            ActorFileTransferStatus.DownloadStarted => "Recipient has attempted to download fileTransfer",
+            ActorFileTransferStatus.DownloadConfirmed => "Recipient has downloaded fileTransfer",
             _ => throw new InvalidEnumArgumentException()
         };
 

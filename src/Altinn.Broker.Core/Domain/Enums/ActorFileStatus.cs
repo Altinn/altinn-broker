@@ -1,6 +1,6 @@
 namespace Altinn.Broker.Core.Domain.Enums;
 
-public enum ActorFileStatus
+public enum ActorFileTransferStatus
 {
     Initialized = 0,
     DownloadStarted = 1,

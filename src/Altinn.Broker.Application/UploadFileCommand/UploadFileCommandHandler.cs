@@ -16,21 +16,21 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 {
     private readonly IAuthorizationService _resourceRightsRepository;
     private readonly IResourceRepository _resourceRepository;
-    private readonly IResourceOwnerRepository _resourceOwnerRepository;
-    private readonly IFileRepository _fileRepository;
-    private readonly IFileStatusRepository _fileStatusRepository;
+    private readonly IServiceOwnerRepository _serviceOwnerRepository;
+    private readonly IFileTransferRepository _fileTransferRepository;
+    private readonly IFileTransferStatusRepository _fileTransferStatusRepository;
     private readonly IBrokerStorageService _brokerStorageService;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly IEventBus _eventBus;
     private readonly ILogger<UploadFileCommandHandler> _logger;
 
-    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IResourceOwnerRepository resourceOwnerRepository, IFileRepository fileRepository, IFileStatusRepository fileStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileCommandHandler> logger)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;
-        _resourceOwnerRepository = resourceOwnerRepository;
-        _fileRepository = fileRepository;
-        _fileStatusRepository = fileStatusRepository;
+        _serviceOwnerRepository = serviceOwnerRepository;
+        _fileTransferRepository = fileTransferRepository;
+        _fileTransferStatusRepository = fileTransferStatusRepository;
         _brokerStorageService = brokerStorageService;
         _backgroundJobClient = backgroundJobClient;
         _eventBus = eventBus;
@@ -39,66 +39,66 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request, CancellationToken cancellationToken)
     {
-        var file = await _fileRepository.GetFile(request.FileId, cancellationToken);
-        if (file is null)
+        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+        if (fileTransfer is null)
         {
-            return Errors.FileNotFound;
+            return Errors.FileTransferNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(file.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileNotFound;
+            return Errors.FileTransferNotFound;
         };
-        if (request.Token.Consumer != file.Sender.ActorExternalId)
+        if (request.Token.Consumer != fileTransfer.Sender.ActorExternalId)
         {
-            return Errors.FileNotFound;
+            return Errors.FileTransferNotFound;
         }
-        if (file.FileStatusEntity.Status > FileStatus.UploadStarted)
+        if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
-            return Errors.FileAlreadyUploaded;
+            return Errors.FileTransferAlreadyUploaded;
         }
-        var resource = await _resourceRepository.GetResource(file.ResourceId, cancellationToken);
+        var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.ResourceNotConfigured;
         };
-        var resourceOwner = await _resourceOwnerRepository.GetResourceOwner(resource.ResourceOwnerId);
-        if (resourceOwner?.StorageProvider is null)
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
+        if (serviceOwner?.StorageProvider is null)
         {
-            return Errors.ResourceOwnerNotConfigured;
+            return Errors.ServiceOwnerNotConfigured;
         };
 
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadStarted, cancellationToken: cancellationToken);
+        await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
         try
         {
-            var checksum = await _brokerStorageService.UploadFile(resourceOwner, file, request.Filestream, cancellationToken);
-            if (string.IsNullOrWhiteSpace(file.Checksum))
+            var checksum = await _brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
+            if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
             {
-                await _fileRepository.SetChecksum(request.FileId, checksum, cancellationToken);
+                await _fileTransferRepository.SetChecksum(request.FileTransferId, checksum, cancellationToken);
             }
-            else if (!string.Equals(checksum, file.Checksum, StringComparison.InvariantCultureIgnoreCase))
+            else if (!string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Checksum mismatch", cancellationToken);
-                _backgroundJobClient.Enqueue(() => _brokerStorageService.DeleteFile(resourceOwner, file, cancellationToken));
+                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Checksum mismatch", cancellationToken);
+                _backgroundJobClient.Enqueue(() => _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
         }
         catch (Exception e)
         {
             _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
-            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Failed, "Error occurred while uploading file.", cancellationToken);
-            await _eventBus.Publish(AltinnEventType.UploadFailed, file.ResourceId, request.FileId.ToString(), cancellationToken);
+            await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
+            await _eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), cancellationToken);
             return Errors.UploadFailed;
         }
-        await _fileRepository.SetStorageDetails(request.FileId, resourceOwner.StorageProvider.Id, request.FileId.ToString(), request.Filestream.Length, cancellationToken);
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.UploadProcessing, cancellationToken: cancellationToken);
-        await _eventBus.Publish(AltinnEventType.UploadProcessing, file.ResourceId, request.FileId.ToString(), cancellationToken);
-        if (resourceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+        await _fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
+        await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
+        await _eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), cancellationToken);
+        if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
         {
-            await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published);
-            await _eventBus.Publish(AltinnEventType.Published, file.ResourceId, request.FileId.ToString(), cancellationToken);
+            await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
+            await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), cancellationToken);
         }
-        await _fileStatusRepository.InsertFileStatus(request.FileId, FileStatus.Published, cancellationToken: cancellationToken);
-        return file.FileId;
+        await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, cancellationToken: cancellationToken);
+        return fileTransfer.FileTransferId;
     }
 }
