@@ -13,9 +13,9 @@ public class ConsoleLogEventBus : IEventBus
         _logger = logger;
     }
 
-    public Task Publish(AltinnEventType type, string resourceId, string fileId, string? organizationId = null, CancellationToken cancellationToken = default)
+    public Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? organizationId = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("{CloudEventType} event raised", type.ToString());
+        _logger.LogInformation("{CloudEventType} event raised on instance {fileTransferId} for party with organization number {organizationId}", type.ToString(), fileTransferId, organizationId);
         return Task.CompletedTask;
     }
 }
