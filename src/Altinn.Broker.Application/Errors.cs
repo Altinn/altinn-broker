@@ -18,4 +18,5 @@ public static class Errors
     public static Error UploadFailed = new Error(10, "Error occurred while uploading file. See /details for more information.", HttpStatusCode.InternalServerError);
     public static Error ChecksumMismatch = new Error(11, "The checksum of uploaded file did not match the checksum specified in initialize call.", HttpStatusCode.BadRequest);
     public static Error FileNotPublished = new Error(12, "A file can only be confirmed to be downloaded when it is published. See file status.", HttpStatusCode.BadRequest);
+    public static Error FileAlreadyConfirmed = new Error(13, "The file has already been confirmed to be downloaded.", HttpStatusCode.BadRequest);
 }

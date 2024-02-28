@@ -10,6 +10,7 @@ using Altinn.Broker.Application.UploadFileCommand;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
@@ -20,6 +21,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using OneOf;
+
 namespace Altinn.Broker.Controllers
 {
     [ApiController]
@@ -28,10 +31,12 @@ namespace Altinn.Broker.Controllers
     public class FileController : Controller
     {
         private readonly ILogger<FileController> _logger;
+        private readonly IIdempotencyEventRepository _idempotencyEventRepository;
 
-        public FileController(ILogger<FileController> logger)
+        public FileController(ILogger<FileController> logger, IIdempotencyEventRepository idempotencyEventRepository)
         {
             _logger = logger;
+            _idempotencyEventRepository = idempotencyEventRepository;
         }
 
         /// <summary>
@@ -250,11 +255,14 @@ namespace Altinn.Broker.Controllers
         {
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
-            var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
+            var requestData = new ConfirmDownloadCommandRequest()
             {
                 FileId = fileId,
                 Token = token
-            }, cancellationToken);
+            };
+            var processingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, cancellationToken));
+            var uniqueString = $"confirmDownload_{fileId}_{token.Consumer}";
+            var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, processingFunction, _idempotencyEventRepository, cancellationToken);
             return commandResult.Match(
                 (_) => Ok(null),
                 Problem
