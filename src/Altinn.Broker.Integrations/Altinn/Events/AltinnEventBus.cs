@@ -6,39 +6,38 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Integrations.Altinn.Events.Helpers;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.Events;
 public class AltinnEventBus : IEventBus
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly AltinnOptions _altinnOptions;
     private readonly HttpClient _httpClient;
+    private readonly IAltinnRegisterService _altinnRegisterService;
     private readonly ILogger<AltinnEventBus> _logger;
 
-    public AltinnEventBus(HttpClient httpClient, IHttpContextAccessor httpContextAccessor, IOptions<AltinnOptions> options, ILogger<AltinnEventBus> logger)
+    public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger)
     {
-        httpClient.BaseAddress = new Uri(options.Value.PlatformGatewayUrl);
-        httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
         _httpClient = httpClient;
-        _httpContextAccessor = httpContextAccessor;
+        _altinnOptions = altinnOptions.Value;
+        _altinnRegisterService = altinnRegisterService;
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, CancellationToken cancellationToken)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? organizationId = null, CancellationToken cancellationToken = default)
     {
-        if (_httpContextAccessor.HttpContext?.User.HasClaim(c => c.Type == "scope" && c.Value == "altinn:events.publish") ?? false)
+        string? partyId = null;
+        if (organizationId != null)
         {
-            _logger.LogInformation("Skipping event publish because token does not include the scope \"altinn:events.publish\"");
-            return;
+            partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
         };
-        var response = await _httpClient.PostAsync("events/api/v1/events", JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json")));
+        var response = await _httpClient.PostAsync("events/api/v1/events", JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json")), cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with filetransfer id {fileTransferId}.", type, resourceId, fileTransferId);
@@ -46,7 +45,7 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId)
     {
         CloudEvent cloudEvent = new CloudEvent()
         {
@@ -56,7 +55,8 @@ public class AltinnEventBus : IEventBus
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
-            Source = _httpContextAccessor.HttpContext?.Request.PathBase.Value + _httpContextAccessor.HttpContext?.Request.Path.Value
+            Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/file",
+            Subject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null
         };
 
         return cloudEvent;

@@ -75,8 +75,9 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
             _logger.LogError("Failed when adding recipient initialized events.");
         }
         _backgroundJobClient.Schedule<ExpireFileTransferCommandHandler>((ExpireFileTransferCommandHandler) => ExpireFileTransferCommandHandler.Process(fileTransferId, cancellationToken), serviceOwner.FileTransferTimeToLive);
-        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), cancellationToken);
+        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
 
         return fileTransferId;
     }
 }
+

@@ -15,15 +15,17 @@ public class ExpireFileTransferCommandHandler : IHandler<Guid, Task>
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IBrokerStorageService _brokerStorageService;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<ExpireFileTransferCommandHandler> _logger;
 
-    public ExpireFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<ExpireFileTransferCommandHandler> logger)
+    public ExpireFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferCommandHandler> logger)
     {
         _fileTransferRepository = fileTransferRepository;
         _fileTransferStatusRepository = fileTransferStatusRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _resourceRepository = resourceRepository;
         _brokerStorageService = brokerStorageService;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -52,13 +54,14 @@ public class ExpireFileTransferCommandHandler : IHandler<Guid, Task>
         else
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, Core.Domain.Enums.FileTransferStatus.Deleted, cancellationToken: cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransferId.ToString(), null, cancellationToken);
         }
         await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken);
         var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
         foreach (var recipient in recipientsWhoHaveNotDownloaded)
         {
             _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-            // TODO, send events
+            await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
         }
         return Task.CompletedTask;
     }

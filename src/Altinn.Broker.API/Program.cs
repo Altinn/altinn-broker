@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
@@ -93,13 +94,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddSwaggerGen();
     services.AddApplicationInsightsTelemetry();
 
-    services.AddApplicationHandlers();
-    services.AddIntegrations();
-    services.AddPersistence();
-
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
+    services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
+
+    services.AddApplicationHandlers();
+    services.AddIntegrations(config, hostEnvironment.IsDevelopment());
+    services.AddPersistence();
 
     services.AddHttpClient();
     services.AddProblemDetails();
