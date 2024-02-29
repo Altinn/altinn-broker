@@ -21,7 +21,13 @@ public class BlobService : IFileStore
 
     private BlobClient GetBlobClient(Guid fileId, string connectionString)
     {
-        var blobServiceClient = new BlobServiceClient(connectionString);
+        var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
+        {
+            Retry =
+            {
+                NetworkTimeout = TimeSpan.MaxValue,
+            }
+        });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
         return blobClient;
@@ -59,7 +65,7 @@ public class BlobService : IFileStore
                 {
                     LeaseId = blobLease.LeaseId
                 },
-                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 },
+                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
             };
             var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
             var metadata = blobMetadata.Value;
