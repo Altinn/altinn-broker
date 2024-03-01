@@ -9,9 +9,9 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
+using Hangfire.Common;
 using Hangfire.MemoryStorage;
 using Hangfire.States;
-using Hangfire.Common;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
