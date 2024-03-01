@@ -67,7 +67,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         }
 
         await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
-        await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), cancellationToken);
+        await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
         bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
         if (shouldConfirmAll)
         {
@@ -77,7 +77,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
                 FileTransferId = request.FileTransferId,
                 Force = true
             }, cancellationToken));
-            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), cancellationToken);
+            await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
         }
 
         return Task.CompletedTask;

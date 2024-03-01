@@ -23,6 +23,44 @@
             "description": "Ok"
           }
         }
+      },
+      "no.altinn.broker.filedeleted": {
+        "post": {
+          "requestBody": {
+            "description": "The file has been deleted from Broker",
+            "content": {
+              "application/cloudevents+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudEvent"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Ok"
+            }
+          }
+        }
+      },
+      "no.altinn.broker.fileneverconfirmeddownloaded": {
+        "post": {
+          "requestBody": {
+            "description": "File was never confirmed downloaded by a recipient",
+            "content": {
+              "application/cloudevents+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudEvent"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Ok"
+            }
+          }
+        }
       }
     },
     "no.altinn.broker.uploadprocessing": {

@@ -18,15 +18,17 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IResourceRepository _resourceRepository;
     private readonly IBrokerStorageService _brokerStorageService;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<ExpireFileTransferCommandHandler> _logger;
 
-    public ExpireFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, ILogger<ExpireFileTransferCommandHandler> logger)
+    public ExpireFileTransferCommandHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferCommandHandler> logger)
     {
         _fileTransferRepository = fileTransferRepository;
         _fileTransferStatusRepository = fileTransferStatusRepository;
         _serviceOwnerRepository = serviceOwnerRepository;
         _resourceRepository = resourceRepository;
         _brokerStorageService = brokerStorageService;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -45,6 +47,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         else
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Deleted, cancellationToken: cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
         }
         if (request.Force || ValidateFileTransferTTL(fileTransfer, serviceOwner))
         {
@@ -53,7 +56,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
             foreach (var recipient in recipientsWhoHaveNotDownloaded)
             {
                 _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-                // TODO, send events
+                await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
             }
 
         }
