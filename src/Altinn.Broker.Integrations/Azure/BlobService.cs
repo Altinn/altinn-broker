@@ -25,7 +25,7 @@ public class BlobService : IFileStore
         {
             Retry =
             {
-                NetworkTimeout = TimeSpan.MaxValue,
+                NetworkTimeout = TimeSpan.FromHours(1),
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
