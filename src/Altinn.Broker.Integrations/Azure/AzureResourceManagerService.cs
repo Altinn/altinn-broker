@@ -21,8 +21,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Polly;
-
 namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManagerService : IResourceManager
 {
