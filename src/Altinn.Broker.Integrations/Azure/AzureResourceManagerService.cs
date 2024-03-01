@@ -88,7 +88,7 @@ public class AzureResourceManagerService : IResourceManager
         }
 
         await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
-       _logger.LogInformation($"Storage account {storageAccountName} created");
+        _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 
     private async Task EnableMicrosoftDefender(string resourceGroupName, string storageAccountName, CancellationToken cancellationToken)
