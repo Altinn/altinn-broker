@@ -29,8 +29,8 @@ public class AzureResourceManagerService : IResourceManager
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly ILogger<AzureResourceManagerService> _logger;
-    public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Split(":")[1]}-rg";
-    public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.ResourceGroupName.ToString().Split("-").First()}sa";
+    private string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
+    private string? GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => serviceOwnerEntity.StorageProvider?.ResourceName;
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
@@ -55,8 +55,8 @@ public class AzureResourceManagerService : IResourceManager
     {
         _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
 
+        var storageAccountName = GenerateStorageAccountName();
         _logger.LogInformation($"Resource group: {resourceGroupName}");
         _logger.LogInformation($"Storage account: {storageAccountName}");
 
@@ -85,6 +85,15 @@ public class AzureResourceManagerService : IResourceManager
         _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 
+    private string GenerateStorageAccountName()
+    {
+        Random random = new Random();
+        const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        var obfuscationString = new string(Enumerable.Repeat(chars, 8)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return "aibroker" + obfuscationString + "sa";
+    }
+
     public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
         if (_hostEnvironment.IsDevelopment())
@@ -103,7 +112,8 @@ public class AzureResourceManagerService : IResourceManager
 
         var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(serviceOwnerEntity), cancellationToken: cancellationToken);
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        var storageAccountExists = storageAccountName != null && await storageAccountCollection.ExistsAsync(storageAccountName, cancellationToken: cancellationToken);
         if (!storageAccountExists)
         {
             _logger.LogInformation($"Could not find storage account for {serviceOwnerEntity.Name}");
@@ -116,14 +126,18 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
         _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
-        var sasToken = await GetSasToken(serviceOwnerEntity);
-        return $"BlobEndpoint=https://{GetStorageAccountName(serviceOwnerEntity)}.blob.core.windows.net/brokerfiles?{sasToken}";
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        if (storageAccountName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        var sasToken = await GetSasToken(serviceOwnerEntity, storageAccountName);
+        return $"BlobEndpoint=https://{storageAccountName}.blob.core.windows.net/brokerfiles?{sasToken}";
     }
 
 
-    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
     {
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
         {
             return sasToken.Token;
@@ -140,7 +154,7 @@ public class AzureResourceManagerService : IResourceManager
             }
             (DateTime Created, string Token) newSasToken = default;
             newSasToken.Created = DateTime.UtcNow;
-            newSasToken.Token = await CreateSasToken(serviceOwnerEntity);
+            newSasToken.Token = await CreateSasToken(serviceOwnerEntity, storageAccountName);
 
             _sasTokens.TryAdd(storageAccountName, newSasToken);
 
@@ -151,11 +165,10 @@ public class AzureResourceManagerService : IResourceManager
             _semaphore.Release();
         }
     }
-    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
     {
         _logger.LogInformation("Creating new SAS token for " + serviceOwnerEntity.Name);
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);
