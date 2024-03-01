@@ -97,7 +97,7 @@ public class AzureResourceManagerService : IResourceManager
         var tokenRequestContext = new TokenRequestContext(new[] { "https://management.azure.com/.default" });
         var token = await _credentials.GetTokenAsync(tokenRequestContext, cancellationToken);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-        var endpoint = $"https://management.azure.com/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/aibrokerba8u7c40sa/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview";
+        var endpoint = $"https://management.azure.com/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview";
         var requestBody = new MalwareScanConfiguration()
         {
             Properties = new Properties()
