@@ -801,7 +801,7 @@
 			]
 		},
 		{
-			"name": "Register Service Owner",
+			"name": "Service Owner",
 			"item": [
 				{
 					"name": "Register Service Owner",
@@ -841,6 +841,170 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Get Service Owner",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": "",
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/serviceowner",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"serviceowner"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"body": "",
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/serviceowner",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"serviceowner"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"Name\": \"string\",\n  \"DeploymentStatus\": \"<int>\",\n  \"FileTransferTimeToLive\": \"<string>\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update file retention",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fileTransferTimeToLive\": \"P90D\"\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/serviceowner/fileretention",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"serviceowner",
+								"fileretention"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"fileTransferTimeToLive\": \"P90D\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/serviceowner/fileretention",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"serviceowner",
+										"fileretention"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": ""
+						}
+					]
 				}
 			]
 		},
