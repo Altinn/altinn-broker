@@ -63,7 +63,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null, cancellationToken);
+        var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null, null, cancellationToken);
         await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
@@ -74,7 +74,12 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             _logger.LogError("Failed when adding recipient initialized events.");
         }
-        _backgroundJobClient.Schedule<ExpireFileTransferCommandHandler>((ExpireFileTransferCommandHandler) => ExpireFileTransferCommandHandler.Process(fileTransferId, cancellationToken), serviceOwner.FileTransferTimeToLive);
+        var jobId = _backgroundJobClient.Schedule<ExpireFileTransferCommandHandler>((ExpireFileTransferCommandHandler) => ExpireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
+        {
+            FileTransferId = fileTransferId,
+            Force = false
+        }, cancellationToken), serviceOwner.FileTransferTimeToLive);
+        await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), cancellationToken);
 
         return fileTransferId;

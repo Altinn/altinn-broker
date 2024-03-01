@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -87,7 +88,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && ((Guid)job.Args[0] == Guid.Parse(fileTransferId))),
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && (((ExpireFileTransferCommandRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
             It.IsAny<EnqueuedState>()));
     }
 

@@ -10,9 +10,9 @@ using Altinn.Broker.Application;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
+using Altinn.Broker.Models.ServiceOwner;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
-using Altinn.Broker.Models.ServiceOwner;
 
 using Hangfire.Common;
 using Hangfire.States;

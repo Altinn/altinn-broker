@@ -2,6 +2,7 @@
 using System.Xml;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Application.UpdateFileRetention;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -70,7 +71,7 @@ public class ServiceOwnerController : Controller
     }
     [HttpPut]
     [Route("fileretention")]
-    public async Task<ActionResult> UpdateFileRetention([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromBody] ServiceOwnerUpdateFileRetentionExt serviceOwnerUpdateFileRetentionExt, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateFileRetention([FromBody] ServiceOwnerUpdateFileRetentionExt serviceOwnerUpdateFileRetentionExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] UpdateFileRetentionHandler updateFileRetentionHandler, CancellationToken cancellationToken)
     {
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         if (serviceOwner is null)
@@ -80,6 +81,10 @@ public class ServiceOwnerController : Controller
 
         var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerUpdateFileRetentionExt.FileTransferTimeToLive);
         await _serviceOwnerRepository.UpdateFileRetention(token.Consumer, fileTimeToLive);
+        await updateFileRetentionHandler.Process(new UpdateFileRetentionRequest
+        {
+            ServiceOwnerId = token.Consumer,
+        }, cancellationToken);
 
         return Ok();
     }
