@@ -30,6 +30,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         _logger = logger;
     }
 
+    [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> Process(ExpireFileTransferCommandRequest request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
@@ -63,6 +64,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         }
         return Task.CompletedTask;
     }
+    [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> RescheduleExpireEvent(ExpireFileTransferCommandRequest request, CancellationToken cancellationToken)
     {
         var fileTransfer = await GetFileTransfer(request.FileTransferId, cancellationToken);
