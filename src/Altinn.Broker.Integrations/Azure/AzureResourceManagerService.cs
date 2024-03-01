@@ -1,4 +1,7 @@
 ﻿using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
@@ -18,6 +21,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Polly;
+
 namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManagerService : IResourceManager
 {
@@ -28,6 +33,7 @@ public class AzureResourceManagerService : IResourceManager
     private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+    private readonly TokenCredential _credentials;
     private readonly ILogger<AzureResourceManagerService> _logger;
     private string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     private string? GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => serviceOwnerEntity.StorageProvider?.ResourceName;
@@ -40,13 +46,13 @@ public class AzureResourceManagerService : IResourceManager
         _hostEnvironment = hostingEnvironment;
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
-            _armClient = new ArmClient(new DefaultAzureCredential());
+            _credentials = new DefaultAzureCredential();
         }
         else
         {
-            var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
-            _armClient = new ArmClient(credentials);
+            _credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
         }
+        _armClient = new ArmClient(_credentials);
         _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
     }
@@ -59,8 +65,6 @@ public class AzureResourceManagerService : IResourceManager
         var storageAccountName = GenerateStorageAccountName();
         _logger.LogInformation($"Resource group: {resourceGroupName}");
         _logger.LogInformation($"Storage account: {storageAccountName}");
-
-        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
         var subscription = GetSubscription();
@@ -75,6 +79,7 @@ public class AzureResourceManagerService : IResourceManager
         storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
+        await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
         var blobService = storageAccount.Value.GetBlobService();
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
@@ -82,7 +87,49 @@ public class AzureResourceManagerService : IResourceManager
             await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, "brokerfiles", new BlobContainerData(), cancellationToken);
         }
 
-        _logger.LogInformation($"Storage account {storageAccountName} created");
+        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
+       _logger.LogInformation($"Storage account {storageAccountName} created");
+    }
+
+    private async Task EnableMicrosoftDefender(string resourceGroupName, string storageAccountName, CancellationToken cancellationToken)
+    {
+        using var client = new HttpClient();
+        var tokenRequestContext = new TokenRequestContext(new[] { "https://management.azure.com/.default" });
+        var token = await _credentials.GetTokenAsync(tokenRequestContext, cancellationToken);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        var endpoint = $"https://management.azure.com/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/aibrokerba8u7c40sa/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview";
+        var requestBody = new MalwareScanConfiguration()
+        {
+            Properties = new Properties()
+            {
+                IsEnabled = true,
+                MalwareScanning = new MalwareScanning()
+                {
+                    OnUpload = new OnUpload()
+                    {
+                        IsEnabled = true,
+                        CapGBPerMonth = 5000
+                    },
+                    ScanResultsEventGridTopicResourceId = $"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.EventGrid/topics/{_resourceManagerOptions.MalwareScanEventGridTopicName}"
+                },
+                OverrideSubscriptionLevelSettings = true,
+                SensitiveDataDiscovery = new SensitiveDataDiscovery()
+                {
+                    IsEnabled = false
+                }
+            },
+            Scope = $"[resourceId('Microsoft.Storage/storageAccounts', parameters({storageAccountName}))]"
+        };
+        var json = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await client.PutAsync(endpoint, content);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to enable Defender Malware Scan. Error: {error}", errorMessage);
+            throw new HttpRequestException($"Failed to enable Defender Malware Scan. Error: {errorMessage}");
+        }
+        _logger.LogInformation($"Microsoft Defender Malware scan enabled for storage account {storageAccountName}");
     }
 
     private string GenerateStorageAccountName()
