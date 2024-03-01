@@ -13,4 +13,6 @@ public class AzureResourceManagerOptions
     public string? ClientId { get; set; }
     public string? ClientSecret { get; set; }
     public string? SubscriptionId { get; set; }
+    public string? ApplicationResourceGroupName { get; set; }
+    public string? MalwareScanEventGridTopicName { get; set; }
 }

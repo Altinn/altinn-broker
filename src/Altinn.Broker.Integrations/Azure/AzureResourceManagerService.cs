@@ -1,4 +1,7 @@
 ﻿using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
@@ -28,9 +31,10 @@ public class AzureResourceManagerService : IResourceManager
     private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+    private readonly TokenCredential _credentials;
     private readonly ILogger<AzureResourceManagerService> _logger;
-    public string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.ResourceGroupName}-rg";
-    public string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => $"ai{_resourceManagerOptions.Environment.ToLowerInvariant()}{serviceOwnerEntity.ResourceGroupName}sa";
+    private string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
+    private string? GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => serviceOwnerEntity.StorageProvider?.ResourceName;
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
@@ -40,13 +44,13 @@ public class AzureResourceManagerService : IResourceManager
         _hostEnvironment = hostingEnvironment;
         if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
         {
-            _armClient = new ArmClient(new DefaultAzureCredential());
+            _credentials = new DefaultAzureCredential();
         }
         else
         {
-            var credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
-            _armClient = new ArmClient(credentials);
+            _credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
         }
+        _armClient = new ArmClient(_credentials);
         _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
     }
@@ -55,12 +59,10 @@ public class AzureResourceManagerService : IResourceManager
     {
         _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
 
+        var storageAccountName = GenerateStorageAccountName();
         _logger.LogInformation($"Resource group: {resourceGroupName}");
         _logger.LogInformation($"Storage account: {storageAccountName}");
-
-        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
 
         // Create or get the resource group
         var subscription = GetSubscription();
@@ -75,6 +77,7 @@ public class AzureResourceManagerService : IResourceManager
         storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
+        await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
         var blobService = storageAccount.Value.GetBlobService();
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
@@ -82,7 +85,58 @@ public class AzureResourceManagerService : IResourceManager
             await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, "brokerfiles", new BlobContainerData(), cancellationToken);
         }
 
+        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
         _logger.LogInformation($"Storage account {storageAccountName} created");
+    }
+
+    private async Task EnableMicrosoftDefender(string resourceGroupName, string storageAccountName, CancellationToken cancellationToken)
+    {
+        using var client = new HttpClient();
+        var tokenRequestContext = new TokenRequestContext(new[] { "https://management.azure.com/.default" });
+        var token = await _credentials.GetTokenAsync(tokenRequestContext, cancellationToken);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        var endpoint = $"https://management.azure.com/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview";
+        var requestBody = new MalwareScanConfiguration()
+        {
+            Properties = new Properties()
+            {
+                IsEnabled = true,
+                MalwareScanning = new MalwareScanning()
+                {
+                    OnUpload = new OnUpload()
+                    {
+                        IsEnabled = true,
+                        CapGBPerMonth = 5000
+                    },
+                    ScanResultsEventGridTopicResourceId = $"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.EventGrid/topics/{_resourceManagerOptions.MalwareScanEventGridTopicName}"
+                },
+                OverrideSubscriptionLevelSettings = true,
+                SensitiveDataDiscovery = new SensitiveDataDiscovery()
+                {
+                    IsEnabled = false
+                }
+            },
+            Scope = $"[resourceId('Microsoft.Storage/storageAccounts', parameters({storageAccountName}))]"
+        };
+        var json = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await client.PutAsync(endpoint, content);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to enable Defender Malware Scan. Error: {error}", errorMessage);
+            throw new HttpRequestException($"Failed to enable Defender Malware Scan. Error: {errorMessage}");
+        }
+        _logger.LogInformation($"Microsoft Defender Malware scan enabled for storage account {storageAccountName}");
+    }
+
+    private string GenerateStorageAccountName()
+    {
+        Random random = new Random();
+        const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        var obfuscationString = new string(Enumerable.Repeat(chars, 8)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return "aibroker" + obfuscationString + "sa";
     }
 
     public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
@@ -103,7 +157,8 @@ public class AzureResourceManagerService : IResourceManager
 
         var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccountExists = await storageAccountCollection.ExistsAsync(GetStorageAccountName(serviceOwnerEntity), cancellationToken: cancellationToken);
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        var storageAccountExists = storageAccountName != null && await storageAccountCollection.ExistsAsync(storageAccountName, cancellationToken: cancellationToken);
         if (!storageAccountExists)
         {
             _logger.LogInformation($"Could not find storage account for {serviceOwnerEntity.Name}");
@@ -116,14 +171,18 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
     {
         _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
-        var sasToken = await GetSasToken(serviceOwnerEntity);
-        return $"BlobEndpoint=https://{GetStorageAccountName(serviceOwnerEntity)}.blob.core.windows.net/brokerfiles?{sasToken}";
+        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        if (storageAccountName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        var sasToken = await GetSasToken(serviceOwnerEntity, storageAccountName);
+        return $"BlobEndpoint=https://{storageAccountName}.blob.core.windows.net/brokerfiles?{sasToken}";
     }
 
 
-    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
     {
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
         {
             return sasToken.Token;
@@ -140,7 +199,7 @@ public class AzureResourceManagerService : IResourceManager
             }
             (DateTime Created, string Token) newSasToken = default;
             newSasToken.Created = DateTime.UtcNow;
-            newSasToken.Token = await CreateSasToken(serviceOwnerEntity);
+            newSasToken.Token = await CreateSasToken(serviceOwnerEntity, storageAccountName);
 
             _sasTokens.TryAdd(storageAccountName, newSasToken);
 
@@ -151,11 +210,10 @@ public class AzureResourceManagerService : IResourceManager
             _semaphore.Release();
         }
     }
-    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
     {
         _logger.LogInformation("Creating new SAS token for " + serviceOwnerEntity.Name);
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);

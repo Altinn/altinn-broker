@@ -16,7 +16,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
         using var command = await _connectionProvider.CreateCommand(
-            "SELECT service_owner_id_pk, service_owner_name, file_transfer_time_to_live, resource_group_name, " +
+            "SELECT service_owner_id_pk, service_owner_name, file_transfer_time_to_live, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type " +
             "FROM broker.service_owner " +
             "LEFT JOIN broker.storage_provider sp on sp.service_owner_id_fk = service_owner_id_pk " +
@@ -33,7 +33,6 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
                 Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
                 Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
                 FileTransferTimeToLive = reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
-                ResourceGroupName = reader.GetGuid(reader.GetOrdinal("resource_group_name")),
                 StorageProvider = reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")) ? null : new StorageProviderEntity()
                 {
                     Created = reader.GetDateTime(reader.GetOrdinal("created")),
@@ -52,13 +51,12 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, file_transfer_time_to_live, resource_group_name) " +
-            "VALUES (@sub, @name, @fileTimeToLive, @resourceGroupName)"))
+            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, file_transfer_time_to_live) " +
+            "VALUES (@sub, @name, @fileTimeToLive)"))
         {
             command.Parameters.AddWithValue("@sub", sub);
             command.Parameters.AddWithValue("@name", name);
             command.Parameters.AddWithValue("@fileTimeToLive", fileTimeToLive);
-            command.Parameters.AddWithValue("@resourceGroupName", Guid.NewGuid());
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }

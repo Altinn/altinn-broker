@@ -98,7 +98,6 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
             await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
             await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
         }
-        await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, cancellationToken: cancellationToken);
         return fileTransfer.FileTransferId;
     }
 }
