@@ -14,6 +14,7 @@ public class FileTransferEntity
     public DateTimeOffset ExpirationTime { get; set; }
     public List<ActorFileTransferStatusEntity> RecipientCurrentStatuses { get; set; } // Joined in
     public string? FileLocation { get; set; }
+    public string? HangfireJobId { get; set; }
     public string FileName { get; set; }
     public long FileTransferSize { get; set; }
     public string? Checksum { get; set; }

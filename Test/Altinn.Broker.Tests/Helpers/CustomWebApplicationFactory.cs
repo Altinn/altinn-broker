@@ -9,7 +9,9 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
+using Hangfire.Common;
 using Hangfire.MemoryStorage;
+using Hangfire.States;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -80,6 +82,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 config.UseMemoryStorage()
             );
             HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
+            HangfireBackgroundJobClient.Setup(x => x.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("1");
             services.AddSingleton(HangfireBackgroundJobClient.Object);
             HangfireRecurringJobClient = new Mock<IRecurringJobManager>();
             services.AddSingleton(HangfireRecurringJobClient.Object);

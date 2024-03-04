@@ -2,6 +2,7 @@
 using System.Xml;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Application.UpdateFileRetention;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -40,8 +41,8 @@ public class ServiceOwnerController : Controller
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
-        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name, fileTimeToLive);
+        var fileTransferTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
+        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name, fileTransferTimeToLive);
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner!, cancellationToken)
@@ -51,10 +52,9 @@ public class ServiceOwnerController : Controller
     }
 
     [HttpGet]
-    [Route("{serviceOwnerId}")]
-    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(string serviceOwnerId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         if (serviceOwner is null)
         {
             return NotFound();
@@ -66,8 +66,28 @@ public class ServiceOwnerController : Controller
         {
             Name = serviceOwner.Name,
             DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
-            FileTimeToLive = serviceOwner.FileTransferTimeToLive
+            FileTransferTimeToLive = serviceOwner.FileTransferTimeToLive
         };
     }
+    [HttpPut]
+    [Route("fileretention")]
+    public async Task<ActionResult> UpdateFileRetention([FromBody] ServiceOwnerUpdateFileRetentionExt serviceOwnerUpdateFileRetentionExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] UpdateFileRetentionHandler updateFileRetentionHandler, CancellationToken cancellationToken)
+    {
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
+        if (serviceOwner is null)
+        {
+            return NotFound();
+        }
+
+        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerUpdateFileRetentionExt.FileTransferTimeToLive);
+        await _serviceOwnerRepository.UpdateFileRetention(token.Consumer, fileTimeToLive);
+        await updateFileRetentionHandler.Process(new UpdateFileRetentionRequest
+        {
+            ServiceOwnerId = token.Consumer,
+        }, cancellationToken);
+
+        return Ok();
+    }
+
 }
 

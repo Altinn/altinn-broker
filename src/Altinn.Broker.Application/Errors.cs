@@ -19,4 +19,5 @@ public static class Errors
     public static Error ChecksumMismatch = new Error(11, "The checksum of uploaded file did not match the checksum specified in initialize call.", HttpStatusCode.BadRequest);
     public static Error FileTransferNotPublished = new Error(12, "A file transfer can only be confirmed to be downloaded when it is published. See file transfer status.", HttpStatusCode.BadRequest);
     public static Error FileDownloadAlreadyConfirmed = new Error(13, "The file has already been confirmed to be downloaded.", HttpStatusCode.BadRequest);
+    public static Error FileTransferNotExpired = new Error(14, "The file transfer has not expired yet", HttpStatusCode.BadRequest);
 }

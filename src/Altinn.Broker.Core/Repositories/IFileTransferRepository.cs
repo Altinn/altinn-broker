@@ -15,6 +15,7 @@ public interface IFileTransferRepository
         Dictionary<string, string> propertyList,
         string? checksum,
         long? fileTransferSize,
+        string? hangfireJobId,
         CancellationToken cancellationToken);
     Task<Domain.FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
@@ -28,4 +29,9 @@ public interface IFileTransferRepository
         long fileTransferSize,
         CancellationToken cancellationToken
     );
+    Task<List<FileTransferEntity>> GetNonDeletedFileTransfersByStorageProvider(
+        long storageProviderId,
+        CancellationToken cancellationToken
+    );
+    Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
 }

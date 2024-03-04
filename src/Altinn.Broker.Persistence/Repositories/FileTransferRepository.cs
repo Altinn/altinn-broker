@@ -38,6 +38,7 @@ public class FileTransferRepository : IFileTransferRepository
                     f.file_location,
                     f.file_transfer_size,
                     f.expiration_time, 
+                    f.hangfire_job_id,
                     sender.actor_external_id as senderActorExternalReference,
                     fs_latest.file_transfer_status_description_id_fk, 
                     fs_latest.file_transfer_status_date, 
@@ -82,6 +83,7 @@ public class FileTransferRepository : IFileTransferRepository
                     FileName = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                    HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
                     FileTransferStatusEntity = new FileTransferStatusEntity()
                     {
                         FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
@@ -151,7 +153,7 @@ public class FileTransferRepository : IFileTransferRepository
         return fileTransferStatuses;
     }
 
-    public async Task<Guid> AddFileTransfer(ServiceOwnerEntity serviceOwner, ResourceEntity resource, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? fileTransferSize, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ServiceOwnerEntity serviceOwner, ResourceEntity resource, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, Dictionary<string, string> propertyList, string? checksum, long? fileTransferSize, string? hangfireJobId, CancellationToken cancellationToken = default)
     {
 
         if (serviceOwner.StorageProvider is null)
@@ -173,8 +175,8 @@ public class FileTransferRepository : IFileTransferRepository
         }
         var fileTransferId = Guid.NewGuid();
         NpgsqlCommand command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time) " +
-            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime)");
+            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
+            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
 
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
@@ -187,6 +189,7 @@ public class FileTransferRepository : IFileTransferRepository
         command.Parameters.AddWithValue("@fileTransferStatusId", (int)FileTransferStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
+        command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
         command.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.Add(serviceOwner.FileTransferTimeToLive));
 
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -485,4 +488,76 @@ public class FileTransferRepository : IFileTransferRepository
             command.ExecuteNonQuery();
         }
     }
+    public async Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken)
+    {
+        await using (var command = await _connectionProvider.CreateCommand(
+            "UPDATE broker.file_transfer " +
+            "SET " +
+                "hangfire_job_id = @hangfireJobId " +
+            "WHERE file_transfer_id_pk = @fileTransferId"))
+        {
+            command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+            command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
+            command.ExecuteNonQuery();
+        }
+    }
+    public async Task<List<FileTransferEntity>> GetNonDeletedFileTransfersByStorageProvider(long storageProviderId, CancellationToken cancellationToken)
+    {
+        var fileTransfers = new List<FileTransferEntity>();
+        await using (var command = await _connectionProvider.CreateCommand(
+                @"SELECT
+                f.*,
+                (
+                    SELECT 
+                        fs.file_transfer_status_description_id_fk
+                    FROM 
+                        broker.file_transfer_status fs
+                    WHERE 
+                        fs.file_transfer_id_fk = f.file_transfer_id_pk
+                    ORDER BY 
+                        fs.file_transfer_status_date DESC
+                    LIMIT 1
+                ) AS file_transfer_status_description_id_fk
+            FROM 
+                broker.file_transfer f
+            WHERE 
+                f.storage_provider_id_fk = @storageProviderId
+                AND (
+                    SELECT 
+                        fs.file_transfer_status_id_pk
+                    FROM 
+                        broker.file_transfer_status fs
+                    WHERE 
+                        fs.file_transfer_id_fk = f.file_transfer_id_pk
+                    ORDER BY 
+                        fs.file_transfer_status_date DESC
+                    LIMIT 1
+                ) != @deletedStatusId;"))
+        {
+            command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
+            command.Parameters.AddWithValue("@deletedStatusId", (int)FileTransferStatus.Deleted);
+            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    fileTransfers.Add(new FileTransferEntity()
+                    {
+                        FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
+                        ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                        FileName = reader.GetString(reader.GetOrdinal("filename")),
+                        Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                        SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                        ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                        FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                        FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                    });
+                }
+            }
+        }
+        return fileTransfers;
+    }
+
 }
+
