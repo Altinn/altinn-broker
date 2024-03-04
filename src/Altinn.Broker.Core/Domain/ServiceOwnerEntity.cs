@@ -6,5 +6,4 @@ public class ServiceOwnerEntity
     public string Name { get; set; }
     public StorageProviderEntity? StorageProvider { get; set; }
     public TimeSpan FileTransferTimeToLive { get; set; }
-    public Guid ResourceGroupName { get; set; }
 }

@@ -13,8 +13,4 @@ public interface IResourceManager
     Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
     Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity);
-
-    string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity);
-
-    string GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity);
 }
