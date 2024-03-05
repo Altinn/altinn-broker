@@ -130,7 +130,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             var altinnOptions = new AltinnOptions();
             config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
-            options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
+            if (hostEnvironment.IsProduction())
+            {
+                options.MetadataAddress = "https://maskinporten.no/.well-known/oauth-authorization-server";
+            } 
+            else 
+            { 
+                options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
+            }
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
