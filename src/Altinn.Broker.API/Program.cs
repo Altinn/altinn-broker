@@ -133,9 +133,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             if (hostEnvironment.IsProduction())
             {
                 options.MetadataAddress = "https://maskinporten.no/.well-known/oauth-authorization-server";
-            } 
-            else 
-            { 
+            }
+            else
+            {
                 options.MetadataAddress = "https://test.maskinporten.no/.well-known/oauth-authorization-server";
             }
             options.TokenValidationParameters = new TokenValidationParameters
