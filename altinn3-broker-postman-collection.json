@@ -1136,7 +1136,7 @@
 					"response": []
 				},
 				{
-					"name": "Authenticate as new sender",
+					"name": "Authenticate as sender",
 					"event": [
 						{
 							"listen": "test",
@@ -1197,7 +1197,7 @@
 					"response": []
 				},
 				{
-					"name": "Authenticate as new recipient",
+					"name": "Authenticate as recipient",
 					"event": [
 						{
 							"listen": "test",
