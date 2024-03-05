@@ -1,26 +1,28 @@
-using Altinn.Broker.Repositories;
+using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Services;
 
 using Azure;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 
 using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService : IFileStore
+public class BlobService : IBrokerStorageService
 {
-
+    private readonly IResourceManager _resourceManager;
     private readonly ILogger<BlobService> _logger;
-    public BlobService(ILogger<BlobService> logger)
+    public BlobService(IResourceManager resourceManager, ILogger<BlobService> logger)
     {
+        _resourceManager = resourceManager;
         _logger = logger;
     }
 
-    private BlobClient GetBlobClient(Guid fileId, string connectionString)
+    private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
+        var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
         var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
         {
             Retry =
@@ -33,9 +35,9 @@ public class BlobService : IFileStore
         return blobClient;
     }
 
-    public async Task<Stream> GetFileStream(Guid fileId, string connectionString, CancellationToken cancellationToken)
+    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = GetBlobClient(fileId, connectionString);
+        BlobClient blobClient = await GetBlobClient(fileTransfer.FileTransferId, serviceOwnerEntity);
         try
         {
             var content = await blobClient.DownloadContentAsync(cancellationToken);
@@ -48,24 +50,14 @@ public class BlobService : IFileStore
         }
     }
 
-    public async Task<string> UploadFile(Stream stream, Guid fileId, string connectionString, CancellationToken cancellationToken)
+    public async Task<string> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = GetBlobClient(fileId, connectionString);
-        var blobLeaseClient = blobClient.GetBlobLeaseClient();
+        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
         try
         {
-            if (!await blobClient.ExistsAsync(cancellationToken))
-            {
-                await blobClient.UploadAsync(new MemoryStream());
-            }
-            BlobLease blobLease = await blobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(-1), cancellationToken: cancellationToken);
             BlobUploadOptions options = new BlobUploadOptions()
             {
-                Conditions = new BlobRequestConditions()
-                {
-                    LeaseId = blobLease.LeaseId
-                },
-                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
+                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }    
             };
             var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
             var metadata = blobMetadata.Value;
@@ -78,15 +70,11 @@ public class BlobService : IFileStore
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
-        finally
-        {
-            await blobLeaseClient.BreakAsync();
-        }
     }
 
-    public async Task DeleteFile(Guid fileId, string connectionString, CancellationToken cancellationToken)
+    public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = GetBlobClient(fileId, connectionString);
+        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
         try
         {
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
