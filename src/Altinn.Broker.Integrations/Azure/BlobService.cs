@@ -57,7 +57,7 @@ public class BlobService : IBrokerStorageService
         {
             BlobUploadOptions options = new BlobUploadOptions()
             {
-                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }    
+                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
             };
             var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
             var metadata = blobMetadata.Value;
