@@ -234,7 +234,7 @@ public class AzureResourceManagerService : IResourceManager
             StartsOn = DateTimeOffset.UtcNow,
             ExpiresOn = DateTimeOffset.UtcNow.AddHours(24),
         };
-        sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write);
+        sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write | BlobSasPermissions.Delete);
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
         return sasToken;
     }
