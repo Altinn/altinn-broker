@@ -15,7 +15,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
-        using var command = await _connectionProvider.CreateCommand(
+        await using var command = await _connectionProvider.CreateCommand(
             "SELECT service_owner_id_pk, service_owner_name, file_transfer_time_to_live, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type " +
             "FROM broker.service_owner " +

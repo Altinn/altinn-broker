@@ -16,7 +16,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
 
     public async Task AddIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
     {
-        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "INSERT INTO broker.idempotency_event (idempotency_event_id_pk, created)" +
                     "VALUES (@idempotency_event_id_pk, @created) ");
         command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
@@ -26,7 +26,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
     }
     public async Task DeleteIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
     {
-        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "DELETE FROM broker.idempotency_event " +
                     "WHERE idempotency_event_id_pk = @idempotency_event_id_pk");
         command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
@@ -35,7 +35,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
     }
     public async Task DeleteOldIdempotencyEvents()
     {
-        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
                     "DELETE FROM broker.idempotency_event " +
                     "WHERE created < @created");
 
