@@ -82,7 +82,7 @@ public class AzureResourceManagerService : IResourceManager
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
         {
-            await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, "brokerfiles", new BlobContainerData(), cancellationToken);
+            await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, containerName, new BlobContainerData(), cancellationToken);
         }
 
         await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
@@ -176,6 +176,10 @@ public class AzureResourceManagerService : IResourceManager
         {
             throw new InvalidOperationException("Storage account has not been deployed");
         }
+        if (serviceOwnerEntity.StorageProvider?.Type == StorageProviderType.Azurite)
+        {
+            return AzureConstants.AzuriteUrl;
+        }
         var sasToken = await GetSasToken(serviceOwnerEntity, storageAccountName);
         return $"BlobEndpoint=https://{storageAccountName}.blob.core.windows.net/brokerfiles?{sasToken}";
     }
@@ -236,6 +240,7 @@ public class AzureResourceManagerService : IResourceManager
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write);
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
+        _logger.LogInformation("SAS Token created");
         return sasToken;
     }
 }

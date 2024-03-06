@@ -81,7 +81,7 @@ namespace Altinn.Broker.Controllers
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
                 FileTransferId = fileTransferId,
-                Token = token,
+                Token = legacyToken,
                 UploadStream = Request.Body,
                 IsLegacy = true
             }, cancellationToken);

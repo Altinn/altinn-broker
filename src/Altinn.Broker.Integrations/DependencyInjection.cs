@@ -10,7 +10,6 @@ using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence.Repositories;
-using Altinn.Broker.Repositories;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,8 +20,7 @@ public static class DependencyInjection
     public static void AddIntegrations(this IServiceCollection services, IConfiguration configuration, bool isDevelopment)
     {
         services.AddSingleton<IResourceManager, AzureResourceManagerService>();
-        services.AddSingleton<IBrokerStorageService, AzureBrokerStorageService>();
-        services.AddSingleton<IFileStore, BlobService>();
+        services.AddSingleton<IBrokerStorageService, BlobService>();
         services.AddScoped<IResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();

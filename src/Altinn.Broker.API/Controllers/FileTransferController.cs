@@ -67,7 +67,7 @@ namespace Altinn.Broker.Controllers
         [Route("{fileTransferId}/upload")]
         [Consumes("application/octet-stream")]
         [Authorize(Policy = AuthorizationConstants.Sender)]
-        public async Task<ActionResult> UploadUploadStreamed(
+        public async Task<ActionResult> UploadStreamed(
             Guid fileTransferId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] UploadFileCommandHandler handler,
@@ -162,7 +162,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Route("{fileTransferId}/details")]
         [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
-        public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileDetails(
+        public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
             Guid fileTransferId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] GetFileTransferDetailsQueryHandler handler,
@@ -222,7 +222,7 @@ namespace Altinn.Broker.Controllers
         [HttpGet]
         [Route("{fileTransferId}/download")]
         [Authorize(Policy = AuthorizationConstants.Recipient)]
-        public async Task<ActionResult> DownloadFileTransfer(
+        public async Task<ActionResult> DownloadFile(
             Guid fileTransferId,
             [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
             [FromServices] DownloadFileQueryHandler handler,
