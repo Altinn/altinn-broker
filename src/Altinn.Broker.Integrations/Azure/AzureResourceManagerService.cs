@@ -120,7 +120,7 @@ public class AzureResourceManagerService : IResourceManager
         };
         var json = JsonSerializer.Serialize(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await client.PutAsync(endpoint, content);
+        var response = await client.PutAsync(endpoint, content, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             var errorMessage = await response.Content.ReadAsStringAsync();
@@ -128,6 +128,7 @@ public class AzureResourceManagerService : IResourceManager
             throw new HttpRequestException($"Failed to enable Defender Malware Scan. Error: {errorMessage}");
         }
         _logger.LogInformation($"Microsoft Defender Malware scan enabled for storage account {storageAccountName}");
+        client.Dispose();
     }
 
     private string GenerateStorageAccountName()
