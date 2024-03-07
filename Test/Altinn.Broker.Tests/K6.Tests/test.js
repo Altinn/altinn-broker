@@ -14,9 +14,7 @@ var tokens = {
   DUMMY_SENDER_TOKEN: "",
   DUMMY_SERVICE_OWNER_TOKEN: ""
 }
-
 var baseUrl = "http://localhost:5096"
-
 
 const file = open("./data/testfile.txt", "b");
 function checkResult(res, status) {
@@ -41,11 +39,9 @@ export function setup() {
   ) {
     fail('Could not update file transfer TTL. Exiting');
   }
-
 }
 
 export default async function () {
-
   var baseFile = {
     resourceId: 'altinn-broker-test-resource-1',
     checksum: null,
@@ -63,7 +59,6 @@ export default async function () {
   sleep(1);
   checkResult(res, status)
 
-
   if (status) {
     headers = generateHeaders(tokens.DUMMY_SENDER_TOKEN, 'application/octet-stream')
     const data = {
@@ -76,10 +71,8 @@ export default async function () {
     status = check(res2, { 'Upload: status was 200': (r) => r.status == 200 });
     checkResult(res, status)
   }
-
-
-
 }
+
 function generateHeaders(token, contentType) {
   return {
     'Authorization': 'Bearer ' + token,
