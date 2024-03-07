@@ -48,6 +48,11 @@ The build and push workflow produces a docker image that is pushed to Github pac
 
 
 ### Load testing with k6
+Before running tests you should mock the following:
+- AltinnAuthorization by setting the function CheckUserAccess to return true
+- AltinnRegisterService to return a string 
+- AltinnResourceRegister to return a ResourceEntity
+- Use the ConsoleLogEventBus 
 
 We run load tests using k6. To run without installing k6 you can use docker-compose(base url has to be http://host.docker.internal:5096):
 ```docker-compose -f docker-compose-test.yml up k6-test``` 
