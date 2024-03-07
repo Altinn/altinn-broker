@@ -25,7 +25,7 @@ public class FileTransferRepository : IFileTransferRepository
     {
         var fileTransfer = new FileTransferEntity();
 
-        using var command = await _connectionProvider.CreateCommand(
+        await using var command = await _connectionProvider.CreateCommand(
             @"
                 SELECT 
                     f.file_transfer_id_pk, 
@@ -73,7 +73,7 @@ public class FileTransferRepository : IFileTransferRepository
                     f.file_transfer_id_pk = @fileTransferId;");
         {
             command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-            using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
                 fileTransfer = new FileTransferEntity
@@ -132,7 +132,7 @@ public class FileTransferRepository : IFileTransferRepository
         {
             command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
             var commandText = command.CommandText;
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -174,7 +174,7 @@ public class FileTransferRepository : IFileTransferRepository
             actorId = actor.ActorId;
         }
         var fileTransferId = Guid.NewGuid();
-        NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
             "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
             "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
 
@@ -261,7 +261,7 @@ public class FileTransferRepository : IFileTransferRepository
                 command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientStatus);
 
             var fileTransfers = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -338,7 +338,7 @@ public class FileTransferRepository : IFileTransferRepository
                 command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.Status);
 
             var files = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -390,7 +390,7 @@ public class FileTransferRepository : IFileTransferRepository
                 command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
 
             var files = new List<Guid>();
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -431,7 +431,7 @@ public class FileTransferRepository : IFileTransferRepository
         {
             command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
             var property = new Dictionary<string, string>();
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -536,7 +536,7 @@ public class FileTransferRepository : IFileTransferRepository
         {
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@deletedStatusId", (int)FileTransferStatus.Deleted);
-            using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
