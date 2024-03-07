@@ -2,10 +2,9 @@ import http from 'k6/http';
 import { sleep, check, fail } from 'k6';
 
 export const options = {
-  vus: 25,
+  vus: 20,
   duration: '10m',
-  insecureSkipTLSVerify: true,
-  iterations: 25
+  iterations: 20
 
   //remove this line before doing a real test
   //httpDebug: 'full',
@@ -15,12 +14,14 @@ var tokens = {
   DUMMY_SENDER_TOKEN: "",
   DUMMY_SERVICE_OWNER_TOKEN: ""
 }
-baseUrl = "http://localhost:5096"
+
+var baseUrl = "http://localhost:5096"
 
 
 const file = open("./data/testfile.txt", "b");
 function checkResult(res, status) {
   if (!status) {
+    console.error(status)
     console.error(res)
   }
 }
@@ -53,22 +54,30 @@ export default async function () {
     sender: '0192:991825827',
     sendersFileTransferReference: 'test-data'
   }
-  sleep(1);
 
   let headers = generateHeaders(tokens.DUMMY_SENDER_TOKEN, 'application/json')
-  var res = http.post(`${baseUrl}/broker/api/v1/filetransfer`, JSON.stringify(baseFile), { headers: headers });
+  var res = await http.asyncRequest('POST',
+    `${baseUrl}/broker/api/v1/filetransfer`,
+    JSON.stringify(baseFile), { headers: headers });
   var status = check(res, { 'Initialize: status was 200': (r) => r.status == 200 });
-  checkResult(res, status)
   sleep(1);
-
-  headers = generateHeaders(tokens.DUMMY_SENDER_TOKEN, 'application/octet-stream')
-  const data = {
-    field: 'this is a standard form field',
-    file: http.file(file, 'testfile.txt')
-  }
-  var res2 = http.post(`${baseUrl}/broker/api/v1/filetransfer/${res.body}/upload`, data, { timeout: "600s", headers: headers });
-  status = check(res2, { 'Upload: status was 200': (r) => r.status == 200 });
   checkResult(res, status)
+
+
+  if (status) {
+    headers = generateHeaders(tokens.DUMMY_SENDER_TOKEN, 'application/octet-stream')
+    const data = {
+      field: 'this is a standard form field',
+      file: http.file(file, 'testfile.txt')
+    }
+    var res2 = await http.asyncRequest('POST',
+      `${baseUrl}/broker/api/v1/filetransfer/${res.body}/upload`, data, { timeout: "600s", headers: headers });
+    sleep(1);
+    status = check(res2, { 'Upload: status was 200': (r) => r.status == 200 });
+    checkResult(res, status)
+  }
+
+
 
 }
 function generateHeaders(token, contentType) {
