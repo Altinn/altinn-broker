@@ -1283,7 +1283,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp&org=ttd&orgNo={{serviceowner_orgnumber}}",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:resourceregistry/resource.write altinn:authorization:pdp&org=ttd&orgNo={{serviceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1301,7 +1301,7 @@
 								},
 								{
 									"key": "scopes",
-									"value": "altinn:broker.admin altinn:resourceregistry/resource.write altinn:authorization:pdp"
+									"value": "altinn:resourceregistry/resource.write altinn:authorization:pdp"
 								},
 								{
 									"key": "org",
