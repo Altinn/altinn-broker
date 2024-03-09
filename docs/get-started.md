@@ -48,10 +48,10 @@ Test out your configuration from 1. and 2. by testing with the [Postman collecti
 
 ### 3. Setup Events subscription
 
-In order to use events/webhooks for a broker resource, you need to setup a subscription for the given resource. You can also use wildcard to setup a single subscription for many resources. This subscription is used to configure the endpoint where the events published by broker end up. [You can read more about how to setup an Events subscription in Altinn Events here](TODO).
+In order to use events/webhooks for a broker resource, you need to setup a subscription for the given resource. You can also use wildcard to setup a single subscription for many resources. This subscription is used to configure the endpoint where the events published by broker end up. [You can read more about how to setup an Events subscription in Altinn Events here](https://docs.altinn.studio/events/subscribe-to-events/developer-guides/setup-subscription/).
 
 ### 4. Integrate your solution to the broker API.
 
-In order to authenticate to the API, use the Maskinporten integration created in step 1 to [retrieve a Maskinporten token](TODO). This token should in turn be used in [a request to Altinn Authentication to retrieve an Altinn Token](TODO). The Altinn Token is then added as a Bearer token to every request to the Broker API.
+In order to authenticate to the API, use the Maskinporten integration created in step 1 to [retrieve a Maskinporten token](https://docs.digdir.no/docs/Maskinporten/maskinporten_protocol_token) (also see "Login to Maskinporten (Initialize)" in our Postman collection). This token should in turn be used in [a request to Altinn Authentication to retrieve an Altinn Token](https://docs.altinn.studio/authentication/architecture/accesstoken/). The Altinn Token is then added as a Bearer token to every request to the Broker API.
 
 If it is your first time as a service owner using the API, you need to have your cloud infrastructure provisioned first. You can do this by calling POST on /serviceowner (see [OpenAPI spec](../altinn-broker-v1.json)) with your Altinn Token that has an altinn:resourceregistry/resource.write scope. Within a minute or two the infrastructure should be ready for use.
