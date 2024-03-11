@@ -34,7 +34,7 @@ public class ResourceRepository : IResourceRepository
             {
                 Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
-                MaxFileTransferSize = reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
+                MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id"))
 
@@ -42,11 +42,9 @@ public class ResourceRepository : IResourceRepository
         }
         if (resource is null)
         {
-            Console.WriteLine("Resource not found in database, fetching from Altinn Resource Registry");
             resource = await _altinnResourceRepository.GetResource(resourceId, cancellationToken);
             if (resource is null)
             {
-                Console.WriteLine("Resource not found in Altinn Resource Registry");
                 return null;
             }
 
@@ -56,7 +54,6 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
-        Console.WriteLine("Creating resource in database");
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
@@ -65,7 +62,7 @@ public class ResourceRepository : IResourceRepository
         {
             command.Parameters.AddWithValue("@resourceId", resource.Id);
             command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
-            command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize ?? 0);
+            command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
             command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
             command.ExecuteNonQuery();
         }
