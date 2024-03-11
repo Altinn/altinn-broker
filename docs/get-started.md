@@ -43,7 +43,7 @@ To setup a resource that works quickly, you can use our Postman collection and r
 **TIP**: Verify your configurations from steps 1 and 2 using the [Postman collection](../README.md#postman), substituting the test tokens with your own Altinn tokens (See "Login to Maskinporten (Initialize)" request in Authenticator folder).
 
 ### 3. Set Up Event Subscriptions
-In order to use events/webhooks for a broker resource, you need to setup a subscription for the given resource. You can also use wildcard to setup a single subscription for many resources. This subscription is used to configure the endpoint where the events published by broker end up. [You can read more about how to setup an Events subscription in Altinn Events here](https://docs.altinn.studio/events/subscribe-to-events/developer-guides/setup-subscription/).
+In order to use events/webhooks for a broker resource, you need to setup a subscription for the given resource. This subscription is used to configure the endpoint where the events published by broker end up. [You can read more about how to setup an Events subscription in Altinn Events here](https://docs.altinn.studio/events/subscribe-to-events/developer-guides/setup-subscription/).
 
 ### 4. Integrate with the Broker API
 Authenticate using the Maskinporten integration from step 1 to [obtain a Maskinporten token](https://docs.digdir.no/docs/Maskinporten/maskinporten_protocol_token), then acquire an Altinn Token from [Altinn Authentication](https://docs.altinn.studio/authentication/architecture/accesstoken/). Use the Altinn Token as a Bearer token for all Broker API requests.
