@@ -17,7 +17,7 @@ public class PartyRepository : IPartyRepository
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)
     {
         await using var command = await _connectionProvider.CreateCommand(
-            "SELECT * " +
+            "SELECT * from broker.party " +
             "WHERE organization_number = @organizationId ");
         command.Parameters.AddWithValue("@organizationId", organizationId);
 
