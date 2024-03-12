@@ -6,4 +6,5 @@ public class ResourceEntity
     public DateTimeOffset? Created { get; set; }
     public string? OrganizationNumber { get; set; }
     public string ServiceOwnerId { get; set; }
+    public long? MaxFileTransferSize { get; set; }
 }

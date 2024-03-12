@@ -32,11 +32,15 @@ namespace Altinn.Broker.Controllers
     {
         private readonly ILogger<FileTransferController> _logger;
         private readonly IIdempotencyEventRepository _idempotencyEventRepository;
+        private readonly IResourceRepository _resourceRepository;
+        private readonly IFileTransferRepository _fileTransferRepository;
 
-        public FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository)
+        public FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository)
         {
             _logger = logger;
             _idempotencyEventRepository = idempotencyEventRepository;
+            _resourceRepository = resourceRepository;
+            _fileTransferRepository = fileTransferRepository;
         }
 
         /// <summary>
@@ -77,6 +81,14 @@ namespace Altinn.Broker.Controllers
             LogContextHelpers.EnrichLogsWithToken(token);
             _logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
             Request.EnableBuffering();
+
+            var fileTransfer = await _fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+            var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+            var max_upload_size = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE"));
+            if (Request.ContentLength > max_upload_size || Request.Body.Length > max_upload_size)
+            {
+                return BadRequest($"File size exceeds maximum allowed size of {max_upload_size} bytes");
+            }
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
                 FileTransferId = fileTransferId,

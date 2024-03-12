@@ -82,7 +82,7 @@ public class ServiceOwnerController : Controller
         var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerUpdateFileRetentionExt.FileTransferTimeToLive);
         if (fileTimeToLive == serviceOwner.FileTransferTimeToLive)
         {
-            return Problem(detail: "The file transfer already has the requested retention time", statusCode: (int)HttpStatusCode.Conflict);
+            return Problem(detail: "The file transfer already has the requested retention time", statusCode: (int)HttpStatusCode.BadRequest);
         }
         await _serviceOwnerRepository.UpdateFileRetention(token.Consumer, fileTimeToLive);
         await updateFileRetentionHandler.Process(new UpdateFileRetentionRequest
