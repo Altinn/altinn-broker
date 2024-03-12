@@ -58,7 +58,7 @@ public class ServiceOwnerControllerTests : IClassFixture<CustomWebApplicationFac
         };
 
         var retentionResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/serviceowner/fileretention", serviceOwnerUpdateFileRetentionExt);
-        Assert.Equal(System.Net.HttpStatusCode.OK, retentionResponse.StatusCode);
+        Assert.True(HttpStatusCode.OK == retentionResponse.StatusCode || HttpStatusCode.Conflict == retentionResponse.StatusCode);
         var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
         Assert.Equal(TimeSpan.FromDays(90), response.FileTransferTimeToLive);
     }

@@ -21,7 +21,8 @@ public static class DependencyInjection
     {
         services.AddSingleton<IResourceManager, AzureResourceManagerService>();
         services.AddSingleton<IBrokerStorageService, BlobService>();
-        services.AddScoped<IResourceRepository, AltinnResourceRegistryRepository>();
+        services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
+        services.AddScoped<IResourceRepository, ResourceRepository>();
         services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
         services.AddScoped<IEventBus, AltinnEventBus>();
