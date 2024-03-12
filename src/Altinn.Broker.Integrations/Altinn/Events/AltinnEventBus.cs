@@ -37,7 +37,7 @@ public class AltinnEventBus : IEventBus
             if (party == null)
             {
                 partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
-                await _partyRepository.InitializeParty(organizationId, partyId);
+                if (partyId != null) await _partyRepository.InitializeParty(organizationId, partyId);
             }
         }
         var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId);
