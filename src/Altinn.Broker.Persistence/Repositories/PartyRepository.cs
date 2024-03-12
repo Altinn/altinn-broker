@@ -1,6 +1,5 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services;
 
 using Npgsql;
 
@@ -38,7 +37,6 @@ public class PartyRepository : IPartyRepository
     public async Task InitializeParty(string organizationId, string partyId)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
-
         await using (var command = await _connectionProvider.CreateCommand(
             "INSERT INTO broker.party (organization_number, party_id, created) " +
             "VALUES (@organizationId, @partyId, NOW())"))
@@ -48,9 +46,6 @@ public class PartyRepository : IPartyRepository
             var commandText = command.CommandText;
             command.ExecuteNonQuery();
         }
-
-
     }
-
 }
 

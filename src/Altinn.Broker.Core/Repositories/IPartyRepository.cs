@@ -1,5 +1,3 @@
-
-
 using Altinn.Broker.Core.Domain;
 
 namespace Altinn.Broker.Core.Repositories;
