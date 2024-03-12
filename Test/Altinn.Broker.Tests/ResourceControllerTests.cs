@@ -34,9 +34,9 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Max_Upload_Size()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
         {
-            ResourceId = "123",
+            ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 99999
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -44,9 +44,9 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Max_Upload_Size_Over_Global_Should_Fail()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
         {
-            ResourceId = "123",
+            ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 999999999999999
         });
         Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
@@ -55,9 +55,9 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Should_Fail_For_Sender()
     {
-        var response = await _senderClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceExt
+        var response = await _senderClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
         {
-            ResourceId = "123",
+            ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 1000000
         });
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
@@ -68,7 +68,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     {
         var response = await _recipientClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceExt
         {
-            ResourceId = "123",
+            ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 1000000
         });
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
