@@ -39,9 +39,9 @@ public class ResourceController : Controller
         {
             return Unauthorized();
         }
-        var resouce = await _resourceRepository.GetResource(resourceExt.ResourceId, cancellationToken);
+        var resource = await _resourceRepository.GetResource(resourceExt.ResourceId, cancellationToken);
 
-        if (resouce is null)
+        if (resource is null)
         {
             return NotFound();
         }
@@ -49,9 +49,9 @@ public class ResourceController : Controller
         {
             return BadRequest("Max upload size cannot be negative");
         }
-        if (resourceExt.MaxFileTransferSize == resouce.MaxFileTransferSize)
+        if (resourceExt.MaxFileTransferSize == resource.MaxFileTransferSize)
         {
-            return Conflict("Max upload size is already set to the requested value");
+            return BadRequest("Max upload size is already set to the requested value");
         }
         long maxFileTransferSize = long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE"));
 
