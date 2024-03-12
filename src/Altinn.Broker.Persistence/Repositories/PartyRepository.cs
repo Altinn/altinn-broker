@@ -8,12 +8,10 @@ namespace Altinn.Broker.Persistence.Repositories;
 public class PartyRepository : IPartyRepository
 {
     private readonly DatabaseConnectionProvider _connectionProvider;
-    private readonly IAltinnRegisterService _altinnRegisterService;
 
-    public PartyRepository(DatabaseConnectionProvider connectionProvider, IAltinnRegisterService altinnRegisterService)
+    public PartyRepository(DatabaseConnectionProvider connectionProvider)
     {
         _connectionProvider = connectionProvider;
-        _altinnRegisterService = altinnRegisterService;
     }
 
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)
@@ -32,17 +30,6 @@ public class PartyRepository : IPartyRepository
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 PartyId = reader.GetString(reader.GetOrdinal("party_id")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created"))
-            };
-        }
-        if (partyData == null)
-        {
-            var partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
-            await InitializeParty(organizationId, partyId);
-            partyData = new PartyEntity
-            {
-                OrganizationNumber = organizationId,
-                PartyId = partyId,
-                Created = DateTime.Now
             };
         }
         return partyData;

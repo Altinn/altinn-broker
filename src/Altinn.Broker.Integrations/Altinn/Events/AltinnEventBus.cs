@@ -16,12 +16,14 @@ public class AltinnEventBus : IEventBus
     private readonly AltinnOptions _altinnOptions;
     private readonly HttpClient _httpClient;
     private readonly IPartyRepository _partyRepository;
+    private readonly IAltinnRegisterService _altinnRegisterService;
     private readonly ILogger<AltinnEventBus> _logger;
 
     public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger, IPartyRepository partyRepository)
     {
         _httpClient = httpClient;
         _altinnOptions = altinnOptions.Value;
+        _altinnRegisterService = altinnRegisterService;
         _partyRepository = partyRepository;
         _logger = logger;
     }
@@ -32,7 +34,11 @@ public class AltinnEventBus : IEventBus
         if (organizationId != null)
         {
             var party = await _partyRepository.GetParty(organizationId, cancellationToken);
-            partyId = party?.PartyId;
+            if (party == null)
+            {
+                partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
+                await _partyRepository.InitializeParty(organizationId, partyId);
+            }
         }
         var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId);
         var serializerOptions = new JsonSerializerOptions
