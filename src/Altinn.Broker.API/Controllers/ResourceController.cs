@@ -45,7 +45,7 @@ public class ResourceController : Controller
         {
             return NotFound();
         }
-        if (resourceExt.MaxFileTransferSize < 0)
+        if (resourceExt.MaxFileTransferSize < 1000)
         {
             return BadRequest("Max upload size cannot be negative");
         }
