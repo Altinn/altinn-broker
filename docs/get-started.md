@@ -29,7 +29,7 @@ sequenceDiagram
 ### 0. Get an API key
 
 In order to use Altinn API's, you need a subscription key for the API's. This is passed as the header "Ocp-Apim-Subscription-Key" in every request.
-You can get it by contacting the service desk.
+You can get it by contacting us at [Altinn@Slack#product-formidling](https://join.slack.com/t/altinn/shared_invite/zt-7c77c9si-ZnMFwGNtab1aFdC6H_vwog).
 
 ### 1. Register Maskinporten Clients
 Register Maskinporten clients to authenticate with the Broker API, assigning them relevant scopes:
@@ -55,4 +55,4 @@ In order to use events/webhooks for a broker resource, you need to setup a subsc
 ### 4. Integrate with the Broker API
 Authenticate using the Maskinporten integration from step 1 to [obtain a Maskinporten token](https://docs.digdir.no/docs/Maskinporten/maskinporten_protocol_token), then acquire an Altinn Token from [Altinn Authentication](https://docs.altinn.studio/authentication/architecture/accesstoken/). Use the Altinn Token as a Bearer token for all Broker API requests along with the APIM subscription key as a header with the key "Ocp-Apim-Subscription-Key".
 
-First-time service owners who want to use Broker need to provision their Altinn Broker-managed cloud infrastructure via POST on /serviceowner with an Altinn Token (see [OpenAPI spec](../altinn-broker-v1.json)) that has the `altinn:resourceregistry/resource.write` scope. The infrastructure should be operational within a couple of minutes.
+First-time service owners who want to use Broker need to provision their Altinn Broker-managed cloud infrastructure via POST on /serviceowner with an Altinn Token (see [Postman collection](../altinn-broker-v1.json)). The infrastructure should be operational within a couple of minutes.
