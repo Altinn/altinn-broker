@@ -186,7 +186,6 @@ public class FileTransferRepository : IFileTransferRepository
         command.Parameters.AddWithValue("@fileTransferSize", fileTransferSize is null ? DBNull.Value : fileTransferSize);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
-        command.Parameters.AddWithValue("@fileTransferStatusId", (int)FileTransferStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
         command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);

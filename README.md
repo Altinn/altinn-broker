@@ -1,9 +1,16 @@
-# altinn-broker (work-in-progress)
-Formidlingstjenesten
+# Altinn Broker ("Formidlingstjenesten")
+
+Altinn Broker is a Managed File Transfer (MFT) service for secure file transfer between organizations in Norway. 
 
 [![Build and push](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml)
 
+## Getting started
+
+Altinn Broker is currently available in Altinn's staging environment at https://platform.tt02.altinn.no. In order to get started integrating to the API, follow our [guide on getting started](./docs/get-started.md).
+
 ## Postman
+
+<a id="postman"></a>
 
 Example requests using postman can be found in [altinn3-broker-postman-collection.json](/altinn3-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". Also set the variable "serviceowner_orgnumber". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
 
@@ -21,6 +28,8 @@ The services required to support local development are run using docker compose:
 To support features like hot reload etc, the app itself is run directly. Either in IDE like Visual Studio or by running:
 ```dotnet watch --project ./src/Altinn.Broker.API/Altinn.Broker.API.csproj```
 
+Installing Dotnet 8.0 is a pre-requisite.
+
 ### Azurite
 
 When running tests or when running locally, we use the Azurite storage emulator to emulate an Azure Storage account locally. You can use Azure Storage Explorer to inspect the blob contents.
@@ -29,14 +38,6 @@ When running tests or when running locally, we use the Azurite storage emulator 
 
 The solution uses Flyway to run migrations. The migration scripts can be found in /src/Altinn.Broker.Persistence/Migrations. Script naming must follow the convention "V${four-digit-version-number}__${name}".
 If you need to re-initialize the database during local development, you can delete the database container and re-run docker compose.
-
-### Authorization
-
-To get access to the Broker API in staging/production, a consumer needs to use a Maskinporten integration. Recipients should use the scope altinn:broker.read and senders should use the scope altinn:broker.write. Tokens with both scopes also work. You can create a Maskinporten integration here:
-https://selvbetjening-samarbeid-ver2.difi.no/integrations
-
-For more on Maskinporten tokens see:
-https://docs.digdir.no/docs/Maskinporten/maskinporten_guide_apikonsument
 
 When running locally for development, you can use any Maskinporten token. It is not validated.
 
