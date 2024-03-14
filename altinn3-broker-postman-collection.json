@@ -801,6 +801,51 @@
 			]
 		},
 		{
+			"name": "Resource",
+			"item": [
+				{
+					"name": "Update Max File Size",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/resource/maxfiletransfersize",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"resource",
+								"maxfiletransfersize"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Service Owner",
 			"item": [
 				{

@@ -20,6 +20,8 @@ Finally, you need to register a resource in the Resource Registry. First set the
 
 ## Local Development
 
+The start.ps1 script runs all neccassary commands to run the project. If you want to run the commands seperate, you can follow the steps below: 
+
 The services required to support local development are run using docker compose:
 ```docker compose up -d```
 
@@ -48,7 +50,7 @@ Formatting of the code base is handled by Dotnet format. [See how to configure i
 The build and push workflow produces a docker image that is pushed to Github packages. This image is then used by the release action found in the [altinn-broker-infra repository](https://github.com/Altinn/altinn-broker-infra).
 
 
-### Load testing with k6
+## Load testing with k6
 Before running tests you should mock the following:
 - AltinnAuthorization by setting the function CheckUserAccess to return true
 - AltinnRegisterService to return a string 
