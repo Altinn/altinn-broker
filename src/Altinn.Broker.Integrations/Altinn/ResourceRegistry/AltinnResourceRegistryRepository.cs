@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.ResourceRegistry;
-public class AltinnResourceRegistryRepository : IResourceRepository
+public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 {
     private readonly HttpClient _client;
     private readonly ILogger<AltinnResourceRegistryRepository> _logger;

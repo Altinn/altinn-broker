@@ -108,6 +108,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
+
+            Environment.SetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE", "2147483648");
         });
     }
 
