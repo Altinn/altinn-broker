@@ -29,7 +29,7 @@ sequenceDiagram
 ### 0. Get an API key
 
 In order to use Altinn API's, you need a subscription key for the API's. This is passed as the header "Ocp-Apim-Subscription-Key" in every request.
-You can get it by contacting us at [Altinn@Slack#product-formidling](https://join.slack.com/t/altinn/shared_invite/zt-7c77c9si-ZnMFwGNtab1aFdC6H_vwog).
+You can get it by contacting us at [Altinn@Slack#produkt-formidling](https://join.slack.com/t/altinn/shared_invite/zt-7c77c9si-ZnMFwGNtab1aFdC6H_vwog).
 
 ### 1. Register Maskinporten Clients
 Register Maskinporten clients to authenticate with the Broker API, assigning them relevant scopes:
