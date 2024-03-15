@@ -68,9 +68,14 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
             fileSearch.To = new DateTimeOffset(request.To.Value.UtcDateTime, TimeSpan.Zero);
         }
 
-        if (request.RecipientStatus.HasValue)
+        if (request.RecipientFileTransferStatus.HasValue)
         {
-            fileSearch.RecipientStatus = request.RecipientStatus;
+            fileSearch.RecipientFileTransferStatus = request.RecipientFileTransferStatus;
+        }
+
+        if (request.FileTransferStatus.HasValue)
+        {
+            fileSearch.FileTransferStatus = request.FileTransferStatus;
         }
 
         return await _fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
