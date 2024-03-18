@@ -15,5 +15,6 @@ public static class DependencyInjection
         services.AddSingleton<IActorFileTransferStatusRepository, ActorFileTransferStatusRepository>();
         services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
         services.AddSingleton<IIdempotencyEventRepository, IdempotencyEventRepository>();
+        services.AddSingleton<IPartyRepository, PartyRepository>();
     }
 }

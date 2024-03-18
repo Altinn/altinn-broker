@@ -141,6 +141,7 @@ namespace Altinn.Broker.Controllers
         /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<List<Guid>>> GetFiles(
+            [FromQuery] FileTransferStatusExt? status,
             [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
             [FromQuery] DateTimeOffset? from,
             [FromQuery] DateTimeOffset? to,
@@ -174,7 +175,8 @@ namespace Altinn.Broker.Controllers
             {
                 Token = legacyToken ?? token,
                 ResourceId = resourceId ?? string.Empty,
-                RecipientStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
+                RecipientFileTransferStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
+                FileTransferStatus = status is not null ? (FileTransferStatus)status : null,
                 OnBehalfOfConsumer = onBehalfOfConsumer,
                 From = from,
                 To = to,

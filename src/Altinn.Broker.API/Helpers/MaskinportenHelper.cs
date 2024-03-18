@@ -44,5 +44,4 @@ public static class MaskinportenHelper
 
     public const string WriteScope = "altinn:broker.write";
     public const string ReadScope = "altinn:broker.read";
-    public const string AdminScope = "altinn:broker.admin";
 }

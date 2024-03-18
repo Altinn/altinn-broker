@@ -186,7 +186,6 @@ public class FileTransferRepository : IFileTransferRepository
         command.Parameters.AddWithValue("@fileTransferSize", fileTransferSize is null ? DBNull.Value : fileTransferSize);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
-        command.Parameters.AddWithValue("@fileTransferStatusId", (int)FileTransferStatus.Initialized); // TODO, remove?
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
         command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
@@ -233,9 +232,13 @@ public class FileTransferRepository : IFileTransferRepository
         {
             commandString.AppendLine("AND resource_id = @resourceId");
         }
-        if (fileTransferSearch.RecipientStatus.HasValue)
+        if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
             commandString.AppendLine("AND actor_file_transfer_status_id_fk = @recipientFileTransferStatus");
+        }
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            commandString.AppendLine("AND filetransferstatus.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
 
         commandString.AppendLine(";");
@@ -257,8 +260,10 @@ public class FileTransferRepository : IFileTransferRepository
                 command.Parameters.AddWithValue("@From", fileTransferSearch.From);
             if (fileTransferSearch.To.HasValue)
                 command.Parameters.AddWithValue("@To", fileTransferSearch.To);
-            if (fileTransferSearch.RecipientStatus.HasValue)
-                command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientStatus);
+            if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
+                command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
+            if (fileTransferSearch.FileTransferStatus.HasValue)
+                command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
 
             var fileTransfers = new List<Guid>();
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
