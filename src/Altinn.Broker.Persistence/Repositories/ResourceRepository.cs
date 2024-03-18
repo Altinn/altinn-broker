@@ -1,5 +1,3 @@
-using System.Numerics;
-
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
@@ -10,7 +8,6 @@ public class ResourceRepository : IResourceRepository
 {
     private readonly DatabaseConnectionProvider _connectionProvider;
     private readonly IAltinnResourceRepository _altinnResourceRepository;
-
     public ResourceRepository(DatabaseConnectionProvider connectionProvider, IAltinnResourceRepository altinnResourceRepository)
     {
         _connectionProvider = connectionProvider;
@@ -37,7 +34,6 @@ public class ResourceRepository : IResourceRepository
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id"))
-
             };
         }
         if (resource is null)
@@ -47,7 +43,6 @@ public class ResourceRepository : IResourceRepository
             {
                 return null;
             }
-
             await CreateResource(resource, cancellationToken);
         }
         return resource;
@@ -67,8 +62,6 @@ public class ResourceRepository : IResourceRepository
             command.ExecuteNonQuery();
         }
     }
-
-
     public async Task UpdateMaxFileTransferSize(string resource, long maxSize, CancellationToken cancellationToken)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
@@ -83,6 +76,5 @@ public class ResourceRepository : IResourceRepository
             command.ExecuteNonQuery();
         }
     }
-
 }
 
