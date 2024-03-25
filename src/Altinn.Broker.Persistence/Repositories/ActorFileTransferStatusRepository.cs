@@ -31,7 +31,7 @@ internal class ActorFileTransferStatusRepository : IActorFileTransferStatusRepos
                     fileTransferStatuses.Add(new Core.Domain.ActorFileTransferStatusEntity()
                     {
                         FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
-                        Status = (Core.Domain.Enums.ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_id_fk")),
+                        Status = (Core.Domain.Enums.ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
                         Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
                         Actor = new ActorEntity()
                         {
@@ -61,7 +61,7 @@ internal class ActorFileTransferStatusRepository : IActorFileTransferStatusRepos
             actorId = actor.ActorId;
         }
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_id_fk, actor_file_transfer_status_date) " +
+            "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date) " +
             "VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())"))
         {
             command.Parameters.AddWithValue("@actorId", actorId);

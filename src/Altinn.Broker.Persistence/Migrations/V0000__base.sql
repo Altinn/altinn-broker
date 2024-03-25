@@ -94,7 +94,7 @@ CREATE TABLE broker.file_transfer_property (
 );
 
 CREATE TABLE broker.actor_file_transfer_status_description (
-    actor_file_transfer_status_id_pk integer PRIMARY KEY,
+    actor_file_transfer_status_description_id_pk integer PRIMARY KEY,
     actor_file_transfer_status_description character varying(200) NOT NULL
 );
 
@@ -102,10 +102,10 @@ CREATE TABLE broker.actor_file_transfer_status (
     actor_file_transfer_status_id_pk bigserial PRIMARY KEY,
     actor_id_fk bigint NOT NULL,
     file_transfer_id_fk uuid NOT NULL,
-    actor_file_transfer_status_id_fk integer NOT NULL,
+    actor_file_transfer_status_description_id_fk integer NOT NULL,
     actor_file_transfer_status_date timestamp without time zone NOT NULL,
     FOREIGN KEY (actor_id_fk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
-    FOREIGN KEY (actor_file_transfer_status_id_fk) REFERENCES broker.actor_file_transfer_status_description (actor_file_transfer_status_id_pk),
+    FOREIGN KEY (actor_file_transfer_status_description_id_fk) REFERENCES broker.actor_file_transfer_status_description (actor_file_transfer_status_description_id_pk),
     FOREIGN KEY (file_transfer_id_fk) REFERENCES broker.file_transfer (file_transfer_id_pk)
 );
 
