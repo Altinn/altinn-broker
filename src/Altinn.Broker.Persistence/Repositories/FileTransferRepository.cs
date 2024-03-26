@@ -234,7 +234,14 @@ public class FileTransferRepository : IFileTransferRepository
         }
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
-            commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+            if(fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
+            {
+                commandString.AppendLine($"AND actor_file_transfer_status_description_id_fk in (0,1)");
+            }
+            else
+            {
+                commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+            }
         }
         if (fileTransferSearch.FileTransferStatus.HasValue)
         {
@@ -260,7 +267,7 @@ public class FileTransferRepository : IFileTransferRepository
                 command.Parameters.AddWithValue("@From", fileTransferSearch.From);
             if (fileTransferSearch.To.HasValue)
                 command.Parameters.AddWithValue("@To", fileTransferSearch.To);
-            if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
+            if (fileTransferSearch.RecipientFileTransferStatus.HasValue && fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
                 command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
             if (fileTransferSearch.FileTransferStatus.HasValue)
                 command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
