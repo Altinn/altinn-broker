@@ -234,7 +234,7 @@ public class FileTransferRepository : IFileTransferRepository
         }
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
-            if(fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
+            if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
                 commandString.AppendLine($"AND actor_file_transfer_status_description_id_fk in (0,1)");
             }

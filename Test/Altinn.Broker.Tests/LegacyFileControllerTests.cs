@@ -195,7 +195,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.Contains(Guid.Parse(fileId), result);
     }
-    
+
     [Fact]
     public async Task GetFiles_GetInitializedAndDownloadStarted_Success()
     {
@@ -218,7 +218,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}/download?onBehalfOfConsumer={file.Recipients[1]}");
-        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync(); 
+        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
 
         // Act
         var getResponse_rep1 = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?status=Published&recipientStatus={status}"
