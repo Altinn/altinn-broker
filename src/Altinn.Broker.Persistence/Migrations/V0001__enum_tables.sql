@@ -9,7 +9,7 @@ VALUES
 (6, 'Deleted'),
 (7, 'Failed');
 
-INSERT INTO broker.actor_file_transfer_status_description (actor_file_transfer_status_id_pk, actor_file_transfer_status_description)
+INSERT INTO broker.actor_file_transfer_status_description (actor_file_transfer_status_description_id_pk, actor_file_transfer_status_description)
 VALUES
 (0, 'Initialized'),
 (1, 'DownloadStarted'),

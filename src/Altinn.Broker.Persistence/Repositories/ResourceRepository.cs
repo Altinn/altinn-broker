@@ -17,7 +17,7 @@ public class ResourceRepository : IResourceRepository
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = await _connectionProvider.CreateCommand(
-            "SELECT * " +
+            "SELECT resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
@@ -33,7 +33,7 @@ public class ResourceRepository : IResourceRepository
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id"))
+                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
             };
         }
         if (resource is null)
@@ -52,7 +52,7 @@ public class ResourceRepository : IResourceRepository
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id) " +
+            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk) " +
             "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, NOW(), @serviceOwnerId)"))
         {
             command.Parameters.AddWithValue("@resourceId", resource.Id);

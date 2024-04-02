@@ -16,7 +16,7 @@ public class PartyRepository : IPartyRepository
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)
     {
         await using var command = await _connectionProvider.CreateCommand(
-            "SELECT * from broker.party " +
+            "SELECT organization_number_pk, party_id, created from broker.party " +
             "WHERE organization_number = @organizationId ");
         command.Parameters.AddWithValue("@organizationId", organizationId);
 
@@ -26,7 +26,7 @@ public class PartyRepository : IPartyRepository
         {
             partyData = new PartyEntity
             {
-                OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
+                OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number_pk")),
                 PartyId = reader.GetString(reader.GetOrdinal("party_id")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created"))
             };
@@ -38,7 +38,7 @@ public class PartyRepository : IPartyRepository
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.party (organization_number, party_id, created) " +
+            "INSERT INTO broker.party (organization_number_pk, party_id, created) " +
             "VALUES (@organizationId, @partyId, NOW())"))
         {
             command.Parameters.AddWithValue("@organizationId", organizationId);

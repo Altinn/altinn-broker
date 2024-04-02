@@ -122,7 +122,7 @@ public class FileTransferRepository : IFileTransferRepository
         var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
         await using (var command = await _connectionProvider.CreateCommand(
             @"
-            SELECT afs.actor_id_fk, MAX(afs.actor_file_transfer_status_id_fk) as actor_file_transfer_status_id_fk, MAX(afs.actor_file_transfer_status_date) as actor_file_transfer_status_date, a.actor_external_id 
+            SELECT afs.actor_id_fk, MAX(afs.actor_file_transfer_status_description_id_fk) as actor_file_transfer_status_description_id_fk, MAX(afs.actor_file_transfer_status_date) as actor_file_transfer_status_date, a.actor_external_id 
             FROM broker.file_transfer 
             LEFT JOIN broker.actor_file_transfer_status afs on afs.file_transfer_id_fk = file_transfer_id_pk 
             LEFT JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk 
@@ -139,7 +139,7 @@ public class FileTransferRepository : IFileTransferRepository
                     fileTransferStatuses.Add(new ActorFileTransferStatusEntity()
                     {
                         FileTransferId = fileTransferId,
-                        Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_id_fk")),
+                        Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
                         Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
                         Actor = new ActorEntity()
                         {
@@ -203,7 +203,7 @@ public class FileTransferRepository : IFileTransferRepository
         commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk");
         commandString.AppendLine("FROM broker.file_transfer f");
         commandString.AppendLine("INNER JOIN LATERAL ");
-        commandString.AppendLine("(SELECT afs.actor_file_transfer_status_id_fk FROM broker.actor_file_transfer_status afs ");
+        commandString.AppendLine("(SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs ");
         commandString.AppendLine("WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk ");
         if (fileTransferSearch.Actors?.Count > 0)
         {
@@ -213,7 +213,7 @@ public class FileTransferRepository : IFileTransferRepository
         {
             commandString.AppendLine("AND afs.actor_id_fk = @actorId");
         }
-        commandString.AppendLine("ORDER BY afs.actor_file_transfer_status_id_fk desc LIMIT 1) AS recipientfiletransferstatus ON true");
+        commandString.AppendLine("ORDER BY afs.actor_file_transfer_status_description_id_fk desc LIMIT 1) AS recipientfiletransferstatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true");
         commandString.AppendLine("WHERE 1 = 1");
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
@@ -234,7 +234,7 @@ public class FileTransferRepository : IFileTransferRepository
         }
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
-            commandString.AppendLine("AND actor_file_transfer_status_id_fk = @recipientFileTransferStatus");
+            commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
         }
         if (fileTransferSearch.FileTransferStatus.HasValue)
         {
@@ -360,9 +360,9 @@ public class FileTransferRepository : IFileTransferRepository
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk");
         commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_transfer_status_id_fk FROM broker.actor_file_transfer_status afs WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_transfer_status_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
+        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_transfer_status_description_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
         commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE actor_file_transfer_status_id_fk = @recipientFileStatus AND resource_id = @resourceId");
+        commandString.AppendLine("WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId");
         if (fileTransferSearch.Status.HasValue)
         {
             commandString.AppendLine("AND file_transfer_status_description_id_fk = @fileStatus");
