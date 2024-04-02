@@ -153,7 +153,7 @@ public class FileTransferRepository : IFileTransferRepository
         return fileTransferStatuses;
     }
 
-    public async Task<Guid> AddFileTransfer(ServiceOwnerEntity serviceOwner, ResourceEntity resource, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset fileExpirationTime, Dictionary<string, string> propertyList, string? checksum, long? fileTransferSize, string? hangfireJobId, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ServiceOwnerEntity serviceOwner, ResourceEntity resource, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, long? fileTransferSize, string? hangfireJobId, CancellationToken cancellationToken = default)
     {
         if (serviceOwner.StorageProvider is null)
         {
@@ -188,7 +188,7 @@ public class FileTransferRepository : IFileTransferRepository
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
         command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
-        command.Parameters.AddWithValue("@expirationTime", fileExpirationTime);
+        command.Parameters.AddWithValue("@expirationTime", expirationTime);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
 

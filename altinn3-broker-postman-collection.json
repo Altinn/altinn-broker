@@ -844,7 +844,7 @@
 					"response": []
 				},
 				{
-					"name": "Update File Retention Time",
+					"name": "Update File Transfer Time To Live Time",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -860,7 +860,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"fileRetentionTime\": \"P30D\"\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"filetransfertimetolive\": \"P30D\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -868,7 +868,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/resource/fileretentiontime",
+							"raw": "{{baseUrl}}/broker/api/v1/resource/filetransfertimetolive",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -877,7 +877,7 @@
 								"api",
 								"v1",
 								"resource",
-								"fileretentiontime"
+								"filetransfertimetolive"
 							]
 						}
 					},

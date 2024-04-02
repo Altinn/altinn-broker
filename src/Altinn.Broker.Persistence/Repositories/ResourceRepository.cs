@@ -31,7 +31,7 @@ public class ResourceRepository : IResourceRepository
                 Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
-                FileRetentionTime = reader.IsDBNull(reader.GetOrdinal("file_retention_time")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_retention_time")),
+                FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
             };
@@ -77,17 +77,17 @@ public class ResourceRepository : IResourceRepository
         }
     }
 
-    public async Task UpdateFileRetention(string resourceId, string fileRetentionTime, CancellationToken cancellationToken = default)
+    public async Task UpdateFileRetention(string resourceId, string fileTransferTimeToLive, CancellationToken cancellationToken = default)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.altinn_resource " +
-            "SET file_retention_time = @fileRetentionTime " +
+            "SET file_transfer_time_to_live = @fileTransferTimeToLive " +
             "WHERE resource_id_pk = @resourceId"))
         {
             command.Parameters.AddWithValue("@resourceId", resourceId);
-            command.Parameters.AddWithValue("@fileRetentionTime", fileRetentionTime);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
             command.ExecuteNonQuery();
         }
     }

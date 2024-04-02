@@ -76,44 +76,44 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task Update_Resource_File_Retention_Time()
+    public async Task Update_Resource_file_transfer_time_to_live()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileTransferTimeToLiveRequest>($"broker/api/v1/resource/filetransfertimetolive", new ResourceFileTransferTimeToLiveRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
-            FileRetentionTime = "P30D"
+            FileTransferTimeToLive = "P30D"
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
     [Fact]
-    public async Task Update_Resource_File_Retention_Time_Over_Limit_Should_Fail()
+    public async Task Update_Resource_file_transfer_time_to_live_Over_Limit_Should_Fail()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileTransferTimeToLiveRequest>($"broker/api/v1/resource/filetransfertimetolive", new ResourceFileTransferTimeToLiveRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
-            FileRetentionTime = "P366D"
+            FileTransferTimeToLive = "P366D"
         });
         Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task Update_Resource_File_Retention_Time_Should_Fail_For_Sender()
+    public async Task Update_Resource_file_transfer_time_to_live_Should_Fail_For_Sender()
     {
-        var response = await _senderClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        var response = await _senderClient.PutAsJsonAsync<ResourceFileTransferTimeToLiveRequest>($"broker/api/v1/resource/filetransfertimetolive", new ResourceFileTransferTimeToLiveRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
-            FileRetentionTime = "P30D"
+            FileTransferTimeToLive = "P30D"
         });
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task Update_Resource_File_Retention_Time_Should_Fail_For_Receiver()
+    public async Task Update_Resource_file_transfer_time_to_live_Should_Fail_For_Receiver()
     {
-        var response = await _recipientClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        var response = await _recipientClient.PutAsJsonAsync<ResourceFileTransferTimeToLiveRequest>($"broker/api/v1/resource/filetransfertimetolive", new ResourceFileTransferTimeToLiveRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
-            FileRetentionTime = "P30D"
+            FileTransferTimeToLive = "P30D"
         });
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
     }

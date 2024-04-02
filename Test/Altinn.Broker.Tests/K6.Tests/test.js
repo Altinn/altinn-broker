@@ -26,8 +26,9 @@ export function setup() {
   let headers = generateHeaders(TOKENS.DUMMY_SERVICE_OWNER_TOKEN, 'application/json')
 
   //set fileTransfer TTL to 15 minutes. Should be longer than the test time
-  var fileRes = http.put(`${BASE_URL}/broker/api/v1/serviceowner/fileretention`, JSON.stringify({
-    fileTransferTimeToLive: "PT15M"
+    var fileRes = http.put(`${BASE_URL}/broker/api/v1/resource/filetransfertimetolive`, JSON.stringify({
+        resourceId. "altinn-broker-test-resource-1",
+        fileTransferTimeToLive: "PT15M"
   }), { headers: headers });
 
   if (

@@ -12,7 +12,7 @@ public interface IFileTransferRepository
         string sendersFileTransferReference,
         string senderExternalId,
         List<string> recipientIds,
-        DateTimeOffset fileExpirationTime,
+        DateTimeOffset expirationTime,
         Dictionary<string, string> propertyList,
         string? checksum,
         long? fileTransferSize,

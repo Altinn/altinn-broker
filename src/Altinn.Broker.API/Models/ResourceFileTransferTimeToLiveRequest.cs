@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Altinn.Broker.API.Models;
 
-public class ResourceFileRetentionRequest
+public class ResourceFileTransferTimeToLiveRequest
 {
     /// <summary>
     /// The Altinn resource ID
@@ -16,7 +16,7 @@ public class ResourceFileRetentionRequest
     /// <summary>
     /// The time before a file is deleted
     /// </summary>
-    [JsonPropertyName("fileRetentionTime")]
+    [JsonPropertyName("fileTransferTimeToLive")]
     [Required]
-    public string FileRetentionTime { get; set; } = "P30D"; // ISO8601 Duration
+    public string FileTransferTimeToLive { get; set; } = "P30D"; // ISO8601 Duration
 }

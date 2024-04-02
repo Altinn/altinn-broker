@@ -71,8 +71,8 @@ public class ResourceController : Controller
     }
 
     [HttpPut]
-    [Route("fileretentiontime")]
-    public async Task<ActionResult> UpdateFileRetention([FromBody] ResourceFileRetentionRequest resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
+    [Route("filetransfertimetolive")]
+    public async Task<ActionResult> UpdateFileTransferTimeToLive([FromBody] ResourceFileTransferTimeToLiveRequest resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
     {
         var hasAccess = await _resourceRightsRepository.CheckUserAccess(resourceExt.ResourceId, token.ClientId, [ResourceAccessLevel.Write], false, cancellationToken);
         if (!hasAccess)
@@ -85,21 +85,21 @@ public class ResourceController : Controller
         {
             return NotFound();
         }
-        TimeSpan fileRetentionTime;
+        TimeSpan fileTransferTimeToLive;
         try 
         {
-            fileRetentionTime = XmlConvert.ToTimeSpan(resourceExt.FileRetentionTime);
+            fileTransferTimeToLive = XmlConvert.ToTimeSpan(resourceExt.FileTransferTimeToLive);
         }
         catch (FormatException)
         {
-            return BadRequest("Invalid file retention format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.");
+            return BadRequest("Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.");
         }
-        if (fileRetentionTime > TimeSpan.FromDays(365))
+        if (fileTransferTimeToLive > TimeSpan.FromDays(365))
         {
-            return BadRequest("Deletion time cannot exceed 365 days");
+            return BadRequest("Time to live cannot exceed 365 days");
         }
 
-        await _resourceRepository.UpdateFileRetention(resourceExt.ResourceId, resourceExt.FileRetentionTime, cancellationToken);
+        await _resourceRepository.UpdateFileRetention(resourceExt.ResourceId, resourceExt.FileTransferTimeToLive, cancellationToken);
         return Ok();
     }
 }

@@ -7,5 +7,5 @@ public class ResourceEntity
     public string? OrganizationNumber { get; set; }
     public string ServiceOwnerId { get; set; }
     public long? MaxFileTransferSize { get; set; }
-    public TimeSpan? FileRetentionTime { get; set; }
+    public TimeSpan? FileTransferTimeToLive { get; set; }
 }

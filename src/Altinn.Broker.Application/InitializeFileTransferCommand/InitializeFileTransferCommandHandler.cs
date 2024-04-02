@@ -63,7 +63,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileExpirationTime = DateTime.UtcNow.Add(resource.FileRetentionTime ?? TimeSpan.FromDays(30));
+        var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
         await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));

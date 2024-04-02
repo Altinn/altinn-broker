@@ -9,5 +9,5 @@ public interface IResourceRepository
     Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken = default);
     Task UpdateMaxFileTransferSize(string resourceId, long maxSize, CancellationToken cancellationToken = default);
     Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken = default);
-    Task UpdateFileRetention(string resourceId, string fileRetentionTime, CancellationToken cancellationToken = default);
+    Task UpdateFileRetention(string resourceId, string fileTransferTimeToLive, CancellationToken cancellationToken = default);
 } 
