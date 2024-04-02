@@ -345,7 +345,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(LegacyRecipientFileStatusExt.DownloadConfirmed, result?.Recipients[0]?.CurrentRecipientFileStatusCode);
         Assert.Equal(LegacyFileStatusExt.AllConfirmedDownloaded, result?.FileStatus);
     }
-    
+
     private async Task<string> InitializeFile()
     {
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
