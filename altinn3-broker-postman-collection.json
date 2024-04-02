@@ -804,7 +804,7 @@
 			"name": "Resource",
 			"item": [
 				{
-					"name": "Update Max File Size",
+					"name": "Update Resource",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -820,7 +820,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\"\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\",\r\n    \"fileTransferTimeToLive\": \"P30D\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -828,7 +828,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/resource/maxfiletransfersize",
+							"raw": "{{baseUrl}}/broker/api/v1/resource/{{resource_id}}",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -837,7 +837,7 @@
 								"api",
 								"v1",
 								"resource",
-								"maxfiletransfersize"
+								"{{resource_id}}"
 							]
 						}
 					},

@@ -30,7 +30,7 @@ public class ResourceController : Controller
         }, cancellationToken);
 
         return result.Match(
-            Ok,
+            (_) => Ok(null),
             Problem
         );
     }

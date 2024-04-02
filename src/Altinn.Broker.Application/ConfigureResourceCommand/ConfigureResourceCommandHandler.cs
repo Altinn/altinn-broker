@@ -89,7 +89,7 @@ public class ConfigureResourceCommandHandler : IHandler<ConfigureResourceCommand
         {
             return Errors.TimeToLiveCannotExceed365Days;
         }
-        await _resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLiveString, cancellationToken);
+        await _resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLive, cancellationToken);
         return Task.CompletedTask;
     }
 }

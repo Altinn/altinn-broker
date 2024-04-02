@@ -17,7 +17,7 @@ public class ResourceRepository : IResourceRepository
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = await _connectionProvider.CreateCommand(
-            "SELECT resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk " +
+            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
@@ -53,12 +53,13 @@ public class ResourceRepository : IResourceRepository
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk) " +
-            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, NOW(), @serviceOwnerId)"))
+            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk) " +
+            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, @fileTransferTimeToLive, NOW(), @serviceOwnerId)"))
         {
             command.Parameters.AddWithValue("@resourceId", resource.Id);
             command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
             command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.MaxFileTransferSize.Value);
             command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
             command.ExecuteNonQuery();
         }
@@ -78,7 +79,7 @@ public class ResourceRepository : IResourceRepository
         }
     }
 
-    public async Task UpdateFileRetention(string resourceId, string fileTransferTimeToLive, CancellationToken cancellationToken = default)
+    public async Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default)
     {
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
@@ -93,4 +94,3 @@ public class ResourceRepository : IResourceRepository
         }
     }
 }
-
