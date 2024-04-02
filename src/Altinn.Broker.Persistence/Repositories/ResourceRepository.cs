@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
+
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
