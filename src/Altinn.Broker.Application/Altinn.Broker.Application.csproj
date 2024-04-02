@@ -7,18 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="DeleteFileCommand\**" />
-    <Compile Remove="GetFileDetailsQuery\**" />
-    <Compile Remove="GetFilesQuery\**" />
-    <EmbeddedResource Remove="DeleteFileCommand\**" />
-    <EmbeddedResource Remove="GetFileDetailsQuery\**" />
-    <EmbeddedResource Remove="GetFilesQuery\**" />
-    <None Remove="DeleteFileCommand\**" />
-    <None Remove="GetFileDetailsQuery\**" />
-    <None Remove="GetFilesQuery\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Folder Include="UploadFileCommand\" />
   </ItemGroup>
 
