@@ -20,4 +20,10 @@ public static class Errors
     public static Error FileTransferNotPublished = new Error(12, "A file transfer can only be confirmed to be downloaded when it is published. See file transfer status.", HttpStatusCode.BadRequest);
     public static Error FileDownloadAlreadyConfirmed = new Error(13, "The file has already been confirmed to be downloaded.", HttpStatusCode.BadRequest);
     public static Error FileTransferNotExpired = new Error(14, "The file transfer has not expired yet", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeCannotBeNegative = new Error(15, "Max file transfer size cannot be negative", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeCannotBeZero = new Error(16, "Max file transfer size cannot be zero", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeAlreadySet = new Error(17, "Max file transfer size is already set to the requested value", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeOverGlobal = new Error(18, "Max file transfer size cannot be set higher than the global max file transfer size", HttpStatusCode.BadRequest);
+    public static Error InvalidTimeToLiveFormat = new Error(19, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
+    public static Error TimeToLiveCannotExceed365Days = new Error(20, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
 }

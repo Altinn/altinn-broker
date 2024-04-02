@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Application.DownloadFileQuery;
+﻿using Altinn.Broker.Application.ConfigureResourceCommand;
+using Altinn.Broker.Application.DownloadFileQuery;
 using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Application.GetFileTransferDetailsQuery;
 using Altinn.Broker.Application.GetFileTransferOverviewQuery;
@@ -25,5 +26,6 @@ public static class DependencyInjection
         services.AddScoped<LegacyGetFilesQueryHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
         services.AddScoped<UpdateFileRetentionHandler>();
+        services.AddScoped<ConfigureResourceCommandHandler>();
     }
 }
