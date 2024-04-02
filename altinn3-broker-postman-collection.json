@@ -13,6 +13,84 @@
 					"name": "{fileTransferId}",
 					"item": [
 						{
+							"name": "Overview",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{sender_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "text/plain"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"broker",
+										"api",
+										"v1",
+										"filetransfer",
+										"{{fileTransferId}}"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Success",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "text/plain"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"broker",
+												"api",
+												"v1",
+												"filetransfer",
+												":fileTransferId"
+											],
+											"variable": [
+												{
+													"key": "fileTransferId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"fileTransferId\": \"<uuid>\",\n  \"FileName\": \"<string>\",\n  \"sendersFileTransferReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Initialized\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Cancelled\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
+								}
+							]
+						},
+						{
 							"name": "Upload",
 							"request": {
 								"auth": {
@@ -346,84 +424,6 @@
 									"body": ""
 								}
 							]
-						}
-					]
-				},
-				{
-					"name": "Overview",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{sender_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "text/plain"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"broker",
-								"api",
-								"v1",
-								"filetransfer",
-								"{{fileTransferId}}"
-							]
-						}
-					},
-					"response": [
-						{
-							"name": "Success",
-							"originalRequest": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Accept",
-										"value": "text/plain"
-									}
-								],
-								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/:fileTransferId",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"broker",
-										"api",
-										"v1",
-										"filetransfer",
-										":fileTransferId"
-									],
-									"variable": [
-										{
-											"key": "fileTransferId"
-										}
-									]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"cookie": [],
-							"body": "{\n  \"fileTransferId\": \"<uuid>\",\n  \"FileName\": \"<string>\",\n  \"sendersFileTransferReference\": \"<string>\",\n  \"checksum\": \"<string>\",\n  \"fileStatus\": \"Failed\",\n  \"fileStatusText\": \"<string>\",\n  \"fileStatusChanged\": \"<dateTime>\",\n  \"brokerResourceId\": \"<uuid>\",\n  \"sender\": \"<string>\",\n  \"recipients\": [\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Initialized\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    },\n    {\n      \"recipient\": \"<string>\",\n      \"recipientFileTransferStatusCode\": \"Cancelled\",\n      \"recipientFileTransferStatusText\": \"<string>\",\n      \"recipientFileTransferStatusChanged\": \"<dateTime>\"\n    }\n  ],\n  \"metadata\": {\n    \"enim3e4\": \"<string>\"\n  }\n}"
 						}
 					]
 				},
@@ -842,6 +842,46 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Update File Retention Time",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"fileRetentionTime\": \"P30D\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/resource/fileretentiontime",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"resource",
+								"fileretentiontime"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -956,98 +996,6 @@
 							],
 							"cookie": [],
 							"body": "{\n  \"Name\": \"string\",\n  \"DeploymentStatus\": \"<int>\",\n  \"FileTransferTimeToLive\": \"<string>\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Update file retention",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{serviceowner_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"fileTransferTimeToLive\": \"P90D\"\n}",
-							"options": {
-								"raw": {
-									"headerFamily": "json",
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/serviceowner/fileretention",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"broker",
-								"api",
-								"v1",
-								"serviceowner",
-								"fileretention"
-							]
-						}
-					},
-					"response": [
-						{
-							"name": "Success",
-							"originalRequest": {
-								"method": "PUT",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									},
-									{
-										"key": "Accept",
-										"value": "text/plain"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"fileTransferTimeToLive\": \"P90D\"\n}",
-									"options": {
-										"raw": {
-											"headerFamily": "json",
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/serviceowner/fileretention",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"broker",
-										"api",
-										"v1",
-										"serviceowner",
-										"fileretention"
-									]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"cookie": [],
-							"body": ""
 						}
 					]
 				}

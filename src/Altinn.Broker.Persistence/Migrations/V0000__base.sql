@@ -42,7 +42,6 @@ CREATE TABLE broker.actor (
 CREATE TABLE broker.service_owner (
     service_owner_id_pk character varying(14) NOT NULL PRIMARY KEY,
     service_owner_name character varying(500) NOT NULL,
-    file_transfer_time_to_live interval NOT NULL,
     CONSTRAINT service_owner_id_pk_format CHECK (service_owner_id_pk ~ '^\d{4}:\d{9}$')
 );
 

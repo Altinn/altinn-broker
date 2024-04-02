@@ -1,6 +1,5 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
-
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
@@ -32,6 +31,7 @@ public class ResourceRepository : IResourceRepository
                 Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
+                FileRetentionTime = reader.IsDBNull(reader.GetOrdinal("file_retention_time")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_retention_time")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
             };
@@ -69,10 +69,25 @@ public class ResourceRepository : IResourceRepository
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET max_file_transfer_size = @maxFileTransferSize " +
-            "WHERE resource_id_pk = @resource"))
+            "WHERE resource_id_pk = @resourceId"))
         {
-            command.Parameters.AddWithValue("@resource", resource);
+            command.Parameters.AddWithValue("@resourceId", resource);
             command.Parameters.AddWithValue("@maxFileTransferSize", maxSize);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    public async Task UpdateFileRetention(string resourceId, string fileRetentionTime, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionProvider.GetConnectionAsync();
+
+        await using (var command = await _connectionProvider.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET file_retention_time = @fileRetentionTime " +
+            "WHERE resource_id_pk = @resourceId"))
+        {
+            command.Parameters.AddWithValue("@resourceId", resourceId);
+            command.Parameters.AddWithValue("@fileRetentionTime", fileRetentionTime);
             command.ExecuteNonQuery();
         }
     }

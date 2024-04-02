@@ -1,25 +1,8 @@
-using System.Globalization;
-using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
-using System.Xml;
 
-using Altinn.Broker.Application;
-using Altinn.Broker.Core.Models;
-using Altinn.Broker.Enums;
-using Altinn.Broker.Models;
 using Altinn.Broker.Models.ServiceOwner;
-using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
-
-using Hangfire.Common;
-using Hangfire.States;
-
-using Microsoft.AspNetCore.Mvc;
-
-using Moq;
 
 using Xunit;
 
@@ -47,25 +30,4 @@ public class ServiceOwnerControllerTests : IClassFixture<CustomWebApplicationFac
         var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
         Assert.Equal("Digitaliseringsdirektoratet Avd Oslo", response.Name);
     }
-
-    [Fact]
-    public async Task Update_FileRetention_For_ServiceOwner()
-    {
-        var serviceOwner = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
-        Assert.NotNull(serviceOwner);
-        var ttl = serviceOwner.FileTransferTimeToLive.Add(TimeSpan.FromDays(1));
-
-        var serviceOwnerUpdateFileRetentionExt = new ServiceOwnerUpdateFileRetentionExt
-        {
-            FileTransferTimeToLive = XmlConvert.ToString(ttl)
-        };
-
-        var retentionResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/serviceowner/fileretention", serviceOwnerUpdateFileRetentionExt);
-        Assert.True(HttpStatusCode.OK == retentionResponse.StatusCode);
-        var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
-        Assert.NotNull(response);
-        Assert.Equal(ttl, response.FileTransferTimeToLive);
-    }
-
-
 }

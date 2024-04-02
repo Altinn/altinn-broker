@@ -7,6 +7,4 @@ public class ServiceOwnerOverviewExt
     public string Name { get; set; }
 
     public DeploymentStatusExt DeploymentStatus { get; set; }
-
-    public TimeSpan FileTransferTimeToLive { get; set; }
 }

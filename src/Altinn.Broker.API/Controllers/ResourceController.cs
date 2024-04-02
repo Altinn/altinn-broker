@@ -1,10 +1,14 @@
+using System.Xml;
+
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Models;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
+using Altinn.Broker.Models.ServiceOwner;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -20,19 +24,17 @@ public class ResourceController : Controller
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly Core.Repositories.IAuthorizationService _resourceRightsRepository;
-    private readonly IResourceManager _resourceManager;
 
-    public ResourceController(IResourceRepository resourceRepository, IResourceManager resourceManager, Core.Repositories.IAuthorizationService resourceRightsRepository)
+    public ResourceController(IResourceRepository resourceRepository, Core.Repositories.IAuthorizationService resourceRightsRepository)
     {
         _resourceRepository = resourceRepository;
-        _resourceManager = resourceManager;
         _resourceRightsRepository = resourceRightsRepository;
 
     }
 
     [HttpPut]
     [Route("maxfiletransfersize")]
-    public async Task<ActionResult> UpdateMaxFileTransferSize([FromBody] ResourceExt resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
+    public async Task<ActionResult> UpdateMaxFileTransferSize([FromBody] ResourceMaxFileTransferSizeRequest resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
     {
         var hasAccess = await _resourceRightsRepository.CheckUserAccess(resourceExt.ResourceId, token.ClientId, [ResourceAccessLevel.Write], false, cancellationToken);
         if (!hasAccess)
@@ -68,5 +70,36 @@ public class ResourceController : Controller
         return Ok();
     }
 
-}
+    [HttpPut]
+    [Route("fileretentiontime")]
+    public async Task<ActionResult> UpdateFileRetention([FromBody] ResourceFileRetentionRequest resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
+    {
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(resourceExt.ResourceId, token.ClientId, [ResourceAccessLevel.Write], false, cancellationToken);
+        if (!hasAccess)
+        {
+            return Unauthorized();
+        }
+        var resource = await _resourceRepository.GetResource(resourceExt.ResourceId, cancellationToken);
 
+        if (resource is null)
+        {
+            return NotFound();
+        }
+        TimeSpan fileRetentionTime;
+        try 
+        {
+            fileRetentionTime = XmlConvert.ToTimeSpan(resourceExt.FileRetentionTime);
+        }
+        catch (FormatException)
+        {
+            return BadRequest("Invalid file retention format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.");
+        }
+        if (fileRetentionTime > TimeSpan.FromDays(365))
+        {
+            return BadRequest("Deletion time cannot exceed 365 days");
+        }
+
+        await _resourceRepository.UpdateFileRetention(resourceExt.ResourceId, resourceExt.FileRetentionTime, cancellationToken);
+        return Ok();
+    }
+}

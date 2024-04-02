@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
+using Altinn.Broker.API.Models;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
 
@@ -34,7 +35,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Max_Upload_Size()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceMaxFileTransferSizeRequest>($"broker/api/v1/resource/maxfiletransfersize", new ResourceMaxFileTransferSizeRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 99999
@@ -44,7 +45,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Max_Upload_Size_Over_Global_Should_Fail()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceMaxFileTransferSizeRequest>($"broker/api/v1/resource/maxfiletransfersize", new ResourceMaxFileTransferSizeRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 999999999999999
@@ -55,7 +56,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Should_Fail_For_Sender()
     {
-        var response = await _senderClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/maxfiletransfersize", new ResourceExt
+        var response = await _senderClient.PutAsJsonAsync<ResourceMaxFileTransferSizeRequest>($"broker/api/v1/resource/maxfiletransfersize", new ResourceMaxFileTransferSizeRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 1000000
@@ -66,7 +67,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Should_Fail_For_Receiver()
     {
-        var response = await _recipientClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceExt
+        var response = await _recipientClient.PutAsJsonAsync<ResourceMaxFileTransferSizeRequest>($"broker/api/v1/resource/MaxFileTransferSize", new ResourceMaxFileTransferSizeRequest
         {
             ResourceId = "altinn-broker-test-resource-1",
             MaxFileTransferSize = 1000000
@@ -74,4 +75,46 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Update_Resource_File_Retention_Time()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        {
+            ResourceId = "altinn-broker-test-resource-1",
+            FileRetentionTime = "P30D"
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
+    [Fact]
+    public async Task Update_Resource_File_Retention_Time_Over_Limit_Should_Fail()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        {
+            ResourceId = "altinn-broker-test-resource-1",
+            FileRetentionTime = "P366D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Update_Resource_File_Retention_Time_Should_Fail_For_Sender()
+    {
+        var response = await _senderClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        {
+            ResourceId = "altinn-broker-test-resource-1",
+            FileRetentionTime = "P30D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Update_Resource_File_Retention_Time_Should_Fail_For_Receiver()
+    {
+        var response = await _recipientClient.PutAsJsonAsync<ResourceFileRetentionRequest>($"broker/api/v1/resource/fileretentiontime", new ResourceFileRetentionRequest
+        {
+            ResourceId = "altinn-broker-test-resource-1",
+            FileRetentionTime = "P30D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
+    }
 }

@@ -7,7 +7,7 @@ namespace Altinn.Broker.Models
     /// <summary>
     /// API input model for file initialization.
     /// </summary>
-    public class ResourceExt
+    public class ResourceMaxFileTransferSizeRequest
     {
         /// <summary>
         /// The Altinn resource ID
@@ -23,7 +23,5 @@ namespace Altinn.Broker.Models
         [JsonPropertyName("maxFileTransferSize")]
         [Required]
         public long MaxFileTransferSize { get; set; } = 0;
-
-
     }
 }

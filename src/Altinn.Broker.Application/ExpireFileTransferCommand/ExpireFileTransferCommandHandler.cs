@@ -85,7 +85,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         }
         else
         {
-            var newExpireTime = fileTransfer.Created.Add(serviceOwner.FileTransferTimeToLive);
+            var newExpireTime = fileTransfer.Created.Add(resource.FileRetentionTime ?? TimeSpan.FromDays(30));
             var hangfireJobId = BackgroundJob.Schedule<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
             {
                 FileTransferId = request.FileTransferId,
