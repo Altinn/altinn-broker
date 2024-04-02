@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-using Altinn.Broker.API.Models;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
 

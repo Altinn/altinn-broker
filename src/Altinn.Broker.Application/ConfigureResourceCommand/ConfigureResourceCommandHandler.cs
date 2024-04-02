@@ -22,16 +22,15 @@ public class ConfigureResourceCommandHandler : IHandler<ConfigureResourceCommand
 
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceCommandRequest request, CancellationToken cancellationToken)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, [ResourceAccessLevel.Write], false, cancellationToken);
-        if (!hasAccess)
-        {
-            return Errors.NoAccessToResource;
-        }
         var resource = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.ResourceNotConfigured;
         }
+        if (resource.ServiceOwnerId != request.Token.Consumer)
+        {
+            return Errors.NoAccessToResource;
+        };
 
         if (request.MaxFileTransferSize is not null)
         {
