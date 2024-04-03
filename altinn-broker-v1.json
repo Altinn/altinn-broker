@@ -172,7 +172,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FileInitalizeExt"
+                "$ref": "#/components/schemas/FileInitialize"
               }
             }
           }
@@ -445,7 +445,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileStatusDetailsExt"
+                  "$ref": "#/components/schemas/FileStatusDetails"
                 }
               }
             }
@@ -523,60 +523,42 @@
           "specversion": {
             "type": "string"
           },
-          "data": {
-            "nullable": true
-          },
-          "dataContentType": {
-            "type": "string",
-            "nullable": true
-          },
           "id": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
-          "dataSchema": {
+          "type": {
+            "type": "string"
+          },
+          "time": {
             "type": "string",
-            "format": "uri",
+            "format": "date-time"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "resourceinstance": {
+            "type": "string",
             "nullable": true
           },
           "source": {
             "type": "string",
-            "format": "uri",
-            "nullable": true
-          },
-          "subject": {
-            "type": "string",
-            "nullable": true
-          },
-          "time": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "isValid": {
-            "type": "boolean",
-            "readOnly": true
+            "format": "uri"
           }
         },
-        "additionalProperties": false,
+        "additionalProperties": true,
         "examples": [
           {
-            "id": "1faa107f-3c0a-4fa6-9fce-7cee8838e258",
-            "resource": "urn:altinn:resource:altinapp.ttd.apps-test",
-            "source": "https://ttd.apps.altinn.no/ttd/apps-test/instances/50015641/a72223a3-926b-4095-a2a6-bacc10815f2d",
             "specversion": "1.0",
-            "type": "app.instance.created",
-            "subject": "/party/50015641",
-            "alternativesubject": "/person/27124902369",
-            "time": "2020-10-29T07:22:19.438039Z"
+            "id": "0b75b5da-7f19-4ab7-9711-ec0f6108d48c",
+            "type": "no.altinn.broker.filetransferinitialized",
+            "time": "2024-04-03T08:59:37.8552029Z",
+            "resource": "urn:altinn:resource:altinapp.ttd.apps-test",
+            "resourceinstance": "0850124f-6ae9-4821-b4f9-8ee7c937ecfc",
+            "source": "https://platform.tt02.altinn.no/broker/api/v1/file"
           }
         ]
       },
-      "FileInitalizeExt": {
+      "FileInitialize": {
         "required": [
           "Filename",
           "recipients",
@@ -595,7 +577,7 @@
             "minLength": 1,
             "type": "string"
           },
-          "SendersFileTransferReference": {
+          "sendersFileTransferReference": {
             "maxLength": 4096,
             "minLength": 1,
             "type": "string",
@@ -643,7 +625,7 @@
             "type": "string",
             "nullable": true
           },
-          "SendersFileTransferReference": {
+          "sendersFileTransferReference": {
             "type": "string",
             "nullable": true
           },
@@ -695,7 +677,7 @@
         },
         "additionalProperties": false
       },
-      "FileStatusDetailsExt": {
+      "FileStatusDetails": {
         "type": "object",
         "properties": {
           "fileTransferId": {
@@ -710,7 +692,7 @@
             "type": "string",
             "nullable": true
           },
-          "SendersFileTransferReference": {
+          "sendersFileTransferReference": {
             "type": "string",
             "nullable": true
           },
@@ -762,21 +744,21 @@
           "fileStatusHistory": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FileStatusEventExt"
+              "$ref": "#/components/schemas/FileStatusEvent"
             },
             "nullable": true
           },
           "recipientFileStatusHistory": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RecipientFileStatusEventExt"
+              "$ref": "#/components/schemas/RecipientFileStatusEvent"
             },
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "FileStatusEventExt": {
+      "FileStatusEvent": {
         "type": "object",
         "properties": {
           "fileStatus": {
@@ -844,7 +826,7 @@
         },
         "additionalProperties": false
       },
-      "RecipientFileStatusEventExt": {
+      "RecipientFileStatusEvent": {
         "type": "object",
         "properties": {
           "recipient": {
