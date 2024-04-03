@@ -1,7 +1,6 @@
 ﻿using Altinn.Broker.Application.InitializeFileTransferCommand;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
-using Altinn.Broker.Models.Maskinporten;
 
 namespace Altinn.Broker.Mappers;
 

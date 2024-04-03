@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace Altinn.Broker.Models.ServiceOwner;
+﻿namespace Altinn.Broker.Models.ServiceOwner;
 
 public class ServiceOwnerInitializeExt
 {

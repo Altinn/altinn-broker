@@ -1,6 +1,3 @@
-
-using System.Numerics;
-
 using Altinn.Broker.Core.Domain;
 
 namespace Altinn.Broker.Core.Repositories;
