@@ -1,5 +1,4 @@
 ﻿using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 
 namespace Altinn.Broker.Core.Repositories;
 public interface IActorFileTransferStatusRepository

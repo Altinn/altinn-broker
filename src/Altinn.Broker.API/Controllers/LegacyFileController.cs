@@ -16,7 +16,6 @@ using Altinn.Broker.Mappers;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
