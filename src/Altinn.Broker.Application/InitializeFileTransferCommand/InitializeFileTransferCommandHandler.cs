@@ -63,7 +63,8 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, request.PropertyList, request.Checksum, null, null, cancellationToken);
+        var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
+        var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
         await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
@@ -78,7 +79,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         {
             FileTransferId = fileTransferId,
             Force = false
-        }, cancellationToken), serviceOwner.FileTransferTimeToLive);
+        }, cancellationToken), fileExpirationTime);
         await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
 

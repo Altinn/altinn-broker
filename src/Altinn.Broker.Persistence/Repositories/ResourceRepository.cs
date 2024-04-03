@@ -17,7 +17,7 @@ public class ResourceRepository : IResourceRepository
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = await _connectionProvider.CreateCommand(
-            "SELECT resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk " +
+            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
@@ -32,6 +32,7 @@ public class ResourceRepository : IResourceRepository
                 Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
                 OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
+                FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
             };
@@ -52,12 +53,13 @@ public class ResourceRepository : IResourceRepository
         await using var connection = await _connectionProvider.GetConnectionAsync();
 
         await using (var command = await _connectionProvider.CreateCommand(
-            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, created, service_owner_id_fk) " +
-            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, NOW(), @serviceOwnerId)"))
+            "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk) " +
+            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, @fileTransferTimeToLive, NOW(), @serviceOwnerId)"))
         {
             command.Parameters.AddWithValue("@resourceId", resource.Id);
             command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
             command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.MaxFileTransferSize.Value);
             command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
             command.ExecuteNonQuery();
         }
@@ -69,12 +71,26 @@ public class ResourceRepository : IResourceRepository
         await using (var command = await _connectionProvider.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET max_file_transfer_size = @maxFileTransferSize " +
-            "WHERE resource_id_pk = @resource"))
+            "WHERE resource_id_pk = @resourceId"))
         {
-            command.Parameters.AddWithValue("@resource", resource);
+            command.Parameters.AddWithValue("@resourceId", resource);
             command.Parameters.AddWithValue("@maxFileTransferSize", maxSize);
             command.ExecuteNonQuery();
         }
     }
-}
 
+    public async Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionProvider.GetConnectionAsync();
+
+        await using (var command = await _connectionProvider.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET file_transfer_time_to_live = @fileTransferTimeToLive " +
+            "WHERE resource_id_pk = @resourceId"))
+        {
+            command.Parameters.AddWithValue("@resourceId", resourceId);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
+            command.ExecuteNonQuery();
+        }
+    }
+}

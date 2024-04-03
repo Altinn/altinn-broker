@@ -42,7 +42,7 @@ public class ServiceOwnerController : Controller
         }
 
         var fileTransferTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
-        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name, fileTransferTimeToLive);
+        await _serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name);
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
         BackgroundJob.Enqueue(
             () => _resourceManager.Deploy(serviceOwner!, cancellationToken)
@@ -65,32 +65,8 @@ public class ServiceOwnerController : Controller
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,
-            DeploymentStatus = (DeploymentStatusExt)deploymentStatus,
-            FileTransferTimeToLive = serviceOwner.FileTransferTimeToLive
+            DeploymentStatus = (DeploymentStatusExt)deploymentStatus
         };
-    }
-    [HttpPut]
-    [Route("fileretention")]
-    public async Task<ActionResult> UpdateFileRetention([FromBody] ServiceOwnerUpdateFileRetentionExt serviceOwnerUpdateFileRetentionExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] UpdateFileRetentionHandler updateFileRetentionHandler, CancellationToken cancellationToken)
-    {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(token.Consumer);
-        if (serviceOwner is null)
-        {
-            return NotFound();
-        }
-
-        var fileTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerUpdateFileRetentionExt.FileTransferTimeToLive);
-        if (fileTimeToLive == serviceOwner.FileTransferTimeToLive)
-        {
-            return Problem(detail: "The file transfer already has the requested retention time", statusCode: (int)HttpStatusCode.BadRequest);
-        }
-        await _serviceOwnerRepository.UpdateFileRetention(token.Consumer, fileTimeToLive);
-        await updateFileRetentionHandler.Process(new UpdateFileRetentionRequest
-        {
-            ServiceOwnerId = token.Consumer,
-        }, cancellationToken);
-
-        return Ok();
     }
 
 }
