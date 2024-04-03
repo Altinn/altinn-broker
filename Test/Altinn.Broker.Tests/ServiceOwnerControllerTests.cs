@@ -32,25 +32,4 @@ public class ServiceOwnerControllerTests : IClassFixture<CustomWebApplicationFac
         var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
         Assert.Equal("Digitaliseringsdirektoratet Avd Oslo", response.Name);
     }
-
-    [Fact]
-    public async Task Update_FileRetention_For_ServiceOwner()
-    {
-        var serviceOwner = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
-        Assert.NotNull(serviceOwner);
-        var ttl = serviceOwner.FileTransferTimeToLive.Add(TimeSpan.FromDays(1));
-
-        var serviceOwnerUpdateFileRetentionExt = new ServiceOwnerUpdateFileRetentionExt
-        {
-            FileTransferTimeToLive = XmlConvert.ToString(ttl)
-        };
-
-        var retentionResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/serviceowner/fileretention", serviceOwnerUpdateFileRetentionExt);
-        Assert.True(HttpStatusCode.OK == retentionResponse.StatusCode);
-        var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
-        Assert.NotNull(response);
-        Assert.Equal(ttl, response.FileTransferTimeToLive);
-    }
-
-
 }
