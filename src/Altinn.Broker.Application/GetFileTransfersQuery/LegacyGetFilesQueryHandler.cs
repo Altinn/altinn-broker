@@ -1,6 +1,5 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;

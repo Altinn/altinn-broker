@@ -1,6 +1,4 @@
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ConfirmDownloadCommand;
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
 using OneOf;

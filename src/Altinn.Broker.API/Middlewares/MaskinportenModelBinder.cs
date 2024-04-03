@@ -1,5 +1,4 @@
 ﻿using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Models.Maskinporten;
 
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 

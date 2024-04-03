@@ -1,15 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Altinn.Authorization.ABAC.Xacml.JsonProfile;
+﻿using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
-
-using Azure.Messaging;
 
 using static Altinn.Authorization.ABAC.Constants.XacmlConstants;
 

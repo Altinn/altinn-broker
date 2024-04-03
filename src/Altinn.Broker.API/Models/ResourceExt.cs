@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Numerics;
 using System.Text.Json.Serialization;
 
 namespace Altinn.Broker.Models
@@ -9,17 +8,21 @@ namespace Altinn.Broker.Models
     /// </summary>
     public class ResourceExt
     {
+        /// <summary>
+        /// The Altinn resource ID
+        /// </summary>
+        [JsonPropertyName("resourceId")]
+        [StringLength(255, MinimumLength = 1)]
+        [Required]
+        public string ResourceId { get; set; } = string.Empty;
 
         /// <summary>
         /// The max upload size for the resource in bytes
         /// </summary>
         [JsonPropertyName("maxFileTransferSize")]
-        public long? MaxFileTransferSize { get; set; }
+        [Required]
+        public long MaxFileTransferSize { get; set; } = 0;
 
-        /// <summary>
-        /// The time before a file transfer expires (ISO8601 Duration format)
-        /// </summary>
-        [JsonPropertyName("fileTransferTimeToLive")]
-        public string? FileTransferTimeToLive { get; set; }
+
     }
 }

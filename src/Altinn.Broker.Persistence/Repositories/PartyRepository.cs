@@ -17,7 +17,7 @@ public class PartyRepository : IPartyRepository
     {
         await using var command = await _connectionProvider.CreateCommand(
             "SELECT organization_number_pk, party_id, created from broker.party " +
-            "WHERE organization_number = @organizationId ");
+            "WHERE organization_number_pk = @organizationId ");
         command.Parameters.AddWithValue("@organizationId", organizationId);
 
         using NpgsqlDataReader reader = command.ExecuteReader();

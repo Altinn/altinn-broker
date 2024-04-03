@@ -1,7 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-using Azure.Core;
-
 namespace Altinn.Broker.Integrations.Azure;
 
 public class AzureResourceManagerOptions
