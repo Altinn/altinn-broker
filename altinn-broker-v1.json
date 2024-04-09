@@ -9,10 +9,6 @@
 		{
 			"url": "https://platform.tt02.altinn.no",
 			"description": "TT02"
-		},
-		{
-			"url": "https://platform.altinn.no",
-			"description": "Production"
 		}
 	],
   "webhooks": {
