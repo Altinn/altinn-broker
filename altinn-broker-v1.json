@@ -5,12 +5,12 @@
     "version": "1.0.0",
     "description": "API for Altinn Broker functionality."
   },
-	"servers": [
-		{
-			"url": "https://platform.tt02.altinn.no",
-			"description": "TT02"
-		}
-	],
+  "servers": [
+    {
+      "url": "https://platform.tt02.altinn.no",
+      "description": "TT02"
+    }
+  ],
   "webhooks": {
     "no.altinn.broker.filetransferinitialized": {
       "post": {
