@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Altinn.ApiClients.Maskinporten" Version="9.1.0" />
-    <PackageReference Include="Altinn.Common.PEP" Version="1.4.0" />
+    <PackageReference Include="Altinn.Common.PEP" Version="4.0.0" />
     <PackageReference Include="Altinn.Platform.Models" Version="1.5.0" />
     <PackageReference Include="Azure.Identity" Version="1.10.4" />
     <PackageReference Include="Azure.ResourceManager" Version="1.11.0" />
