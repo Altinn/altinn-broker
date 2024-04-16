@@ -30,7 +30,7 @@ namespace Altinn.Broker.Controllers
             try
             {
                 using var connection = await _databaseConnectionProvider.GetConnectionAsync();
-                var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description", connection);
+                using var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description", connection);
                 var count = (long)(command.ExecuteScalar() ?? 0);
                 if (count == 0)
                 {
