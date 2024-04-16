@@ -2,7 +2,6 @@
 using System.Xml;
 
 using Altinn.Broker.API.Configuration;
-using Altinn.Broker.Application.UpdateFileRetention;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;

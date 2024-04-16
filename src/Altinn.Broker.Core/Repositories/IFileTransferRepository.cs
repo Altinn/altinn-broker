@@ -29,9 +29,5 @@ public interface IFileTransferRepository
         long fileTransferSize,
         CancellationToken cancellationToken
     );
-    Task<List<FileTransferEntity>> GetNonDeletedFileTransfersByStorageProvider(
-        long storageProviderId,
-        CancellationToken cancellationToken
-    );
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
 }

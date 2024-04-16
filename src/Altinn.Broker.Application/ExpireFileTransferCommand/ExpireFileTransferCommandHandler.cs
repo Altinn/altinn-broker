@@ -49,7 +49,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Deleted, cancellationToken: cancellationToken);
             await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
         }
-        if (request.Force || ValidateFileTransferTTL(fileTransfer, serviceOwner))
+        if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
             await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken);
             var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
@@ -62,55 +62,11 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         }
         else
         {
-            _logger.LogInformation("FileTransfer has not expired, rescheduling expire event");
-            await RescheduleExpireEvent(request, cancellationToken);
+            throw new Exception("FileTransfer has not expired, and should not be deleted");
         }
         return Task.CompletedTask;
     }
     [AutomaticRetry(Attempts = 0)]
-    public async Task<OneOf<Task, Error>> RescheduleExpireEvent(ExpireFileTransferCommandRequest request, CancellationToken cancellationToken)
-    {
-        var fileTransfer = await GetFileTransfer(request.FileTransferId, cancellationToken);
-        var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);
-        var serviceOwner = await GetServiceOwner(resource.ServiceOwnerId);
-
-        BackgroundJob.Delete(fileTransfer.HangfireJobId);
-        if (request.Force)
-        {
-            BackgroundJob.Enqueue<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
-            {
-                FileTransferId = request.FileTransferId,
-                Force = true
-            }, cancellationToken));
-        }
-        else
-        {
-            var newExpireTime = fileTransfer.Created.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
-            var hangfireJobId = BackgroundJob.Schedule<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
-            {
-                FileTransferId = request.FileTransferId,
-                Force = false
-            }, cancellationToken), newExpireTime);
-            await _fileTransferRepository.SetFileTransferHangfireJobId(request.FileTransferId, hangfireJobId, cancellationToken);
-        }
-        return Task.CompletedTask;
-
-
-
-    }
-
-    private bool ValidateFileTransferTTL(FileTransferEntity fileTransfer, ServiceOwnerEntity serviceOwner)
-    {
-        var fileTransferTimeToLive = serviceOwner.FileTransferTimeToLive;
-        var fileTransferTTL = fileTransferTimeToLive;
-        var fileTransferExpires = fileTransfer.Created.Add(fileTransferTTL);
-        if (fileTransferExpires < DateTime.UtcNow)
-        {
-            return true;
-        }
-        return false;
-    }
-
 
     private Task<FileTransferEntity> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
     {
