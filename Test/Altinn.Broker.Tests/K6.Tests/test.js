@@ -26,15 +26,16 @@ export function setup() {
   let headers = generateHeaders(TOKENS.DUMMY_SERVICE_OWNER_TOKEN, 'application/json')
 
   //set fileTransfer TTL to 15 minutes. Should be longer than the test time
-    var fileRes = http.put(`${BASE_URL}/broker/api/v1/resource/altinn-broker-test-resource-1`, JSON.stringify({
-        fileTransferTimeToLive: "PT15M"
+  var fileRes = http.put(`${BASE_URL}/broker/api/v1/resource/altinn-broker-test-resource-1`, JSON.stringify({
+    fileTransferTimeToLive: "PT15M"
   }), { headers: headers });
 
   if (
     !check(fileRes, {
-      'status code MUST be 200 or 409': (fileRes) => fileRes.status === 200 || fileRes.status === 409,
+      'status code MUST be 200,204 or 409': (fileRes) => fileRes.status === 200 || fileRes.status === 409 || fileRes.status === 204
     })
   ) {
+    checkResult(fileRes, false)
     fail('Could not update file transfer TTL. Exiting');
   }
 }
