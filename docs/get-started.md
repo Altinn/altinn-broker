@@ -34,8 +34,8 @@ You can get it by contacting us at [Altinn@Slack#produkt-formidling](https://joi
 ### 1. Register Maskinporten Clients
 Register Maskinporten clients to authenticate with the Broker API, assigning them relevant scopes:
 - `altinn:authorization:pdp` - Required for all broker API clients for authorization access.
-- `altinn:broker.sender` - For clients sending files.
-- `altinn:broker.reader` - For clients receiving files.
+- `altinn:broker.write` - For clients sending files.
+- `altinn:broker.read` - For clients receiving files.
 
 Use [Samarbeidsportalen self-service](https://sjolvbetjening.test.samarbeid.digdir.no/) for registration. [Here's a detailed guide](https://docs.digdir.no/docs/Maskinporten/maskinporten_sjolvbetjening_web#selvbetjening-som-api-konsument).
 
@@ -43,7 +43,7 @@ Use [Samarbeidsportalen self-service](https://sjolvbetjening.test.samarbeid.digd
 All files sent using Broker is associated with a resource/service/"tjenesteressurs". These are registered in Altinn Studio, and are used for access rules and access lists.
 Your access rules must be configured in such a way that that they permit the actions "publish" (for all), "read" (for recipients) and "write" (for senders). 
 
-To setup a resource that works quickly, you can use our Postman collection and run the requests "Create resource" and "Create resource policy". See an example policy in .xml format in Test/Altinn.Broker.Tests/Data/BasePolicy.xml. Note that this policy will authorize neither on access lists nor on system user, and is essentially open for use by anyone with access to the Broker API in general.
+To setup a resource that works quickly, you can use our Postman collection and run the requests "Create resource" and "Create resource policy" with a token that has the scope "altinn:resourceregistry/resource.write". See an example policy in .xml format in Test/Altinn.Broker.Tests/Data/BasePolicy.xml. Note that this policy will authorize neither on access lists nor on system user, and is essentially open for use by anyone with access to the Broker API in general.
 
 Alternatively, you can use the GUI in Altinn Studio. 
 
