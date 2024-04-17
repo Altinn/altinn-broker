@@ -72,7 +72,7 @@ public class ConfirmDownloadCommandHandler : IHandler<ConfirmDownloadCommandRequ
         if (shouldConfirmAll)
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
-            _backgroundJobClient.Enqueue<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.RescheduleExpireEvent(new ExpireFileTransferCommandRequest
+            _backgroundJobClient.Enqueue<ExpireFileTransferCommandHandler>((expireFileTransferCommandHandler) => expireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
             {
                 FileTransferId = request.FileTransferId,
                 Force = true
