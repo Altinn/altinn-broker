@@ -4,6 +4,7 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
@@ -123,6 +124,15 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 RequireExpirationTime = true,
                 ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
                 ClockSkew = TimeSpan.Zero
+            };
+            options.Events = new JwtBearerEvents()
+            {
+                OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context),
+                OnChallenge = c =>
+                {
+                    c.HandleResponse();
+                    return Task.CompletedTask;
+                }
             };
         })
         .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
