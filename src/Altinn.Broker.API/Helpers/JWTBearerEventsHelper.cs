@@ -2,10 +2,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Altinn.Broker.Helpers;
-
-/**
- * This binder is used to get claims from Maskinporten token and make it available as a controller parameter 
- * */
 public class JWTBearerEventsHelper
 {
     public static Task OnAuthenticationFailed(AuthenticationFailedContext context)
