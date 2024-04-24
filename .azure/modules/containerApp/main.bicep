@@ -50,9 +50,6 @@ var containerAppEnvVars = [
   { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
   { name: 'AzureResourceManagerOptions__MalwareScanEventGridTopicName', value: malwarescan_event_grid_topic_name }
   { name: 'AZURE_CLIENT_ID', value: userIdentityClientId }
-  { name: 'HangfireAuthorizationOptions__TenantId', value: userIdentityTenantId }
-  { name: 'HangfireAuthorizationOptions__GroupId', value: userIdentityPrincipalId }
-  { name: 'HangfireAuthorizationOptions__Audience', value: 'https://ossrdbms-aad.database.windows.net' }
   {
     name: 'AltinnOptions__OpenIdWellKnown'
     value: '${platform_base_url}/authentication/api/v1/openid/.well-known/openid-configuration'
