@@ -7,7 +7,7 @@ param keyVaultUrl string
 @secure()
 param keyVaultName string
 
-var containerAppJobName = '${namePrefix}-migration-job'
+var containerAppJobName = '${namePrefix}-migration'
 var containerAppEnvName = '${namePrefix}-env'
 var migrationConnectionStringName = 'broker-migration-connection-string'
 
