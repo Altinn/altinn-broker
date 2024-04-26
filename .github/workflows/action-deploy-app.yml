@@ -58,8 +58,8 @@ jobs:
 
       - name: Deploy migration job (${{ inputs.environment }})
         uses: azure/arm-deploy@v2
-        if: ${{ inputs.migrate == 'true' }}
         id: migration-job
+        if: ${{ inputs.migrate == 'true' }}
         env:
           KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
@@ -86,10 +86,12 @@ jobs:
       - name: Start migration job
         uses: azure/CLI@v2
         if: ${{ inputs.migrate == 'true' }}
+        env:
+          MIGRATION_JOB_NAME: ${{ steps.migration-job.outputs.name }}
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
-            az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ secrets.AZURE_RESOURCE_GROUP_NAME }}
+            az containerapp job start -n ${{ env.MIGRATION_JOB_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP_NAME }}
 
       - name: Verify migration
         uses: azure/CLI@v2
@@ -124,7 +126,7 @@ jobs:
           parameters: ./.azure/applications/api/params.bicepparam
 
       - name: Verify deployment
-        uses: azure/CLI@v1
+        uses: azure/CLI@v2
         id: verify-deployment
         timeout-minutes: 3
         with:
