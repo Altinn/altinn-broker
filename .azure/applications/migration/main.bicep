@@ -17,7 +17,7 @@ resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@
 }
 
 module addKeyvaultRead '../../modules/keyvault/addReaderRoles.bicep' = {
-  name: 'keyVaultReaderAccessPolicy-${namePrefix}-migration-identity'
+  name: 'kvreader-${namePrefix}-migration'
   params: {
     keyvaultName: keyVaultName
     tenantId: userAssignedIdentity.properties.tenantId
