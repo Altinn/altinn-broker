@@ -1,9 +1,9 @@
-name: Infra apply test
+name: Infra apply staging
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      forceMigrate:
+      initialDeploy:
         type: boolean
         description: Force database migration
 #  workflow_dispatch:
@@ -64,7 +64,7 @@ jobs:
       AZURE_NAME_PREFIX: ${{ secrets.AZURE_STAGING_NAME_PREFIX }}
       AZURE_SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_STAGING_KEY_VAULT_NAME }}
       AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_STAGING_MIGRATION_STORAGE_ACCOUNT_NAME }}
-      AZURE_CLIENT_SECRET: $${{ secrets.AZURE_STAGING_CLIENT_SECRET }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_STAGING_CLIENT_SECRET }}
       MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
       MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
       PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
@@ -99,5 +99,5 @@ jobs:
       environment: staging
       region: norwayeast
       ref: ${{ github.ref }}
-      version: "1.1.0-${{ needs.generate-git-short-sha.outputs.gitShortSha }}"
-      migrate: ${{ check-for-changes.outputs.hasMigrationChanges || github.event.inputs.forceMigrate }}
+      version: ${{ needs.get-current-version.outputs.version }}
+      migrate: ${{ needs.check-for-changes.outputs.hasMigrationChanges == 'true' || github.event.inputs.initialDeploy }}

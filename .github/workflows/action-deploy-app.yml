@@ -16,7 +16,6 @@ on:
         required: true
       AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
         required: true
-      
     inputs:
       region:
         required: true
@@ -36,7 +35,7 @@ on:
       migrate:
         description: "Should migration be run before deploying"
         required: true
-        type: bool
+        type: string
 jobs:
   deploy-app:
     name: Deploy to ${{ inputs.environment }}
@@ -59,8 +58,8 @@ jobs:
 
       - name: Deploy migration job (${{ inputs.environment }})
         uses: azure/arm-deploy@v2
-        if: ${{ inputs.migrate }}
-        id: migrate
+        if: ${{ inputs.migrate == 'true' }}
+        id: migration-job
         env:
           KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
@@ -70,52 +69,37 @@ jobs:
           template: ./.azure/applications/migration/main.bicep
           resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
           deploymentMode: Incremental
-          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-migration-${{ inputs.version }}
+          deploymentName: migration-${{ inputs.version }}
           region: ${{ inputs.region }}
           failOnStdErr: false
           additionalArguments: "${{inputs.dryRun && '--what-if'}}"
           parameters: ./.azure/applications/migration/params.bicepparam
 
-      - name: "Checkout Altinn Broker Repository"
-        uses: actions/checkout@v4
-        if: ${{ inputs.migrate }}
-        with:
-          repository: "Altinn/altinn-broker"
-          path: "altinn-broker"
-          ref: ${{ inputs.ref }}
-      
-      - name: Install Azure CLI
-        if: ${{ inputs.migrate }}
-        run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-      - name: Authenticate using Azure CLI
-        if: ${{ inputs.migrate }}
-        run: |
-          az login --identity
-
       - name: Upload Migration Files to Azure File Share
-        if: ${{ inputs.migrate }}
-        run: |
-          az storage file upload-batch --source ./altinn-broker/src/Altinn.Broker.Persistence/Migrations --destination migrations --account-name ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }} --auth-mode login
+        uses: azure/CLI@v2
+        if: ${{ inputs.migrate == 'true' }}
+        with:
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
+          inlineScript: |
+            az storage file upload-batch --source ./altinn-broker/src/Altinn.Broker.Persistence/Migrations --destination migrations --account-name ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }} --auth-mode login
 
       - name: Start migration job
         uses: azure/CLI@v2
-        if: ${{!inputs.dryRun && migrate}}
+        if: ${{ inputs.migrate == 'true' }}
         with:
-          azcliversion: 2.56.0
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
-            az containerapp job start -n ${{ steps.migrate.outputs.name }} -g ${{ secrets.AZURE_RESOURCE_GROUP_NAME }}
+            az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ secrets.AZURE_RESOURCE_GROUP_NAME }}
 
       - name: Verify migration
         uses: azure/CLI@v2
-        if: ${{!inputs.dryRun && migrate}}
+        if: ${{ inputs.migrate == 'true' }}
         id: verify-migration
         timeout-minutes: 3
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
-            ./.github/tools/revisionVerifier.sh ${{ steps.migrate.outputs.revisionName }} ${{ secrets.AZURE_NAME_PREFIX }}-rg
+            ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ secrets.AZURE_NAME_PREFIX }}-rg' ${{ inputs.version }}
 
       - name: Deploy app (${{ inputs.environment }})
         uses: azure/arm-deploy@v2
