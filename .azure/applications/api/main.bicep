@@ -33,7 +33,7 @@ resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@
 }
 
 module keyVaultReaderAccessPolicyUserIdentity '../../modules/keyvault/addReaderRoles.bicep' = {
-  name: 'keyVaultReader-${namePrefix}-app-identity'
+  name: 'kvreader-${namePrefix}-app'
   params: {
     keyvaultName: sourceKeyVaultName
     tenantId: userAssignedIdentity.properties.tenantId
