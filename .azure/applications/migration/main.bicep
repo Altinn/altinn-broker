@@ -87,3 +87,5 @@ module containerAppJob '../../modules/containerAppJob/main.bicep' = {
     principalId: userAssignedIdentity.id
   }
 }
+
+output name string = containerAppJob.outputs.name
