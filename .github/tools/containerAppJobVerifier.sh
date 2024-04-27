@@ -18,7 +18,7 @@ fi
 job_name="$1"
 resource_group="$2"
 image_tag="$3"
-query_filter="[?properties.template.containers[?env[?name=='APP_VERSION' && value=='$image_tag']]].{name: name, status: properties.status, timestamp: properties.startTime} | sort_by(@, &timestamp) | reverse(@) | []"
+query_filter="[?properties.template.containers[?env[?name=='APP_VERSION' && value=='$image_tag']]].{name: name, status: properties.status, timestamp: properties.startTime} | sort_by(@, &timestamp) | reverse(@) | [0]"
 
 echo "Verifying job $job_name for image tag $image_tag"
 echo " "
