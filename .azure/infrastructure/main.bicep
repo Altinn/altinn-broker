@@ -2,24 +2,18 @@ targetScope = 'subscription'
 @minLength(3)
 param location string
 @secure()
-@minLength(3)
 param brokerPgAdminPassword string
 @secure()
-@minLength(3)
 param sourceKeyVaultName string
 @secure()
-@minLength(3)
 param tenantId string
 @secure()
-@minLength(3)
 param object_id string
 @secure()
 param test_client_id string
 @secure()
 param deploySecret string
-
 param environment string
-
 @secure()
 param namePrefix string
 
@@ -31,6 +25,8 @@ param maskinportenJwk string
 param maskinportenClientId string 
 @secure()
 param platformSubscriptionKey string
+@secure()
+param keyVaultSourceKeys string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -41,10 +37,6 @@ param postgresSku PostgresSku
 var resourceGroupName = '${namePrefix}-rg'
 
 var secrets = [
-  {
-    name: 'broker-admin-password'
-    value: brokerPgAdminPassword
-  }
   {
     name: 'deploy-id'
     value: object_id
@@ -100,18 +92,9 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
   }
 }
 
-var brokerAdminPasswordSecretName = 'broker-admin-password'
-module storeAdminPassword '../modules/keyvault/upsertSecret.bicep' = {
+resource srcKeyVaultResource 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: environmentKeyVault.name
   scope: resourceGroup
-  name: brokerAdminPasswordSecretName
-  dependsOn: [
-    environmentKeyVault
-  ]
-  params: {
-    destKeyVaultName: sourceKeyVaultName
-    secretName: brokerAdminPasswordSecretName
-    secretValue: brokerPgAdminPassword
-  }
 }
 
 // #####################################################
@@ -124,6 +107,7 @@ var srcKeyVault = {
   resourceGroupName: resourceGroupName
 }
 
+var brokerAdminPasswordSecretName = 'broker-admin-password'
 module postgresql '../modules/postgreSql/create.bicep' = {
   scope: resourceGroup
   name: 'postgresql'
@@ -135,8 +119,10 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     location: location
     environmentKeyVaultName: sourceKeyVaultName
     srcKeyVault: srcKeyVault
-    srcSecretName: 'brokerPgAdminPassword'
-    administratorLoginPassword: brokerPgAdminPassword
+    srcSecretName: brokerAdminPasswordSecretName
+    administratorLoginPassword: contains(keyVaultSourceKeys, brokerAdminPasswordSecretName)
+      ? srcKeyVaultResource.getSecret(brokerAdminPasswordSecretName)
+      : brokerPgAdminPassword
     sku: postgresSku
     tenantId: tenantId
     test_client_id: test_client_id
