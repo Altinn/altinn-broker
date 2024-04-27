@@ -93,7 +93,7 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
 }
 
 resource srcKeyVaultResource 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: environmentKeyVault.name
+  name: environmentKeyVault.outputs.name
   scope: resourceGroup
 }
 
