@@ -99,5 +99,5 @@ jobs:
       environment: staging
       region: norwayeast
       ref: ${{ github.ref }}
-      version: ${{ needs.get-current-version.outputs.version }}
+      version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
       migrate: ${{ needs.check-for-changes.outputs.hasMigrationChanges == 'true' || github.event.inputs.initialDeploy }}

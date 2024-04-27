@@ -1,5 +1,6 @@
 param namePrefix string
 param location string
+param appVersion string
 
 @secure()
 param keyVaultUrl string
@@ -46,6 +47,10 @@ var containerAppEnvVars = [
     name: 'FLYWAY_VALIDATE_MIGRATION_NAMING'
     value: 'true'
   }
+  {
+    name: 'APP_VERSION'
+    value: appVersion
+  }
 ]
 
 var volumes = [
@@ -88,4 +93,4 @@ module containerAppJob '../../modules/containerAppJob/main.bicep' = {
   }
 }
 
-output name string = containerAppJob.outputs.name
+output name string = containerAppJob.name

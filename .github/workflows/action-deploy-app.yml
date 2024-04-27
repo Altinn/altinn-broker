@@ -44,7 +44,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: "Checkout GitHub Action"
+      - name: "Checkout Altinn Broker repository"
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -58,12 +58,13 @@ jobs:
 
       - name: Deploy migration job (${{ inputs.environment }})
         uses: azure/arm-deploy@v2
-        id: migration-job
         if: ${{ inputs.migrate == 'true' }}
+        id: migration-job
         env:
           KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
           NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+          APP_VERSION: ${{ inputs.version }}
         with:
           scope: resourcegroup
           template: ./.azure/applications/migration/main.bicep
@@ -72,7 +73,6 @@ jobs:
           deploymentName: migration-${{ inputs.version }}
           region: ${{ inputs.region }}
           failOnStdErr: false
-          additionalArguments: "${{inputs.dryRun && '--what-if'}}"
           parameters: ./.azure/applications/migration/params.bicepparam
 
       - name: Upload Migration Files to Azure File Share
@@ -86,12 +86,10 @@ jobs:
       - name: Start migration job
         uses: azure/CLI@v2
         if: ${{ inputs.migrate == 'true' }}
-        env:
-          MIGRATION_JOB_NAME: ${{ steps.migration-job.outputs.name }}
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
-            az containerapp job start -n ${{ env.MIGRATION_JOB_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP_NAME }}
+            az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ secrets.AZURE_NAME_PREFIX }}-rg
 
       - name: Verify migration
         uses: azure/CLI@v2
@@ -101,6 +99,7 @@ jobs:
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
+            chmod +x ./.github/tools/containerAppJobVerifier.sh
             ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ secrets.AZURE_NAME_PREFIX }}-rg' ${{ inputs.version }}
 
       - name: Deploy app (${{ inputs.environment }})
@@ -132,6 +131,7 @@ jobs:
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
+            chmod +x ./.github/tools/revisionVerifier.sh
             ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ secrets.AZURE_NAME_PREFIX }}-rg
 
       - name: Logout from azure

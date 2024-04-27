@@ -18,7 +18,7 @@ fi
 job_name="$1"
 resource_group="$2"
 image_tag="$3"
-query_filter="[?properties.template.containers[?ends_with(image, ':$image_tag')]].{name: name, status: properties.status} | [0]"
+query_filter="[?properties.template.containers[?env[?name=='APP_VERSION' && value=='12345']]].{name: name, status: properties.status, timestamp: properties.startTime} | sort_by(@, &timestamp) | reverse(@)"
 
 echo "Verifying job $job_name for image tag $image_tag"
 echo " "
@@ -29,7 +29,7 @@ verify_job_succeeded() {
   current_job_execution=$(az containerapp job execution list -n "$job_name" -g "$resource_group" --query "$query_filter" 2>/dev/null)
 
   if [ -z "$current_job_execution" ]; then
-      echo "No job execution found for job $job_name"
+      echo "No job execution found for job $job_name and $image_tag"
       return 1
   fi
     
