@@ -45,15 +45,15 @@ jobs:
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
-    needs: [ generate-git-short-sha, check-for-changes, deploy-infra] # add build-and-test when we migrate to altinn-broker repo, where sonarqube is active
-    #if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra] # add build-and-test when we migrate to altinn-broker repo, where sonarqube is active
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
       version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
 
   deploy-infra:
     name: Deploy infrastructure
-    if: ${{ needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
     needs: [check-for-changes]
     uses: ./.github/workflows/action-deploy-infra.yml
     secrets:
@@ -72,7 +72,6 @@ jobs:
       region: norwayeast
       environment: staging
       version: "1.1.0"
-      #version: ${{ needs.get-current-version.outputs.version }}
       ref: ${{ github.ref }}
 
   deploy-app:
@@ -84,9 +83,8 @@ jobs:
         generate-git-short-sha,
         publish,
         deploy-infra, # we want deployment of app to be dependent on deployment of infrastructure, but if infrastructure is skipped, we still want to deploy the app
-      ]
-   
-    if: ${{ always() && !failure() && !cancelled() && needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+      ]   
+    if: ${{ always() && !failure() && !cancelled() && (inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true') }}
     uses: ./.github/workflows/action-deploy-app.yml
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_OIDC_STAGING_CLIENT_ID }}
