@@ -81,7 +81,7 @@ jobs:
         with:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
-            az storage file upload-batch --source ./altinn-broker/src/Altinn.Broker.Persistence/Migrations --destination migrations --account-name ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }} --auth-mode login
+            az storage copy --source ./src/Altinn.Broker.Persistence/Migrations --destination https://${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}.file.core.windows.net/migrations --recursive
 
       - name: Start migration job
         uses: azure/CLI@v2
