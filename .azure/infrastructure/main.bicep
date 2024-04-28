@@ -25,8 +25,6 @@ param maskinportenJwk string
 param maskinportenClientId string 
 @secure()
 param platformSubscriptionKey string
-@secure()
-param keyVaultSourceKeys string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -92,11 +90,6 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
   }
 }
 
-resource srcKeyVaultResource 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: environmentKeyVault.outputs.name
-  scope: resourceGroup
-}
-
 // #####################################################
 // Create resources with dependencies to other resources
 // #####################################################
@@ -120,9 +113,7 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     environmentKeyVaultName: sourceKeyVaultName
     srcKeyVault: srcKeyVault
     srcSecretName: brokerAdminPasswordSecretName
-    administratorLoginPassword: contains(keyVaultSourceKeys, brokerAdminPasswordSecretName)
-      ? srcKeyVaultResource.getSecret(brokerAdminPasswordSecretName)
-      : brokerPgAdminPassword
+    administratorLoginPassword: brokerPgAdminPassword
     sku: postgresSku
     tenantId: tenantId
     test_client_id: test_client_id

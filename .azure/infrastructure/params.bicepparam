@@ -15,7 +15,6 @@ param deploySecret = readEnvironmentVariable('CLIENT_SECRET')
 param maskinportenJwk = readEnvironmentVariable('MASKINPORTEN_JWK')
 param maskinportenClientId = readEnvironmentVariable('MASKINPORTEN_CLIENT_ID')
 param platformSubscriptionKey = readEnvironmentVariable('PLATFORM_SUBSCRIPTION_KEY')
-param keyVaultSourceKeys = readEnvironmentVariable('KEY_VAULT_SOURCE_KEYS')
 
 // SKUs
 param keyVaultSku = {
