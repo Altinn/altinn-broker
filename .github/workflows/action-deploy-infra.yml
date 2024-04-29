@@ -30,6 +30,8 @@ on:
        required: true
       PLATFORM_SUBSCRIPTION_KEY:
        required: true
+      NOTIFICATION_EMAIL:
+        required: false
 
     inputs:
       region:
@@ -96,6 +98,7 @@ jobs:
           MASKINPORTEN_JWK: ${{ SECRETS.MASKINPORTEN_JWK }}
           MASKINPORTEN_CLIENT_ID: ${{ SECRETS.MASKINPORTEN_CLIENT_ID }}
           PLATFORM_SUBSCRIPTION_KEY: ${{ SECRETS.PLATFORM_SUBSCRIPTION_KEY }}
+          NOTIFICATION_EMAIL: ${{ SECRETS.NOTIFICATION_EMAIL }}
         with:
           scope: subscription
           template: ./.azure/infrastructure/main.bicep

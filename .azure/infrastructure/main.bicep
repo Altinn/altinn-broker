@@ -22,9 +22,11 @@ param migrationsStorageAccountName string
 @secure()
 param maskinportenJwk string
 @secure()
-param maskinportenClientId string 
+param maskinportenClientId string
 @secure()
 param platformSubscriptionKey string
+@secure()
+param notificationEmail string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -140,6 +142,7 @@ module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
     location: location
     namePrefix: namePrefix
     migrationsStorageAccountName: migrationsStorageAccountName
+    emailReceiver: notificationEmail
   }
 }
 
