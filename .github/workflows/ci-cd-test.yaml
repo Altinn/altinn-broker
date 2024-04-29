@@ -6,11 +6,11 @@ on:
       forceMigrate:
         type: boolean
         description: Force database migration
-#  workflow_dispatch:
-#  push:
-#    branches: [main]
-#    paths-ignore:
-#      - "Test/**" # ignore changes to tests
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "Test/**" # ignore changes to tests
 
 env:
   name: broker
