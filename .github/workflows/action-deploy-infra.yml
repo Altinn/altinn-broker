@@ -20,9 +20,9 @@ on:
         required: true
       AZURE_NAME_PREFIX:
         required: true
-      MIGRATION_STORAGE_ACCOUNT_NAME:
+      AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
        required: true
-      CLIENT_SECRET:
+      AZURE_CLIENT_SECRET:
        required: true
       MASKINPORTEN_JWK:
        required: true
@@ -67,16 +67,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Fetch secret keys from source Azure Key Vault
-        uses: azure/CLI@v1
-        id: keyvault-keys
-        with:
-          azcliversion: ${{ env.AZ_CLI_VERSION }}
-          inlineScript: |
-            KEY_VAULT_KEYS=$(az keyvault secret list --vault-name ${{ secrets.AZURE_SOURCE_KEY_VAULT_NAME }} --subscription ${{ secrets.AZURE_SOURCE_KEY_VAULT_SUBSCRIPTION_ID }} --query "[].name" -o json | tr -d '\n')
-            echo "::set-output name=key-vault-keys::$KEY_VAULT_KEYS"
-
+  
       - name: Generate postgresql password
         id: pwd-generator
         shell: pwsh
@@ -85,26 +76,22 @@ jobs:
           $password = (GeneratePassword -length 30).Password
           echo "::add-mask::$password"
           echo "::set-output name=postgresqlPassword::$password"
-
+  
       - name: Deploy infrastructure (${{ inputs.environment }})
         uses: azure/arm-deploy@v1
         id: deploy
         env:
-          KEY_VAULT_SOURCE_KEYS: ${{ steps.keyvault-keys.outputs.key-vault-keys }}
           ENVIRONMENT: ${{ inputs.environment }}
           BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
           AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
           SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_KEY_VAULT_NAME }}
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
           TEST_CLIENT_ID: ${{ secrets.AZURE_TEST_ACCESS_CLIENT_ID }}
           NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
-          BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
-          TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
-          TEST_CLIENT_ID: ${{ secrets.AZURE_TEST_ACCESS_CLIENT_ID }}
           KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_KEY_VAULT_NAME }}
-          MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.MIGRATION_STORAGE_ACCOUNT_NAME }}
+          MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
           CLIENT_SECRET: ${{ SECRETS.AZURE_CLIENT_SECRET }}
           MASKINPORTEN_JWK: ${{ SECRETS.MASKINPORTEN_JWK }}
           MASKINPORTEN_CLIENT_ID: ${{ SECRETS.MASKINPORTEN_CLIENT_ID }}

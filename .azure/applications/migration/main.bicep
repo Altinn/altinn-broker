@@ -1,5 +1,6 @@
 param namePrefix string
 param location string
+param appVersion string
 
 @secure()
 param keyVaultUrl string
@@ -17,7 +18,7 @@ resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@
 }
 
 module addKeyvaultRead '../../modules/keyvault/addReaderRoles.bicep' = {
-  name: 'keyVaultReaderAccessPolicy-${namePrefix}-migration-identity'
+  name: 'kvreader-${namePrefix}-migration'
   params: {
     keyvaultName: keyVaultName
     tenantId: userAssignedIdentity.properties.tenantId
@@ -45,6 +46,10 @@ var containerAppEnvVars = [
   {
     name: 'FLYWAY_VALIDATE_MIGRATION_NAMING'
     value: 'true'
+  }
+  {
+    name: 'APP_VERSION'
+    value: appVersion
   }
 ]
 
@@ -87,3 +92,5 @@ module containerAppJob '../../modules/containerAppJob/main.bicep' = {
     principalId: userAssignedIdentity.id
   }
 }
+
+output name string = containerAppJob.name

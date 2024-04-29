@@ -1,16 +1,17 @@
 name: Infra apply test
 
 on:
-  workflow_call:
-    inputs:
-      forceMigrate:
-        type: boolean
-        description: Force database migration
   workflow_dispatch:
+    inputs:
+      initialDeploy:
+        type: boolean
+        description: Initial deploy
+        default: false
   push:
     branches: [main]
     paths-ignore:
       - "Test/**" # ignore changes to tests
+
 
 env:
   name: broker
@@ -45,14 +46,14 @@ jobs:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
     needs: [get-current-version, generate-git-short-sha, check-for-changes]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
       version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
 
   deploy-infra:
     name: Deploy infrastructure
-    if: ${{ needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
     needs: [check-for-changes, get-current-version]
     uses: ./.github/workflows/action-deploy-infra.yml
     secrets:
@@ -64,7 +65,7 @@ jobs:
       AZURE_NAME_PREFIX: ${{ secrets.AZURE_TEST_NAME_PREFIX }}
       AZURE_SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_TEST_KEY_VAULT_NAME }}
       AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_TEST_MIGRATION_STORAGE_ACCOUNT_NAME }}
-      AZURE_CLIENT_SECRET: $${{ secrets.AZURE_TEST_CLIENT_SECRET }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_TEST_CLIENT_SECRET }}
       MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
       MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
       PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
@@ -84,7 +85,7 @@ jobs:
         publish,
         deploy-infra, # we want deployment of app to be dependent on deployment of infrastructure, but if infrastructure is skipped, we still want to deploy the app
       ]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' &&always() && !failure() && !cancelled()  }}
+    if: ${{ (inputs.initialDeploy ||  needs.check-for-changes.outputs.hasBackendChanges == 'true')  && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/action-deploy-app.yml
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_OIDC_TEST_CLIENT_ID }}
@@ -98,4 +99,4 @@ jobs:
       region: norwayeast
       ref: ${{ github.ref }}
       version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
-      migrate: ${{ check-for-changes.outputs.hasMigrationChanges || github.event.inputs.forceMigrate }}
+      migrate: ${{ needs.check-for-changes.outputs.hasMigrationChanges == 'true' || github.event.inputs.initialDeploy }}

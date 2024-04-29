@@ -1,9 +1,9 @@
-name: Infra apply test
+name: Infra apply staging
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      forceMigrate:
+      initialDeploy:
         type: boolean
         description: Force database migration
   workflow_dispatch:
@@ -45,15 +45,15 @@ jobs:
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
-    needs: [ generate-git-short-sha, check-for-changes, deploy-infra] # add build-and-test when we migrate to altinn-broker repo, where sonarqube is active
-    #if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra] # add build-and-test when we migrate to altinn-broker repo, where sonarqube is active
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
       version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
 
   deploy-infra:
     name: Deploy infrastructure
-    if: ${{ needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
+    if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
     needs: [check-for-changes]
     uses: ./.github/workflows/action-deploy-infra.yml
     secrets:
@@ -64,7 +64,8 @@ jobs:
       AZURE_NAME_PREFIX: ${{ secrets.AZURE_STAGING_NAME_PREFIX }}
       AZURE_SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_STAGING_KEY_VAULT_NAME }}
       AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_STAGING_MIGRATION_STORAGE_ACCOUNT_NAME }}
-      AZURE_CLIENT_SECRET: $${{ secrets.AZURE_STAGING_CLIENT_SECRET }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_STAGING_CLIENT_SECRET }}
+      AZURE_TEST_ACCESS_CLIENT_ID : ${{ secrets.AZURE_TEST_ACCESS_CLIENT_ID }}
       MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
       MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
       PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
@@ -72,7 +73,6 @@ jobs:
       region: norwayeast
       environment: staging
       version: "1.1.0"
-      #version: ${{ needs.get-current-version.outputs.version }}
       ref: ${{ github.ref }}
 
   deploy-app:
@@ -84,9 +84,8 @@ jobs:
         generate-git-short-sha,
         publish,
         deploy-infra, # we want deployment of app to be dependent on deployment of infrastructure, but if infrastructure is skipped, we still want to deploy the app
-      ]
-   
-    if: ${{ always() && !failure() && !cancelled() && needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+      ]   
+    if: ${{ always() && !failure() && !cancelled() && (inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true') }}
     uses: ./.github/workflows/action-deploy-app.yml
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_OIDC_STAGING_CLIENT_ID }}
@@ -99,5 +98,5 @@ jobs:
       environment: staging
       region: norwayeast
       ref: ${{ github.ref }}
-      version: "1.1.0-${{ needs.generate-git-short-sha.outputs.gitShortSha }}"
-      migrate: ${{ check-for-changes.outputs.hasMigrationChanges || github.event.inputs.forceMigrate }}
+      version: ${{ needs.get-current-version.outputs.version }}-${{ needs.generate-git-short-sha.outputs.gitShortSha }}
+      migrate: ${{ needs.check-for-changes.outputs.hasMigrationChanges == 'true' || github.event.inputs.initialDeploy }}

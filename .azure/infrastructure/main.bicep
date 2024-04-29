@@ -2,24 +2,18 @@ targetScope = 'subscription'
 @minLength(3)
 param location string
 @secure()
-@minLength(3)
 param brokerPgAdminPassword string
 @secure()
-@minLength(3)
 param sourceKeyVaultName string
 @secure()
-@minLength(3)
 param tenantId string
 @secure()
-@minLength(3)
 param object_id string
 @secure()
 param test_client_id string
 @secure()
 param deploySecret string
-
 param environment string
-
 @secure()
 param namePrefix string
 
@@ -41,10 +35,6 @@ param postgresSku PostgresSku
 var resourceGroupName = '${namePrefix}-rg'
 
 var secrets = [
-  {
-    name: 'broker-admin-password'
-    value: brokerPgAdminPassword
-  }
   {
     name: 'deploy-id'
     value: object_id
@@ -100,20 +90,6 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
   }
 }
 
-var brokerAdminPasswordSecretName = 'broker-admin-password'
-module storeAdminPassword '../modules/keyvault/upsertSecret.bicep' = {
-  scope: resourceGroup
-  name: brokerAdminPasswordSecretName
-  dependsOn: [
-    environmentKeyVault
-  ]
-  params: {
-    destKeyVaultName: sourceKeyVaultName
-    secretName: brokerAdminPasswordSecretName
-    secretValue: brokerPgAdminPassword
-  }
-}
-
 // #####################################################
 // Create resources with dependencies to other resources
 // #####################################################
@@ -124,6 +100,7 @@ var srcKeyVault = {
   resourceGroupName: resourceGroupName
 }
 
+var brokerAdminPasswordSecretName = 'broker-admin-password'
 module postgresql '../modules/postgreSql/create.bicep' = {
   scope: resourceGroup
   name: 'postgresql'
@@ -135,7 +112,7 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     location: location
     environmentKeyVaultName: sourceKeyVaultName
     srcKeyVault: srcKeyVault
-    srcSecretName: 'brokerPgAdminPassword'
+    srcSecretName: brokerAdminPasswordSecretName
     administratorLoginPassword: brokerPgAdminPassword
     sku: postgresSku
     tenantId: tenantId
