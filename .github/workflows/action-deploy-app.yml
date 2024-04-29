@@ -1,0 +1,140 @@
+﻿name: Deploy app
+env:
+  AZ_CLI_VERSION: 2.56.0
+on:
+  workflow_call:
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AZURE_ENVIRONMENT_KEY_VAULT_NAME:
+        required: true
+      AZURE_NAME_PREFIX:
+        required: true
+      AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
+        required: true
+    inputs:
+      region:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      version:
+        description: "Current version to use as tag"
+        required: true
+        type: string
+      ref:
+        description: "The branch or tag ref to deploy. Using default checkout ref if not provided."
+        required: false
+        default: ${{ github.ref }}
+        type: string
+      migrate:
+        description: "Should migration be run before deploying"
+        required: true
+        type: string
+jobs:
+  deploy-app:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: "Checkout Altinn Broker repository"
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: OIDC Login to Azure Public Cloud
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy migration job (${{ inputs.environment }})
+        uses: azure/arm-deploy@v2
+        if: ${{ inputs.migrate == 'true' }}
+        id: migration-job
+        env:
+          KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+          KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
+          NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+          APP_VERSION: ${{ inputs.version }}
+        with:
+          scope: resourcegroup
+          template: ./.azure/applications/migration/main.bicep
+          resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
+          deploymentMode: Incremental
+          deploymentName: migration-${{ inputs.version }}
+          region: ${{ inputs.region }}
+          failOnStdErr: false
+          parameters: ./.azure/applications/migration/params.bicepparam
+
+      - name: Upload Migration Files to Azure File Share
+        uses: azure/CLI@v2
+        if: ${{ inputs.migrate == 'true' }}
+        with:
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
+          inlineScript: |
+            az storage copy --source ./src/Altinn.Broker.Persistence/Migrations --destination https://${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}.file.core.windows.net/migrations --recursive
+
+      - name: Start migration job
+        uses: azure/CLI@v2
+        if: ${{ inputs.migrate == 'true' }}
+        with:
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
+          inlineScript: |
+            az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ secrets.AZURE_NAME_PREFIX }}-rg
+
+      - name: Verify migration
+        uses: azure/CLI@v2
+        if: ${{ inputs.migrate == 'true' }}
+        id: verify-migration
+        timeout-minutes: 3
+        with:
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
+          inlineScript: |
+            chmod +x ./.github/tools/containerAppJobVerifier.sh
+            ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ secrets.AZURE_NAME_PREFIX }}-rg' ${{ inputs.version }}
+
+      - name: Deploy app (${{ inputs.environment }})
+        uses: azure/arm-deploy@v2
+        id: deploy
+        env:
+          IMAGE_TAG: ${{ inputs.version }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+          KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
+          NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        with:
+          scope: resourcegroup
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
+          template: ./.azure/applications/api/main.bicep
+          deploymentMode: Incremental
+          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-${{ inputs.version }}
+          region: ${{ inputs.region }}
+          failOnStdErr: false
+          parameters: ./.azure/applications/api/params.bicepparam
+
+      - name: Verify deployment
+        uses: azure/CLI@v2
+        id: verify-deployment
+        timeout-minutes: 3
+        with:
+          azcliversion: ${{ env.AZ_CLI_VERSION }}
+          inlineScript: |
+            chmod +x ./.github/tools/revisionVerifier.sh
+            ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ secrets.AZURE_NAME_PREFIX }}-rg
+
+      - name: Logout from azure
+        if: ${{failure() || success()}}
+        continue-on-error: true
+        run: az logout
