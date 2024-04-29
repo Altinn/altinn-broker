@@ -30,7 +30,7 @@ function GeneratePassword{
 	$lowercase = 'abcdefghiklmnoprstuvwxyz'
 	$uppercase = 'ABCDEFGHKLMNOPRSTUVWXYZ'
 	$numbers = '1234567890'
-	$special = '{#*+£()!~'
+	$special = '~!@#^()_-'
 	$characters = $lowercase + $uppercase + $numbers + $special
 	$password = Get-RandomCharacters $minLower $lowercase
 	$password += Get-RandomCharacters $minUpper $uppercase
