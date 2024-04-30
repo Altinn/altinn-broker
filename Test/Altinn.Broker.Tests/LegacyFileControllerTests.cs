@@ -96,7 +96,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.Contains(Guid.Parse(fileId), result);
     }
-    
+
     [Fact]
     public async Task InitializeAndUpload_FailsDueToAntivirus()
     {

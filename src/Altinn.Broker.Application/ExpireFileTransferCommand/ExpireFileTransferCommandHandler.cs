@@ -47,7 +47,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         else if (!request.DoNotUpdateStatus)
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {

@@ -6,8 +6,8 @@ public class ExpireFileTransferCommandRequest
     public bool Force { get; set; }
 
     /// <summary>
-    /// When this is set, the ExpireFileTransferCommandHandler will delete the file from storage, but will refrain from setting the FileTransferStatus to Deleted in FileTransferRepository.
+    /// When this is set, the ExpireFileTransferCommandHandler will delete the file from storage, but will refrain from setting the FileTransferStatus to Purged in FileTransferRepository.
     /// This is used when MalwareScanResultHandler fails an uploaded file.
     /// </summary>
-    public bool DoNotUpdateStatus  {get;set; }
+    public bool DoNotUpdateStatus { get; set; }
 }
