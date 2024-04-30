@@ -21,7 +21,7 @@ internal static class LegacyFileStatusOverviewExtMapper
             FileStatus = MapToExternalEnum(fileTransfer.FileTransferStatusEntity.Status),
             Sender = fileTransfer.Sender.ActorExternalId,
             FileStatusChanged = fileTransfer.FileTransferStatusChanged,
-            FileStatusText = MapToFileStatusText(fileTransfer.FileTransferStatusEntity.Status),
+            FileStatusText = MapToFileStatusText(fileTransfer.FileTransferStatusEntity),
             PropertyList = fileTransfer.PropertyList,
             Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
             SendersFileReference = fileTransfer.SendersFileTransferReference,
@@ -40,15 +40,15 @@ internal static class LegacyFileStatusOverviewExtMapper
             FileTransferStatus.Published => LegacyFileStatusExt.Published,
             FileTransferStatus.Cancelled => LegacyFileStatusExt.Cancelled,
             FileTransferStatus.AllConfirmedDownloaded => LegacyFileStatusExt.AllConfirmedDownloaded,
-            FileTransferStatus.Deleted => LegacyFileStatusExt.Deleted,
+            FileTransferStatus.Purged => LegacyFileStatusExt.Deleted,
             FileTransferStatus.Failed => LegacyFileStatusExt.Failed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
 
-    internal static string MapToFileStatusText(FileTransferStatus domainEnum)
+    internal static string MapToFileStatusText(FileTransferStatusEntity status)
     {
-        return domainEnum switch
+        return status.Status switch
         {
             FileTransferStatus.Initialized => "Ready for upload",
             FileTransferStatus.UploadStarted => "Upload started",
@@ -56,8 +56,8 @@ internal static class LegacyFileStatusOverviewExtMapper
             FileTransferStatus.Published => "Ready for download",
             FileTransferStatus.Cancelled => "File cancelled",
             FileTransferStatus.AllConfirmedDownloaded => "All downloaded",
-            FileTransferStatus.Deleted => "File has been deleted",
-            FileTransferStatus.Failed => "Upload failed",
+            FileTransferStatus.Purged => "File has been purged",
+            FileTransferStatus.Failed => status.DetailedStatus ?? "Upload failed",
             _ => throw new InvalidEnumArgumentException()
         };
     }
