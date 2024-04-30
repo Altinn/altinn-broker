@@ -27,13 +27,27 @@ resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
     WorkspaceResourceId: log_analytics_workspace.id
   }
 }
+resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-11-02-preview' = {
+  name: '${namePrefix}-env'
+  location: location
+  properties: {
+    infrastructureResourceGroup: '${namePrefix}-rg'
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: log_analytics_workspace.properties.customerId
+        sharedKey: log_analytics_workspace.listKeys().primarySharedKey
+      }
+    }
+  }
+}
 resource application_insights_action 'Microsoft.Insights/actionGroups@2023-01-01' =
   if (emailReceiver != null) {
     name: '${namePrefix}-action'
-    location: location
-    dependsOn: [application_insights]
+    location: 'global' // action group locations is limited, change to use location variable when new locations is added
+    dependsOn: [application_insights, containerAppEnvironment]
     properties: {
-      groupShortName: '${namePrefix}-ai-alert'
+      groupShortName: 'broker-alert'
       enabled: true
       emailReceivers: [
         {
@@ -53,7 +67,7 @@ resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-
       severity: 1
       evaluationFrequency: 'PT5M'
       windowSize: 'PT5M'
-      scopes: [application_insights.id]
+      scopes: [log_analytics_workspace.id]
       autoMitigate: false
       targetResourceTypes: [
         'microsoft.insights/components'
@@ -79,21 +93,6 @@ resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-
       }
     }
   }
-
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
-  name: '${namePrefix}-env'
-  location: location
-  properties: {
-    infrastructureResourceGroup: '${namePrefix}-rg'
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: log_analytics_workspace.properties.customerId
-        sharedKey: log_analytics_workspace.listKeys().primarySharedKey
-      }
-    }
-  }
-}
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: migrationsStorageAccountName

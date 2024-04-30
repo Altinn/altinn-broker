@@ -69,7 +69,6 @@ jobs:
       MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
       MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
       PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
-      NOTIFICATION_EMAIL: ${{ secrets.TEST_NOTIFICATION_EMAIL }}
     with:
       region: norwayeast
       environment: test
