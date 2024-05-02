@@ -52,7 +52,7 @@ AZURE_TEST_PRINCIPAL_ID" = "<principal_id>"
 
 
 AZURE_TEST_ACCESS_CLIENT_ID = "<Client_id of dev SP>"  This is used for developer access to database, and is not required. It is only used in test environment. 
-
+STAGING_NOTIFICATION_EMAIL = "<email>" Optional parameter. If an email is provided, a scheduled query will be created for 500 errors, which sends an email of exception information.
 
 SONAR_TOKEN = "<sonar_token"> Token used for sonarqube scan
 ```
