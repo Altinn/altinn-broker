@@ -40,7 +40,7 @@ internal static class FileTransferStatusOverviewExtMapper
             FileTransferStatus.Published => FileTransferStatusExt.Published,
             FileTransferStatus.Cancelled => FileTransferStatusExt.Cancelled,
             FileTransferStatus.AllConfirmedDownloaded => FileTransferStatusExt.AllConfirmedDownloaded,
-            FileTransferStatus.Deleted => FileTransferStatusExt.Deleted,
+            FileTransferStatus.Purged => FileTransferStatusExt.Purged,
             FileTransferStatus.Failed => FileTransferStatusExt.Failed,
             _ => throw new InvalidEnumArgumentException()
         };
@@ -60,7 +60,7 @@ internal static class FileTransferStatusOverviewExtMapper
             FileTransferStatus.Published => "Ready for download",
             FileTransferStatus.Cancelled => "FileTransfer cancelled",
             FileTransferStatus.AllConfirmedDownloaded => "All downloaded",
-            FileTransferStatus.Deleted => "FileTransfer has been deleted",
+            FileTransferStatus.Purged => "FileTransfer has been purged",
             FileTransferStatus.Failed => "Upload failed",
             _ => throw new InvalidEnumArgumentException()
         };

@@ -8,7 +8,7 @@ namespace Altinn.Broker.Enums
         Published,
         Cancelled,
         AllConfirmedDownloaded,
-        Deleted,
+        Purged,
         Failed
     }
 }

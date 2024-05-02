@@ -8,6 +8,6 @@ public enum FileTransferStatus
     Published = 3,
     Cancelled = 4,
     AllConfirmedDownloaded = 5,
-    Deleted = 6,
+    Purged = 6,
     Failed = 7
 }

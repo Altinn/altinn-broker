@@ -40,14 +40,14 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);
         var serviceOwner = await GetServiceOwner(resource.ServiceOwnerId);
 
-        if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Deleted)
+        if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
-            _logger.LogInformation("FileTransfer has already been set to deleted");
+            _logger.LogInformation("FileTransfer has already been set to purged");
         }
-        else
+        else if (!request.DoNotUpdateStatus)
         {
-            await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Deleted, cancellationToken: cancellationToken);
-            await _eventBus.Publish(AltinnEventType.FileDeleted, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
+            await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
@@ -58,11 +58,10 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
                 _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
                 await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
             }
-
         }
         else
         {
-            throw new Exception("FileTransfer has not expired, and should not be deleted");
+            throw new Exception("FileTransfer has not expired, and should not be purged");
         }
         return Task.CompletedTask;
     }

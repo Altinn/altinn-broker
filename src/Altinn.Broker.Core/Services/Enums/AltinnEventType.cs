@@ -8,6 +8,6 @@ public enum AltinnEventType
     UploadFailed,
     DownloadConfirmed,
     AllConfirmedDownloaded,
-    FileDeleted,
+    FilePurged,
     FileNeverConfirmedDownloaded
 }
