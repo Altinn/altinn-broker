@@ -1,5 +1,9 @@
 ## Getting Started
 
+{{% notice warning  %}}
+This guide is being replaced by the User Guides on the Altinn Studio Docs site here: [https://docs.altinn.studio/broker/user-guides/](https://docs.altinn.studio/broker/user-guides/)
+{{% /notice %}}
+
 To understand how the Broker API operates, including its dependencies and configuration steps, refer to the information below:
 
 ```mermaid
