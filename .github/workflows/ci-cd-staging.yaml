@@ -38,13 +38,12 @@ jobs:
     name: Build and test
     uses: ./.github/workflows/action-build-and-analyze.yml
     needs: [check-for-changes]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' && !always() }} 
-  # TODO: remove always() when we migrate to altinn-broker repo, where sonarqube is active
+    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }} 
 
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
-    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra] # add build-and-test when we migrate to altinn-broker repo, where sonarqube is active
+    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra, build-and-test] 
     if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
