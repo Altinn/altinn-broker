@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Altinn.Broker/Altinn.Broker.csproj",
+                "${workspaceFolder}/src/Altinn.Broker.API/Altinn.Broker.API.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/Altinn.Broker/Altinn.Broker.csproj",
+                "${workspaceFolder}/src/Altinn.Broker.API/Altinn.Broker.API.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/src/Altinn.Broker/Altinn.Broker.csproj"
+                "${workspaceFolder}/src/Altinn.Broker.API/Altinn.Broker.API.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
