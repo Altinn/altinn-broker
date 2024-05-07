@@ -8,6 +8,8 @@ using Npgsql;
 
 using NpgsqlTypes;
 
+using Serilog.Context;
+
 namespace Altinn.Broker.Persistence.Repositories;
 
 public class FileTransferRepository : IFileTransferRepository
@@ -110,9 +112,19 @@ public class FileTransferRepository : IFileTransferRepository
         }
         fileTransfer.RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken);
         fileTransfer.PropertyList = await GetMetadata(fileTransferId, cancellationToken);
+        EnrichLogs(fileTransfer);
         return fileTransfer;
     }
 
+    private static void EnrichLogs(FileTransferEntity fileTransferEntity)
+    {
+        LogContext.PushProperty("fileTransferId", fileTransferEntity.FileTransferId);
+        LogContext.PushProperty("resourceId", fileTransferEntity.ResourceId);
+        LogContext.PushProperty("sender", fileTransferEntity.Sender);
+        LogContext.PushProperty("recipients", string.Join(',', fileTransferEntity.RecipientCurrentStatuses.Select(status => status.Actor.ActorExternalId)));
+        LogContext.PushProperty("fileName", fileTransferEntity.FileName);
+        LogContext.PushProperty("status", fileTransferEntity.FileTransferStatusEntity.Status.ToString());
+    }
 
     /*
      * Get the current status of a file tranfer's recipients along wiith the last time their status changed.  

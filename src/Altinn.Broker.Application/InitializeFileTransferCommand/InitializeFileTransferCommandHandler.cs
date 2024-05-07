@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Application.ExpireFileTransferCommand;
+﻿using System;
+
+using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -10,6 +12,8 @@ using Hangfire;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
+
+using Serilog.Context;
 
 namespace Altinn.Broker.Application.InitializeFileTransferCommand;
 public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTransferCommandRequest, Guid>
@@ -65,6 +69,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
+        LogContext.PushProperty("fileTransferId", fileTransferId);
         await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
