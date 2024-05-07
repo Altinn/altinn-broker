@@ -3,10 +3,10 @@ param tenantId string
 param appName string
 param namePrefix string
 
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers@2022-03-08-preview' existing = {
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' existing = {
   name: '${namePrefix}-pgflex'
 }
-resource databaseAccess 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2022-03-08-preview' = {
+resource databaseAccess 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2022-12-01' = {
   name: principalId
   parent: database
   properties: {
