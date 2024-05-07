@@ -1,6 +1,6 @@
 targetScope = 'subscription'
 
-resource StorageAccounts 'Microsoft.Security/pricings@2023-01-01' = {
+resource StorageAccounts 'Microsoft.Security/pricings@2024-01-01' = {
   name: 'StorageAccounts'
   properties: {
     pricingTier: 'Standard'

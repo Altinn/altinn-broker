@@ -9,9 +9,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Altinn.Broker/bin/Debug/net8.0/Altinn.Broker.dll",
+            "program": "${workspaceFolder}/src/Altinn.Broker.API/bin/Debug/net8.0/Altinn.Broker.API.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/Altinn.Broker",
+            "cwd": "${workspaceFolder}/src/Altinn.Broker.API",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",

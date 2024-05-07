@@ -9,10 +9,10 @@
   <ItemGroup>
     <PackageReference Include="Altinn.ApiClients.Maskinporten" Version="9.1.0" />
     <PackageReference Include="Altinn.Common.PEP" Version="4.0.0" />
-    <PackageReference Include="Altinn.Platform.Models" Version="1.5.0" />
-    <PackageReference Include="Azure.Identity" Version="1.10.4" />
-    <PackageReference Include="Azure.ResourceManager" Version="1.11.0" />
-    <PackageReference Include="Azure.ResourceManager.Storage" Version="1.2.1" />
+    <PackageReference Include="Altinn.Platform.Models" Version="1.6.0" />
+    <PackageReference Include="Azure.Identity" Version="1.11.2" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.11.1" />
+    <PackageReference Include="Azure.ResourceManager.Storage" Version="1.2.2" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.12" />
     <PackageReference Include="Hangfire.Core" Version="1.8.12" />
