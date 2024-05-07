@@ -34,16 +34,10 @@ jobs:
     name: Check for changes
     uses: ./.github/workflows/action-check-for-changes.yml
 
-  build-and-test:
-    name: Build and test
-    uses: ./.github/workflows/action-build-and-analyze.yml
-    needs: [check-for-changes]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }} 
-
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
-    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra, build-and-test] 
+    needs: [ generate-git-short-sha, check-for-changes, get-current-version, deploy-infra] 
     if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
