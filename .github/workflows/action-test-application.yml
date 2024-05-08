@@ -1,10 +1,10 @@
-name: .NET Analysis
+name: Test application
 on:
   workflow_call:
   workflow_dispatch:
 jobs:
-  build-test-analyze:
-    name: Build, test & analyze
+  test-application:
+    name: Test application
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
