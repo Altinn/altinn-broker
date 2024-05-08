@@ -42,7 +42,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-11-02-p
   }
 }
 resource application_insights_action 'Microsoft.Insights/actionGroups@2023-01-01' =
-  if (emailReceiver != null) {
+  if (emailReceiver != null && emailReceiver != '') {
     name: '${namePrefix}-action'
     location: 'global' // action group locations is limited, change to use location variable when new locations is added
     dependsOn: [application_insights, containerAppEnvironment]
@@ -58,7 +58,7 @@ resource application_insights_action 'Microsoft.Insights/actionGroups@2023-01-01
     }
   }
 resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' =
-  if (emailReceiver != null) {
+  if (emailReceiver != null && emailReceiver != '') {
     name: '${namePrefix}-500-exception-occured'
     location: location
     properties: {
