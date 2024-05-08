@@ -15,31 +15,25 @@ jobs:
           dotnet-version: |
             8.0.x
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+
       - name: Format
         run: |
-          dotnet format Altinn.Broker.sln --verify-no-changes --verbosity diagnostic  --include ./src/**
+          dotnet format --verify-no-changes --verbosity diagnostic  --include ./src/**
 
       - name: Start dependencies for tests (docker-compose)
         run: |
           docker-compose up -d
 
+      - name: Restore
+        run: dotnet restore
+
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        run: |
-          dotnet test --no-build --configuration Release \
-          -v q \
-          --collect:"XPlat Code Coverage" \
-          --results-directory TestResults/ \
-          --logger "trx;" \
-          --configuration release \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
-
-      - name: Process .NET test result
-        if: ${{ failure() }}
-        uses: NasAmin/trx-parser@v0.6.0
-        with:
-          TRX_PATH: ${{ github.workspace }}/TestResults
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  
+        run: dotnet test --no-build --configuration Release
