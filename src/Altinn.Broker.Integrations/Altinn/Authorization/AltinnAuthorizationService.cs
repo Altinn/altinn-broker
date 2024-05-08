@@ -25,8 +25,6 @@ public class AltinnAuthorizationService : IAuthorizationService
 
     public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<AltinnAuthorizationService> logger)
     {
-        httpClient.BaseAddress = new Uri(altinnOptions.Value.PlatformGatewayUrl);
-        httpClient.DefaultRequestHeaders.Add("Authorization", httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString());
         httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", altinnOptions.Value.PlatformSubscriptionKey);
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
