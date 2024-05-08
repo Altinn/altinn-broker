@@ -36,6 +36,12 @@ jobs:
     name: Check for changes
     uses: ./.github/workflows/action-check-for-changes.yml
 
+  test:	
+    name: Build and test	
+    uses: ./.github/workflows/action-test-application.yml	
+    needs: [check-for-changes]	
+    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' || needs.check-for-changes.outputs.hasMigrationChanges == 'true' }}
+
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
