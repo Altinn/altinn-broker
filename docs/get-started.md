@@ -37,7 +37,6 @@ You can get it by contacting us at [Altinn@Slack#produkt-formidling](https://joi
 
 ### 1. Register Maskinporten Clients
 Register Maskinporten clients to authenticate with the Broker API, assigning them relevant scopes:
-- `altinn:authorization:pdp` - Required for all broker API clients for authorization access.
 - `altinn:broker.write` - For clients sending files.
 - `altinn:broker.read` - For clients receiving files.
 
