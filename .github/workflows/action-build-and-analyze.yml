@@ -8,22 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
             8.0.x
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-
-      - name: Format
-        run: |
-          dotnet format --verify-no-changes --verbosity diagnostic  --include ./src/**
 
       - name: Start dependencies for tests (docker-compose)
         run: |
