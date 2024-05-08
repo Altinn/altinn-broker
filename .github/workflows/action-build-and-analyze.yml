@@ -23,11 +23,12 @@ jobs:
         run: |
           docker-compose up -d
 
-      - name: Build & Test
-        run: |
-          dotnet build Altinn.Broker.sln -v q
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
 
-          dotnet test Altinn.Broker.sln \
+      - name: Test
+        run: |
+          dotnet test --no-build --configuration Release \
           -v q \
           --collect:"XPlat Code Coverage" \
           --results-directory TestResults/ \
@@ -41,3 +42,4 @@ jobs:
         with:
           TRX_PATH: ${{ github.workspace }}/TestResults
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
