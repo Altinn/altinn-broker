@@ -37,7 +37,7 @@ jobs:
     uses: ./.github/workflows/action-check-for-changes.yml
 
   test:	
-    name: Build and test	
+    name: Test application	
     uses: ./.github/workflows/action-test-application.yml	
     needs: [check-for-changes]	
     if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' || needs.check-for-changes.outputs.hasMigrationChanges == 'true' }}
@@ -45,7 +45,7 @@ jobs:
   publish:
     name: Build and publish docker images
     uses: ./.github/workflows/action-build-and-push.yml
-    needs: [get-current-version, generate-git-short-sha, check-for-changes]
+    needs: [get-current-version, generate-git-short-sha, check-for-changes, test]
     if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     with:
       dockerImageBaseName: ghcr.io/altinn/altinn-broker
@@ -54,7 +54,7 @@ jobs:
   deploy-infra:
     name: Deploy infrastructure
     if: ${{ inputs.initialDeploy || needs.check-for-changes.outputs.hasAzureChanges == 'true' }}
-    needs: [check-for-changes, get-current-version]
+    needs: [check-for-changes, get-current-version, test]
     uses: ./.github/workflows/action-deploy-infra.yml
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_OIDC_TEST_CLIENT_ID }}
@@ -84,6 +84,7 @@ jobs:
         generate-git-short-sha,
         publish,
         deploy-infra, # we want deployment of app to be dependent on deployment of infrastructure, but if infrastructure is skipped, we still want to deploy the app
+        test
       ]
     if: ${{ (inputs.initialDeploy ||  needs.check-for-changes.outputs.hasBackendChanges == 'true')  && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/action-deploy-app.yml
