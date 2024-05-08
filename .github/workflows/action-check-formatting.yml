@@ -7,19 +7,14 @@ jobs:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
-      - name: "Checkout Altinn Broker Repository"
-        uses: actions/checkout@v4
-        with:
-          repository: "Altinn/altinn-broker"
-          submodules: true  # or 'recursive' for recursive submodules
-          ref: 'main'
+        - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
+        - name: Setup .NET
+          uses: actions/setup-dotnet@v4
+          with:
+           dotnet-version: |
             8.0.x
 
-      - name: Format
-        run: |
-          dotnet format --verify-no-changes --verbosity diagnostic --include ./src/**
+        - name: Format
+          run: |
+            dotnet format --verify-no-changes --verbosity diagnostic --include ./src/**
