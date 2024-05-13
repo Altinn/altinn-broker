@@ -1,7 +1,6 @@
-name: Formatting
+name: Check formatting
 on:
-  workflow_dispatch:
-  workflow_call:
+  pull_request:
 
 jobs:
   check-formatting:
