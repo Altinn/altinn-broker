@@ -1,4 +1,4 @@
-name: Check formatting
+name: Formatting
 on:
   workflow_dispatch:
   workflow_call:
