@@ -25,7 +25,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
         {
             return null;
         }
