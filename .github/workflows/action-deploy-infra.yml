@@ -16,7 +16,7 @@ on:
         required: false
       AZURE_SUBSCRIPTION_ID:
         required: true
-      AZURE_SOURCE_KEY_VAULT_NAME:
+      AZURE_ENVIRONMENT_KEY_VAULT_NAME:
         required: true
       AZURE_NAME_PREFIX:
         required: true
@@ -86,13 +86,13 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
           AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
-          SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_KEY_VAULT_NAME }}
+          SOURCE_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
           TEST_CLIENT_ID: ${{ secrets.AZURE_TEST_ACCESS_CLIENT_ID }}
           NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
-          KEY_VAULT_NAME: ${{ secrets.AZURE_SOURCE_KEY_VAULT_NAME }}
+          KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
           CLIENT_SECRET: ${{ SECRETS.AZURE_CLIENT_SECRET }}
           MASKINPORTEN_JWK: ${{ SECRETS.MASKINPORTEN_JWK }}
