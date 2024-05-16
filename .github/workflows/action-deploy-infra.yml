@@ -40,8 +40,8 @@ on:
       environment:
         required: true
         type: string
-      version:
-        description: "Current version to use as tag"
+      imageTag:
+        description: "Current imageTag"
         required: true
         type: string
       ref:
@@ -104,7 +104,7 @@ jobs:
           template: ./.azure/infrastructure/main.bicep
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           deploymentMode: Incremental
-          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-${{ inputs.version }}
+          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-${{ inputs.imageTag }}
           region: ${{ inputs.region }}
           resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
           failOnStdErr: false

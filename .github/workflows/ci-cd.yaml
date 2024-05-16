@@ -1,0 +1,85 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+    - "Test/**" # ignore changes to tests
+
+jobs:
+  get-current-version:
+    name: Get current version
+    uses: ./.github/workflows/action-get-current-version.yml
+
+  check-for-changes:
+    name: Check for changes
+    uses: ./.github/workflows/action-check-for-changes.yml
+
+  automated-tests:	
+    name: Test application	
+    uses: ./.github/workflows/action-test-application.yml	
+    needs: [check-for-changes]	
+    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' || needs.check-for-changes.outputs.hasMigrationChanges == 'true' }}
+
+  publish:
+    name: Build and publish new version
+    uses: ./.github/workflows/action-build-and-push.yml
+    needs: [get-current-version, check-for-changes, automated-tests]
+    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
+    with:
+      dockerImageBaseName: ghcr.io/altinn/altinn-broker
+      version: ${{ needs.get-current-version.outputs.imageTag }}
+
+  deploy-test:
+    name: Deploy to test environment for internal testers
+    uses: ./.github/workflows/action-deploy-solution.yml
+    needs: [ 
+      publish,
+      get-current-version,
+      get-current-version,
+      check-for-changes
+    ]
+    secrets: inherit
+    with:
+      environment: TEST
+      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
+      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
+      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
+
+
+  deploy-staging:
+    name: Deploy to staging environment for external testers
+    needs: [ 
+      deploy-test,
+      get-current-version,
+      get-current-version,
+      check-for-changes
+    ]
+    uses: ./.github/workflows/action-deploy-solution.yml
+    secrets: inherit
+    with:
+      environment: STAGING
+      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
+      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
+      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
+
+
+  deploy-production:
+    name: Deploy to production
+    needs: [ 
+      deploy-staging,
+      get-current-version,
+      get-current-version,
+      check-for-changes
+    ]
+    uses: ./.github/workflows/action-deploy-solution.yml
+    secrets: inherit
+    with:
+      environment: PROD
+      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
+      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
+      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
+

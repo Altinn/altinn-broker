@@ -23,8 +23,8 @@ on:
       environment:
         required: true
         type: string
-      version:
-        description: "Current version to use as tag"
+      imageTag:
+        description: "Current image version"
         required: true
         type: string
       ref:
@@ -64,13 +64,13 @@ jobs:
           KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
           NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
-          APP_VERSION: ${{ inputs.version }}
+          APP_VERSION: ${{ inputs.imageTag }}
         with:
           scope: resourcegroup
           template: ./.azure/applications/migration/main.bicep
           resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
           deploymentMode: Incremental
-          deploymentName: migration-${{ inputs.version }}
+          deploymentName: migration-${{ inputs.imageTag }}
           region: ${{ inputs.region }}
           failOnStdErr: false
           parameters: ./.azure/applications/migration/params.bicepparam
@@ -100,13 +100,13 @@ jobs:
           azcliversion: ${{ env.AZ_CLI_VERSION }}
           inlineScript: |
             chmod +x ./.github/tools/containerAppJobVerifier.sh
-            ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ secrets.AZURE_NAME_PREFIX }}-rg' ${{ inputs.version }}
+            ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ secrets.AZURE_NAME_PREFIX }}-rg' ${{ inputs.imageTag }}
 
       - name: Deploy app (${{ inputs.environment }})
         uses: azure/arm-deploy@v2
         id: deploy
         env:
-          IMAGE_TAG: ${{ inputs.version }}
+          IMAGE_TAG: ${{ inputs.imageTag }}
           ENVIRONMENT: ${{ inputs.environment }}
           KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
           KEY_VAULT_URL: https://${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
@@ -119,7 +119,7 @@ jobs:
           resourceGroupName: ${{ secrets.AZURE_NAME_PREFIX }}-rg
           template: ./.azure/applications/api/main.bicep
           deploymentMode: Incremental
-          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-${{ inputs.version }}
+          deploymentName: ${{ secrets.AZURE_NAME_PREFIX }}-${{ inputs.imageTag }}
           region: ${{ inputs.region }}
           failOnStdErr: false
           parameters: ./.azure/applications/api/params.bicepparam

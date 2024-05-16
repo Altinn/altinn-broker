@@ -7,15 +7,25 @@ on:
       version:
         description: "Version"
         value: ${{ jobs.get-current-version.outputs.version }}
+      imageTag:
+        description: "Image tag"
+        value: ${{ jobs.get-current-version.outputs.imageTag }}
 jobs:
   get-current-version:
     name: Filter
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-current-version.outputs.version }}
+      imageTag: ${{ steps.set-current-version.outputs.imageTag }}
     steps:
       - name: "Checkout GitHub Action"
         uses: actions/checkout@v4
       - name: Set current version
         id: set-current-version
         run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+      - name: Set git short sha
+        id: set-git-short-sha
+        run: echo "gitShortSha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Set image tag
+        id: set-image-tag
+        run: echo "imageTag=$version-$gitShortSha"
