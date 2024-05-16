@@ -47,7 +47,6 @@ jobs:
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
-
   deploy-staging:
     name: Deploy to staging environment for external testers
     needs: [ 
@@ -65,10 +64,9 @@ jobs:
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
-
   deploy-production:
     name: Deploy to production
-    needs: [ 
+    needs: [
       deploy-staging,
       get-current-version,
       get-current-version,
@@ -82,4 +80,3 @@ jobs:
       hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
-
