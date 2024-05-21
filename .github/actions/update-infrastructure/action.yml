@@ -24,9 +24,6 @@ inputs:
   AZURE_TENANT_ID:
     description: "Tenant ID for the service principal"
     required: true
-  AZURE_OBJECT_ID:
-    description: "Object ID for the service principal"
-    required: true
   AZURE_TEST_ACCESS_CLIENT_ID:
     description: "Client ID for the test access service principal"
     required: true
@@ -80,15 +77,12 @@ runs:
       uses: azure/arm-deploy@v2
       id: deploy
       env:
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         ENVIRONMENT: ${{ inputs.environment }}
         BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
-        AZURE_NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
-        SOURCE_KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
-        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
         TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
-        OBJECT_ID: ${{ inputs.AZURE_OBJECT_ID }}
+        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
         TEST_CLIENT_ID: ${{ inputs.AZURE_TEST_ACCESS_CLIENT_ID }}
-        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         MIGRATION_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
         CLIENT_SECRET: ${{ inputs.AZURE_CLIENT_SECRET }}
