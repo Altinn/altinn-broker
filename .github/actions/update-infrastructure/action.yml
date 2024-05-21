@@ -1,0 +1,114 @@
+name: Update infrastructure
+
+description: "Update the infrastructure to the version given by git ref"
+
+inputs:
+  region:
+    description: "Azure region to deploy to"
+    required: true
+  environment:
+    description: "Github environment to deploy from"
+    required: true
+  AZURE_NAME_PREFIX:
+    description: "Prefix for all resources"
+    required: true
+  AZURE_SUBSCRIPTION_ID: 
+    description: "Subscription ID for the service principal"
+    required: true
+  AZURE_ENVIRONMENT_KEY_VAULT_NAME:
+    description: "Name of the key vault"
+    required: true
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
+  AZURE_OBJECT_ID:
+    description: "Object ID for the service principal"
+    required: true
+  AZURE_TEST_ACCESS_CLIENT_ID:
+    description: "Client ID for the test access service principal"
+    required: true
+  AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
+    description: "Name of the storage account for migration files"
+    required: true
+  AZURE_CLIENT_SECRET:
+    description: "Client secret for the service principal"
+    required: true
+  MASKINPORTEN_JWK:
+    description: "JWK for maskinporten"
+    required: true
+  MASKINPORTEN_CLIENT_ID:
+    description: "Client ID for maskinporten"
+    required: true
+  PLATFORM_SUBSCRIPTION_KEY:
+    description: "Subscription key for platform"
+    required: true
+  NOTIFICATION_EMAIL:
+    description: "Email for notifications"
+    required: true
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Checkout GitHub Action"
+      uses: actions/checkout@v4
+
+    - name: Get version
+      id: get-version
+      uses: ./.github/actions/get-current-version
+
+    - name: OIDC Login to Azure Public Cloud
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Generate postgresql password
+      id: pwd-generator
+      shell: pwsh
+      run: |
+        Import-module "./.github/tools/pwdGenerator.ps1" -Force
+        $password = (GeneratePassword -length 30).Password
+        echo "::add-mask::$password"
+        echo "::set-output name=postgresqlPassword::$password"
+
+    - name: Deploy to Azure
+      uses: azure/arm-deploy@v2
+      id: deploy
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
+        AZURE_NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        SOURCE_KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
+        TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
+        OBJECT_ID: ${{ inputs.AZURE_OBJECT_ID }}
+        TEST_CLIENT_ID: ${{ inputs.AZURE_TEST_ACCESS_CLIENT_ID }}
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        MIGRATION_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
+        CLIENT_SECRET: ${{ inputs.AZURE_CLIENT_SECRET }}
+        MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
+        MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
+        PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
+        NOTIFICATION_EMAIL: ${{ inputs.NOTIFICATION_EMAIL }}
+      with:
+        scope: subscription
+        template: ./.azure/infrastructure/main.bicep
+        subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+        deploymentMode: Incremental
+        deploymentName: ${{ inputs.AZURE_NAME_PREFIX }}-${{ steps.get-version.outputs.imageTag }}
+        region: ${{ inputs.region }}
+        resourceGroupName: ${{ inputs.AZURE_NAME_PREFIX }}-rg
+        failOnStdErr: false
+        parameters: ./.azure/infrastructure/params.bicepparam
+
+    - name: Logout from azure
+      shell: bash
+      if: ${{failure() || success()}}
+      continue-on-error: true
+      run: az logout

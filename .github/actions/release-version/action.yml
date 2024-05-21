@@ -1,0 +1,81 @@
+name: Release version
+
+description: "Deploys new version of the application to Azure"
+
+inputs:
+  region:
+    description: "Azure region to deploy to"
+    required: true
+  environment:
+    description: "Github environment to deploy from"
+    required: true
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
+  AZURE_SUBSCRIPTION_ID:  
+    description: "Subscription ID for the service principal"
+    required: true
+  AZURE_ENVIRONMENT_KEY_VAULT_NAME:
+    description: "Name of the key vault"
+    required: true
+  AZURE_NAME_PREFIX:
+    description: "Prefix for all resources"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Checkout repository"
+      uses: actions/checkout@v4
+
+    - name: OIDC Login to Azure Public Cloud
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Get version
+      id: get-version
+      uses: ./.github/actions/get-current-version
+      
+    - name: Deploy app
+      uses: azure/arm-deploy@v2
+      id: deploy
+      env:
+        IMAGE_TAG: ${{ steps.get-version.outputs.imageTag }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
+        TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
+      with:
+        scope: subscription
+        subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ inputs.AZURE_NAME_PREFIX }}-rg
+        template: ./.azure/applications/api/main.bicep
+        deploymentMode: Incremental
+        deploymentName: ${{ inputs.AZURE_NAME_PREFIX }}-${{ steps.get-version.outputs.imageTag }}
+        region: ${{ inputs.region }}
+        failOnStdErr: false
+        parameters: ./.azure/applications/api/params.bicepparam
+
+    - name: Verify deployment
+      uses: azure/CLI@v2
+      id: verify-deployment
+      with:
+        timeout-minutes: 3
+        azcliversion: 2.56.0
+        inlineScript: |
+          chmod +x ./.github/tools/revisionVerifier.sh
+          ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ inputs.AZURE_NAME_PREFIX }}-rg
+
+    - name: Logout from azure
+      shell: bash
+      if: ${{failure() || success()}}
+      continue-on-error: true
+      run: az logout

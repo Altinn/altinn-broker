@@ -1,0 +1,97 @@
+name: Deploy to environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+      hasAzureChanges:
+        type: string
+      hasBackendChanges:
+        type: string
+      hasMigrationChanges:
+        type: string
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options:
+          - test
+          - staging
+          - production
+      hasAzureChanges:
+        description: Update infrastructure
+        type: boolean
+      hasBackendChanges:
+        description: Release version
+        type: boolean
+      hasMigrationChanges:
+        description: Migrate database
+        type: boolean
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions: 
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: List results
+      id: list-results
+      shell: bash
+      run: |
+        echo "Azure related files changed: ${{ inputs.hasAzureChanges }}"
+        echo "Backend related files changed: ${{ inputs.hasBackendChanges }}"
+        echo "Migration related files changed: ${{ inputs.hasMigrationChanges }}"
+
+    - name: Update infrastructure
+      if: ${{ inputs.hasAzureChanges == 'true' || inputs.hasAzureChanges == true }}
+      uses: ./.github/actions/update-infrastructure
+      with:
+        region: norwayeast
+        environment: ${{ inputs.environment }}
+        AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+        AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        AZURE_OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_TEST_ACCESS_CLIENT_ID: ${{ secrets.AZURE_TEST_ACCESS_CLIENT_ID }}
+        AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
+        AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
+        MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
+        PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
+        NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+
+    - name: Migrate database
+      if: ${{ inputs.hasMigrationChanges == 'true' || inputs.hasMigrationChanges == true }}
+      uses: ./.github/actions/migrate-database
+      with:
+        region: norwayeast
+        environment: ${{ inputs.environment }}
+        AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+        AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        AZURE_OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
+
+    - name: Release version
+      if: ${{ inputs.hasBackendChanges == 'true' || inputs.hasBackendChanges == true }}
+      uses: ./.github/actions/release-version
+      with:
+        region: norwayeast
+        environment: ${{ inputs.environment }}
+        AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+        AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        AZURE_OBJECT_ID: ${{ secrets.AZURE_OBJECT_ID }}
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

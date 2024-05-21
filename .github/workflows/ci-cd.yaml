@@ -7,76 +7,104 @@ on:
     - "Test/**" # ignore changes to tests
 
 jobs:
-  get-current-version:
-    name: Get current version
-    uses: ./.github/workflows/action-get-current-version.yml
-
   check-for-changes:
     name: Check for changes
-    uses: ./.github/workflows/action-check-for-changes.yml
+    runs-on: ubuntu-latest
+    outputs:
+      hasAzureChanges: ${{ steps.check-for-changes.outputs.hasAzureChanges }}
+      hasBackendChanges: ${{ steps.check-for-changes.outputs.hasBackendChanges }}
+      hasMigrationChanges: ${{ steps.check-for-changes.outputs.hasMigrationChanges }}
+    steps:        
+      - uses: actions/checkout@v4
 
-  automated-tests:	
-    name: Test application	
-    uses: ./.github/workflows/action-test-application.yml	
-    needs: [check-for-changes]	
+      - name: "Check for changes"
+        id: check-for-changes
+        uses: ./.github/actions/check-for-changes
+
+      - name: "Inform about infrastructure skip"
+        if: ${{ steps.check-for-changes.outputs.hasAzureChanges != 'true' }}
+        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Infrastructure-as-code did not change. Infrastructure update will be skipped."
+
+      - name: "Inform about publish skip"
+        if: ${{ steps.check-for-changes.outputs.hasBackendChanges != 'true' }}
+        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Code not changed. Will not publish and release new version."
+
+      - name: "Inform about database migration skip"
+        if: ${{ steps.check-for-changes.outputs.hasMigrationChanges != 'true' }}
+        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Migrations did not change. No migration will run."
+
+  test:	
+    name: QA	
+    uses: ./.github/workflows/test-application.yml	
+    needs: [check-for-changes]
     if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' || needs.check-for-changes.outputs.hasMigrationChanges == 'true' }}
 
   publish:
-    name: Build and publish new version
-    uses: ./.github/workflows/action-build-and-push.yml
-    needs: [get-current-version, check-for-changes, automated-tests]
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [check-for-changes]
     if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
-    with:
-      dockerImageBaseName: ghcr.io/altinn/altinn-broker
-      version: ${{ needs.get-current-version.outputs.imageTag }}
+    permissions: 
+      packages: write
+      contents: read
+    steps:        
+      - uses: actions/checkout@v4
+      - name: "Publish image"
+        uses: ./.github/actions/publish-image
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          dockerImageBaseName: ghcr.io/ceredron/github-env-testing
 
   deploy-test:
-    name: Deploy to test environment for internal testers
-    uses: ./.github/workflows/action-deploy-solution.yml
+    name: Internal test
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: always() && !failure() && !cancelled() 
     needs: [ 
       publish,
-      get-current-version,
-      get-current-version,
       check-for-changes
     ]
+    permissions: 
+      id-token: write
+      contents: read
     secrets: inherit
     with:
-      environment: TEST
-      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      environment: test
       hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   deploy-staging:
-    name: Deploy to staging environment for external testers
+    name: Staging
     needs: [ 
       deploy-test,
-      get-current-version,
-      get-current-version,
       check-for-changes
     ]
-    uses: ./.github/workflows/action-deploy-solution.yml
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: (!failure() && !cancelled()) 
+    permissions: 
+      id-token: write
+      contents: read
     secrets: inherit
     with:
-      environment: STAGING
-      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      environment: staging
       hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   deploy-production:
-    name: Deploy to production
+    name: Production
     needs: [
       deploy-staging,
-      get-current-version,
-      get-current-version,
       check-for-changes
     ]
-    uses: ./.github/workflows/action-deploy-solution.yml
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: (!failure() && !cancelled())
+    permissions: 
+      id-token: write
+      contents: read
     secrets: inherit
     with:
-      environment: PROD
-      imageTag: ${{ needs.get-current-version.outputs.imageTag }}
+      environment: production
       hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
