@@ -1,0 +1,87 @@
+name: Migrate database
+
+description: "Migrate the database to the version given by git ref"
+
+inputs:
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
+  AZURE_SUBSCRIPTION_ID:  
+    description: "Subscription ID for the service principal"
+    required: true
+  AZURE_ENVIRONMENT_KEY_VAULT_NAME:
+    description: "Name of the key vault"
+    required: true
+  AZURE_NAME_PREFIX:
+    description: "Prefix for all resources"
+    required: true
+  AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
+    description: "Name of the storage account for migration files"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Checkout repository"
+      uses: actions/checkout@v4
+
+    - name: Get version
+      id: get-version
+      uses: ./.github/actions/get-current-version
+
+    - name: OIDC Login to Azure Public Cloud
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Deploy migration job
+      uses: azure/arm-deploy@v2
+      id: migration-job
+      env:
+        KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
+        KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        APP_VERSION: ${{ steps.get-version.outputs.imageTag }}
+      with:
+        scope: resourcegroup
+        template: ./.azure/applications/migration/main.bicep
+        resourceGroupName: ${{ inputs.AZURE_NAME_PREFIX }}-rg
+        deploymentMode: Incremental
+        deploymentName: migration-${{ steps.get-version.outputs.imageTag }}
+        region: norwayeast
+        failOnStdErr: false
+        parameters: ./.azure/applications/migration/params.bicepparam
+
+    - name: Upload Migration Files to Azure File Share
+      uses: azure/CLI@v2
+      with:
+        azcliversion: 2.56.0
+        inlineScript: |
+          az storage copy --source ./src/Altinn.Broker.Persistence/Migrations --destination https://${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}.file.core.windows.net/migrations --recursive
+
+    - name: Start migration job
+      uses: azure/CLI@v2
+      with:
+        azcliversion: 2.56.0
+        inlineScript: |
+          az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ inputs.AZURE_NAME_PREFIX }}-rg
+
+    - name: Verify migration
+      uses: azure/CLI@v2
+      id: verify-migration
+      with:
+        azcliversion: 2.56.0
+        inlineScript: |
+          chmod +x ./.github/tools/containerAppJobVerifier.sh
+          ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ inputs.AZURE_NAME_PREFIX }}-rg' ${{ steps.get-version.outputs.imageTag }}
+
+    - name: Logout from azure
+      shell: bash 
+      if: ${{failure() || success()}}
+      continue-on-error: true
+      run: az logout

@@ -7,7 +7,7 @@ param environment = readEnvironmentVariable('ENVIRONMENT')
 // secrets
 param brokerPgAdminPassword = readEnvironmentVariable('BROKER_PG_ADMIN_PASSWORD')
 param tenantId = readEnvironmentVariable('TENANT_ID')
-param object_id = readEnvironmentVariable('CLIENT_ID')
+param azureClientId = readEnvironmentVariable('CLIENT_ID')
 param test_client_id = readEnvironmentVariable('TEST_CLIENT_ID')
 param sourceKeyVaultName = readEnvironmentVariable('KEY_VAULT_NAME')
 param migrationsStorageAccountName = readEnvironmentVariable('MIGRATION_STORAGE_ACCOUNT_NAME')
