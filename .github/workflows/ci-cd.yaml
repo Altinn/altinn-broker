@@ -53,7 +53,7 @@ jobs:
         uses: ./.github/actions/publish-image
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          dockerImageBaseName: ghcr.io/ceredron/github-env-testing
+          dockerImageBaseName: ghcr.io/altinn/altinn-broker
 
   deploy-test:
     name: Internal test

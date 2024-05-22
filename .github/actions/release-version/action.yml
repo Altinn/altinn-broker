@@ -9,12 +9,6 @@ inputs:
   environment:
     description: "Github environment to deploy from"
     required: true
-  AZURE_CLIENT_ID:
-    description: "Client ID for the service principal"
-    required: true
-  AZURE_TENANT_ID:
-    description: "Tenant ID for the service principal"
-    required: true
   AZURE_SUBSCRIPTION_ID:  
     description: "Subscription ID for the service principal"
     required: true
@@ -23,6 +17,9 @@ inputs:
     required: true
   AZURE_NAME_PREFIX:
     description: "Prefix for all resources"
+    required: true
+  PLATFORM_BASE_URL:
+    description: "Base url for Altinn platform"
     required: true
 
 runs:
@@ -51,8 +48,7 @@ runs:
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
-        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
-        TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
+        PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}

@@ -42,14 +42,7 @@ public class AzureResourceManagerService : IResourceManager
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _hostEnvironment = hostingEnvironment;
-        if (string.IsNullOrWhiteSpace(_resourceManagerOptions.ClientId))
-        {
-            _credentials = new DefaultAzureCredential();
-        }
-        else
-        {
-            _credentials = new ClientSecretCredential(_resourceManagerOptions.TenantId, _resourceManagerOptions.ClientId, _resourceManagerOptions.ClientSecret);
-        }
+        _credentials = new DefaultAzureCredential();
         _armClient = new ArmClient(_credentials);
         _serviceOwnerRepository = serviceOwnerRepository;
         _logger = logger;
@@ -58,6 +51,7 @@ public class AzureResourceManagerService : IResourceManager
     public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
+        _logger.LogInformation($"Using app identity for deploying Azure resources"); // TODO remove
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
 
         var storageAccountName = GenerateStorageAccountName();
@@ -69,7 +63,6 @@ public class AzureResourceManagerService : IResourceManager
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
         resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
-
         var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
 
         // Create or get the storage account

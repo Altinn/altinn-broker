@@ -5,8 +5,6 @@ param environment string
 param tenant_id string
 @secure()
 param test_client_id string
-@secure()
-param azureClientId string
 @export()
 type Sku = {
   name: 'standard'
@@ -28,19 +26,6 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
           {
             applicationId: null
             tenantId: tenant_id
-            objectId: azureClientId
-            permissions: {
-              keys: []
-              secrets: [
-                'Get'
-                'List'
-              ]
-              certificates: []
-            }
-          }
-          {
-            applicationId: null
-            tenantId: tenant_id
             objectId: test_client_id
             permissions: {
               keys: []
@@ -52,22 +37,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
               certificates: []
             }
           }
-        ]
-      : [
-          {
-            applicationId: null
-            tenantId: tenant_id
-            objectId: azureClientId
-            permissions: {
-              keys: []
-              secrets: [
-                'Get'
-                'List'
-              ]
-              certificates: []
-            }
-          }
-        ]
+        ]: []
   }
 }
 
