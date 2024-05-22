@@ -24,7 +24,6 @@ inputs:
   AZURE_TENANT_ID:
     description: "Tenant ID for the service principal"
     required: true
-    required: true
   AZURE_TEST_ACCESS_CLIENT_ID:
     description: "Client ID for the test access service principal"
     required: true
