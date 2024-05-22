@@ -25,7 +25,7 @@ runs:
 
     - name: Create release
       shell: bash
-      if: ${{ set-latest-tag.outputs.latest_tag !=  steps.get-version.outputs.version }}
+      if: ${{ steps.set-latest-tag.outputs.latest_tag !=  steps.get-version.outputs.version }}
       env:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
