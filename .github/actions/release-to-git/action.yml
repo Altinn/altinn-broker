@@ -1,0 +1,36 @@
+name: Create release
+
+description: Create a release to git if the version has bumped
+
+inputs:
+  GITHUB_TOKEN:
+    description: "GitHub token"
+    required: true
+    default: ${{ github.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Get version
+      id: get-version
+      uses: ./.github/actions/get-current-version
+
+    - name: set latest tag
+      shell: bash
+      id: set-latest-tag
+      run: |
+        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_EN
+
+    - name: Create release
+      shell: bash
+      if: ${{ latest_tag !=  steps.get-version.outputs.version }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref_name }}
+      run: |
+        gh release create "$tag" \
+        --repo="$GITHUB_REPOSITORY" \
+        --title="v${steps.get-version.outputs.version}" \
+        --generate-notes

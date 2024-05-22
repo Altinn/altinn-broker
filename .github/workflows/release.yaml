@@ -1,0 +1,22 @@
+name: release
+
+on:
+  push: 
+    branches:
+      - main
+      - feat/automatic-release-notes
+
+jobs:
+  release-to-git:
+    name: release-to-git
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write
+      contents: read
+    steps:
+      - name: release
+        if: (!failure() && !cancelled())
+        uses: ./.github/actions/release-to-git
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+
