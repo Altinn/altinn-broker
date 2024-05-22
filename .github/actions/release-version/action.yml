@@ -15,6 +15,12 @@ inputs:
   AZURE_ENVIRONMENT_KEY_VAULT_NAME:
     description: "Name of the key vault"
     required: true
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
   AZURE_NAME_PREFIX:
     description: "Prefix for all resources"
     required: true
