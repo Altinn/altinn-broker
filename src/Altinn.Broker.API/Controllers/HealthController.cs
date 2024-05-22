@@ -54,7 +54,7 @@ namespace Altinn.Broker.Controllers
             {
                 return BadRequest($"Resource groups not found under subscription with id: {subscription.Id}. Are the service principal environment variables set?");
             }
-            await resourceGroupCollection.GetAsync($"altinn-{_azureResourceManagerOptions.Environment}-broker-rg");
+            await resourceGroupCollection.GetAsync(_azureResourceManagerOptions.ApplicationResourceGroupName);
 
             return Ok("Environment properly configured");
         }

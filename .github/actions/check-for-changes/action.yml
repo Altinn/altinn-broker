@@ -1,0 +1,44 @@
+name: "Check for file changes"
+
+description: "Analyses repository to see what is changed since last commit"
+
+outputs:
+  hasAzureChanges:
+    description: "Azure related files changed"
+    value: ${{ steps.check-for-changes.outputs.azure_any_changed }}
+  hasBackendChanges:
+    description: "Backend related files changed"
+    value: ${{ steps.check-for-changes.outputs.backend_any_changed }}
+  hasMigrationChanges:
+    description: "Migration related files changed"
+    value: ${{ steps.check-for-changes.outputs.migrations_any_changed }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        # fetch-depth needs to be 0 in cases where we want to fetch changes since previous tag for example
+        fetch-depth: 0
+
+    - uses: tj-actions/changed-files@v42
+      id: check-for-changes
+      with:
+        files_yaml: |
+          azure:
+            - '.azure/infrastructure/**/*'
+            - '.azure/modules/**/*'
+          backend:
+            - 'src/**/*'
+            - 'Test/**/*'
+          migrations: 
+            - 'src/Altinn.Broker.Persistence/Migrations/*'
+
+    - name: List results
+      id: list-results
+      shell: bash
+      run: |
+        echo "Azure related files changed: ${{ steps.check-for-changes.outputs.azure_any_changed }}"
+        echo "Backend related files changed: ${{ steps.check-for-changes.outputs.backend_any_changed }}"
+        echo "Migration related files changed: ${{ steps.check-for-changes.outputs.migrations_any_changed }}"

@@ -8,7 +8,7 @@ param sourceKeyVaultName string
 @secure()
 param tenantId string
 @secure()
-param object_id string
+param azureClientId string
 @secure()
 param test_client_id string
 @secure()
@@ -39,7 +39,7 @@ var resourceGroupName = '${namePrefix}-rg'
 var secrets = [
   {
     name: 'deploy-id'
-    value: object_id
+    value: azureClientId
   }
   {
     name: 'deploy-secret'
@@ -78,7 +78,7 @@ module environmentKeyVault '../modules/keyvault/create.bicep' = {
     sku: keyVaultSku
     tenant_id: tenantId
     environment: environment
-    object_id: object_id
+    azureClientId: azureClientId
     test_client_id: test_client_id
   }
 }
