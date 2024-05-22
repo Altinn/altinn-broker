@@ -55,25 +55,6 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
   location: location
 }
 
-resource StorageAccounts 'Microsoft.Security/pricings@2024-01-01' = {
-  name: 'StorageAccounts'
-  properties: {
-    pricingTier: 'Standard'
-
-    subPlan: 'DefenderForStorageV2'
-    extensions: [
-      {
-        name: 'OnUploadMalwareScanning'
-        isEnabled: 'True'
-      }
-      {
-        name: 'SensitiveDataDiscovery'
-        isEnabled: 'True'
-      }
-    ]
-  }
-}
-
 module environmentKeyVault '../modules/keyvault/create.bicep' = {
   scope: resourceGroup
   name: 'keyVault'
