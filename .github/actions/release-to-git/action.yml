@@ -25,9 +25,9 @@ runs:
 
     - name: Create release
       shell: bash
-      if: ${{ latest_tag !=  steps.get-version.outputs.version }}
+      if: ${{ set-latest-tag.latest_tag !=  steps.get-version.outputs.version }}
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
       run: |
         gh release create "$tag" \
