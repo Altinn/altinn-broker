@@ -17,6 +17,12 @@ runs:
       id: get-version
       uses: ./.github/actions/get-current-version
 
+    - name: output values
+      shell: bash
+      run: |
+        echo "version=${{ steps.get-version.outputs.version }}"
+        echo "latest_tag=$(git tag | sort --version-sort | tail -n1)"
+
     - name: set latest tag
       shell: bash
       id: set-latest-tag
