@@ -18,6 +18,7 @@ param keyVaultUrl string
 @secure()
 param namePrefix string
 
+var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
 
 var resourceGroupName = '${namePrefix}-rg'
@@ -26,13 +27,19 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
-
 module appIdentity '../../modules/identity/create.bicep' = {
   name: 'appIdentity'
   scope: resourceGroup
   params: {
     namePrefix: namePrefix
     location: location
+  }
+}
+
+module addContributorAccess '../../modules/identity/addContributorAccess.bicep' = {
+  name: 'appDeployToAzureAccess'
+  params: {
+    userAssignedIdentityPrincipalId: appIdentity.outputs.principalId
   }
 }
 
@@ -71,7 +78,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
   dependsOn: [keyVaultReaderAccessPolicyUserIdentity, databaseAccess]
   params: {
     namePrefix: namePrefix
-    image: imageTag
+    image: image
     location: location
     environment: environment
     subscription_id: subscription().subscriptionId
