@@ -11,8 +11,6 @@ param tenantId string
 param azureClientId string
 @secure()
 param test_client_id string
-@secure()
-param deploySecret string
 param environment string
 @secure()
 param namePrefix string
@@ -38,18 +36,6 @@ var resourceGroupName = '${namePrefix}-rg'
 
 var secrets = [
   {
-    name: 'deploy-id'
-    value: azureClientId
-  }
-  {
-    name: 'deploy-secret'
-    value: deploySecret
-  }
-  {
-    name: 'deploy-tenant-id'
-    value: tenantId
-  }
-  {
     name: 'maskinporten-client-id'
     value: maskinportenClientId
   }
@@ -67,6 +53,25 @@ var secrets = [
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
   name: '${namePrefix}-rg'
   location: location
+}
+
+resource StorageAccounts 'Microsoft.Security/pricings@2024-01-01' = {
+  name: 'StorageAccounts'
+  properties: {
+    pricingTier: 'Standard'
+
+    subPlan: 'DefenderForStorageV2'
+    extensions: [
+      {
+        name: 'OnUploadMalwareScanning'
+        isEnabled: 'True'
+      }
+      {
+        name: 'SensitiveDataDiscovery'
+        isEnabled: 'True'
+      }
+    ]
+  }
 }
 
 module environmentKeyVault '../modules/keyvault/create.bicep' = {

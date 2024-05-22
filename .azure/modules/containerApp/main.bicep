@@ -9,21 +9,11 @@ param maskinporten_environment string
 @secure()
 param subscription_id string
 @secure()
-param client_id string
-@secure()
-param tenant_id string
-@secure()
 param principal_id string
 @secure()
 param keyVaultUrl string
 @secure()
-param malwarescan_event_grid_topic_name string
-@secure()
-param userIdentityTenantId string
-@secure()
 param userIdentityClientId string
-@secure()
-param userIdentityPrincipalId string
 @secure()
 param containerAppEnvId string
 
@@ -44,11 +34,8 @@ var containerAppEnvVars = [
   { name: 'AzureResourceManagerOptions__SubscriptionId', value: subscription_id }
   { name: 'AzureResourceManagerOptions__Location', value: 'norwayeast' }
   { name: 'AzureResourceManagerOptions__Environment', value: environment }
-  { name: 'AzureResourceManagerOptions__ClientId', value: client_id }
-  { name: 'AzureResourceManagerOptions__TenantId', value: tenant_id }
-  { name: 'AzureResourceManagerOptions__ClientSecret', secretRef: 'deploy-client-secret' }
   { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
-  { name: 'AzureResourceManagerOptions__MalwareScanEventGridTopicName', value: malwarescan_event_grid_topic_name }
+  { name: 'AzureResourceManagerOptions__MalwareScanEventGridTopicName', value: eventgrid_topic.name }
   { name: 'AZURE_CLIENT_ID', value: userIdentityClientId }
   {
     name: 'AltinnOptions__OpenIdWellKnown'
@@ -81,11 +68,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         transport: 'Auto'
       }
       secrets: [
-        {
-          identity: principal_id
-          keyVaultUrl: '${keyVaultUrl}/secrets/deploy-secret'
-          name: 'deploy-client-secret'
-        }
         {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/platform-subscription-key'
@@ -168,6 +150,25 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
+resource eventgrid_topic 'Microsoft.EventGrid/topics@2022-06-15' = {
+  name: '${namePrefix}-malware-scan-event-topic'
+  location: location
+}
+
+resource eventgrid_event_subscription 'Microsoft.EventGrid/topics/eventSubscriptions@2022-06-15' = {
+  name: '${namePrefix}-malware-scan-event-subscription'
+  parent: eventgrid_topic
+  properties: {
+    destination: {
+      endpointType: 'WebHook'
+      properties: {
+        endpointUrl: 'https://${containerApp.properties.configuration.ingress.fqdn}/broker/api/v1/webhooks/malwarescanresults'
+      }
+    }
+  }
+}
+
 output name string = containerApp.name
 output revisionName string = containerApp.properties.latestRevisionName
 output app object = containerApp
+output eventGridTopicName string = eventgrid_topic.name

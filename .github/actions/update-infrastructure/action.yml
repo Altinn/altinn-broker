@@ -24,14 +24,12 @@ inputs:
   AZURE_TENANT_ID:
     description: "Tenant ID for the service principal"
     required: true
+    required: true
   AZURE_TEST_ACCESS_CLIENT_ID:
     description: "Client ID for the test access service principal"
     required: true
   AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
     description: "Name of the storage account for migration files"
-    required: true
-  AZURE_CLIENT_SECRET:
-    description: "Client secret for the service principal"
     required: true
   MASKINPORTEN_JWK:
     description: "JWK for maskinporten"
@@ -77,15 +75,16 @@ runs:
       uses: azure/arm-deploy@v2
       id: deploy
       env:
-        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         ENVIRONMENT: ${{ inputs.environment }}
         BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
-        TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
+        AZURE_NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        SOURCE_KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
+        TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
         TEST_CLIENT_ID: ${{ inputs.AZURE_TEST_ACCESS_CLIENT_ID }}
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         MIGRATION_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
-        CLIENT_SECRET: ${{ inputs.AZURE_CLIENT_SECRET }}
         MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}

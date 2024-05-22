@@ -9,5 +9,3 @@ param environment = readEnvironmentVariable('ENVIRONMENT')
 // secrets
 param sourceKeyVaultName = readEnvironmentVariable('KEY_VAULT_NAME')
 param keyVaultUrl = readEnvironmentVariable('KEY_VAULT_URL')
-param client_id = readEnvironmentVariable('CLIENT_ID')
-param tenant_id = readEnvironmentVariable('TENANT_ID')
