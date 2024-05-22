@@ -74,7 +74,7 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview' 
   name: containerAppEnvName
 }
 
-module containerAppJob '../../modules/containerAppJob/main.bicep' = {
+module containerAppJob '../../modules/migrationJob/main.bicep' = {
   name: containerAppJobName
   dependsOn: [
     addKeyvaultRead
