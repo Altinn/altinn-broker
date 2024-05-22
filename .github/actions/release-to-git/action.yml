@@ -21,7 +21,7 @@ runs:
       shell: bash
       id: set-latest-tag
       run: |
-        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_EN
+        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
 
     - name: Create release
       shell: bash
