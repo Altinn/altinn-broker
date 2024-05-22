@@ -78,7 +78,6 @@ runs:
         BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
         AZURE_NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         SOURCE_KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
-        CLIENT_ID: ${{ inputs.AZURE_CLIENT_ID }}
         TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
         TEST_CLIENT_ID: ${{ inputs.AZURE_TEST_ACCESS_CLIENT_ID }}
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}

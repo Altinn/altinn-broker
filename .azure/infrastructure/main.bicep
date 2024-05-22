@@ -8,8 +8,6 @@ param sourceKeyVaultName string
 @secure()
 param tenantId string
 @secure()
-param azureClientId string
-@secure()
 param test_client_id string
 param environment string
 @secure()
@@ -64,7 +62,6 @@ module environmentKeyVault '../modules/keyvault/create.bicep' = {
     sku: keyVaultSku
     tenant_id: tenantId
     environment: environment
-    azureClientId: azureClientId
     test_client_id: test_client_id
   }
 }
