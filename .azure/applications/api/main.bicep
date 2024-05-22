@@ -20,8 +20,9 @@ param namePrefix string
 
 var containerAppName = '${namePrefix}-app'
 
+var resourceGroupName = '${namePrefix}-rg'
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: 'namePrefix-rg'
+  name: resourceGroupName
   location: location
 }
 
