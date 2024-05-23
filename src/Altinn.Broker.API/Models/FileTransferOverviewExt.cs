@@ -25,7 +25,7 @@ namespace Altinn.Broker.Models
         /// <summary>
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
-        public string SendersFileTransferReference { get; set; } = string.Empty;
+        public string? SendersFileTransferReference { get; set; } = string.Empty;
 
         /// <summary>
         /// MD5 checksum for file data.
