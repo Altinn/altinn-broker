@@ -3,7 +3,7 @@ param migrationsStorageAccountName string
 param fileshare string
 param location string
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' = {
   name: migrationsStorageAccountName
   location: location
   kind: 'StorageV2'

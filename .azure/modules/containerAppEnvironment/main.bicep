@@ -57,7 +57,7 @@ resource application_insights_action 'Microsoft.Insights/actionGroups@2023-01-01
       ]
     }
   }
-resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' =
+resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
   if (emailReceiver != null && emailReceiver != '') {
     name: '${namePrefix}-500-exception-occured'
     location: location
@@ -94,7 +94,7 @@ resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-
     }
   }
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' existing = {
   name: migrationsStorageAccountName
 }
 
