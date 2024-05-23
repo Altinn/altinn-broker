@@ -70,12 +70,12 @@ namespace Altinn.Broker.Models
         {
         }
 
-        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        protected override ValidationResult IsValid(object? value, ValidationContext validationContext)
         {
             var stringValue = value as string;
             if (string.IsNullOrWhiteSpace(stringValue))
             {
-                return ValidationResult.Success;
+                return ValidationResult.Success!;
             }
             if (stringValue.Length != 32)
             {
@@ -85,7 +85,7 @@ namespace Altinn.Broker.Models
             {
                 return new ValidationResult("The checksum, if used, must be a MD5 hash in lower case");
             }
-            return ValidationResult.Success;
+            return ValidationResult.Success!;
         }
     }
 }
