@@ -102,3 +102,6 @@ https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
 
 ## After deployment of infrastructure
 It's important to check that Microsoft Defender is enabled for all blob storages in the environment. 
+
+## Create release notes
+If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 
