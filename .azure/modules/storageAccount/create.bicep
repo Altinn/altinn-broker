@@ -15,7 +15,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' = {
   }
 }
 
-resource storageAccountFileServices 'Microsoft.Storage/storageAccounts/fileServices@2023-01-01' = {
+resource storageAccountFileServices 'Microsoft.Storage/storageAccounts/fileServices@2023-04-01' = {
   name: 'default'
   parent: storageAccount
 }
