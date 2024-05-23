@@ -17,6 +17,10 @@ runs:
       id: get-version
       uses: ./.github/actions/get-current-version
 
+    - name: fetch tags
+      shell: bash
+      run: git fetch --tags
+
     - name: set latest tag
       shell: bash
       id: set-latest-tag
