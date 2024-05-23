@@ -70,7 +70,7 @@ var volumeMounts = [
   }
 ]
 
-resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview' existing = {
+resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: containerAppEnvName
 }
 
