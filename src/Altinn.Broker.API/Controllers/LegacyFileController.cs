@@ -120,21 +120,6 @@ namespace Altinn.Broker.Controllers
         }
 
         /// <summary>
-        /// Get more detailed information about the file upload for auditing and troubleshooting purposes
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet]
-        [Route("{fileId}/details")]
-        public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
-            Guid fileId,
-            [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-            [FromServices] GetFileTransferDetailsQueryHandler handler,
-            CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
         /// Get files that can be accessed by the caller according to specified filters.
         /// </summary>
         /// <returns></returns>
