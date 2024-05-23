@@ -9,7 +9,7 @@ param volumes { name: string, storageName: string, storageType: string, mountOpt
 param volumeMounts { mountPath: string, subPath: string, volumeName: string }[] = []
 param principalId string
 
-resource job 'Microsoft.App/jobs@2023-11-02-preview' = {
+resource job 'Microsoft.App/jobs@2024-03-01' = {
   name: name
   location: location
   identity: {

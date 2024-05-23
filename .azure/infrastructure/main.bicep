@@ -8,11 +8,7 @@ param sourceKeyVaultName string
 @secure()
 param tenantId string
 @secure()
-param azureClientId string
-@secure()
 param test_client_id string
-@secure()
-param deploySecret string
 param environment string
 @secure()
 param namePrefix string
@@ -38,18 +34,6 @@ var resourceGroupName = '${namePrefix}-rg'
 
 var secrets = [
   {
-    name: 'deploy-id'
-    value: azureClientId
-  }
-  {
-    name: 'deploy-secret'
-    value: deploySecret
-  }
-  {
-    name: 'deploy-tenant-id'
-    value: tenantId
-  }
-  {
     name: 'maskinporten-client-id'
     value: maskinportenClientId
   }
@@ -64,7 +48,7 @@ var secrets = [
 ]
 
 // Create resource groups
-resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
+resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: '${namePrefix}-rg'
   location: location
 }
@@ -78,7 +62,6 @@ module environmentKeyVault '../modules/keyvault/create.bicep' = {
     sku: keyVaultSku
     tenant_id: tenantId
     environment: environment
-    azureClientId: azureClientId
     test_client_id: test_client_id
   }
 }

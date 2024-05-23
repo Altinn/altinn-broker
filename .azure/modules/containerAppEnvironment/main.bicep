@@ -27,7 +27,7 @@ resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
     WorkspaceResourceId: log_analytics_workspace.id
   }
 }
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-11-02-preview' = {
+resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: '${namePrefix}-env'
   location: location
   properties: {
@@ -57,7 +57,7 @@ resource application_insights_action 'Microsoft.Insights/actionGroups@2023-01-01
       ]
     }
   }
-resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' =
+resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
   if (emailReceiver != null && emailReceiver != '') {
     name: '${namePrefix}-500-exception-occured'
     location: location
@@ -94,11 +94,11 @@ resource exceptionOccuredAlertRule 'Microsoft.Insights/scheduledQueryRules@2023-
     }
   }
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' existing = {
   name: migrationsStorageAccountName
 }
 
-resource containerAppEnvironmentStorage 'Microsoft.App/managedEnvironments/storages@2023-11-02-preview' = {
+resource containerAppEnvironmentStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'migrations'
   parent: containerAppEnvironment
   properties: {
