@@ -108,3 +108,21 @@ jobs:
       hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
       hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
+
+  release-to-git:  
+    name: release to git
+    runs-on: ubuntu-latest
+    needs: [check-for-changes, deploy-production]
+    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' && !failure() && !cancelled()}}
+    permissions: 
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: release
+        if: (!failure() && !cancelled())
+        uses: ./.github/actions/release-to-git
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
