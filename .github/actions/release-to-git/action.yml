@@ -23,6 +23,11 @@ runs:
       run: |
         echo "latestTag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
 
+    - name: output values
+      run: |
+        echo "latestTag: ${{ steps.set-latest-tag.outputs.latestTag }}"
+        echo "version: ${{ steps.get-version.outputs.version }}"
+
     - name: Create release
       shell: bash
       if: ${{ !(steps.set-latest-tag.outputs.latestTag == steps.get-version.outputs.version) }}
