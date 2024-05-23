@@ -5,7 +5,7 @@ description: "Get the current version from a file and the git short sha"
 outputs:
   version:
     description: "Version"
-    value: ${{ steps.get-current-version.outputs.version }}
+    value: ${{ steps.set-current-version.outputs.version }}
   gitShortSha:
     description: "Git short sha"
     value: ${{ steps.set-git-short-sha.outputs.gitShortSha }}
@@ -28,9 +28,8 @@ runs:
       id: set-git-short-sha
       shell: bash
       run: echo "gitShortSha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      
+
     - name: Set image tag
       id: set-image-tag
       shell: bash
       run: echo "imageTag=$(cat version.txt)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
