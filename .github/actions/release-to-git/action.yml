@@ -1,6 +1,6 @@
 name: Create release in github
 
-description: Create a release to git if the version has been bumped
+description: Create a release to git if the version has been bumped in the version.txt file
 
 inputs:
   GITHUB_TOKEN:
