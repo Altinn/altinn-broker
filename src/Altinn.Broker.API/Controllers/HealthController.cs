@@ -45,7 +45,7 @@ namespace Altinn.Broker.Controllers
             }
 
             // Verify that resource manager has access to our subscription
-            var credentials = new ClientSecretCredential(_azureResourceManagerOptions.TenantId, _azureResourceManagerOptions.ClientId, _azureResourceManagerOptions.ClientSecret);
+            var credentials = new DefaultAzureCredential();
             var armClient = new ArmClient(credentials);
             var subscription = armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_azureResourceManagerOptions.SubscriptionId}"));
             var resourceGroupCollection = subscription.GetResourceGroups();
