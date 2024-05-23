@@ -31,7 +31,7 @@ namespace Altinn.Broker.Models
         /// Used by senders and receivers to identify specific file using external identification methods.
         /// </summary>
         [JsonPropertyName("sendersFileReference")]
-        public string SendersFileReference { get; set; } = string.Empty;
+        public string? SendersFileReference { get; set; } = string.Empty;
 
         /// <summary>
         /// MD5 checksum for file data.
