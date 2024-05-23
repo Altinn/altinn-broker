@@ -1,14 +1,13 @@
-namespace Altinn.Broker.Enums
+namespace Altinn.Broker.Enums;
+
+public enum LegacyFileStatusExt
 {
-    public enum LegacyFileStatusExt
-    {
-        Initialized,
-        UploadStarted,
-        UploadProcessing,
-        Published,
-        Cancelled,
-        AllConfirmedDownloaded,
-        Deleted,
-        Failed
-    }
+    Initialized,
+    UploadStarted,
+    UploadProcessing,
+    Published,
+    Cancelled,
+    AllConfirmedDownloaded,
+    Deleted,
+    Failed
 }

@@ -1,23 +1,22 @@
 using System.Text.Json.Serialization;
 
-namespace Altinn.Broker.Models
+namespace Altinn.Broker.Models;
+
+/// <summary>
+/// API input model for file initialization.
+/// </summary>
+public class ResourceExt
 {
+
     /// <summary>
-    /// API input model for file initialization.
+    /// The max upload size for the resource in bytes
     /// </summary>
-    public class ResourceExt
-    {
+    [JsonPropertyName("maxFileTransferSize")]
+    public long? MaxFileTransferSize { get; set; }
 
-        /// <summary>
-        /// The max upload size for the resource in bytes
-        /// </summary>
-        [JsonPropertyName("maxFileTransferSize")]
-        public long? MaxFileTransferSize { get; set; }
-
-        /// <summary>
-        /// The time before a file transfer expires (ISO8601 Duration format)
-        /// </summary>
-        [JsonPropertyName("fileTransferTimeToLive")]
-        public string? FileTransferTimeToLive { get; set; }
-    }
+    /// <summary>
+    /// The time before a file transfer expires (ISO8601 Duration format)
+    /// </summary>
+    [JsonPropertyName("fileTransferTimeToLive")]
+    public string? FileTransferTimeToLive { get; set; }
 }

@@ -1,6 +1,4 @@
-﻿using System;
-
-using Altinn.Broker.Application.ExpireFileTransferCommand;
+﻿using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;

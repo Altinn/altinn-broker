@@ -1,14 +1,13 @@
-namespace Altinn.Broker.Enums
+namespace Altinn.Broker.Enums;
+
+public enum FileTransferStatusExt
 {
-    public enum FileTransferStatusExt
-    {
-        Initialized,
-        UploadStarted,
-        UploadProcessing,
-        Published,
-        Cancelled,
-        AllConfirmedDownloaded,
-        Purged,
-        Failed
-    }
+    Initialized,
+    UploadStarted,
+    UploadProcessing,
+    Published,
+    Cancelled,
+    AllConfirmedDownloaded,
+    Purged,
+    Failed
 }
