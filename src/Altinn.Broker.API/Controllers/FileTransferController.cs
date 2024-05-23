@@ -82,18 +82,12 @@ namespace Altinn.Broker.Controllers
             _logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
             Request.EnableBuffering();
 
-            var fileTransfer = await _fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
-            var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
-            var max_upload_size = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? "0");
-            if (Request.ContentLength > max_upload_size || Request.Body.Length > max_upload_size)
-            {
-                return BadRequest($"File size exceeds maximum allowed size of {max_upload_size} bytes");
-            }
             var commandResult = await handler.Process(new UploadFileCommandRequest()
             {
                 FileTransferId = fileTransferId,
                 Token = token,
-                UploadStream = Request.Body
+                UploadStream = Request.Body,
+                ContentLength = Request.ContentLength ?? Request.Body.Length
             }, cancellationToken);
             return commandResult.Match(
                 fileId => Ok(fileId.ToString()),

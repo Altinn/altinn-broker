@@ -3,6 +3,8 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
+using Azure.Core;
+
 using Hangfire;
 
 using Microsoft.Extensions.Logging;
@@ -66,6 +68,11 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
+        var maxUploadSize = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? "0");
+        if (request.ContentLength > maxUploadSize)
+        {
+            return Errors.FileSizeTooBig;
+        }
 
         await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
         try

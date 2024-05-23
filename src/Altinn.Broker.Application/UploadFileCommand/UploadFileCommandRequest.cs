@@ -9,4 +9,5 @@ public class UploadFileCommandRequest
     public required CallerIdentity Token { get; set; }
     public required Stream UploadStream { get; set; }
     public bool IsLegacy { get; set; }
+    public long ContentLength { get; set; }
 }

@@ -25,4 +25,5 @@ public static class Errors
     public static Error MaxUploadSizeOverGlobal = new Error(17, "Max file transfer size cannot be set higher than the global max file transfer size", HttpStatusCode.BadRequest);
     public static Error InvalidTimeToLiveFormat = new Error(18, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
     public static Error TimeToLiveCannotExceed365Days = new Error(19, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
+    public static Error FileSizeTooBig = new Error(20, "File size exceeds maximum", HttpStatusCode.BadRequest);
 }
