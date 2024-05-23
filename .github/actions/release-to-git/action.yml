@@ -23,12 +23,6 @@ runs:
       run: |
         echo "latestTag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
 
-    - name: output values
-      shell: bash
-      run: |
-        echo "version= $(cat version.txt)"
-        echo "latestTag=$(git tag | sort --version-sort | tail -n1)"
-
     - name: Create release
       shell: bash
       if: ${{ !(steps.set-latest-tag.outputs.latestTag == steps.get-version.outputs.version) }}
@@ -36,7 +30,4 @@ runs:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         TAG: ${{ github.ref_name }}
       run: |
-        gh release create "$TAG" 
-        --repo="$GITHUB_REPOSITORY" 
-        --title="v${{steps.get-version.outputs.version}}" 
-        --generate-notes
+        gh release create "$TAG" --title="v${{steps.get-version.outputs.version}}" --generate-notes
