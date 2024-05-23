@@ -1,4 +1,4 @@
-name: Create release
+name: Create release in github
 
 description: Create a release to git if the version has been bumped
 
