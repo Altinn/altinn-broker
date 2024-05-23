@@ -17,17 +17,18 @@ runs:
       id: get-version
       uses: ./.github/actions/get-current-version
 
+    - name: set latest tag
+      shell: bash
+
+      id: set-latest-tag
+      run: |
+        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
+
     - name: output values
       shell: bash
       run: |
         echo "version= $(cat version.txt)"
         echo "latest_tag=$(git tag | sort --version-sort | tail -n1)"
-
-    - name: set latest tag
-      shell: bash
-      id: set-latest-tag
-      run: |
-        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
 
     - name: Create release
       shell: bash
@@ -37,6 +38,5 @@ runs:
         tag: ${{ github.ref_name }}
       run: |
         gh release create "$tag" \
-        --repo="$GITHUB_REPOSITORY" \
         --title="v${{steps.get-version.outputs.version}}" \
         --generate-notes
