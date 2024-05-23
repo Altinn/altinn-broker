@@ -2,6 +2,6 @@
 
 public class ServiceOwnerInitializeExt
 {
-    public string Name { get; set; }
-    public string DeletionTime { get; set; } // ISO8601 Duration
+    public required string Name { get; set; }
+    public required string DeletionTime { get; set; } // ISO8601 Duration
 }

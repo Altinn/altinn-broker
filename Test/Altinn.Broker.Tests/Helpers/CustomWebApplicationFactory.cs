@@ -40,7 +40,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ((IList<AuthenticationSchemeBuilder>)o.Schemes).Clear();
             });
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(async options =>
+                .AddJwtBearer(options =>
                 {
                     options.RequireHttpsMetadata = false;
                     options.SaveToken = true;

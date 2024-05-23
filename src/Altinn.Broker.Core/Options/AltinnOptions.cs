@@ -2,8 +2,7 @@
 
 public class AltinnOptions
 {
-    public string OpenIdWellKnown { get; set; }
-    public string LegacyOpenIdWellKnown { get; set; }
-    public string PlatformGatewayUrl { get; set; }
-    public string PlatformSubscriptionKey { get; set; }
+    public string OpenIdWellKnown { get; set; } = string.Empty;
+    public string PlatformGatewayUrl { get; set; } = string.Empty;
+    public string PlatformSubscriptionKey { get; set; } = string.Empty;
 }

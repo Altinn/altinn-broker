@@ -30,8 +30,11 @@ public class LegacyGetFilesQueryHandler : IHandler<LegacyGetFilesQueryRequest, L
         List<ActorEntity> actors = new();
         foreach (string recipient in recipients)
         {
-            ActorEntity entity = await _actorRepository.GetActorAsync(recipient, cancellationToken);
-            actors.Add(entity);
+            var entity = await _actorRepository.GetActorAsync(recipient, cancellationToken);
+            if (entity is not null)
+            {
+                actors.Add(entity);
+            }
         }
 
         return actors;

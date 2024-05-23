@@ -5,7 +5,7 @@ namespace Altinn.Broker.Application.GetFileTransfersQuery;
 
 public class GetFileTransfersQueryRequest
 {
-    public CallerIdentity Token { get; set; }
+    public required CallerIdentity Token { get; set; }
     public string ResourceId { get; set; }
     public FileTransferStatus? Status { get; set; }
     public ActorFileTransferStatus? RecipientStatus { get; set; }

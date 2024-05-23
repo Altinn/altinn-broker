@@ -25,7 +25,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        var fileTransfer = new FileTransferEntity();
+        FileTransferEntity fileTransfer;
 
         await using var command = await _connectionProvider.CreateCommand(
             @"
@@ -102,16 +102,16 @@ public class FileTransferRepository : IFileTransferRepository
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
                         ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
-                    }
-                };
+                    },
+                    RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
+                    PropertyList = await GetMetadata(fileTransferId, cancellationToken)
+            };
             }
             else
             {
                 return null;
             }
         }
-        fileTransfer.RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken);
-        fileTransfer.PropertyList = await GetMetadata(fileTransferId, cancellationToken);
         EnrichLogs(fileTransfer);
         return fileTransfer;
     }

@@ -2,7 +2,7 @@
 
 public class FileTransferInitializeAndUploadExt
 {
-    public FileTransferInitalizeExt Metadata { get; set; }
+    public required FileTransferInitalizeExt Metadata { get; set; }
 
-    public IFormFile FileTransfer { get; set; }
+    public required IFormFile FileTransfer { get; set; }
 }

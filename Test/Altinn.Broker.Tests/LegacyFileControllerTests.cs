@@ -10,7 +10,6 @@ using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
-
 using Xunit;
 
 namespace Altinn.Broker.Tests;
@@ -90,10 +89,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         var textResponse = await getResponse.Content.ReadAsStringAsync();
 
-        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+        var result = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(result);
         Assert.Contains(Guid.Parse(fileId), result);
     }
 
@@ -154,10 +154,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         + $"&resourceId={file.ResourceId}"
         + $"&recipients={file.Recipients[0]}");
 
-        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+        var result = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(result);
         Assert.Contains(Guid.Parse(fileId), result);
     }
 
@@ -188,10 +189,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         + $"&resourceId={file.ResourceId}"
         + $"&recipients={file.Recipients[1]}");
 
-        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+        var result = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(result);
         Assert.Contains(Guid.Parse(fileId), result);
     }
 
@@ -221,11 +223,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[0]}");
-        var result = await getResponse.Content.ReadAsAsync<List<Guid>>();
+        var result = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-        Assert.Contains(Guid.Parse(fileId), result);
+        Assert.Contains(Guid.Parse(fileId), result!);
     }
 
     [Fact]
@@ -262,13 +264,13 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[1]}");
 
-        var result_recip1 = await getResponse_rep1.Content.ReadAsAsync<List<Guid>>();
-        var result_recip2 = await getResponse_rep2.Content.ReadAsAsync<List<Guid>>();
+        var result_recip1 = await getResponse_rep1.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
+        var result_recip2 = await getResponse_rep2.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(HttpStatusCode.OK, getResponse_rep1.StatusCode);
-        Assert.Contains(Guid.Parse(fileId), result_recip1);
-        Assert.Contains(Guid.Parse(fileId), result_recip2);
+        Assert.Contains(Guid.Parse(fileId), result_recip1!);
+        Assert.Contains(Guid.Parse(fileId), result_recip2!);
     }
 
     [Fact]
@@ -291,10 +293,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Act
         var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={file.Recipients[0]}");
-        var fileData = await getResponse.Content.ReadAsAsync<LegacyFileOverviewExt>();
+        var fileData = await getResponse.Content.ReadFromJsonAsync<LegacyFileOverviewExt>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(fileData);
         Assert.Equal(fileId, fileData.FileId.ToString());
     }
 
@@ -339,10 +342,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[0]}");
         string s = await getResponse.Content.ReadAsStringAsync();
-        List<Guid> fileData = await getResponse.Content.ReadAsAsync<List<Guid>>();
+        var fileData = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
 
         // Assert        
         Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(fileData);
         Assert.Contains(fileData, g => g == Guid.Parse(fileId1));
         Assert.DoesNotContain(fileData, g => g == Guid.Parse(fileId2));
     }
@@ -413,7 +417,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         // Act
         var getResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/confirmdownload?onBehalfOfConsumer={file.Recipients[0]}", null);
         var statusResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={file.Recipients[0]}");
-        var result = await statusResponse.Content.ReadAsAsync<LegacyFileOverviewExt>();
+        var result = await statusResponse.Content.ReadFromJsonAsync<LegacyFileOverviewExt>(_responseSerializerOptions);
 
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
