@@ -98,7 +98,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' existing 
   name: migrationsStorageAccountName
 }
 
-resource containerAppEnvironmentStorage 'Microsoft.App/managedEnvironments/storages@2023-11-02-preview' = {
+resource containerAppEnvironmentStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'migrations'
   parent: containerAppEnvironment
   properties: {
