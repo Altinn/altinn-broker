@@ -31,7 +31,7 @@ runs:
 
     - name: Create release
       shell: bash
-      if: ${{ !(steps.set-latest-tag.outputs.latest_tag ==  $(cat version.txt) }}
+      if: ${{ !(steps.set-latest-tag.outputs.latest_tag ==  steps.get-version.outputs.version) }}
       env:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
