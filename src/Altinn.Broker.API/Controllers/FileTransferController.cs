@@ -32,15 +32,11 @@ namespace Altinn.Broker.Controllers
     {
         private readonly ILogger<FileTransferController> _logger;
         private readonly IIdempotencyEventRepository _idempotencyEventRepository;
-        private readonly IResourceRepository _resourceRepository;
-        private readonly IFileTransferRepository _fileTransferRepository;
 
-        public FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository)
+        public FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository)
         {
             _logger = logger;
             _idempotencyEventRepository = idempotencyEventRepository;
-            _resourceRepository = resourceRepository;
-            _fileTransferRepository = fileTransferRepository;
         }
 
         /// <summary>
