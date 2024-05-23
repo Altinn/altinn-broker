@@ -19,24 +19,24 @@ runs:
 
     - name: set latest tag
       shell: bash
-
       id: set-latest-tag
       run: |
-        - echo "latest_tag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
+        - echo "latestTag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
 
     - name: output values
       shell: bash
       run: |
         echo "version= $(cat version.txt)"
-        echo "latest_tag=$(git tag | sort --version-sort | tail -n1)"
+        echo "latestTag=$(git tag | sort --version-sort | tail -n1)"
 
     - name: Create release
       shell: bash
-      if: ${{ !(steps.set-latest-tag.outputs.latest_tag ==  steps.get-version.outputs.version) }}
+      if: ${{ !(steps.set-latest-tag.outputs.latestTag ==  steps.get-version.outputs.version) }}
       env:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
-        tag: ${{ github.ref_name }}
+        TAG: ${{ github.ref_name }}
       run: |
-        gh release create "$tag" \
-        --title="v${{steps.get-version.outputs.version}}" \
+        gh release create "$TAG" 
+        --repo="$GITHUB_REPOSITORY" 
+        --title="v${{steps.get-version.outputs.version}}" 
         --generate-notes
