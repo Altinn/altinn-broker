@@ -110,7 +110,7 @@ jobs:
       hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   release-to-git:  
-    name: release to git
+    name: Release to git
     runs-on: ubuntu-latest
     needs: [check-for-changes, deploy-production]
     if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' && !failure() && !cancelled()}}

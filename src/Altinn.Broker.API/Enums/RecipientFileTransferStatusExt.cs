@@ -1,9 +1,8 @@
-namespace Altinn.Broker.Enums
+namespace Altinn.Broker.Enums;
+
+public enum RecipientFileTransferStatusExt
 {
-    public enum RecipientFileTransferStatusExt
-    {
-        Initialized,
-        DownloadStarted,
-        DownloadConfirmed
-    }
+    Initialized,
+    DownloadStarted,
+    DownloadConfirmed
 }

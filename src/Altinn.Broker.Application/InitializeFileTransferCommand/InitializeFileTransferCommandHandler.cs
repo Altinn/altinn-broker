@@ -1,6 +1,4 @@
-﻿using System;
-
-using Altinn.Broker.Application.ExpireFileTransferCommand;
+﻿using Altinn.Broker.Application.ExpireFileTransferCommand;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -78,7 +76,8 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed when adding recipient initialized events.");
+            _logger.LogError("Failed when adding recipient initialized events: {message}\n{stackTrace}", ex.Message, ex.StackTrace);
+            throw;
         }
         var jobId = _backgroundJobClient.Schedule<ExpireFileTransferCommandHandler>((ExpireFileTransferCommandHandler) => ExpireFileTransferCommandHandler.Process(new ExpireFileTransferCommandRequest
         {

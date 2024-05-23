@@ -58,7 +58,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             return false;
         }
         var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: cancellationToken);
-        if (user is null)
+        if (responseContent is null)
         {
             _logger.LogError("Unexpected null or invalid json response from Authorization.");
             return false;

@@ -13,12 +13,12 @@ public class ValidateElementsInList : ValidationAttribute
         _attributeArgs = attributeArgs;
     }
 
-    protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+    protected override ValidationResult IsValid(object? value, ValidationContext validationContext)
     {
         var list = value as IEnumerable<string>;
         if (list != null)
         {
-            var attributeInstance = (ValidationAttribute)Activator.CreateInstance(_attributeType, _attributeArgs);
+            var attributeInstance = (ValidationAttribute)Activator.CreateInstance(_attributeType, _attributeArgs)!;
             foreach (var item in list)
             {
                 if (!attributeInstance.IsValid(item))
@@ -28,6 +28,6 @@ public class ValidateElementsInList : ValidationAttribute
             }
         }
 
-        return ValidationResult.Success;
+        return ValidationResult.Success!;
     }
 }
