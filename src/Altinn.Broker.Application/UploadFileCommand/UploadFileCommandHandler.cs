@@ -68,7 +68,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var maxUploadSize = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? "0");
+        var maxUploadSize = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? int.MaxValue.ToString());
         if (request.ContentLength > maxUploadSize)
         {
             return Errors.FileSizeTooBig;

@@ -59,7 +59,7 @@ public class ConfigureResourceCommandHandler : IHandler<ConfigureResourceCommand
         {
             return Errors.MaxUploadSizeCannotBeZero;
         }
-        long globalMaxFileTransferSize = long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? "0");
+        long globalMaxFileTransferSize = long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? int.MaxValue.ToString());
         if (maxFileTransferSize > globalMaxFileTransferSize)
         {
             return Errors.MaxUploadSizeOverGlobal;
