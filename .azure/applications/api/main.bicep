@@ -22,7 +22,7 @@ var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
 
 var resourceGroupName = '${namePrefix}-rg'
-resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
 }
