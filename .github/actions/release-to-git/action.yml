@@ -34,4 +34,4 @@ runs:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         TAG: ${{ steps.get-version.outputs.version }}
       run: |
-        gh release create "$TAG" --title="v${{steps.get-version.outputs.version}}" --generate-notes --target feat/automatic-release-notes
+        gh release create "$TAG" --title="v${{steps.get-version.outputs.version}}" --generate-notes
