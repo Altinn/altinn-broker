@@ -18,6 +18,9 @@ changelog:
     - title: Dependency Upgrades 📦
       labels:
         - kind/dependencies
+    - title: Incident
+      labels:
+        - kind/incident
     - title: Uncategorized changes
       labels:
         - "*"
