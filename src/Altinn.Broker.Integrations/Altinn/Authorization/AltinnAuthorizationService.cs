@@ -76,7 +76,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             Resource = new List<XacmlJsonCategory>()
         };
 
-        var subjectCategory = XacmlMappers.CreateSubjectCategory(user.Claims);
+        var subjectCategory = XacmlMappers.CreateSubjectCategory(user);
         subjectCategory.Attribute = subjectCategory.Attribute.Where(attribute => attribute.AttributeId != "urn:altinn:authlevel").ToList(); // Temp fix as xcaml int32 not implemented
         request.AccessSubject.Add(subjectCategory);
         foreach (var actionType in actionTypes)
@@ -88,34 +88,6 @@ public class AltinnAuthorizationService : IAuthorizationService
         XacmlJsonRequestRoot jsonRequest = new() { Request = request };
 
         return jsonRequest;
-    }
-
-    private XacmlJsonCategory GetSubject(ClaimsPrincipal user)
-    {
-        XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
-        List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-
-        foreach (Claim claim in user.Claims)
-        {
-            if (IsCamelCaseOrgnumberClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsScopeClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:scope", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsJtiClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:sessionid", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsValidUrn(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute(claim.Type, claim.Value, "string", claim.Issuer));
-            }
-        }
-        xacmlJsonCategory.Attribute = list;
-        return xacmlJsonCategory;
     }
 
     private static bool ValidateResult(XacmlJsonResponse response)
