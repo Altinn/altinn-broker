@@ -52,8 +52,6 @@ public class AltinnAuthorizationService : IAuthorizationService
         }
         var actionIds = rights.Select(GetActionId).ToList();
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, actionIds, resource);
-        var sdfdsf = JsonSerializer.Serialize(jsonRequest);
-        _logger.LogInformation("Sending request to Authorization: {jsonRequest}", sdfdsf);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
