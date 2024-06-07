@@ -64,8 +64,8 @@ public class AltinnEventBus : IEventBus
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
             Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
-            Subject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null,
-            AlternativeSubject = !string.IsNullOrWhiteSpace(alternativeSubject) ? "/organisation/" + alternativeSubject : null,
+            Subject = !string.IsNullOrWhiteSpace(alternativeSubject) ? "/organisation/" + alternativeSubject : null,
+            AlternativeSubject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null,
         };
 
         return cloudEvent;
