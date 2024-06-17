@@ -10,7 +10,7 @@ param keyVaultName string
 
 var containerAppJobName = '${namePrefix}-migration'
 var containerAppEnvName = '${namePrefix}-env'
-var migrationConnectionStringName = 'broker-migration-connection-string'
+var migrationConnectionStringName = 'broker-ado-connection-string'
 
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-migration-identity'
