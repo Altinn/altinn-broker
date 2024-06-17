@@ -1,7 +1,7 @@
 param namePrefix string
 param location string
 param appVersion string
-
+param environment string
 @secure()
 param keyVaultUrl string
 
@@ -64,6 +64,11 @@ var containerAppEnvVars = [
     name: 'APP_VERSION'
     value: appVersion
   }
+  { name: 'AzureResourceManagerOptions__SubscriptionId', value: subscription().subscriptionId }
+  { name: 'AzureResourceManagerOptions__Location', value: 'norwayeast' }
+  { name: 'AzureResourceManagerOptions__Environment', value: environment }
+  { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
+  { name: 'AZURE_CLIENT_ID', value: userAssignedIdentity.properties.clientId }
 ]
 
 var volumes = [
