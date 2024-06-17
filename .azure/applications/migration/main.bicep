@@ -3,7 +3,6 @@ param location string
 param appVersion string
 @secure()
 param keyVaultUrl string
-
 @secure()
 param keyVaultName string
 
@@ -22,19 +21,6 @@ module addKeyvaultRead '../../modules/keyvault/addReaderRoles.bicep' = {
     keyvaultName: keyVaultName
     tenantId: userAssignedIdentity.properties.tenantId
     principalIds: [userAssignedIdentity.properties.principalId]
-  }
-}
-
-module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' = {
-  name: 'databaseAccess'
-  dependsOn: [
-    addKeyvaultRead // Timing issue
-  ]
-  params: {
-    tenantId: userAssignedIdentity.properties.tenantId
-    principalId: userAssignedIdentity.properties.principalId
-    appName: userAssignedIdentity.name
-    namePrefix: namePrefix
   }
 }
 
