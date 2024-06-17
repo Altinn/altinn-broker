@@ -7,43 +7,13 @@ on:
     - "Test/**" # ignore changes to tests
 
 jobs:
-  check-for-changes:
-    name: Check for changes
-    runs-on: ubuntu-latest
-    outputs:
-      hasAzureChanges: ${{ steps.check-for-changes.outputs.hasAzureChanges }}
-      hasBackendChanges: ${{ steps.check-for-changes.outputs.hasBackendChanges }}
-      hasMigrationChanges: ${{ steps.check-for-changes.outputs.hasMigrationChanges }}
-    steps:        
-      - uses: actions/checkout@v4
-
-      - name: "Check for changes"
-        id: check-for-changes
-        uses: ./.github/actions/check-for-changes
-
-      - name: "Inform about infrastructure skip"
-        if: ${{ steps.check-for-changes.outputs.hasAzureChanges != 'true' }}
-        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Infrastructure-as-code did not change. Infrastructure update will be skipped."
-
-      - name: "Inform about publish skip"
-        if: ${{ steps.check-for-changes.outputs.hasBackendChanges != 'true' }}
-        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Code not changed. Will not publish and release new version."
-
-      - name: "Inform about database migration skip"
-        if: ${{ steps.check-for-changes.outputs.hasMigrationChanges != 'true' }}
-        run: echo "::warning file=.github/workflows/ci-cd.yaml,line=1,col=1::Migrations did not change. No migration will run."
-
   test:	
     name: QA	
     uses: ./.github/workflows/test-application.yml	
-    needs: [check-for-changes]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' || needs.check-for-changes.outputs.hasMigrationChanges == 'true' }}
 
   publish:
     name: Publish
     runs-on: ubuntu-latest
-    needs: [check-for-changes]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' }}
     permissions: 
       packages: write
       contents: read
@@ -60,8 +30,7 @@ jobs:
     uses: ./.github/workflows/deploy-to-environment.yml
     if: always() && !failure() && !cancelled() 
     needs: [ 
-      publish,
-      check-for-changes
+      publish
     ]
     permissions: 
       id-token: write
@@ -69,15 +38,11 @@ jobs:
     secrets: inherit
     with:
       environment: test
-      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
-      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
-      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   deploy-staging:
     name: Staging
     needs: [ 
       deploy-test,
-      check-for-changes
     ]
     uses: ./.github/workflows/deploy-to-environment.yml
     if: (!failure() && !cancelled()) 
@@ -87,15 +52,11 @@ jobs:
     secrets: inherit
     with:
       environment: staging
-      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
-      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
-      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   deploy-production:
     name: Production
     needs: [
       deploy-staging,
-      check-for-changes
     ]
     uses: ./.github/workflows/deploy-to-environment.yml
     if: (!failure() && !cancelled())
@@ -105,15 +66,12 @@ jobs:
     secrets: inherit
     with:
       environment: production
-      hasAzureChanges: ${{ needs.check-for-changes.outputs.hasAzureChanges }}
-      hasBackendChanges: ${{ needs.check-for-changes.outputs.hasBackendChanges }}
-      hasMigrationChanges: ${{ needs.check-for-changes.outputs.hasMigrationChanges }}
 
   release-to-git:  
     name: Release to git
     runs-on: ubuntu-latest
-    needs: [check-for-changes, deploy-production]
-    if: ${{ needs.check-for-changes.outputs.hasBackendChanges == 'true' && !failure() && !cancelled()}}
+    needs: [deploy-production]
+    if: ${{ !failure() && !cancelled()}}
     permissions: 
       id-token: write
       contents: write

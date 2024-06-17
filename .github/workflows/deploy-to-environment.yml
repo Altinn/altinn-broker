@@ -5,12 +5,6 @@ on:
     inputs:
       environment:
         type: string
-      hasAzureChanges:
-        type: string
-      hasBackendChanges:
-        type: string
-      hasMigrationChanges:
-        type: string
   workflow_dispatch:
     inputs:
       environment:
@@ -19,15 +13,6 @@ on:
           - test
           - staging
           - production
-      hasAzureChanges:
-        description: Update infrastructure
-        type: boolean
-      hasBackendChanges:
-        description: Release version
-        type: boolean
-      hasMigrationChanges:
-        description: Migrate database
-        type: boolean
 
 jobs:
   deploy:
@@ -41,16 +26,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: List results
-      id: list-results
-      shell: bash
-      run: |
-        echo "Azure related files changed: ${{ inputs.hasAzureChanges }}"
-        echo "Backend related files changed: ${{ inputs.hasBackendChanges }}"
-        echo "Migration related files changed: ${{ inputs.hasMigrationChanges }}"
 
     - name: Update infrastructure
-      if: ${{ inputs.hasAzureChanges == 'true' || inputs.hasAzureChanges == true }}
       uses: ./.github/actions/update-infrastructure
       with:
         region: norwayeast
@@ -68,7 +45,6 @@ jobs:
         NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
 
     - name: Migrate database
-      if: ${{ inputs.hasMigrationChanges == 'true' || inputs.hasMigrationChanges == true }}
       uses: ./.github/actions/migrate-database
       with:
         region: norwayeast
@@ -81,7 +57,6 @@ jobs:
         AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
 
     - name: Release version
-      if: ${{ inputs.hasBackendChanges == 'true' || inputs.hasBackendChanges == true }}
       uses: ./.github/actions/release-version
       with:
         region: norwayeast
