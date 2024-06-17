@@ -17,8 +17,6 @@ param srcKeyVault object
 param administratorLoginPassword string
 @secure()
 param tenantId string
-@secure()
-param test_client_id string
 
 var databaseName = 'brokerdb'
 var databaseUser = 'adminuser'
