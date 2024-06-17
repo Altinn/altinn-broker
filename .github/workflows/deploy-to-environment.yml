@@ -15,10 +15,38 @@ on:
           - production
 
 jobs:
+  get-version: 
+    name: Get version
+    runs-on: ubuntu-latest
+    outputs:
+      imageTag: ${{ steps.get-version.outputs.imageTag }}
+    permissions: 
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Get current version"
+        uses: ./.github/actions/get-current-version
+        id: get-version
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [get-version]
+    permissions: 
+      packages: write
+      contents: read
+    steps:        
+      - uses: actions/checkout@v4
+      - name: "Publish image"
+        uses: ./.github/actions/publish-image
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          dockerImageBaseName: ghcr.io/altinn/altinn-broker
+          imageTag: ${{ needs.get-version.outputs.imageTag }}
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    needs: [get-version, publish]
     permissions: 
       id-token: write
       contents: read
@@ -61,6 +89,7 @@ jobs:
       with:
         region: norwayeast
         environment: ${{ inputs.environment }}
+        imageTag: ${{ needs.get-version.outputs.imageTag }}
         AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
         AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
