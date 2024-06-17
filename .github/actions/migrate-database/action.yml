@@ -9,7 +9,7 @@ inputs:
   AZURE_TENANT_ID:
     description: "Tenant ID for the service principal"
     required: true
-  AZURE_SUBSCRIPTION_ID:  
+  AZURE_SUBSCRIPTION_ID:
     description: "Subscription ID for the service principal"
     required: true
   AZURE_ENVIRONMENT_KEY_VAULT_NAME:
@@ -47,6 +47,7 @@ runs:
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         APP_VERSION: ${{ steps.get-version.outputs.imageTag }}
+        ENVIRONMENT: ${{ inputs.environment }}
       with:
         scope: resourcegroup
         template: ./.azure/applications/migration/main.bicep
@@ -81,7 +82,7 @@ runs:
           ./.github/tools/containerAppJobVerifier.sh ${{ steps.migration-job.outputs.name }} '${{ inputs.AZURE_NAME_PREFIX }}-rg' ${{ steps.get-version.outputs.imageTag }}
 
     - name: Logout from azure
-      shell: bash 
+      shell: bash
       if: ${{failure() || success()}}
       continue-on-error: true
       run: az logout
