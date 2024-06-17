@@ -26,6 +26,19 @@ module addKeyvaultRead '../../modules/keyvault/addReaderRoles.bicep' = {
   }
 }
 
+module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' = {
+  name: 'databaseAccess'
+  dependsOn: [
+    addKeyvaultRead // Timing issue
+  ]
+  params: {
+    tenantId: userAssignedIdentity.properties.tenantId
+    principalId: userAssignedIdentity.properties.principalId
+    appName: userAssignedIdentity.name
+    namePrefix: namePrefix
+  }
+}
+
 var secrets = [
   {
     name: migrationConnectionStringName
