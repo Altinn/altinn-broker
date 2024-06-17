@@ -75,7 +75,7 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   }
 }
 
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
   name: databaseName
   parent: postgres
   properties: {
@@ -102,15 +102,3 @@ module adoConnectionString '../keyvault/upsertSecret.bicep' = {
     secretValue: 'Host=${postgres.properties.fullyQualifiedDomainName};Database=${databaseName};Port=5432;Username=${namePrefix}-app-identity;Ssl Mode=Require;Trust Server Certificate=True;Maximum Pool Size=${poolSize};'
   }
 }
-
-resource databaseAccess 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2022-12-01' =
-  if (environment == 'test') {
-    name: test_client_id
-    parent: postgres
-    dependsOn: [allowAzureAccess] // Needs to depend on allowAzureAccess to avoid updating at the same time
-    properties: {
-      principalType: 'Group'
-      tenantId: tenantId
-      principalName: 'Altinn-30-Broker-Test-Developers'
-    }
-  }

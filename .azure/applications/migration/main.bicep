@@ -1,7 +1,6 @@
 param namePrefix string
 param location string
 param appVersion string
-param environment string
 @secure()
 param keyVaultUrl string
 
@@ -10,7 +9,7 @@ param keyVaultName string
 
 var containerAppJobName = '${namePrefix}-migration'
 var containerAppEnvName = '${namePrefix}-env'
-var migrationConnectionStringName = 'broker-ado-connection-string'
+var migrationConnectionStringName = 'broker-migration-connection-string'
 
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-migration-identity'
@@ -64,11 +63,6 @@ var containerAppEnvVars = [
     name: 'APP_VERSION'
     value: appVersion
   }
-  { name: 'AzureResourceManagerOptions__SubscriptionId', value: subscription().subscriptionId }
-  { name: 'AzureResourceManagerOptions__Location', value: 'norwayeast' }
-  { name: 'AzureResourceManagerOptions__Environment', value: environment }
-  { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
-  { name: 'AZURE_CLIENT_ID', value: userAssignedIdentity.properties.clientId }
 ]
 
 var volumes = [

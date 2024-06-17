@@ -47,7 +47,6 @@ runs:
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         APP_VERSION: ${{ steps.get-version.outputs.imageTag }}
-        ENVIRONMENT: ${{ inputs.environment }}
       with:
         scope: resourcegroup
         template: ./.azure/applications/migration/main.bicep
