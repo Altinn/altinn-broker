@@ -11,30 +11,14 @@ jobs:
     name: QA	
     uses: ./.github/workflows/test-application.yml	
 
-  publish:
-    name: Publish
-    runs-on: ubuntu-latest
-    permissions: 
-      packages: write
-      contents: read
-    steps:        
-      - uses: actions/checkout@v4
-      - name: "Publish image"
-        uses: ./.github/actions/publish-image
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          dockerImageBaseName: ghcr.io/altinn/altinn-broker
-
   deploy-test:
     name: Internal test
     uses: ./.github/workflows/deploy-to-environment.yml
     if: always() && !failure() && !cancelled() 
-    needs: [ 
-      publish
-    ]
     permissions: 
       id-token: write
       contents: read
+      packages: write
     secrets: inherit
     with:
       environment: test
@@ -49,6 +33,7 @@ jobs:
     permissions: 
       id-token: write
       contents: read
+      packages: write
     secrets: inherit
     with:
       environment: staging
@@ -63,6 +48,7 @@ jobs:
     permissions: 
       id-token: write
       contents: read
+      packages: write
     secrets: inherit
     with:
       environment: production
