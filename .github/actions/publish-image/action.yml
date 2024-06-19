@@ -6,6 +6,9 @@ inputs:
   dockerImageBaseName:
     description: "Base image name for docker images"
     required: true
+  imageTag:
+    description: "Tag for the image"
+    required: true
   GITHUB_TOKEN:
     description: "GitHub token"
     required: true
@@ -15,11 +18,6 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@v4
-
-    - name: Get version
-      id: get-version
-      uses: ./.github/actions/get-current-version
-
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
@@ -31,6 +29,6 @@ runs:
       shell: bash
       run: |
         # Construct the image tag using the Git hash
-        IMAGE="${{ inputs.dockerImageBaseName }}:${{ steps.get-version.outputs.imageTag }}"
+        IMAGE="${{ inputs.dockerImageBaseName }}:${{ inputs.imageTag }}"
         docker build . --tag $IMAGE
         docker push $IMAGE

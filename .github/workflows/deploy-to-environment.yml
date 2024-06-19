@@ -5,12 +5,6 @@ on:
     inputs:
       environment:
         type: string
-      hasAzureChanges:
-        type: string
-      hasBackendChanges:
-        type: string
-      hasMigrationChanges:
-        type: string
   workflow_dispatch:
     inputs:
       environment:
@@ -19,21 +13,40 @@ on:
           - test
           - staging
           - production
-      hasAzureChanges:
-        description: Update infrastructure
-        type: boolean
-      hasBackendChanges:
-        description: Release version
-        type: boolean
-      hasMigrationChanges:
-        description: Migrate database
-        type: boolean
 
 jobs:
+  get-version: 
+    name: Get version
+    runs-on: ubuntu-latest
+    outputs:
+      imageTag: ${{ steps.get-version.outputs.imageTag }}
+    permissions: 
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Get current version"
+        uses: ./.github/actions/get-current-version
+        id: get-version
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [get-version]
+    permissions: 
+      packages: write
+      contents: read
+    steps:        
+      - uses: actions/checkout@v4
+      - name: "Publish image"
+        uses: ./.github/actions/publish-image
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          dockerImageBaseName: ghcr.io/altinn/altinn-broker
+          imageTag: ${{ needs.get-version.outputs.imageTag }}
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    needs: [get-version, publish]
     permissions: 
       id-token: write
       contents: read
@@ -41,16 +54,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: List results
-      id: list-results
-      shell: bash
-      run: |
-        echo "Azure related files changed: ${{ inputs.hasAzureChanges }}"
-        echo "Backend related files changed: ${{ inputs.hasBackendChanges }}"
-        echo "Migration related files changed: ${{ inputs.hasMigrationChanges }}"
 
     - name: Update infrastructure
-      if: ${{ inputs.hasAzureChanges == 'true' || inputs.hasAzureChanges == true }}
       uses: ./.github/actions/update-infrastructure
       with:
         region: norwayeast
@@ -68,7 +73,6 @@ jobs:
         NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
 
     - name: Migrate database
-      if: ${{ inputs.hasMigrationChanges == 'true' || inputs.hasMigrationChanges == true }}
       uses: ./.github/actions/migrate-database
       with:
         region: norwayeast
@@ -81,11 +85,11 @@ jobs:
         AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
 
     - name: Release version
-      if: ${{ inputs.hasBackendChanges == 'true' || inputs.hasBackendChanges == true }}
       uses: ./.github/actions/release-version
       with:
         region: norwayeast
         environment: ${{ inputs.environment }}
+        imageTag: ${{ needs.get-version.outputs.imageTag }}
         AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
         AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

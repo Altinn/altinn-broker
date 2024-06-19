@@ -101,7 +101,6 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     administratorLoginPassword: brokerPgAdminPassword
     sku: postgresSku
     tenantId: tenantId
-    test_client_id: test_client_id
     environment: environment
   }
 }

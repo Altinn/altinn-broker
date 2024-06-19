@@ -1,10 +1,8 @@
 param namePrefix string
 param location string
 param appVersion string
-
 @secure()
 param keyVaultUrl string
-
 @secure()
 param keyVaultName string
 

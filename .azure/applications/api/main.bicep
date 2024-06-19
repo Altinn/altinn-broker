@@ -62,7 +62,7 @@ module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' =
   params: {
     tenantId: appIdentity.outputs.tenantId
     principalId: appIdentity.outputs.principalId
-    appName: appIdentity.name
+    appName: appIdentity.outputs.name
     namePrefix: namePrefix
   }
 }

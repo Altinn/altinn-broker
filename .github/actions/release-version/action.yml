@@ -9,7 +9,10 @@ inputs:
   environment:
     description: "Github environment to deploy from"
     required: true
-  AZURE_SUBSCRIPTION_ID:  
+  imageTag:
+    description: "Tag for the image"
+    required: true
+  AZURE_SUBSCRIPTION_ID:
     description: "Subscription ID for the service principal"
     required: true
   AZURE_ENVIRONMENT_KEY_VAULT_NAME:
@@ -44,12 +47,12 @@ runs:
     - name: Get version
       id: get-version
       uses: ./.github/actions/get-current-version
-      
+
     - name: Deploy app
       uses: azure/arm-deploy@v2
       id: deploy
       env:
-        IMAGE_TAG: ${{ steps.get-version.outputs.imageTag }}
+        IMAGE_TAG: ${{ inputs.imageTag }}
         ENVIRONMENT: ${{ inputs.environment }}
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
@@ -61,7 +64,7 @@ runs:
         resourceGroupName: ${{ inputs.AZURE_NAME_PREFIX }}-rg
         template: ./.azure/applications/api/main.bicep
         deploymentMode: Incremental
-        deploymentName: ${{ inputs.AZURE_NAME_PREFIX }}-${{ steps.get-version.outputs.imageTag }}
+        deploymentName: ${{ inputs.AZURE_NAME_PREFIX }}-${{ inputs.imageTag }}
         region: ${{ inputs.region }}
         failOnStdErr: false
         parameters: ./.azure/applications/api/params.bicepparam
