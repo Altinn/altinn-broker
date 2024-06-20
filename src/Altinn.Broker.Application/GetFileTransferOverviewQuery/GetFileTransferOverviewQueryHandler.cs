@@ -34,7 +34,7 @@ public class GetFileTransferOverviewQueryHandler : IHandler<GetFileTransferOverv
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

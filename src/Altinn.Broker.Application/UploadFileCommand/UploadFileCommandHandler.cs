@@ -44,7 +44,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;

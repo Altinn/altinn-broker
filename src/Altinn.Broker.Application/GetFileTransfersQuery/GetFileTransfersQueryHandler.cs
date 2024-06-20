@@ -28,7 +28,7 @@ public class GetFileTransfersQueryHandler : IHandler<GetFileTransfersQueryReques
 
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersQueryRequest request, CancellationToken cancellationToken)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

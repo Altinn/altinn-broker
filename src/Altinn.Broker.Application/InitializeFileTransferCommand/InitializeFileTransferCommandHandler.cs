@@ -50,7 +50,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
 
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferCommandRequest request, CancellationToken cancellationToken)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, request.Token.ClientId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
