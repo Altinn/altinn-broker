@@ -49,12 +49,12 @@ public class FileTransferInitalizeExt
     [Required]
     [MinLength(1, ErrorMessage = "One or more recipients are required")]
     public List<string> Recipients { get; set; } = new List<string>();
-
+  
     /// <summary>
     /// User-defined properties related to the file
     /// </summary>
     [JsonPropertyName("propertyList")]
-    [MaxLength(10, ErrorMessage = "propertyList can contain at most 10 properties")]
+    [PropertyList]
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
 
     /// <summary>
@@ -64,6 +64,7 @@ public class FileTransferInitalizeExt
     [MD5Checksum]
     public string? Checksum { get; set; } = string.Empty;
 }
+
 internal class MD5ChecksumAttribute : ValidationAttribute
 {
     public MD5ChecksumAttribute()
@@ -86,5 +87,42 @@ internal class MD5ChecksumAttribute : ValidationAttribute
             return new ValidationResult("The checksum, if used, must be a MD5 hash in lower case");
         }
         return ValidationResult.Success!;
+    }
+}
+
+[AttributeUsage(AttributeTargets.Property)]
+internal class PropertyListAttribute : ValidationAttribute
+{
+    public PropertyListAttribute()
+    {
+    }
+
+    protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+    {
+        if(value == null) 
+        {
+            return ValidationResult.Success;
+        }
+
+        if (!(value is Dictionary<string, string>))
+        {
+            return new ValidationResult("PropertyList Object is not of proper type");
+        }
+
+        var dictionary = (Dictionary<string, string>)value;
+
+        if (dictionary.Count > 10)
+            return new ValidationResult("PropertyList can contain at most 10 properties");
+
+        foreach (var keyValuePair in dictionary)
+        {
+            if (keyValuePair.Key.Length > 50)
+                return new ValidationResult(String.Format("PropertyList Key can not be longer than 50. Length:{0}, KeyValue:{1}", keyValuePair.Key.Length.ToString(), keyValuePair.Key));
+
+            if (keyValuePair.Value.Length > 300)
+                return new ValidationResult(String.Format("PropertyList Value can not be longer than 300. Length:{0}, Value:{1}", keyValuePair.Value.Length.ToString(), keyValuePair.Value));
+        }
+
+        return ValidationResult.Success;
     }
 }

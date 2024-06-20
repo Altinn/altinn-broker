@@ -42,7 +42,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         _responseSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     }
 
-
     [Fact]
     public async Task NormalFlow_WhenAllIsOK_Success()
     {
@@ -90,6 +89,125 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
             It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && (((ExpireFileTransferCommandRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
             It.IsAny<EnqueuedState>()));
+    }
+
+    [Fact]
+    public async Task NormalFlow_With10Properties_Success()
+    {
+        // Initialize
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("SuperProperty01", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty02", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty03", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty04", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty05", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty06", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty07", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty08", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty09", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty10", "BLAHBLAHBLAH");
+
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        
+        var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterInitialize);
+        Assert.True(fileTransferAfterInitialize.FileTransferStatus == FileTransferStatusExt.Initialized);
+
+        // Upload
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+        var fileTransferAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterUpload);
+        Assert.True(fileTransferAfterUpload.FileTransferStatus == FileTransferStatusExt.Published); // When running integration test this happens instantly as of now.
+
+        // Download
+        var downloadedFile = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
+        Assert.Equal(uploadedFileBytes, downloadedFileBytes);
+
+        // Details
+        var downloadedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(downloadedFileTransferDetails);
+        Assert.True(downloadedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.Published);
+        Assert.Contains(downloadedFileTransferDetails.RecipientFileTransferStatusHistory, recipient => recipient.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadStarted);
+
+        // Confirm
+        await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        var confirmedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(confirmedFileTransferDetails);
+        Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
+        Assert.Contains(confirmedFileTransferDetails.RecipientFileTransferStatusHistory, recipient => recipient.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadConfirmed);
+
+        // Attempt re-download
+        var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.Equal(HttpStatusCode.Forbidden, secondDownloadAttempt.StatusCode);
+
+        // Confirm that it has been enqueued for deletion
+        _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && (((ExpireFileTransferCommandRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
+            It.IsAny<EnqueuedState>()));
+    }
+
+    [Fact]
+    public async Task Initialize_With11Properties_ValidationFailure()
+    {
+        // Initialize
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("SuperProperty01", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty02", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty03", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty04", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty05", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty06", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty07", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty08", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty09", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty10", "BLAHBLAHBLAH");
+        initializeRequestBody.PropertyList.Add("SuperProperty11", "BLAHBLAHBLAH");
+
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);        
+
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Contains("PropertyList can contain at most 10 properties", parsedError.Extensions.First().Value.ToString());
+    }
+
+    [Fact]
+    public async Task Initialize_WitPropertiesInvalidKeyLength_ValidationFailure()
+    {
+        // Initialize
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("yesthispropertykyelengthismuchmorethan50actuallyitis54", "actuallyAValidValue");
+
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Contains("PropertyList Key can not be longer than 50", parsedError.Extensions.First().Value.ToString());
+    }
+
+    [Fact]
+    public async Task Initialize_WitPropertiesInvalidValueLength_ValidationFailure()
+    {
+        // Initialize
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Contains("PropertyList Value can not be longer than 300", parsedError.Extensions.First().Value.ToString());
     }
 
     [Fact]
@@ -366,7 +484,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
-        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        
         return await initializeFileTransferResponse.Content.ReadAsStringAsync();
     }
 
