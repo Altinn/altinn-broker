@@ -4,7 +4,7 @@ public class ServiceOwnerOverviewExt
 {
     public ServiceOwnerOverviewExt() { }
 
-    public string Name { get; set; }
+    public required string Name { get; set; }
 
-    public DeploymentStatusExt DeploymentStatus { get; set; }
+    public required DeploymentStatusExt DeploymentStatus { get; set; }
 }

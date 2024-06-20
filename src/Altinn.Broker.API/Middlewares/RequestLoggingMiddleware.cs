@@ -1,73 +1,72 @@
-﻿namespace Altinn.Broker.Middlewares
+﻿namespace Altinn.Broker.Middlewares;
+
+public class RequestLoggingMiddleware
 {
-    public class RequestLoggingMiddleware
+    private readonly RequestDelegate _next;
+
+    private readonly ILogger<RequestLoggingMiddleware> _logger;
+
+    public RequestLoggingMiddleware(
+        RequestDelegate next,
+        ILogger<RequestLoggingMiddleware> logger
+    )
     {
-        private readonly RequestDelegate _next;
+        _next = next;
+        _logger = logger;
+    }
 
-        private readonly ILogger<RequestLoggingMiddleware> _logger;
+    private static readonly string[] IgnoredPaths =
+    {
+        "/health",
+        "/hangfire"
+    };
 
-        public RequestLoggingMiddleware(
-            RequestDelegate next,
-            ILogger<RequestLoggingMiddleware> logger
-        )
+    public async Task Invoke(HttpContext httpContext)
+    {
+        // Log request
+        var requestMethod = httpContext.Request.Method;
+        var requestPath = httpContext.Request.PathBase.Add(httpContext.Request.Path).ToString();
+        if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
         {
-            _next = next;
-            _logger = logger;
+            _logger.LogInformation(
+                "Request for method {RequestMethod} at {RequestPath}",
+                requestMethod,
+                requestPath
+            );
         }
 
-        private static readonly string[] IgnoredPaths =
-        {
-            "/health",
-            "/hangfire"
-        };
+        await _next(httpContext);
 
-        public async Task Invoke(HttpContext httpContext)
+        // Log response
+        var statusCode = httpContext.Response.StatusCode;
+        if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
         {
-            // Log request
-            var requestMethod = httpContext.Request.Method;
-            var requestPath = httpContext.Request.PathBase.Add(httpContext.Request.Path).ToString();
-            if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
+            if (statusCode >= 200 && statusCode < 400)
             {
                 _logger.LogInformation(
-                    "Request for method {RequestMethod} at {RequestPath}",
+                    "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                     requestMethod,
-                    requestPath
+                    requestPath,
+                    httpContext.Response.StatusCode
                 );
             }
-
-            await _next(httpContext);
-
-            // Log response
-            var statusCode = httpContext.Response.StatusCode;
-            if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
+            else if (statusCode >= 400 && statusCode < 500)
             {
-                if (statusCode >= 200 && statusCode < 400)
-                {
-                    _logger.LogInformation(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
-                        requestMethod,
-                        requestPath,
-                        httpContext.Response.StatusCode
-                    );
-                }
-                else if (statusCode >= 400 && statusCode < 500)
-                {
-                    _logger.LogWarning(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
-                        requestMethod,
-                        requestPath,
-                        httpContext.Response.StatusCode
-                    );
-                }
-                else if (statusCode >= 500)
-                {
-                    _logger.LogError(
-                        "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
-                        requestMethod,
-                        requestPath,
-                        httpContext.Response.StatusCode
-                    );
-                }
+                _logger.LogWarning(
+                    "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
+                    requestMethod,
+                    requestPath,
+                    httpContext.Response.StatusCode
+                );
+            }
+            else if (statusCode >= 500)
+            {
+                _logger.LogError(
+                    "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
+                    requestMethod,
+                    requestPath,
+                    httpContext.Response.StatusCode
+                );
             }
         }
     }

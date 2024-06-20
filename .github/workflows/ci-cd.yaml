@@ -1,0 +1,72 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+    - "Test/**" # ignore changes to tests
+
+jobs:
+  test:	
+    name: QA	
+    uses: ./.github/workflows/test-application.yml	
+
+  deploy-test:
+    name: Internal test
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: always() && !failure() && !cancelled() 
+    permissions: 
+      id-token: write
+      contents: read
+      packages: write
+    secrets: inherit
+    with:
+      environment: test
+
+  deploy-staging:
+    name: Staging
+    needs: [ 
+      deploy-test,
+    ]
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: (!failure() && !cancelled()) 
+    permissions: 
+      id-token: write
+      contents: read
+      packages: write
+    secrets: inherit
+    with:
+      environment: staging
+
+  deploy-production:
+    name: Production
+    needs: [
+      deploy-staging,
+    ]
+    uses: ./.github/workflows/deploy-to-environment.yml
+    if: (!failure() && !cancelled())
+    permissions: 
+      id-token: write
+      contents: read
+      packages: write
+    secrets: inherit
+    with:
+      environment: production
+
+  release-to-git:  
+    name: Release to git
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: ${{ !failure() && !cancelled()}}
+    permissions: 
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: release
+        if: (!failure() && !cancelled())
+        uses: ./.github/actions/release-to-git
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

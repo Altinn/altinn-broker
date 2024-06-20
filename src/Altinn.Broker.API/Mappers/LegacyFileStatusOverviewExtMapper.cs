@@ -68,7 +68,8 @@ internal static class LegacyFileStatusOverviewExtMapper
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
-            .ToList();
+            .Where(receipt => receipt is not null)
+            .ToList().OfType<ActorFileTransferStatusEntity>();
         return lastStatusForEveryRecipient.Select(statusEvent => new LegacyRecipientFileStatusDetailsExt()
         {
             Recipient = statusEvent.Actor.ActorExternalId,

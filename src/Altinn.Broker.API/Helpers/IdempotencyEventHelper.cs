@@ -19,7 +19,7 @@ public class IdempotencyEventHelper
                 // Call you method
                 return await process();
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // Delete the entry on error to make sure the next one isn't ignored
                 await idempotencyEventRepository.DeleteIdempotencyEventAsync(uniqueString, cancellationToken);

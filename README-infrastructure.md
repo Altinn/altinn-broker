@@ -65,15 +65,10 @@ az ad app federated-credential create --id <APPLICATION-OBJECT-ID> --parameters 
 
 ## Manual steps after deployment to new environment
 
-Get a client secret for the service principal that deploys and set the following key vault secret:
-* AZURE_CLIENT_SECRET
-Cannot be automated as our deploying service principal does not have access to its own secret
-
-Further, the following secrets has to be added to the keyVault: 
+The following secrets has to be added to the keyVault: 
 1. Platform-subscription key. See Step 0 in [technical integration guide](https://github.com/Altinn/altinn-broker/blob/main/docs/get-started.md)
 2. maskinporten-client-id
 3. maskinporten-jwk
-4. deploy-client-secret
 
 # FAQ
 
@@ -107,3 +102,6 @@ https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
 
 ## After deployment of infrastructure
 It's important to check that Microsoft Defender is enabled for all blob storages in the environment. 
+
+## Create release notes
+If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 

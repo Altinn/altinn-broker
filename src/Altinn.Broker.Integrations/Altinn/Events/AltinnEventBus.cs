@@ -40,7 +40,7 @@ public class AltinnEventBus : IEventBus
                 if (partyId != null) await _partyRepository.InitializeParty(organizationId, partyId);
             }
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, organizationId);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -53,7 +53,7 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? alternativeSubject)
     {
         CloudEvent cloudEvent = new CloudEvent()
         {
@@ -63,8 +63,9 @@ public class AltinnEventBus : IEventBus
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
-            Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/file",
-            Subject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null
+            Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
+            Subject = !string.IsNullOrWhiteSpace(alternativeSubject) ? "/organisation/" + alternativeSubject : null,
+            AlternativeSubject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null,
         };
 
         return cloudEvent;

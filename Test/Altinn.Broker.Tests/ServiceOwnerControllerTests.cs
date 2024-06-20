@@ -28,6 +28,6 @@ public class ServiceOwnerControllerTests : IClassFixture<CustomWebApplicationFac
     public async Task Get_ServiceOwner()
     {
         var response = await _serviceOwnerClient.GetFromJsonAsync<ServiceOwnerOverviewExt>($"broker/api/v1/serviceowner", _responseSerializerOptions);
-        Assert.Equal("Digitaliseringsdirektoratet Avd Oslo", response.Name);
+        Assert.Equal("Digitaliseringsdirektoratet Avd Oslo", response!.Name);
     }
 }

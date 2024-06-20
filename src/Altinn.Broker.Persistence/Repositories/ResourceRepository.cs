@@ -59,7 +59,7 @@ public class ResourceRepository : IResourceRepository
             command.Parameters.AddWithValue("@resourceId", resource.Id);
             command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
             command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
-            command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.MaxFileTransferSize.Value);
+            command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.FileTransferTimeToLive.Value);
             command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
             command.ExecuteNonQuery();
         }

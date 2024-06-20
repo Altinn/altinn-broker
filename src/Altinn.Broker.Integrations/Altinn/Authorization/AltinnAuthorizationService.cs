@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
@@ -7,7 +8,6 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Common.PEP.Helpers;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -58,7 +58,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             return false;
         }
         var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: cancellationToken);
-        if (user is null)
+        if (responseContent is null)
         {
             _logger.LogError("Unexpected null or invalid json response from Authorization.");
             return false;
@@ -76,7 +76,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             Resource = new List<XacmlJsonCategory>()
         };
 
-        var subjectCategory = DecisionHelper.CreateSubjectCategory(user.Claims);
+        var subjectCategory = XacmlMappers.CreateSubjectCategory(user);
         subjectCategory.Attribute = subjectCategory.Attribute.Where(attribute => attribute.AttributeId != "urn:altinn:authlevel").ToList(); // Temp fix as xcaml int32 not implemented
         request.AccessSubject.Add(subjectCategory);
         foreach (var actionType in actionTypes)
@@ -89,6 +89,7 @@ public class AltinnAuthorizationService : IAuthorizationService
 
         return jsonRequest;
     }
+
     private static bool ValidateResult(XacmlJsonResponse response)
     {
         if (response.Response[0].Decision.Equals(XacmlContextDecision.Permit.ToString()))

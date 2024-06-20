@@ -2,7 +2,7 @@
 
 Altinn Broker is a Managed File Transfer (MFT) service for secure file transfer between organizations in Norway. 
 
-[![Build and push](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/build-and-push.yml)
+[![CI/CD](https://github.com/Altinn/altinn-broker/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/Altinn/altinn-broker/actions/workflows/ci-cd.yaml)
 
 ## Getting started
 

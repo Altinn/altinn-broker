@@ -72,7 +72,8 @@ internal static class FileTransferStatusOverviewExtMapper
             .GroupBy(receipt => receipt.Actor.ActorExternalId)
             .Select(receiptsForRecipient =>
                 receiptsForRecipient.MaxBy(receipt => receipt.Date))
-            .ToList();
+            .Where(receipt => receipt is not null)
+            .ToList().OfType<ActorFileTransferStatusEntity>();
         return lastStatusForEveryRecipient.Select(statusEvent => new RecipientFileTransferStatusDetailsExt()
         {
             Recipient = statusEvent.Actor.ActorExternalId,

@@ -1,0 +1,35 @@
+name: "Get current version"
+
+description: "Get the current version from a file and the git short sha"
+
+outputs:
+  version:
+    description: "Version"
+    value: ${{ steps.set-current-version.outputs.version }}
+  gitShortSha:
+    description: "Git short sha"
+    value: ${{ steps.set-git-short-sha.outputs.gitShortSha }}
+  imageTag:
+    description: "Image tag"
+    value: ${{ steps.set-image-tag.outputs.imageTag }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout GitHub Action"
+      uses: actions/checkout@v4
+
+    - name: Set current version
+      id: set-current-version
+      shell: bash
+      run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+
+    - name: Set git short sha
+      id: set-git-short-sha
+      shell: bash
+      run: echo "gitShortSha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Set image tag
+      id: set-image-tag
+      shell: bash
+      run: echo "imageTag=$(cat version.txt)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT

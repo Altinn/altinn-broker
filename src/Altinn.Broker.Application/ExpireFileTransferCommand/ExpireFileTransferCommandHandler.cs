@@ -36,9 +36,9 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
     public async Task<OneOf<Task, Error>> Process(ExpireFileTransferCommandRequest request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
-        var fileTransfer = await GetFileTransfer(request.FileTransferId, cancellationToken);
+        var fileTransfer = await GetFileTransferAsync(request.FileTransferId, cancellationToken);
         var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);
-        var serviceOwner = await GetServiceOwner(resource.ServiceOwnerId);
+        var serviceOwner = await GetServiceOwnerAsync(resource.ServiceOwnerId);
 
         if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
@@ -47,7 +47,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
         else if (!request.DoNotUpdateStatus)
         {
             await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-            await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), null, cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
@@ -58,6 +58,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
                 _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
                 await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
             }
+            await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
         }
         else
         {
@@ -67,27 +68,27 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
     }
     [AutomaticRetry(Attempts = 0)]
 
-    private Task<FileTransferEntity> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
+    private async Task<FileTransferEntity> GetFileTransferAsync(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        var fileTransfer = _fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        var fileTransfer = await _fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
             throw new Exception("FileTransfer not found");
         }
         return fileTransfer;
     }
-    private Task<ServiceOwnerEntity> GetServiceOwner(string serviceOwnerId)
+    private async Task<ServiceOwnerEntity> GetServiceOwnerAsync(string serviceOwnerId)
     {
-        var serviceOwner = _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
+        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
         if (serviceOwner is null)
         {
             throw new Exception("ServiceOwner not found");
         }
         return serviceOwner;
     }
-    private Task<ResourceEntity> GetResource(string resourceId, CancellationToken cancellationToken)
+    private async Task<ResourceEntity> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        var resource = _resourceRepository.GetResource(resourceId, cancellationToken);
+        var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
             throw new Exception("Resource not found");
