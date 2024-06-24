@@ -28,24 +28,25 @@ public class AltinnEventBus : IEventBus
         _logger = logger;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? organizationId = null, CancellationToken cancellationToken = default)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
     {
         string? partyId = null;
-        if (organizationId != null)
+        if (subjectOrganizationNumber != null)
         {
-            var party = await _partyRepository.GetParty(organizationId, cancellationToken);
+            var party = await _partyRepository.GetParty(subjectOrganizationNumber, cancellationToken);
             if (party == null)
             {
-                partyId = await _altinnRegisterService.LookUpOrganizationId(organizationId, cancellationToken);
-                if (partyId != null) await _partyRepository.InitializeParty(organizationId, partyId);
+                partyId = await _altinnRegisterService.LookUpOrganizationId(subjectOrganizationNumber, cancellationToken);
+                if (partyId != null) await _partyRepository.InitializeParty(subjectOrganizationNumber, partyId);
             }
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, organizationId);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
         };
-        var response = await _httpClient.PostAsync("events/api/v1/events", JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json")), cancellationToken);
+        var requestBody = JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json"));
+        var response = await _httpClient.PostAsync("events/api/v1/events", requestBody, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with filetransfer id {fileTransferId}.", type, resourceId, fileTransferId);
@@ -53,8 +54,12 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? alternativeSubject)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? organizationNumber)
     {
+        if (organizationNumber is not null && organizationNumber.StartsWith("0192:"))
+        {
+            organizationNumber = organizationNumber.Split(":")[1];
+        }
         CloudEvent cloudEvent = new CloudEvent()
         {
             Id = Guid.NewGuid(),
@@ -64,7 +69,7 @@ public class AltinnEventBus : IEventBus
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
             Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
-            Subject = !string.IsNullOrWhiteSpace(alternativeSubject) ? "/organisation/" + alternativeSubject : null,
+            Subject = !string.IsNullOrWhiteSpace(organizationNumber) ? "/organisation/" + organizationNumber : null,
             AlternativeSubject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null,
         };
 
