@@ -43,11 +43,11 @@ module saveMigrationConnectionString '../keyvault/upsertSecret.bicep' = {
   }
 }
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
-  name: '${namePrefix}-pgflex'
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
+  name: '${namePrefix}-dbserver'
   location: location
   properties: {
-    version: '14'
+    version: '15'
     administratorLogin: databaseUser
     administratorLoginPassword: administratorLoginPassword
     storage: {
@@ -63,6 +63,15 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview'
   sku: sku
 }
 
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
+  name: databaseName
+  parent: postgres
+  properties: {
+    charset: 'UTF8'
+    collation: 'nb_NO.utf8'
+  }
+}
+
 resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
   name: 'azure.extensions'
   parent: postgres
@@ -70,15 +79,6 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   properties: {
     value: 'UUID-OSSP'
     source: 'user-override'
-  }
-}
-
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
-  name: databaseName
-  parent: postgres
-  properties: {
-    charset: 'UTF8'
-    collation: 'nb_NO.utf8'
   }
 }
 
