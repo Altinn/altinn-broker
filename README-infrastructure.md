@@ -76,7 +76,7 @@ The following secrets has to be added to the keyVault:
 
 The database uses IP blocking for security reasons so to get access you need to add a firewall rule on the database server for your IP. You also need to set yourself as an AD administrator with access to the database.
 
-1. Go to the database server in the Azure Portal (name ends in "-pgflex")
+1. Go to the database server in the Azure Portal (name ends in "-dbserver")
 2. Go Settings > Networking and click "Add current client IP address"
 3. Go Security > Authentication and use "Add Microsoft Entra Admins" to add yourself.
 4. After you have added yourself, you will see your AD user in the list of admins. Use the username from here and use an Azure Access token for password that can be generated using the CLI:
