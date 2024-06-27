@@ -5,5 +5,5 @@ services:
     image: grafana/k6:latest
     command: run /test.js
     volumes:
-      - ./Test/Altinn.Broker.Tests/K6.Tests/test.js:/test.js
-      - ./Test/Altinn.Broker.Tests/K6.Tests/data:/data
+      - ./tests/Altinn.Broker.Tests/K6.Tests/test.js:/test.js
+      - ./tests/Altinn.Broker.Tests/K6.Tests/data:/data
