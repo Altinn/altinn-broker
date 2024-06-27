@@ -38,7 +38,7 @@ services:
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
     volumes:
       - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
-      - ./Test/Altinn.Broker.Tests/Data/:/flyway/sql/R__Prepare_Test_Data.sql
+      - ./tests/Altinn.Broker.Tests/Data/:/flyway/sql/R__Prepare_Test_Data.sql
     depends_on:
       - database
     entrypoint:
