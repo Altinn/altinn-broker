@@ -1,9 +1,0 @@
-version: '3.4'
-
-services:
-  k6-test:
-    image: grafana/k6:latest
-    command: run /test.js
-    volumes:
-      - ./tests/Altinn.Broker.LoadTests/test.js:/test.js
-      - ./tests/Altinn.Broker.LoadTests/data:/data
