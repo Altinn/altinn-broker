@@ -86,22 +86,11 @@ az account get-access-token --resource=https://ossrdbms-aad.database.windows.net
 
 * Note: There is some time delay (~3 min) from when your IP address is added successfully to the firewall and when it actually has access.
 
-## How to get access to Hangfire dashboard
-
-Hangfire dashboard is available on /hangfire. When running locally, no auth is required.  
-
-When running in environment, you can get access from locally by running the HangfireDashboard project in /scripts/ folder. Follow procedure above to get access to deployed database and replace the AZURE_CONNECTION_STRING in appsettings.development.json with the connection string to the database.
-
-
 ## Where/how is APIM configured?
 
 We run on Platform's shared APIM. It is configured in [Azure Devops/altinn-studio-ops](https://dev.azure.com/brreg/altinn-studio-ops/_git/altinn-studio-ops) See:
 
 https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
-
-
-## After deployment of infrastructure
-It's important to check that Microsoft Defender is enabled for all blob storages in the environment. 
 
 ## Create release notes
 If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 
