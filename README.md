@@ -6,7 +6,7 @@ Altinn Broker is a Managed File Transfer (MFT) service for secure file transfer 
 
 ## Getting started
 
-Altinn Broker is currently available in Altinn's staging environment at https://platform.tt02.altinn.no. In order to get started integrating to the API, follow our [guide on getting started](./docs/get-started.md) and implement according to our [Swagger specification](https://docs.altinn.studio/api/broker/spec/).
+Altinn Broker is currently available in Altinn's staging environment at https://platform.tt02.altinn.no. In order to get started integrating to the API, follow our [guide on getting started](https://docs.altinn.studio/broker/user-guides/) and implement according to our [Swagger specification](https://docs.altinn.studio/api/broker/spec/).
 
 ## Postman
 
