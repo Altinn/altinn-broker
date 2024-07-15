@@ -16,7 +16,7 @@ Example requests using postman can be found in [altinn3-broker-postman-collectio
 
 The first time you start testing in an environment, you need to register a service owner in Broker so that we can provision the necessary storage resources for you. Use the "Register Service Owner" request in the Postman collection to do this. Make sure you have run the Authenticator/"Authenticate as service owner (tjeneste-eier)" request first. 
 
-Finally, you need to register a resource in the Resource Registry. First set the Postman variable resource_id to some unique ID. You can then use the requests in the Resource Registry folder with [the test policy](/Test/Altinn.Broker.Tests/Data/BasePolicy.xml) to create and manage the resource. As with registering a service owner, you need to have authenticated as a service owner to make these requests.
+Finally, you need to register a resource in the Resource Registry. First set the Postman variable resource_id to some unique ID. You can then use the requests in the Resource Registry folder with [the test policy](/tests/Altinn.Broker.Tests/Data/BasePolicy.xml) to create and manage the resource. As with registering a service owner, you need to have authenticated as a service owner to make these requests.
 
 ## Local Development
 
@@ -46,6 +46,8 @@ When running locally for development, you can use any Maskinporten token. It is 
 Formatting of the code base is handled by Dotnet format. [See how to configure it to format-on-save in Visual Studio here.](https://learn.microsoft.com/en-us/community/content/how-to-enforce-dotnet-format-using-editorconfig-github-actions#3---formatting-your-code-locally)
 
 ## Deploy
+
+The solution uses Github actions to deploy. 
 
 The build and push workflow produces a docker image that is pushed to Github packages. This image is then used by the release action found in the [altinn-broker-infra repository](https://github.com/Altinn/altinn-broker-infra).
 
