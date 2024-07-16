@@ -1,5 +1,5 @@
-# altinn-broker-infra
-IaC for Altinn Broker (formidlingstjenesten)
+# Infrastructure
+Infrastructure-as-code (IaC) for Altinn Broker (formidlingstjenesten)
 
 # Environments
 
@@ -15,10 +15,6 @@ Versioning is handled with a route parameter. Changes made should generally be b
 1. Code repo action produces a docker image as an artifact and places it into Github packages
 2. Infrastructure is deployed using a Github action. The deployment uses the last Github build from code repo.
 
-
-## Setup
-* Create a resource group
-
 ## Github action
 
 * The Github Action uses a service principal in order to authenticate to manage Azure resources, as when deploying resources. To create a service principal, do
@@ -27,48 +23,11 @@ az login
 az ad sp create-for-rbac --name broker_sp --role Owner --scopes /subscriptions/<subscription_id>
 ```
 
-The following Github secrets should be set:
-``` 
-AZURE_OIDC_STAGING_CLIENT_ID = "<appId>"
-AZURE_OIDC_STAGING_SUBSCRIPTION_ID = "<subscription_id>"
-AZURE_OIDC_STAGING_TENANT_ID = "<tenant>"
-AZURE_STAGING_NAME_PREFIX = "prefix of all azure resources"
-AZURE_SOURCE_STAGING_KEY_VAULT_NAME = "<key_vault_name>
-AZURE_STAGING_PRINCIPAL_ID" = "<principal_id>"
-
-AZURE_OIDC_PROD_CLIENT_ID = "<appId>"
-AZURE_OIDC_PROD_SUBSCRIPTION_ID = "<subscription_id>"
-AZURE_OIDC_PROD_TENANT_ID = "<tenant>"
-AZURE_PROD_NAME_PREFIX = "prefix of all azure resources"
-AZURE_SOURCE_PROD_KEY_VAULT_NAME = "<key_vault_name>
-AZURE_PROD_PRINCIPAL_ID" = "<principal_id>"
-
-AZURE_OIDC_TEST_CLIENT_ID = "<appId>"
-AZURE_OIDC_TEST_SUBSCRIPTION_ID = "<subscription_id>"
-AZURE_OIDC_TEST_TENANT_ID = "<tenant>"
-AZURE_TEST_NAME_PREFIX = "prefix of all azure resources"
-AZURE_SOURCE_TEST_KEY_VAULT_NAME = "<key_vault_name>
-AZURE_TEST_PRINCIPAL_ID" = "<principal_id>"
-
-
-AZURE_TEST_ACCESS_CLIENT_ID = "<Client_id of dev SP>"  This is used for developer access to database, and is not required. It is only used in test environment. 
-STAGING_NOTIFICATION_EMAIL = "<email>" Optional parameter. If an email is provided, a scheduled query will be created for 500 errors, which sends an email of exception information.
-
-SONAR_TOKEN = "<sonar_token"> Token used for sonarqube scan
-```
-
 * Federated credentials are used to authorize the pipeline based on the repo and branch. This is the reason why we do not need client secret in the pipeline. Because of this, we need one federated credential for the main branch and one for pull requests. Generate these by running:
 ```
 az ad app federated-credential create --id <APPLICATION-OBJECT-ID> --parameters credential-pr.json
 az ad app federated-credential create --id <APPLICATION-OBJECT-ID> --parameters credential-main.json
 ```
-
-## Manual steps after deployment to new environment
-
-The following secrets has to be added to the keyVault: 
-1. Platform-subscription key. See Step 0 in [technical integration guide](https://github.com/Altinn/altinn-broker/blob/main/docs/get-started.md)
-2. maskinporten-client-id
-3. maskinporten-jwk
 
 # FAQ
 
@@ -86,22 +45,11 @@ az account get-access-token --resource=https://ossrdbms-aad.database.windows.net
 
 * Note: There is some time delay (~3 min) from when your IP address is added successfully to the firewall and when it actually has access.
 
-## How to get access to Hangfire dashboard
-
-Hangfire dashboard is available on /hangfire. When running locally, no auth is required.  
-
-When running in environment, you can get access from locally by running the HangfireDashboard project in /scripts/ folder. Follow procedure above to get access to deployed database and replace the AZURE_CONNECTION_STRING in appsettings.development.json with the connection string to the database.
-
-
 ## Where/how is APIM configured?
 
 We run on Platform's shared APIM. It is configured in [Azure Devops/altinn-studio-ops](https://dev.azure.com/brreg/altinn-studio-ops/_git/altinn-studio-ops) See:
 
 https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
-
-
-## After deployment of infrastructure
-It's important to check that Microsoft Defender is enabled for all blob storages in the environment. 
 
 ## Create release notes
 If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 

@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\Test\Altinn.Broker.Tests\Data\*.json">
+    <Content Include="..\..\tests\Altinn.Broker.Tests\Data\*.json">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

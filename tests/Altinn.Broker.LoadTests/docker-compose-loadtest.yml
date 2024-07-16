@@ -1,0 +1,9 @@
+version: '3.4'
+
+services:
+  k6-test:
+    image: grafana/k6:latest
+    command: run /test.js
+    volumes:
+      - ./test.js:/test.js
+      - ./data:/data

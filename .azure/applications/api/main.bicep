@@ -36,7 +36,8 @@ module appIdentity '../../modules/identity/create.bicep' = {
   }
 }
 
-module addContributorAccess '../../modules/identity/addContributorAccess.bicep' = {
+// Required to enable Microsoft Defender malware scan on storage account
+module addOwnerAccess '../../modules/identity/addOwnerAccess.bicep' = { 
   name: 'appDeployToAzureAccess'
   params: {
     userAssignedIdentityPrincipalId: appIdentity.outputs.principalId
