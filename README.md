@@ -47,4 +47,4 @@ Formatting of the code base is handled by Dotnet format. [See how to configure i
 
 ## Deploy
 
-The solution uses Github actions to deploy. When a branch is merged to main, the [CI/CD workflow](.github/workflows/ci-cd.yaml) will deploy it to the internal test environment (https://altinn-dev-api.azure-api.net) where the developer can test it. They then have to return to the workflow and approve it for further deployment to staging and production.
+The solution uses Github actions to deploy. When a branch is merged to main, the [CI/CD workflow](https://github.com/Altinn/altinn-broker/actions/workflows/ci-cd.yaml) will deploy it to the internal test environment (https://altinn-dev-api.azure-api.net) where the developer can test it. They then have to return to the workflow and approve it for further deployment to staging and production.
