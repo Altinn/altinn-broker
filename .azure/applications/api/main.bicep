@@ -37,10 +37,12 @@ module appIdentity '../../modules/identity/create.bicep' = {
 }
 
 // Required to enable Microsoft Defender malware scan on storage account
-module addOwnerAccess '../../modules/identity/addOwnerAccess.bicep' = { 
+var userAccessAdminRoleDefinitionId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9'
+module appDeployToAzureAccess '../../modules/identity/addRole.bicep' = { 
   name: 'appDeployToAzureAccess'
   params: {
     userAssignedIdentityPrincipalId: appIdentity.outputs.principalId
+    roleDefinitionResourceId: userAccessAdminRoleDefinitionId
   }
 }
 
