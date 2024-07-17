@@ -842,46 +842,6 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "Update File Transfer Time To Live Time",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{serviceowner_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"filetransfertimetolive\": \"P30D\"\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/broker/api/v1/resource/filetransfertimetolive",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"broker",
-								"api",
-								"v1",
-								"resource",
-								"filetransfertimetolive"
-							]
-						}
-					},
-					"response": []
 				}
 			]
 		},
@@ -1216,7 +1176,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read altinn:events.publish&org=ttd&orgNo=986252932",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read&org=ttd&orgNo=986252932",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
