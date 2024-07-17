@@ -36,15 +36,13 @@ module appIdentity '../../modules/identity/create.bicep' = {
   }
 }
 
-// Required to enable Microsoft Defender malware scan on storage account
-var userAccessAdminRoleDefinitionId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9'
-module appDeployToAzureAccess '../../modules/identity/addRole.bicep' = { 
+module appDeployToAzureAccess '../../modules/identity/addDeploymentRoles.bicep' = { 
   name: 'appDeployToAzureAccess'
   params: {
     userAssignedIdentityPrincipalId: appIdentity.outputs.principalId
-    roleDefinitionResourceId: userAccessAdminRoleDefinitionId
   }
 }
+
 
 module keyVaultReaderAccessPolicyUserIdentity '../../modules/keyvault/addReaderRoles.bicep' = {
   name: 'kvreader-${namePrefix}-app'
