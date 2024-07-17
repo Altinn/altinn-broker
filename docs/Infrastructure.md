@@ -23,11 +23,9 @@ az login
 az ad sp create-for-rbac --name broker_sp --role Owner --scopes /subscriptions/<subscription_id>
 ```
 
-* Federated credentials are used to authorize the pipeline based on the repo and branch. This is the reason why we do not need client secret in the pipeline. Because of this, we need one federated credential for the main branch and one for pull requests. Generate these by running:
-```
-az ad app federated-credential create --id <APPLICATION-OBJECT-ID> --parameters credential-pr.json
-az ad app federated-credential create --id <APPLICATION-OBJECT-ID> --parameters credential-main.json
-```
+* The service principal should be set up as Contributor and User Access Administrator (without constraint on delegating User Access Administrator to others) in the subscription you deploy to.
+
+* Federated credentials are used to authorize the pipeline based on the repo and branch. This is the reason why we do not need client secret in the pipeline. Because of this, we need one federated credential for each environment. I.E, for test the subject should be repo:Altinn/altinn-broker:environment:test.
 
 # FAQ
 
