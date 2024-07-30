@@ -49,7 +49,7 @@ public static class DependencyInjection
 
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAuthorizationService).FullName, maskinportenSettings);
             services.AddHttpClient<IAuthorizationService, AltinnAuthorizationService>((client) => client.BaseAddress = new Uri(altinnOptions!.PlatformGatewayUrl))
-                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>(x => x.ClientSettings.ExhangeToAltinnToken = false);
+                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>(x => x.ClientSettings.ExhangeToAltinnToken = true);
         }
     }
 }
