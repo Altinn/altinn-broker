@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
@@ -52,6 +53,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         }
         var actionIds = rights.Select(GetActionId).ToList();
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, actionIds, resource);
+        _logger.LogInformation("Json request created. Sending to Authorization. ResourceId: {resourceId} - Body: {body}", resourceId, JsonSerializer.Serialize(jsonRequest));
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
