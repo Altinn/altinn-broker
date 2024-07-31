@@ -47,6 +47,11 @@ public class FileTransferController : Controller
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferCommandHandler handler, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Initializing file transfer");
+        foreach (var header in HttpContext.Request.Headers)
+        {
+            _logger.LogInformation("Found header: {key} - {value}", header.Key, header.Value);  
+        }
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Initializing file transfer");
