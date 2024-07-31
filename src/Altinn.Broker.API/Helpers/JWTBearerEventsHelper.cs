@@ -9,7 +9,7 @@ public class JWTBearerEventsHelper
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
         context.Response.Headers.Append("WWW-Authenticate", context.Options.Challenge + " error=\"invalid_token\"");
-        string err = "";
+        string err = context.Exception.Message;
         if (context.Exception is SecurityTokenInvalidIssuerException)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
