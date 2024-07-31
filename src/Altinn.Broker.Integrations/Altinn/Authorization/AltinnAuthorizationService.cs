@@ -53,8 +53,6 @@ public class AltinnAuthorizationService : IAuthorizationService
         }
         var actionIds = rights.Select(GetActionId).ToList();
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, actionIds, resource);
-        _logger.LogInformation("Json request created. Sending to Authorization. ResourceId: {resourceId} - Body: {body}", resourceId, JsonSerializer.Serialize(jsonRequest));
-        _logger.LogInformation("The token is set to expire at {userTokenExpiryTime}", user.FindFirst("exp")?.Value);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
