@@ -8,7 +8,7 @@ public class JWTBearerEventsHelper
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
-        context.Response.Headers.Append("WWW-Authenticate", context.Options.Challenge + " error=\"invalid_token\", error_description=\"" + context.Exception.Message + "\"");
+        context.Response.Headers.Append("WWW-Authenticate", context.Options.Challenge + " error=\"invalid_token\"");
         string err = "";
         if (context.Exception is SecurityTokenInvalidIssuerException)
         {
@@ -20,6 +20,7 @@ public class JWTBearerEventsHelper
                 err = "IDX10205: Issuer validation failed. Maskinporten token is not valid. Exchange to Altinn token and try again. Read more at https://docs.altinn.studio/api/scenarios/authentication/#maskinporten-jwt-access-token-input";
             }
         }
+
         return context.Response.WriteAsync(err);
     }
 }
