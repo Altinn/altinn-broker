@@ -20,7 +20,6 @@ public class JWTBearerEventsHelper
                 err = "IDX10205: Issuer validation failed. Maskinporten token is not valid. Exchange to Altinn token and try again. Read more at https://docs.altinn.studio/api/scenarios/authentication/#maskinporten-jwt-access-token-input";
             }
         }
-
         return context.Response.WriteAsync(err);
     }
 }
