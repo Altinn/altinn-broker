@@ -50,7 +50,7 @@ var containerAppEnvVars = [
     value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:authorization/authorize.admin'
   }
   { name: 'MaskinportenSettings__ExhangeToAltinnToken'
-    value: true
+    value: 'true'
   }
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
 ]
