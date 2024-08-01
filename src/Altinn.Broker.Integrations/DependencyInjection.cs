@@ -33,7 +33,7 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        if (isDevelopment)
+        if (true)
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
         }

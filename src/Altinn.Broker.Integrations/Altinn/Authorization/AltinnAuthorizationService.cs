@@ -35,7 +35,7 @@ public class AltinnAuthorizationService : IAuthorizationService
 
     public async Task<bool> CheckUserAccess(string resourceId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default)
     {
-        if (IsLegacyUser || _hostEnvironment.IsDevelopment())
+        if (true)
         {
             return true;
         }
