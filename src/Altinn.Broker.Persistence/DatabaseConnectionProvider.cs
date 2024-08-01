@@ -72,7 +72,7 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
         }
         finally
         {
-            _logger.LogDebug("DB Connection milliseconds: {time}", stopwatch.ElapsedMilliseconds);
+            _logger.LogWarning("DB Connection milliseconds: {time}", stopwatch.ElapsedMilliseconds);
             _semaphore.Release();
         }
     }
