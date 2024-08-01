@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "a372d772-482c-4859-b0e3-93e049f6c2ce",
+		"_postman_id": "edc0afde-1074-4685-9bd7-e28205f1abfa",
 		"name": "Altinn.Broker",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "32732086"
@@ -28,8 +28,9 @@
 								"method": "GET",
 								"header": [
 									{
-										"key": "Accept",
-										"value": "text/plain"
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{platform_subscription_key}}",
+										"type": "text"
 									}
 								],
 								"url": {
@@ -109,6 +110,11 @@
 										"key": "Content-Type",
 										"value": "application/octet-stream",
 										"type": "text"
+									},
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{platform_subscription_key}}",
+										"type": "text"
 									}
 								],
 								"body": {
@@ -183,8 +189,9 @@
 								"method": "GET",
 								"header": [
 									{
-										"key": "Accept",
-										"value": "text/plain"
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{platform_subscription_key}}",
+										"type": "text"
 									}
 								],
 								"url": {
@@ -261,9 +268,15 @@
 									]
 								},
 								"method": "GET",
-								"header": [],
+								"header": [
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{platform_subscription_key}}",
+										"type": "text"
+									}
+								],
 								"url": {
-									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
+									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download?",
 									"host": [
 										"{{baseUrl}}"
 									],
@@ -374,7 +387,13 @@
 									]
 								},
 								"method": "POST",
-								"header": [],
+								"header": [
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{platform_subscription_key}}",
+										"type": "text"
+									}
+								],
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/confirmdownload",
 									"host": [
@@ -462,6 +481,11 @@
 							{
 								"key": "Accept",
 								"value": "text/plain"
+							},
+							{
+								"key": "Ocp-Apim-Subscription-Key",
+								"value": "{{platform_subscription_key}}",
+								"type": "text"
 							}
 						],
 						"body": {
@@ -557,6 +581,11 @@
 							{
 								"key": "Accept",
 								"value": "text/plain"
+							},
+							{
+								"key": "Ocp-Apim-Subscription-Key",
+								"value": "{{platform_subscription_key}}",
+								"type": "text"
 							}
 						],
 						"url": {
@@ -574,6 +603,11 @@
 								{
 									"key": "resourceId",
 									"value": "{{resource_id}}"
+								},
+								{
+									"key": "Ocp-Apim-Subscription-Key",
+									"value": "{{platform_subscription_key}}",
+									"disabled": true
 								}
 							]
 						}
@@ -817,7 +851,13 @@
 							]
 						},
 						"method": "PUT",
-						"header": [],
+						"header": [
+							{
+								"key": "Ocp-Apim-Subscription-Key",
+								"value": "{{platform_subscription_key}}",
+								"type": "text"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\",\r\n    \"fileTransferTimeToLive\": \"P30D\"\r\n}",
@@ -902,7 +942,6 @@
 						},
 						"method": "GET",
 						"header": [],
-						"body": "",
 						"url": {
 							"raw": "{{baseUrl}}/broker/api/v1/serviceowner",
 							"host": [
@@ -931,7 +970,6 @@
 										"value": "text/plain"
 									}
 								],
-								"body": "",
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/serviceowner",
 									"host": [
@@ -1142,7 +1180,7 @@
 								},
 								{
 									"key": "orgNo",
-									"value": "991825827"
+									"value": "{{serviceowner_orgnumber}}"
 								}
 							]
 						}
@@ -1258,11 +1296,11 @@
 								},
 								{
 									"key": "org",
-									"value": "digdir"
+									"value": "ttd"
 								},
 								{
 									"key": "orgNo",
-									"value": "991825827"
+									"value": "{{serviceowner_orgnumber}}"
 								}
 							]
 						}
@@ -1321,6 +1359,11 @@
 		{
 			"key": "baseUrl",
 			"value": "https://platform.tt02.altinn.no",
+			"type": "string"
+		},
+		{
+			"key": "platform_subscription_key",
+			"value": "Contact us to get a subscription key for use with Altinn APIs",
 			"type": "string"
 		}
 	]
