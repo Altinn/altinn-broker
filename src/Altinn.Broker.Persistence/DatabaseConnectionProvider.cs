@@ -34,8 +34,11 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 
     public async Task<NpgsqlConnection> GetConnectionAsync()
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await EnsureValidDataSource();
-        return await _dataSource.OpenConnectionAsync();
+        var connection = await _dataSource.OpenConnectionAsync();
+        _logger.LogWarning("DB Connection milliseconds: {time}", stopwatch.ElapsedMilliseconds);
+        return connection;
     }
 
     public async Task<NpgsqlCommand> CreateCommand(string commandText)
@@ -52,7 +55,6 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
     private async Task EnsureValidDataSource()
     {
         await _semaphore.WaitAsync();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             NpgsqlConnectionStringBuilder connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
@@ -72,7 +74,6 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
         }
         finally
         {
-            _logger.LogWarning("DB Connection milliseconds: {time}", stopwatch.ElapsedMilliseconds);
             _semaphore.Release();
         }
     }
