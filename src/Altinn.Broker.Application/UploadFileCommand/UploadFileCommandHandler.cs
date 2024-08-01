@@ -1,3 +1,4 @@
+using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -7,6 +8,7 @@ using Altinn.Broker.Core.Services.Enums;
 using Hangfire;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -23,8 +25,9 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly IEventBus _eventBus;
     private readonly ILogger<UploadFileCommandHandler> _logger;
+    private readonly long _maxFileUploadSize;
 
-    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileCommandHandler> logger)
+    public UploadFileCommandHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileCommandHandler> logger, IOptions<ApplicationSettings> applicationSettings)
     {
         _resourceRightsRepository = resourceRightsRepository;
         _resourceRepository = resourceRepository;
@@ -35,6 +38,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         _backgroundJobClient = backgroundJobClient;
         _eventBus = eventBus;
         _logger = logger;
+        _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
     }
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileCommandRequest request, CancellationToken cancellationToken)
@@ -67,7 +71,7 @@ public class UploadFileCommandHandler : IHandler<UploadFileCommandRequest, Guid>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var maxUploadSize = resource?.MaxFileTransferSize ?? long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? int.MaxValue.ToString());
+        var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
         if (request.ContentLength > maxUploadSize)
         {
             return Errors.FileSizeTooBig;

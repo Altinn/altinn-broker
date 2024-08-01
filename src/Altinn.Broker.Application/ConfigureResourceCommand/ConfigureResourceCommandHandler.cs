@@ -1,8 +1,11 @@
 ﻿using System.Xml;
 
+using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
+
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -11,11 +14,13 @@ public class ConfigureResourceCommandHandler : IHandler<ConfigureResourceCommand
 {
     private readonly IResourceRepository _resourceRepository;
     private readonly IAuthorizationService _resourceRightsRepository;
+    private readonly long _maxFileUploadSize;
 
-    public ConfigureResourceCommandHandler(IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository)
+    public ConfigureResourceCommandHandler(IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IOptions<ApplicationSettings> applicationSettings)
     {
         _resourceRepository = resourceRepository;
         _resourceRightsRepository = resourceRightsRepository;
+        _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
     }
 
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceCommandRequest request, CancellationToken cancellationToken)
@@ -59,8 +64,7 @@ public class ConfigureResourceCommandHandler : IHandler<ConfigureResourceCommand
         {
             return Errors.MaxUploadSizeCannotBeZero;
         }
-        long globalMaxFileTransferSize = long.Parse(Environment.GetEnvironmentVariable("MAX_FILE_UPLOAD_SIZE") ?? int.MaxValue.ToString());
-        if (maxFileTransferSize > globalMaxFileTransferSize)
+        if (maxFileTransferSize > _maxFileUploadSize)
         {
             return Errors.MaxUploadSizeOverGlobal;
         }
