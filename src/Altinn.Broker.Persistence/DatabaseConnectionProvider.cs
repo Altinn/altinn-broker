@@ -52,6 +52,7 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
     private async Task EnsureValidDataSource()
     {
         await _semaphore.WaitAsync();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             NpgsqlConnectionStringBuilder connectionStringBuilder = new NpgsqlConnectionStringBuilder(_connectionString);
@@ -71,6 +72,7 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
         }
         finally
         {
+            _logger.LogDebug('DB Connection milliseconds: {time}', stopwatch.ElapsedMilliseconds);
             _semaphore.Release();
         }
     }
