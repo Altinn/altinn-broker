@@ -49,6 +49,10 @@ var containerAppEnvVars = [
     name: 'MaskinportenSettings__Scope'
     value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:authorization/authorize.admin'
   }
+  { 
+    name: 'MaskinportenSettings__ExhangeToAltinnToken'
+    value: 'true'
+  }
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
 ]
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {

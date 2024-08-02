@@ -6,13 +6,13 @@ Altinn Broker is a Managed File Transfer (MFT) service for secure file transfer 
 
 ## Getting started
 
-Altinn Broker is currently available in Altinn's staging environment at https://platform.tt02.altinn.no. In order to get started integrating to the API, follow our [guide on getting started](https://docs.altinn.studio/broker/user-guides/) and implement according to our [Swagger specification](https://docs.altinn.studio/api/broker/spec/).
+Altinn Broker is currently available in Altinn's staging environment at https://platform.tt02.altinn.no. In order to get started integrating to the API, follow our [guide on getting started](https://docs.altinn.studio/broker/getting-started/) and implement according to our [Swagger specification](https://docs.altinn.studio/api/broker/spec/).
 
 ## Postman
 
 <a id="postman"></a>
 
-Example requests using postman can be found in [altinn3-broker-postman-collection.json](/altinn3-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". Also set the variable "serviceowner_orgnumber". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
+Example requests using postman can be found in [altinn-broker-postman-collection.json](/altinn-broker-postman-collection.json). In order to use it, you need to [register a Maskinporten integration](https://sjolvbetjening.test.samarbeid.digdir.no/auth/login) with the scope "altinn:testtools/tokengenerator/enterprise" and use it to fill out the Postman variables "client_id", "client_kid" and "client_jwk". Also set the variable "serviceowner_orgnumber". After that, run all the requests in the folder Authenticator in order. This will authenticate you to to run all the other requests in the collection.
 
 The first time you start testing in an environment, you need to register a service owner in Broker so that we can provision the necessary storage resources for you. Use the "Register Service Owner" request in the Postman collection to do this. Make sure you have run the Authenticator/"Authenticate as service owner (tjeneste-eier)" request first. 
 
@@ -47,30 +47,4 @@ Formatting of the code base is handled by Dotnet format. [See how to configure i
 
 ## Deploy
 
-The solution uses Github actions to deploy. 
-
-The build and push workflow produces a docker image that is pushed to Github packages. This image is then used by the release action found in the [altinn-broker-infra repository](https://github.com/Altinn/altinn-broker-infra).
-
-
-## Load testing with k6
-Before running tests you should mock the following:
-- AltinnAuthorization by setting the function CheckUserAccess to return true
-- AltinnRegisterService to return a string 
-- AltinnResourceRegister to return a ResourceEntity
-- Use the ConsoleLogEventBus 
-
-Constants: 
-- BASE_URL; enviroment to test. 
-- TOKENS: tokens for a service owner(TOKENS.DUMMY_SERVICE_OWNER_TOKEN) and a sender(TOKENS.DUMMY_SENDER_TOKEN), which can be found in postman(Authenticate as Sender/serviceOwner) in the Authenticator folder. 
-
-k6 option variables: 
-- VUs: How many virtual users running tests at the same time. 
-- iterations: how many tests TOTAL should be completed. vus/iterations=test per vus. 0 means infinite iterations for as long as the test will run. 
-- httpDebug: full/summary. Outputs infomration about http requests and responses
-- duration: How long the test should be running. The test also adds a 30 seconds gracefull stop period on top of this. 
-
-We run load tests using k6. To run without installing k6 you can use docker-compose(base url has to be http://host.docker.internal:5096):
-```docker-compose -f docker-compose-test.yml up k6-test``` 
-
-if you have k6 installed locally, you can run it by using the following command: 
-```"k6 run test.js"```
+The solution uses Github actions to deploy. When a branch is merged to main, the [CI/CD workflow](https://github.com/Altinn/altinn-broker/actions/workflows/ci-cd.yaml) will deploy it to the internal test environment (https://altinn-dev-api.azure-api.net) where the developer can test it. They then have to return to the workflow and approve it for further deployment to staging and production.

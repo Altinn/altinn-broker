@@ -132,7 +132,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context),
                 OnChallenge = c =>
                 {
-                    c.HandleResponse();
+                    if (c.AuthenticateFailure != null)
+                    {
+                        c.HandleResponse();
+                    }
                     return Task.CompletedTask;
                 }
             };
