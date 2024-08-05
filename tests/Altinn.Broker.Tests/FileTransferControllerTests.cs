@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ExpireFileTransferCommand;
+using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -87,7 +87,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && (((ExpireFileTransferCommandRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferHandler" && (((ExpireFileTransferRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
             It.IsAny<EnqueuedState>()));
     }
 
@@ -110,7 +110,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
-        
+
         var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(fileTransferAfterInitialize);
         Assert.True(fileTransferAfterInitialize.FileTransferStatus == FileTransferStatusExt.Initialized);
@@ -151,7 +151,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferCommandHandler" && (((ExpireFileTransferCommandRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
+            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferHandler" && (((ExpireFileTransferRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
             It.IsAny<EnqueuedState>()));
     }
 
@@ -172,7 +172,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         initializeRequestBody.PropertyList.Add("SuperProperty10", "BLAHBLAHBLAH");
         initializeRequestBody.PropertyList.Add("SuperProperty11", "BLAHBLAHBLAH");
 
-        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);        
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
@@ -484,7 +484,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
-        
+
         return await initializeFileTransferResponse.Content.ReadAsStringAsync();
     }
 

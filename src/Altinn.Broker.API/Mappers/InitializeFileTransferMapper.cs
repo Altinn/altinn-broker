@@ -1,4 +1,4 @@
-﻿using Altinn.Broker.Application.InitializeFileTransferCommand;
+﻿using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
 
@@ -6,9 +6,9 @@ namespace Altinn.Broker.Mappers;
 
 internal static class InitializeFileTransferMapper
 {
-    internal static InitializeFileTransferCommandRequest MapToRequest(FileTransferInitalizeExt fileTransferInitializeExt, CallerIdentity token)
+    internal static InitializeFileTransferRequest MapToRequest(FileTransferInitalizeExt fileTransferInitializeExt, CallerIdentity token)
     {
-        return new InitializeFileTransferCommandRequest()
+        return new InitializeFileTransferRequest()
         {
             Token = token,
             ResourceId = fileTransferInitializeExt.ResourceId,
