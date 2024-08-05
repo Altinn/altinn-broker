@@ -17,7 +17,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0.6-alpine3.18 AS final
 WORKDIR /app
 EXPOSE 2525
 ENV ASPNETCORE_URLS=http://+:2525
-ENV MAX_FILE_UPLOAD_SIZE=2147483648
 
 COPY --from=build /app/out .
 #COPY src/Altinn.Broker.Persistence/Migration ./Migration
