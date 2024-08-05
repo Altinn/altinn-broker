@@ -36,4 +36,9 @@ public static class LogContextHelpers
     {
         LogContext.PushProperty("fileTransferId", fileTransferId);
     }   
+
+    public static void EnrichLogsWithResourceId(string resourceId)
+    {
+        LogContext.PushProperty("resourceId", resourceId);
+    }
 }

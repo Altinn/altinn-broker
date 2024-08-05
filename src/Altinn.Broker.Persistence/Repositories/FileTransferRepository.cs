@@ -118,6 +118,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     private static void EnrichLogs(FileTransferEntity fileTransferEntity)
     {
+        LogContext.PushProperty("resourceId", fileTransferEntity.ResourceId);
         LogContext.PushProperty("fileTransferId", fileTransferEntity.FileTransferId);
         LogContext.PushProperty("resourceId", fileTransferEntity.ResourceId);
         LogContext.PushProperty("sender", fileTransferEntity.Sender);
