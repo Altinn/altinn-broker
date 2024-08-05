@@ -10,6 +10,8 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
+using Serilog.Context;
+
 namespace Altinn.Broker.Application.ExpireFileTransferCommand;
 public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferCommandRequest, Task>
 {
@@ -35,6 +37,7 @@ public class ExpireFileTransferCommandHandler : IHandler<ExpireFileTransferComma
     [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> Process(ExpireFileTransferCommandRequest request, CancellationToken cancellationToken)
     {
+        LogContext.PushProperty("fileTransferId", request.FileTransferId);
         _logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
         var fileTransfer = await GetFileTransferAsync(request.FileTransferId, cancellationToken);
         var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);

@@ -74,6 +74,7 @@ public class FileTransferController : Controller
         CancellationToken cancellationToken
     )
     {
+        LogContextHelpers.EnrichLogsWithFileTransferId(fileTransferId);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
         Request.EnableBuffering();
@@ -144,6 +145,7 @@ public class FileTransferController : Controller
         [FromServices] GetFileTransferOverviewQueryHandler handler,
         CancellationToken cancellationToken)
     {
+        LogContextHelpers.EnrichLogsWithFileTransferId(fileTransferId);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Getting filetransfer overview for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferOverviewQueryRequest()
@@ -170,6 +172,7 @@ public class FileTransferController : Controller
         [FromServices] GetFileTransferDetailsQueryHandler handler,
         CancellationToken cancellationToken)
     {
+        LogContextHelpers.EnrichLogsWithFileTransferId(fileTransferId);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Getting fileTransfer details for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferDetailsQueryRequest()
@@ -230,6 +233,7 @@ public class FileTransferController : Controller
         [FromServices] DownloadFileQueryHandler handler,
          CancellationToken cancellationToken)
     {
+        LogContextHelpers.EnrichLogsWithFileTransferId(fileTransferId);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new DownloadFileQueryRequest()
@@ -256,6 +260,7 @@ public class FileTransferController : Controller
         [FromServices] ConfirmDownloadCommandHandler handler,
         CancellationToken cancellationToken)
     {
+        LogContextHelpers.EnrichLogsWithFileTransferId(fileTransferId);
         LogContextHelpers.EnrichLogsWithToken(token);
         _logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
         var requestData = new ConfirmDownloadCommandRequest()

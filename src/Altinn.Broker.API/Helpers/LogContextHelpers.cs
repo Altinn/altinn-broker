@@ -31,4 +31,9 @@ public static class LogContextHelpers
         LogContext.PushProperty("scope", token.Scope);
         LogContext.PushProperty("clientId", token.ClientId);
     }
+
+    public static void EnrichLogsWithFileTransferId(Guid fileTransferId)
+    {
+        LogContext.PushProperty("fileTransferId", fileTransferId);
+    }   
 }
