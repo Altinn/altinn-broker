@@ -15,8 +15,8 @@ k6 option variables:
 - httpDebug: full/summary. Outputs infomration about http requests and responses
 - duration: How long the test should be running. The test also adds a 30 seconds gracefull stop period on top of this. 
 
-We run load tests using k6. To run without installing k6 you can use docker-compose(base url has to be http://host.docker.internal:5096):
-```docker-compose -f docker-compose-loadtest.yml up k6-test``` 
+We run load tests using k6. To run without installing k6 you can use docker compose(base url has to be http://host.docker.internal:5096):
+```docker compose -f docker-compose-loadtest.yml up k6-test``` 
 
 if you have k6 installed locally, you can run it by using the following command: 
 ```"k6 run test.js"```
