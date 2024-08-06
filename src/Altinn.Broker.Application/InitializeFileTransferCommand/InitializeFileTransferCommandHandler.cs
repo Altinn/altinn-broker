@@ -85,7 +85,7 @@ public class InitializeFileTransferCommandHandler : IHandler<InitializeFileTrans
             Force = false
         }, cancellationToken), fileExpirationTime);
         await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
-        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, request.ResourceId, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
+        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
 
         return fileTransferId;
     }
