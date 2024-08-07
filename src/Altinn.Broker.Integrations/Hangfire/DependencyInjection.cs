@@ -16,8 +16,9 @@ public static class DependencyInjection
         var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
         config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
         var serviceProvider = services.BuildServiceProvider();
+        var connectionFactory = serviceProvider.GetRequiredService<IConnectionFactory>();
         services.AddHangfire(config =>
-            config.UsePostgreSqlStorage(databaseOptions.ConnectionString)
+            config.UsePostgreSqlStorage(options => options.UseConnectionFactory(connectionFactory))
         );
         services.AddHangfireServer();
     }
