@@ -47,7 +47,10 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 
     public NpgsqlConnection GetOrCreateConnection()
     {
-        return GetConnectionAsync().Result;
+        _logger.LogInformation("Hangfire GetOrCreateConnection");
+        EnsureValidDataSource().RunSynchronously();
+        _logger.LogInformation("Hangfire GetOrCreateConnection valid token");
+        return _dataSource.CreateConnection();
     }
 
     private async Task EnsureValidDataSource()
