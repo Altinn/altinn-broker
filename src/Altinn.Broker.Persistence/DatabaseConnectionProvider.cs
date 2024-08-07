@@ -34,10 +34,8 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 
     public async Task<NpgsqlConnection> GetConnectionAsync()
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await EnsureValidDataSource();
         var connection = await _dataSource.OpenConnectionAsync();
-        _logger.LogWarning("DB Connection milliseconds: {time}", stopwatch.ElapsedMilliseconds);
         return connection;
     }
 
