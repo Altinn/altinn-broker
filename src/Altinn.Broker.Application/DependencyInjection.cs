@@ -1,11 +1,11 @@
-﻿using Altinn.Broker.Application.ConfigureResourceCommand;
-using Altinn.Broker.Application.DownloadFileQuery;
-using Altinn.Broker.Application.ExpireFileTransferCommand;
-using Altinn.Broker.Application.GetFileTransferDetailsQuery;
-using Altinn.Broker.Application.GetFileTransferOverviewQuery;
-using Altinn.Broker.Application.GetFileTransfersQuery;
-using Altinn.Broker.Application.InitializeFileTransferCommand;
-using Altinn.Broker.Application.UploadFileCommand;
+﻿using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.DownloadFile;
+using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.GetFileTransferDetails;
+using Altinn.Broker.Application.GetFileTransferOverview;
+using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.InitializeFileTransfer;
+using Altinn.Broker.Application.UploadFile;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,16 +14,16 @@ public static class DependencyInjection
 {
     public static void AddApplicationHandlers(this IServiceCollection services)
     {
-        services.AddScoped<InitializeFileTransferCommandHandler>();
-        services.AddScoped<UploadFileCommandHandler>();
-        services.AddScoped<GetFileTransferOverviewQueryHandler>();
-        services.AddScoped<GetFileTransferDetailsQueryHandler>();
-        services.AddScoped<DownloadFileQueryHandler>();
-        services.AddScoped<ConfirmDownloadCommandHandler>();
-        services.AddScoped<GetFileTransfersQueryHandler>();
-        services.AddScoped<ExpireFileTransferCommandHandler>();
-        services.AddScoped<LegacyGetFilesQueryHandler>();
+        services.AddScoped<InitializeFileTransferHandler>();
+        services.AddScoped<UploadFileHandler>();
+        services.AddScoped<GetFileTransferOverviewHandler>();
+        services.AddScoped<GetFileTransferDetailsHandler>();
+        services.AddScoped<DownloadFileHandler>();
+        services.AddScoped<ConfirmDownloadHandler>();
+        services.AddScoped<GetFileTransfersHandler>();
+        services.AddScoped<ExpireFileTransferHandler>();
+        services.AddScoped<LegacyGetFilesHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
-        services.AddScoped<ConfigureResourceCommandHandler>();
+        services.AddScoped<ConfigureResourceHandler>();
     }
 }

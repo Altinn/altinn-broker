@@ -1,11 +1,11 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ConfirmDownloadCommand;
-using Altinn.Broker.Application.DownloadFileQuery;
-using Altinn.Broker.Application.GetFileTransferOverviewQuery;
-using Altinn.Broker.Application.GetFileTransfersQuery;
-using Altinn.Broker.Application.InitializeFileTransferCommand;
-using Altinn.Broker.Application.UploadFileCommand;
+using Altinn.Broker.Application.ConfirmDownload;
+using Altinn.Broker.Application.DownloadFile;
+using Altinn.Broker.Application.GetFileTransferOverview;
+using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.InitializeFileTransfer;
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Enums;
@@ -40,7 +40,7 @@ public class LegacyFileController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpPost]
-    public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferCommandHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult<Guid>> InitializeFile(LegacyFileInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         CallerIdentity legacyToken = CreateLegacyToken(initializeExt.Sender, token);
 
@@ -66,7 +66,7 @@ public class LegacyFileController : Controller
         Guid fileTransferId,
         [FromQuery] string onBehalfOfConsumer,
         [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-        [FromServices] UploadFileCommandHandler handler,
+        [FromServices] UploadFileHandler handler,
         CancellationToken cancellationToken
     )
     {
@@ -75,7 +75,7 @@ public class LegacyFileController : Controller
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         _logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
         Request.EnableBuffering();
-        var commandResult = await handler.Process(new UploadFileCommandRequest()
+        var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
             Token = legacyToken,
@@ -98,14 +98,14 @@ public class LegacyFileController : Controller
         Guid fileId,
         [FromQuery] string onBehalfOfConsumer,
         [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-        [FromServices] GetFileTransferOverviewQueryHandler handler,
+        [FromServices] GetFileTransferOverviewHandler handler,
         CancellationToken cancellationToken)
     {
         CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         _logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
-        var queryResult = await handler.Process(new GetFileTransferOverviewQueryRequest()
+        var queryResult = await handler.Process(new GetFileTransferOverviewRequest()
         {
             FileTransferId = fileId,
             Token = legacyToken,
@@ -131,7 +131,7 @@ public class LegacyFileController : Controller
         [FromQuery] string? onBehalfOfConsumer,
         [FromQuery] string[]? recipients,
         [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-        [FromServices] LegacyGetFilesQueryHandler handler,
+        [FromServices] LegacyGetFilesHandler handler,
         CancellationToken cancellationToken)
     {
         // HasAvailableFiles calls are not made on behalf of any consumer.
@@ -153,7 +153,7 @@ public class LegacyFileController : Controller
             _logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer);
         }
 
-        var queryResult = await handler.Process(new LegacyGetFilesQueryRequest()
+        var queryResult = await handler.Process(new LegacyGetFilesRequest()
         {
             Token = legacyToken ?? token,
             ResourceId = resourceId ?? string.Empty,
@@ -180,13 +180,13 @@ public class LegacyFileController : Controller
          Guid fileId,
         [FromQuery] string onBehalfOfConsumer,
         [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-        [FromServices] DownloadFileQueryHandler handler,
+        [FromServices] DownloadFileHandler handler,
         CancellationToken cancellationToken)
     {
         CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
-        var queryResult = await handler.Process(new DownloadFileQueryRequest()
+        var queryResult = await handler.Process(new DownloadFileRequest()
         {
             FileTransferId = fileId,
             Token = legacyToken,
@@ -208,13 +208,13 @@ public class LegacyFileController : Controller
         Guid fileId,
         [FromQuery] string onBehalfOfConsumer,
         [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
-        [FromServices] ConfirmDownloadCommandHandler handler,
+        [FromServices] ConfirmDownloadHandler handler,
          CancellationToken cancellationToken)
     {
         CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
-        var commandResult = await handler.Process(new ConfirmDownloadCommandRequest()
+        var commandResult = await handler.Process(new ConfirmDownloadRequest()
         {
             FileTransferId = fileId,
             Token = legacyToken,

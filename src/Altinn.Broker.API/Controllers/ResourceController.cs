@@ -1,6 +1,6 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ConfigureResourceCommand;
+using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models;
@@ -19,9 +19,9 @@ public class ResourceController : Controller
 {
     [HttpPut]
     [Route("{resourceId}")]
-    public async Task<ActionResult> ConfigureResource(string resourceId, [FromBody] ResourceExt resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] ConfigureResourceCommandHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult> ConfigureResource(string resourceId, [FromBody] ResourceExt resourceExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] ConfigureResourceHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.Process(new ConfigureResourceCommandRequest()
+        var result = await handler.Process(new ConfigureResourceRequest()
         {
             Token = token,
             ResourceId = resourceId,
