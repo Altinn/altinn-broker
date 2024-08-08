@@ -360,18 +360,24 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     public async Task UploadFileTransfer_ChecksumCorrect_Succeeds()
     {
         // Arrange
-        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
         var fileContent = "This is the contents of the uploaded file";
         var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
         var checksum = CalculateChecksum(fileContentBytes);
-        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();       
         fileTransfer.Checksum = checksum;
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
-        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, fileTransferId);
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
+
+        // Assert
         Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        var fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+        Assert.NotNull(fileTransferDetails.Checksum);
+        Assert.Equal(checksum, fileTransferDetails.Checksum);
     }
 
     [Fact]
