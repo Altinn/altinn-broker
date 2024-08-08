@@ -85,19 +85,24 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             HangfireRecurringJobClient = new Mock<IRecurringJobManager>();
             services.AddSingleton(HangfireRecurringJobClient.Object);
 
-
-            var resourceRegistryRepository = new Mock<IResourceRepository>();
-            string capturedId = "";
-            resourceRegistryRepository.Setup(x => x.GetResource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .Callback((string id, CancellationToken _) => capturedId = id)
+            var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is<string>("altinn-broker-test-resource-1", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
-                    Id = capturedId,
+                    Id = "altinn-broker-test-resource-1",
                     Created = DateTime.UtcNow,
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
-            services.AddSingleton(resourceRegistryRepository.Object);
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is<string>(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "",
+                    OrganizationNumber = "",
+                });
+            services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
             authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);

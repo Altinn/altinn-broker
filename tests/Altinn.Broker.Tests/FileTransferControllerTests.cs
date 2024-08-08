@@ -8,6 +8,7 @@ using System.Text.Json;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Models;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
@@ -17,6 +18,7 @@ using Hangfire.Common;
 using Hangfire.States;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 using Moq;
 
@@ -443,7 +445,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SendFileTransfer_UsingUnregisteredUser_Fails()
+    public async Task SendFileTransfer_UsingUnregisteredResource_Fails()
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -457,6 +459,22 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
+    {
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ServiceOwnerNotConfigured.Message, parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
