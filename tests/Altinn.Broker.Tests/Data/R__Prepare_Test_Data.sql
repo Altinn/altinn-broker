@@ -14,7 +14,7 @@ INSERT INTO broker.altinn_resource (
 ) VALUES (
     'altinn-broker-test-resource-1',
     NOW(),
-    null,  -- 100 MB in bytes
+    null,
     null,
     '991825827',
     '0192:991825827'
