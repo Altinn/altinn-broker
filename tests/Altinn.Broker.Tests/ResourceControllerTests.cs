@@ -28,13 +28,12 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
             PropertyNameCaseInsensitive = true
         });
         _responseSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-
     }
 
     [Fact]
     public async Task Update_Resource_Max_Upload_Size()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             MaxFileTransferSize = 99999
         });
@@ -43,7 +42,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Max_Upload_Size_Over_Global_Should_Fail()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             MaxFileTransferSize = 999999999999999
         });
@@ -53,7 +52,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Should_Fail_For_Sender()
     {
-        var response = await _senderClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _senderClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             MaxFileTransferSize = 1000000,
             FileTransferTimeToLive = "P30D"
@@ -64,7 +63,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_Should_Fail_For_Receiver()
     {
-        var response = await _recipientClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _recipientClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             MaxFileTransferSize = 1000000,
             FileTransferTimeToLive = "P30D"
@@ -75,7 +74,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_file_transfer_time_to_live()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             FileTransferTimeToLive = "P30D"
         });
@@ -84,7 +83,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task Update_Resource_file_transfer_time_to_live_Over_Limit_Should_Fail()
     {
-        var response = await _serviceOwnerClient.PutAsJsonAsync<ResourceExt>($"broker/api/v1/resource/altinn-broker-test-resource-1", new ResourceExt
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
             FileTransferTimeToLive = "P366D"
         });

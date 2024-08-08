@@ -40,7 +40,7 @@ public class ResourceRepository : IResourceRepository
         if (resource is null)
         {
             resource = await _altinnResourceRepository.GetResource(resourceId, cancellationToken);
-            if (resource is null)
+            if (resource is null || string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
             {
                 return null;
             }

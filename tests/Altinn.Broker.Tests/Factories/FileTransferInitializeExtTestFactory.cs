@@ -1,11 +1,12 @@
 ﻿using Altinn.Broker.Models;
+using Altinn.Broker.Tests.Helpers;
 
 namespace Altinn.Broker.Tests.Factories;
 internal static class FileTransferInitializeExtTestFactory
 {
     internal static FileTransferInitalizeExt BasicFileTransfer() => new FileTransferInitalizeExt()
     {
-        ResourceId = "altinn-broker-test-resource-1",
+        ResourceId = TestConstants.RESOURCE_FOR_TEST,
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],
@@ -15,7 +16,7 @@ internal static class FileTransferInitializeExtTestFactory
     };
     internal static FileTransferInitalizeExt BasicFileTransfer_MultipleRecipients() => new FileTransferInitalizeExt()
     {
-        ResourceId = "altinn-broker-test-resource-2",
+        ResourceId = TestConstants.RESOURCE_FOR_TEST,
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],

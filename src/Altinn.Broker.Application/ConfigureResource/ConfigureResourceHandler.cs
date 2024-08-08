@@ -28,7 +28,7 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
         var resource = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceNotConfigured;
+            return Errors.InvalidResourceDefinition;
         }
         if (resource.ServiceOwnerId != request.Token.Consumer)
         {

@@ -358,18 +358,24 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     public async Task UploadFileTransfer_ChecksumCorrect_Succeeds()
     {
         // Arrange
-        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
         var fileContent = "This is the contents of the uploaded file";
         var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
         var checksum = CalculateChecksum(fileContentBytes);
-        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();       
         fileTransfer.Checksum = checksum;
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
-        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, fileTransferId);
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
+
+        // Assert
         Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        var fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+        Assert.NotNull(fileTransferDetails.Checksum);
+        Assert.Equal(checksum, fileTransferDetails.Checksum);
     }
 
     [Fact]
@@ -443,7 +449,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SendFileTransfer_UsingUnregisteredUser_Fails()
+    public async Task SendFileTransfer_UserWithoutAccess_Fails()
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -457,6 +463,23 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
