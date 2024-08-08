@@ -8,7 +8,6 @@ using System.Text.Json;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Models;
-using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
@@ -18,7 +17,6 @@ using Hangfire.Common;
 using Hangfire.States;
 
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 
 using Moq;
 
