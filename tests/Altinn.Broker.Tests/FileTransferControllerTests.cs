@@ -468,6 +468,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
     {
+        // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
         file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
 
