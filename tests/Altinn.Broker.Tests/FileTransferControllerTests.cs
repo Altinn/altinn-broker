@@ -474,7 +474,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Equal(Errors.ServiceOwnerNotConfigured.Message, parsedError.Detail);
+        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
