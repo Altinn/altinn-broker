@@ -449,7 +449,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SendFileTransfer_UsingUnregisteredResource_Fails()
+    public async Task SendFileTransfer_UserWithoutAccess_Fails()
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
