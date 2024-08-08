@@ -86,15 +86,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(HangfireRecurringJobClient.Object);
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is<string>("altinn-broker-test-resource-1", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
-                    Id = "altinn-broker-test-resource-1",
+                    Id = TestConstants.RESOURCE_FOR_TEST,
                     Created = DateTime.UtcNow,
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is<string>(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
                     Id = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER,
