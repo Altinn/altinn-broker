@@ -12,7 +12,7 @@ public static class Errors
     public static Error ServiceOwnerNotReadyInfrastructure = new Error(4, "Service owner infrastructure is not ready.", HttpStatusCode.UnprocessableEntity);
     public static Error NoFileUploaded = new Error(5, "No file uploaded yet", HttpStatusCode.BadRequest);
     public static Error FileTransferAlreadyUploaded = new Error(6, "A file transfer has already been, or attempted to be, created. Create a new file transfer resource to try again.", HttpStatusCode.Conflict);
-    public static Error InvalidResourceDefinition = new Error(7, "Resource needs to be associated with a service owner", HttpStatusCode.Forbidden);
+    public static Error InvalidResourceDefinition = new Error(7, "The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner", HttpStatusCode.Forbidden);
     public static Error NoAccessToResource = new Error(8, "You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry", HttpStatusCode.Unauthorized);
     public static Error FileTransferNotAvailable = new Error(9, "The requested file transfer's file is not ready for download. See file transfer status.", HttpStatusCode.Forbidden);
     public static Error UploadFailed = new Error(10, "Error occurred while uploading file See /details for more information.", HttpStatusCode.InternalServerError);
