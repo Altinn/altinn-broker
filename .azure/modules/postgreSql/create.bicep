@@ -97,6 +97,6 @@ module adoConnectionString '../keyvault/upsertSecret.bicep' = {
   params: {
     destKeyVaultName: environmentKeyVaultName
     secretName: 'broker-ado-connection-string'
-    secretValue: 'Host=${postgres.properties.fullyQualifiedDomainName};Database=${databaseName};Port=5432;Username=${namePrefix}-app-identity;Ssl Mode=Require;Trust Server Certificate=True;Maximum Pool Size=${poolSize};'
+    secretValue: 'Host=${postgres.properties.fullyQualifiedDomainName};Database=${databaseName};Port=5432;Username=${namePrefix}-app-identity;Ssl Mode=Require;Trust Server Certificate=True;Maximum Pool Size=${poolSize};options=-c role=azure_pg_admin;'
   }
 }
