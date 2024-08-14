@@ -31,6 +31,10 @@ verify_revision() {
   if [[ $health_state == "Healthy" && ($running_state == "Running" || $running_state == "RunningAtMaxScale") ]]; then
     return 0  # OK!
   else
+    if [[ $running_state == "Failed"]]; then
+      echo "Revision $revision_name failed. Exiting script."
+      exit 1
+    fi 
     return 1  # Not OK!
   fi
 }
@@ -46,5 +50,8 @@ while true; do
     echo "Attempt $attempt: Waiting for revision $revision_name ..."
     sleep 10 # Sleep for 10 seconds
     attempt=$((attempt+1))
+    if [[ $attempt -gt 25 ]]; then
+      echo "Revision $revision_name did not start in time. Exiting script."
+      exit 1
   fi
 done
