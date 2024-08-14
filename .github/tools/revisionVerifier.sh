@@ -41,7 +41,6 @@ verify_revision() {
 
 attempt=1
 
-# Loop until verified (GitHub action will do a timeout)
 while true; do
   if verify_revision; then
     echo "Revision $revision_name is healthy and running"
@@ -53,5 +52,6 @@ while true; do
     if [[ $attempt -gt 25 ]]; then
       echo "Revision $revision_name did not start in time. Exiting script."
       exit 1
+    fi
   fi
 done
