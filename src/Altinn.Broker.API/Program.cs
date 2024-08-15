@@ -159,7 +159,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateIssuer = true,
                 ValidateAudience = false,
                 RequireExpirationTime = true,
-                ValidateLifetime = !hostEnvironment.IsDevelopment(),
+                ValidateLifetime = false,
                 ClockSkew = TimeSpan.Zero
             };
         });
