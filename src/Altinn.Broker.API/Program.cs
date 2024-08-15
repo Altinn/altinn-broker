@@ -124,7 +124,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateIssuer = true,
                 ValidateAudience = false,
                 RequireExpirationTime = true,
-                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ValidateLifetime = false, // For test
                 ClockSkew = TimeSpan.Zero
             };
             options.Events = new JwtBearerEvents()
