@@ -32,11 +32,11 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
         _logger = logger;
     }
 
+
     public async Task<NpgsqlConnection> GetConnectionAsync()
     {
         await EnsureValidDataSource();
-        var connection = await _dataSource.OpenConnectionAsync();
-        return connection;
+        return await _dataSource.OpenConnectionAsync();
     }
 
     public async Task<NpgsqlCommand> CreateCommand(string commandText)
@@ -47,12 +47,8 @@ public class DatabaseConnectionProvider : IDisposable, IConnectionFactory
 
     public NpgsqlConnection GetOrCreateConnection()
     {
-        _logger.LogInformation("Hangfire GetOrCreateConnection");
-        EnsureValidDataSource().RunSynchronously();
-        _logger.LogInformation("Hangfire GetOrCreateConnection valid token");
-        return _dataSource.CreateConnection();
+        return GetConnectionAsync().Result;
     }
-
     private async Task EnsureValidDataSource()
     {
         await _semaphore.WaitAsync();
