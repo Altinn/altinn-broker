@@ -178,7 +178,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     {
         options.Limits.MaxRequestBodySize = null;
         options.Limits.MaxRequestBufferSize = null;
-        options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(60);
+        options.Limits.KeepAliveTimeout = TimeSpan.FromHours(48);
         options.Limits.MinRequestBodyDataRate = new MinDataRate(bytesPerSecond: 100, gracePeriod: TimeSpan.FromSeconds(10));
     });
     services.Configure<FormOptions>(options =>
