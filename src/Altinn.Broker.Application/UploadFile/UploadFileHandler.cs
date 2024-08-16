@@ -64,7 +64,7 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
         var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceNotConfigured;
+            return Errors.InvalidResourceDefinition;
         };
         var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner?.StorageProvider is null)

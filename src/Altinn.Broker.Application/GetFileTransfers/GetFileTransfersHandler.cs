@@ -36,7 +36,7 @@ public class GetFileTransfersHandler : IHandler<GetFileTransfersRequest, List<Gu
         var service = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (service is null)
         {
-            return Errors.ResourceNotConfigured;
+            return Errors.InvalidResourceDefinition;
         };
         var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
         if (callingActor is null)
