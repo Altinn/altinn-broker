@@ -5,13 +5,12 @@ public class XorShiftDataStream : Stream
     private long _length;
     private byte[] _buffer;
     private readonly XorShiftRandom _rng;
+    private Timer _timer;
 
     long bytesRead = 0;
-    long milestoneSize => _length / 100;
-    long lastMileStoneRead = 0;
-    int milestoneCount = 0;
 
     int bufferCount = 0;
+    long lastBytesRead = 0;
 
     public XorShiftDataStream(long length, int bufferSize)
     {
@@ -20,7 +19,14 @@ public class XorShiftDataStream : Stream
         _buffer = new byte[bufferSize];
         _rng = new XorShiftRandom();
         Console.WriteLine("Length: " + _length.ToString("N0"));
-        Console.WriteLine("Milestone size: " + milestoneSize.ToString("N0"));
+        _timer = new Timer(OnTimerElapsed, null, 1000, 1000);
+    }
+
+    private void OnTimerElapsed(object state)
+    {
+        Console.WriteLine($"Progress {bytesRead.ToString("N0")}/{_length.ToString("N0")} bytes");
+        Console.WriteLine($"Speed : {((bytesRead - lastBytesRead) / 1024).ToString("N0")} KB/s");
+        lastBytesRead = bytesRead;
     }
 
     public override bool CanRead => true;
@@ -43,12 +49,6 @@ public class XorShiftDataStream : Stream
     {
         bufferCount++;
         bytesRead += count;
-        if ((bytesRead - lastMileStoneRead) >= (milestoneSize * (milestoneCount+1)))
-        {
-            lastMileStoneRead = bytesRead;
-            milestoneCount++;
-            Console.WriteLine($"Read {bytesRead.ToString("N0")} bytes in buffer {bufferCount.ToString("N0")}, reached milestone {milestoneCount}.");
-        }
 
         if (_position >= _length)
             return 0;
