@@ -71,11 +71,11 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
+        /*var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
         if (request.ContentLength > maxUploadSize)
         {
             return Errors.FileSizeTooBig;
-        }
+        }*/
 
         await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
         try
