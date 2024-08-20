@@ -1,6 +1,5 @@
 
 using Altinn.Broker.Integrations.Azure;
-using Altinn.Broker.Persistence;
 
 using Azure.Core;
 using Azure.Identity;
@@ -9,16 +8,18 @@ using Azure.ResourceManager;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
+using Npgsql;
+
 namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("health")]
 public class HealthController : ControllerBase
 {
-    private readonly DatabaseConnectionProvider _databaseConnectionProvider;
+    private readonly NpgsqlDataSource _databaseConnectionProvider;
     private readonly AzureResourceManagerOptions _azureResourceManagerOptions;
 
-    public HealthController(DatabaseConnectionProvider databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions)
+    public HealthController(NpgsqlDataSource databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions)
     {
         _databaseConnectionProvider = databaseConnectionProvider;
         _azureResourceManagerOptions = azureResourceManagerOptions.Value;
@@ -29,8 +30,7 @@ public class HealthController : ControllerBase
     {
         try
         {
-            using var connection = await _databaseConnectionProvider.GetConnectionAsync();
-            using var command = new Npgsql.NpgsqlCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description", connection);
+            using var command = _databaseConnectionProvider.CreateCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description");
             var count = (long)(command.ExecuteScalar() ?? 0);
             if (count == 0)
             {
