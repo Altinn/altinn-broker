@@ -7,16 +7,16 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileTransferStatusRepository : IFileTransferStatusRepository
 {
-    private NpgsqlDataSource _connectionProvider;
+    private NpgsqlDataSource _dataSource;
 
     public FileTransferStatusRepository(NpgsqlDataSource connectionProvider)
     {
-        _connectionProvider = connectionProvider;
+        _dataSource = connectionProvider;
     }
 
     public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
     {
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
                     "INSERT INTO broker.file_transfer_status (file_transfer_id_fk, file_transfer_status_description_id_fk, file_transfer_status_date, file_transfer_status_detailed_description) " +
                     "VALUES (@fileTransferId, @statusId, NOW(), @detailedFileTransferStatus) RETURNING file_transfer_status_id_pk;");
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
@@ -32,7 +32,7 @@ public class FileTransferStatusRepository : IFileTransferStatusRepository
 
     public async Task<List<FileTransferStatusEntity>> GetFileTransferStatusHistory(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, file_transfer_status_date, file_transfer_status_detailed_description " +
             "FROM broker.file_transfer_status fis " +
             "WHERE fis.file_transfer_id_fk = @fileTransferId");

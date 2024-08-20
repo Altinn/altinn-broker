@@ -8,17 +8,17 @@ namespace Altinn.Broker.Persistence.Repositories;
 internal class ActorFileTransferStatusRepository : IActorFileTransferStatusRepository
 {
     private readonly IActorRepository _actorRepository;
-    private NpgsqlDataSource _connectionProvider;
+    private NpgsqlDataSource _dataSource;
 
     public ActorFileTransferStatusRepository(IActorRepository actorRepository, NpgsqlDataSource connectionProvider)
     {
         _actorRepository = actorRepository;
-        _connectionProvider = connectionProvider;
+        _dataSource = connectionProvider;
     }
 
     public async Task<List<ActorFileTransferStatusEntity>> GetActorEvents(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
            "SELECT *, a.actor_external_id " +
            "FROM broker.actor_file_transfer_status afs " +
            "INNER JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
@@ -60,7 +60,7 @@ internal class ActorFileTransferStatusRepository : IActorFileTransferStatusRepos
         {
             actorId = actor.ActorId;
         }
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date) " +
             "VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())");
         command.Parameters.AddWithValue("@actorId", actorId);

@@ -14,12 +14,12 @@ namespace Altinn.Broker.Persistence.Repositories;
 
 public class FileTransferRepository : IFileTransferRepository
 {
-    private NpgsqlDataSource _connectionProvider;
+    private NpgsqlDataSource _dataSource;
     private readonly IActorRepository _actorRepository;
 
     public FileTransferRepository(NpgsqlDataSource connectionProvider, IActorRepository actorRepository)
     {
-        _connectionProvider = connectionProvider;
+        _dataSource = connectionProvider;
         _actorRepository = actorRepository;
     }
 
@@ -27,7 +27,7 @@ public class FileTransferRepository : IFileTransferRepository
     {
         FileTransferEntity fileTransfer;
 
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             @"
                 SELECT 
                     f.file_transfer_id_pk, 
@@ -132,7 +132,7 @@ public class FileTransferRepository : IFileTransferRepository
     private async Task<List<ActorFileTransferStatusEntity>> GetLatestRecipientFileTransferStatuses(Guid fileTransferId, CancellationToken cancellationToken)
     {
         var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             @"
             SELECT afs.actor_id_fk, MAX(afs.actor_file_transfer_status_description_id_fk) as actor_file_transfer_status_description_id_fk, MAX(afs.actor_file_transfer_status_date) as actor_file_transfer_status_date, a.actor_external_id 
             FROM broker.file_transfer 
@@ -183,7 +183,7 @@ public class FileTransferRepository : IFileTransferRepository
             actorId = actor.ActorId;
         }
         var fileTransferId = Guid.NewGuid();
-        await using NpgsqlCommand command = _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = _dataSource.CreateCommand(
             "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
             "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
 
@@ -259,7 +259,7 @@ public class FileTransferRepository : IFileTransferRepository
 
         commandString.AppendLine(";");
 
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             commandString.ToString());
         if (!(fileTransferSearch.Actor is null))
         {
@@ -343,7 +343,7 @@ public class FileTransferRepository : IFileTransferRepository
 
         commandString.AppendLine(";");
 
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             commandString.ToString()))
         {
             command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
@@ -394,7 +394,7 @@ public class FileTransferRepository : IFileTransferRepository
             commandString.AppendLine("AND f.created < @to");
         }
 
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             commandString.ToString()))
         {
             command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
@@ -423,7 +423,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
     {
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "file_location = @fileLocation, " +
@@ -441,7 +441,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        await using var command = _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "SELECT * " +
             "FROM broker.file_transfer_property " +
             "WHERE file_transfer_id_fk = @fileTransferId");
@@ -459,7 +459,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     private async Task SetMetadata(Guid fileTransferId, Dictionary<string, string> property, CancellationToken cancellationToken)
     {
-        using var connection = await _connectionProvider.OpenConnectionAsync(cancellationToken);
+        using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
         using var command = new NpgsqlCommand(
             "INSERT INTO broker.file_transfer_property (property_id_pk, file_transfer_id_fk, key, value) " +
@@ -492,7 +492,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken)
     {
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "checksum = @checksum " +
@@ -505,7 +505,7 @@ public class FileTransferRepository : IFileTransferRepository
     }
     public async Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken)
     {
-        await using (var command = _connectionProvider.CreateCommand(
+        await using (var command = _dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "hangfire_job_id = @hangfireJobId " +
