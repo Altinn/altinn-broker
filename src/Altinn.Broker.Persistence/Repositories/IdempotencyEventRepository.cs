@@ -6,9 +6,9 @@ namespace Altinn.Broker.Persistence.Repositories;
 
 public class IdempotencyEventRepository : IIdempotencyEventRepository
 {
-    private DatabaseConnectionProvider _connectionProvider;
+    private NpgsqlDataSource _connectionProvider;
 
-    public IdempotencyEventRepository(DatabaseConnectionProvider connectionProvider)
+    public IdempotencyEventRepository(NpgsqlDataSource connectionProvider)
     {
         _connectionProvider = connectionProvider;
     }
@@ -16,7 +16,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
 
     public async Task AddIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
     {
-        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = _connectionProvider.CreateCommand(
                     "INSERT INTO broker.idempotency_event (idempotency_event_id_pk, created)" +
                     "VALUES (@idempotency_event_id_pk, @created) ");
         command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
@@ -26,7 +26,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
     }
     public async Task DeleteIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
     {
-        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = _connectionProvider.CreateCommand(
                     "DELETE FROM broker.idempotency_event " +
                     "WHERE idempotency_event_id_pk = @idempotency_event_id_pk");
         command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
@@ -35,7 +35,7 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
     }
     public async Task DeleteOldIdempotencyEvents()
     {
-        await using NpgsqlCommand command = await _connectionProvider.CreateCommand(
+        await using NpgsqlCommand command = _connectionProvider.CreateCommand(
                     "DELETE FROM broker.idempotency_event " +
                     "WHERE created < @created");
 

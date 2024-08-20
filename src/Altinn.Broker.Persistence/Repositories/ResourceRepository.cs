@@ -6,9 +6,9 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class ResourceRepository : IResourceRepository
 {
-    private readonly DatabaseConnectionProvider _connectionProvider;
+    private readonly NpgsqlDataSource _connectionProvider;
     private readonly IAltinnResourceRepository _altinnResourceRepository;
-    public ResourceRepository(DatabaseConnectionProvider connectionProvider, IAltinnResourceRepository altinnResourceRepository)
+    public ResourceRepository(NpgsqlDataSource connectionProvider, IAltinnResourceRepository altinnResourceRepository)
     {
         _connectionProvider = connectionProvider;
         _altinnResourceRepository = altinnResourceRepository;
@@ -16,14 +16,14 @@ public class ResourceRepository : IResourceRepository
 
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        await using var command = await _connectionProvider.CreateCommand(
+        await using var command = _connectionProvider.CreateCommand(
             "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
         command.Parameters.AddWithValue("@resourceId", resourceId);
 
-        using NpgsqlDataReader reader = command.ExecuteReader();
+        using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         ResourceEntity? resource = null;
         while (reader.Read())
         {
@@ -50,47 +50,35 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _connectionProvider.CreateCommand(
             "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk) " +
-            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, @fileTransferTimeToLive, NOW(), @serviceOwnerId)"))
-        {
-            command.Parameters.AddWithValue("@resourceId", resource.Id);
-            command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
-            command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
-            command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.FileTransferTimeToLive.Value);
-            command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
-            command.ExecuteNonQuery();
-        }
+            "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, @fileTransferTimeToLive, NOW(), @serviceOwnerId)");
+        command.Parameters.AddWithValue("@resourceId", resource.Id);
+        command.Parameters.AddWithValue("@organizationNumber", resource.OrganizationNumber ?? "");
+        command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
+        command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.FileTransferTimeToLive.Value);
+        command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
+        command.ExecuteNonQuery();
     }
     public async Task UpdateMaxFileTransferSize(string resource, long maxSize, CancellationToken cancellationToken)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _connectionProvider.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET max_file_transfer_size = @maxFileTransferSize " +
-            "WHERE resource_id_pk = @resourceId"))
-        {
-            command.Parameters.AddWithValue("@resourceId", resource);
-            command.Parameters.AddWithValue("@maxFileTransferSize", maxSize);
-            command.ExecuteNonQuery();
-        }
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resource);
+        command.Parameters.AddWithValue("@maxFileTransferSize", maxSize);
+        command.ExecuteNonQuery();
     }
 
     public async Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _connectionProvider.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET file_transfer_time_to_live = @fileTransferTimeToLive " +
-            "WHERE resource_id_pk = @resourceId"))
-        {
-            command.Parameters.AddWithValue("@resourceId", resourceId);
-            command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
-            command.ExecuteNonQuery();
-        }
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
+        command.ExecuteNonQuery();
     }
 }
