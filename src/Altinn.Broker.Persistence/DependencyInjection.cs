@@ -30,14 +30,19 @@ public static class DependencyInjection
     {
         var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
         config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder();
+        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = databaseOptions.ConnectionString;
+        if (!string.IsNullOrWhiteSpace(dataSourceBuilder.ConnectionStringBuilder.Password))
+        {
+            return dataSourceBuilder.Build();
+        }
+
         var psqlServerTokenProvider = new DefaultAzureCredential();
         var tokenRequestContext = new TokenRequestContext(scopes: ["https://ossrdbms-aad.database.windows.net/.default"]) { };
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder();
         dataSourceBuilder.UsePeriodicPasswordProvider(async (_, cancellationToken) =>
                 psqlServerTokenProvider.GetTokenAsync(tokenRequestContext).Result.Token,
             TimeSpan.FromMinutes(45), TimeSpan.FromSeconds(0));
 
-        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = databaseOptions.ConnectionString;
         
         return dataSourceBuilder.Build();
     }
