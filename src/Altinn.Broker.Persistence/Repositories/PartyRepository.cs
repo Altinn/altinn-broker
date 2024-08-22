@@ -6,21 +6,21 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class PartyRepository : IPartyRepository
 {
-    private readonly DatabaseConnectionProvider _connectionProvider;
+    private readonly NpgsqlDataSource _dataSource;
 
-    public PartyRepository(DatabaseConnectionProvider connectionProvider)
+    public PartyRepository(NpgsqlDataSource connectionProvider)
     {
-        _connectionProvider = connectionProvider;
+        _dataSource = connectionProvider;
     }
 
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)
     {
-        await using var command = await _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "SELECT organization_number_pk, party_id, created from broker.party " +
             "WHERE organization_number_pk = @organizationId ");
         command.Parameters.AddWithValue("@organizationId", organizationId);
 
-        using NpgsqlDataReader reader = command.ExecuteReader();
+        using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         PartyEntity? partyData = null;
         while (reader.Read())
         {
@@ -36,16 +36,13 @@ public class PartyRepository : IPartyRepository
 
     public async Task InitializeParty(string organizationId, string partyId)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "INSERT INTO broker.party (organization_number_pk, party_id, created) " +
-            "VALUES (@organizationId, @partyId, NOW())"))
-        {
-            command.Parameters.AddWithValue("@organizationId", organizationId);
-            command.Parameters.AddWithValue("@partyId", partyId);
-            var commandText = command.CommandText;
-            command.ExecuteNonQuery();
-        }
+            "VALUES (@organizationId, @partyId, NOW())");
+        command.Parameters.AddWithValue("@organizationId", organizationId);
+        command.Parameters.AddWithValue("@partyId", partyId);
+        var commandText = command.CommandText;
+        command.ExecuteNonQuery();
     }
 }
 

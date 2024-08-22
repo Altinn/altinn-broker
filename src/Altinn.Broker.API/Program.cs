@@ -104,7 +104,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
-    services.AddPersistence();
+    services.AddPersistence(config);
 
     services.AddHttpClient();
     services.AddProblemDetails();

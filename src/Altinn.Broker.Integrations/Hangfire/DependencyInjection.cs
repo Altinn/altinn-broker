@@ -1,6 +1,4 @@
-﻿using Altinn.Broker.Persistence;
-
-using Hangfire;
+﻿using Hangfire;
 using Hangfire.PostgreSql;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -10,10 +8,11 @@ public static class DependencyInjection
 {
     public static void ConfigureHangfire(this IServiceCollection services)
     {
+        services.AddSingleton<IConnectionFactory, HangfireDatabaseConnectionFactory>();
         var serviceProvider = services.BuildServiceProvider();
         services.AddHangfire(config =>
             config.UsePostgreSqlStorage(
-                c => c.UseConnectionFactory(serviceProvider.GetRequiredService<DatabaseConnectionProvider>())
+                c => c.UseConnectionFactory(serviceProvider.GetRequiredService<IConnectionFactory>())
             )
         );
         services.AddHangfireServer();

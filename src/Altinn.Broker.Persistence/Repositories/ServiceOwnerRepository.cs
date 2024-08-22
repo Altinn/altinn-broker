@@ -6,16 +6,16 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class ServiceOwnerRepository : IServiceOwnerRepository
 {
-    private readonly DatabaseConnectionProvider _connectionProvider;
+    private readonly NpgsqlDataSource _dataSource;
 
-    public ServiceOwnerRepository(DatabaseConnectionProvider connectionProvider)
+    public ServiceOwnerRepository(NpgsqlDataSource connectionProvider)
     {
-        _connectionProvider = connectionProvider;
+        _dataSource = connectionProvider;
     }
 
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
-        await using var command = await _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "SELECT service_owner_id_pk, service_owner_name, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type " +
             "FROM broker.service_owner " +
@@ -24,7 +24,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
             "ORDER BY created desc");
         command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
 
-        using NpgsqlDataReader reader = command.ExecuteReader();
+        using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         ServiceOwnerEntity? serviceOwner = null;
         while (reader.Read())
         {
@@ -47,34 +47,26 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task InitializeServiceOwner(string sub, string name)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name) " +
-            "VALUES (@sub, @name)"))
-        {
-            command.Parameters.AddWithValue("@sub", sub);
-            command.Parameters.AddWithValue("@name", name);
-            var commandText = command.CommandText;
-            command.ExecuteNonQuery();
-        }
+            "VALUES (@sub, @name)");
+        command.Parameters.AddWithValue("@sub", sub);
+        command.Parameters.AddWithValue("@name", name);
+        var commandText = command.CommandText;
+        command.ExecuteNonQuery();
 
 
     }
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
     {
-        await using var connection = await _connectionProvider.GetConnectionAsync();
-
-        await using (var command = await _connectionProvider.CreateCommand(
+        await using var command = _dataSource.CreateCommand(
             "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk) " +
-            "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId)"))
-        {
-            command.Parameters.AddWithValue("@resourceName", resourceName);
-            command.Parameters.AddWithValue("@storageType", storageType.ToString());
-            command.Parameters.AddWithValue("@serviceOwnerId", sub);
-            command.ExecuteNonQuery();
-        }
+            "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId)");
+        command.Parameters.AddWithValue("@resourceName", resourceName);
+        command.Parameters.AddWithValue("@storageType", storageType.ToString());
+        command.Parameters.AddWithValue("@serviceOwnerId", sub);
+        command.ExecuteNonQuery();
     }
 }
 
