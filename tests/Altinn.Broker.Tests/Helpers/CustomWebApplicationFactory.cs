@@ -1,4 +1,6 @@
+using System.Data.Common;
 using System.Net.Http.Headers;
+using System.Threading;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
@@ -8,6 +10,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
+using Hangfire.MemoryStorage;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,6 +22,10 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using Moq;
+
+using Npgsql;
+
+using Polly;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -72,6 +79,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                         }
                     };
                 });
+            services.AddHangfire(c => c.UseMemoryStorage());
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
@@ -99,9 +107,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
+            var sp = services.BuildServiceProvider();
+            var _backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
 
-            var serviceProvider = services.BuildServiceProvider();
-            var hangfireJobStorage = serviceProvider.GetRequiredService<JobStorage>(); // Force Hangfire database migration to run pre-test
+            var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
+            var result = policy.ExecuteAndCapture(() => _backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
+            if (result.Outcome == OutcomeType.Failure)
+            {
+                throw new InvalidOperationException("Hangfire could not be installed");
+            }
         });
     }
 
