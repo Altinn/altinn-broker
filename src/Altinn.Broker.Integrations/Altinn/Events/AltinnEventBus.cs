@@ -7,6 +7,8 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Integrations.Altinn.Events.Helpers;
 
+using Hangfire;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +19,7 @@ public class AltinnEventBus : IEventBus
     private readonly HttpClient _httpClient;
     private readonly IPartyRepository _partyRepository;
     private readonly IAltinnRegisterService _altinnRegisterService;
+    private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<AltinnEventBus> _logger;
 
     public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger, IPartyRepository partyRepository)
@@ -27,8 +30,12 @@ public class AltinnEventBus : IEventBus
         _partyRepository = partyRepository;
         _logger = logger;
     }
-
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
+    {
+        _backgroundJobClient.Enqueue(() => Publish(type, resourceId, fileTransferId, Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken));
+    }
+
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
     {
         string? partyId = null;
         if (subjectOrganizationNumber != null)
@@ -40,7 +47,7 @@ public class AltinnEventBus : IEventBus
                 if (partyId != null) await _partyRepository.InitializeParty(subjectOrganizationNumber, partyId);
             }
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber, eventId, time);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -54,7 +61,7 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? organizationNumber)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? organizationNumber, Guid? eventId, DateTime time)
     {
         if (organizationNumber is not null && organizationNumber.StartsWith("0192:"))
         {
@@ -62,9 +69,9 @@ public class AltinnEventBus : IEventBus
         }
         CloudEvent cloudEvent = new CloudEvent()
         {
-            Id = Guid.NewGuid(),
+            Id = eventId ?? Guid.NewGuid(),
             SpecVersion = "1.0",
-            Time = DateTime.UtcNow,
+            Time = time,
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),

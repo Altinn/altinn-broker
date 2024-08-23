@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Application.ExpireFileTransfer;
+﻿using System.Transactions;
+
+using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -65,29 +67,31 @@ public class InitializeFileTransferHandler : IHandler<InitializeFileTransferRequ
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
-        var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
-        LogContext.PushProperty("fileTransferId", fileTransferId);
-        await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
-        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
-        try
-        {
-            await Task.WhenAll(addRecipientEventTasks);
+        using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)) { 
+            var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
+            var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
+            LogContext.PushProperty("fileTransferId", fileTransferId);
+            await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
+            var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
+            try
+            {
+                await Task.WhenAll(addRecipientEventTasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed when adding recipient initialized events: {message}\n{stackTrace}", ex.Message, ex.StackTrace);
+                throw;
+            }
+            var jobId = _backgroundJobClient.Schedule<ExpireFileTransferHandler>((ExpireFileTransferHandler) => ExpireFileTransferHandler.Process(new ExpireFileTransferRequest
+            {
+                FileTransferId = fileTransferId,
+                Force = false
+            }, cancellationToken), fileExpirationTime);
+            await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
+            transaction.Complete();
+            return fileTransferId;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed when adding recipient initialized events: {message}\n{stackTrace}", ex.Message, ex.StackTrace);
-            throw;
-        }
-        var jobId = _backgroundJobClient.Schedule<ExpireFileTransferHandler>((ExpireFileTransferHandler) => ExpireFileTransferHandler.Process(new ExpireFileTransferRequest
-        {
-            FileTransferId = fileTransferId,
-            Force = false
-        }, cancellationToken), fileExpirationTime);
-        await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
-        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
-
-        return fileTransferId;
     }
 }
 
