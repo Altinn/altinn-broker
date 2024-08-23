@@ -73,19 +73,19 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
         {
             using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
                 await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
                 await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
                 bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
                 if (shouldConfirmAll)
                 {
+                    await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                     await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
                     _backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
                     }, cancellationToken));
-                    await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                 }
                 transaction.Complete();
             }
