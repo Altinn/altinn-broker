@@ -10,6 +10,7 @@ using Altinn.Broker.Tests.Helpers;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.MemoryStorage;
+using Hangfire.PostgreSql;
 using Hangfire.States;
 
 using Microsoft.AspNetCore.Authentication;
@@ -75,15 +76,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                         }
                     };
                 });
-
-            services.AddHangfire(config =>
-                config.UseMemoryStorage()
-            );
-            HangfireBackgroundJobClient = new Mock<IBackgroundJobClient>();
-            HangfireBackgroundJobClient.Setup(x => x.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("1");
-            services.AddSingleton(HangfireBackgroundJobClient.Object);
-            HangfireRecurringJobClient = new Mock<IRecurringJobManager>();
-            services.AddSingleton(HangfireRecurringJobClient.Object);
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
