@@ -30,9 +30,21 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Wait for docker compose services to be ready
+      - name: Wait for docker compose services to be ready and database migration to complete
         run: |
-          timeout 5m bash -c 'while ! docker ps | grep "(healthy)"; do sleep 1; done'
-
+          timeout 5m bash -c '
+            while ! docker ps | grep -q "(healthy)"; do
+              echo "Waiting for services to be healthy..."
+              sleep 5
+            done
+            while docker ps -a | grep -q "database_migration"; do
+              if docker ps -a | grep -q "database_migration.*Exited"; then
+                echo "Database migration completed."
+                break
+              fi
+              echo "Waiting for database migration to complete..."
+              sleep 5
+            done
+          '
       - name: Test
         run: dotnet test --no-build --configuration Release
