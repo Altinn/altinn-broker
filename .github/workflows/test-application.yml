@@ -38,7 +38,7 @@ jobs:
               sleep 5
             done
             while docker ps -a | grep -q "database_migration"; do
-              if docker ps -a | grep -q "database_migration.*Exited"; then
+              if docker ps -a | grep -q "Exited.*database_migration"; then
                 echo "Database migration completed."
                 break
               fi
