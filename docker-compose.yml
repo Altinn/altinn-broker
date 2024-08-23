@@ -1,5 +1,6 @@
 volumes:
     broker-storage:
+    postgres-data:
 
 services:
   storage:
@@ -31,6 +32,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: broker
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./tests/Altinn.Broker.Tests/Data/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
   database_migration:
     image: flyway/flyway:latest
     command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
