@@ -1,6 +1,7 @@
 ﻿using System.Transactions;
 
 using Hangfire;
+using Hangfire.PostgreSql;
 
 using Microsoft.Extensions.Logging;
 
@@ -16,9 +17,10 @@ public static class TransactionPolicy
         .Handle<TransactionAbortedException>()
         .Or<PostgresException>()
         .Or<BackgroundJobClientException>()
+        .Or<PostgreSqlDistributedLockException>()
         .WaitAndRetryAsync(
-            10,
-            retryAttempt => TimeSpan.FromMilliseconds(0),
+            20,
+            retryAttempt => TimeSpan.FromMilliseconds(10),
             (exception, timeSpan, retryCount, context) =>
             {
                 logger.LogWarning($"Attempt {retryCount} failed with exception {exception.Message}. Retrying in {timeSpan.TotalSeconds} seconds.");
