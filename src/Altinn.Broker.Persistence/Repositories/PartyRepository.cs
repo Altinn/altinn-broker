@@ -8,9 +8,9 @@ public class PartyRepository : IPartyRepository
 {
     private readonly NpgsqlDataSource _dataSource;
 
-    public PartyRepository(NpgsqlDataSource connectionProvider)
+    public PartyRepository(NpgsqlDataSource dataSource)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)

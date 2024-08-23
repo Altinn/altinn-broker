@@ -8,9 +8,9 @@ public class ResourceRepository : IResourceRepository
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly IAltinnResourceRepository _altinnResourceRepository;
-    public ResourceRepository(NpgsqlDataSource connectionProvider, IAltinnResourceRepository altinnResourceRepository)
+    public ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
         _altinnResourceRepository = altinnResourceRepository;
     }
 

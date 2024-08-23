@@ -9,9 +9,9 @@ public class ActorRepository : IActorRepository
 {
     private NpgsqlDataSource _dataSource;
 
-    public ActorRepository(NpgsqlDataSource connectionProvider)
+    public ActorRepository(NpgsqlDataSource dataSource)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
     public async Task<ActorEntity?> GetActorAsync(string actorExternalId, CancellationToken cancellationToken)

@@ -9,9 +9,9 @@ public class FileTransferStatusRepository : IFileTransferStatusRepository
 {
     private NpgsqlDataSource _dataSource;
 
-    public FileTransferStatusRepository(NpgsqlDataSource connectionProvider)
+    public FileTransferStatusRepository(NpgsqlDataSource dataSource)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
     public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
