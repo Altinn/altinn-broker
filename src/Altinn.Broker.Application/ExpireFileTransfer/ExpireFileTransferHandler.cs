@@ -12,6 +12,8 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
+using Polly;
+
 namespace Altinn.Broker.Application.ExpireFileTransfer;
 public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Task>
 {
@@ -58,15 +60,23 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
         {
             await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
 
-            using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)) { 
-                var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
-                foreach (var recipient in recipientsWhoHaveNotDownloaded)
+            var retryResult = await TransactionPolicy.RetryPolicy(_logger).ExecuteAndCaptureAsync(async () =>
+            {
+                using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                 {
-                    _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-                    await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
+                    foreach (var recipient in recipientsWhoHaveNotDownloaded)
+                    {
+                        _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
+                        await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    }
+                    await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                    transaction.Complete();
                 }
-                await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-                transaction.Complete();
+            });
+            if (retryResult.Outcome == OutcomeType.Failure)
+            {
+                throw retryResult.FinalException;
             }
         }
         else

@@ -14,6 +14,8 @@ using Microsoft.Extensions.Options;
 
 using OneOf;
 
+using Polly;
+
 namespace Altinn.Broker.Application.UploadFile;
 
 public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
@@ -107,24 +109,36 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
                 return Errors.UploadFailed;
             }
         }
-        using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        var retryResult = await TransactionPolicy.RetryPolicy(_logger).ExecuteAndCaptureAsync(async () =>
         {
-            await _fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
-            if (serviceOwner.StorageProvider.Type == StorageProviderType.Altinn3Azure)
+            using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-                await _eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-            } else if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
-            {
-                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
-                await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-                foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                await _fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
+                if (serviceOwner.StorageProvider.Type == StorageProviderType.Altinn3Azure)
                 {
-                    await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
+                    await _eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                 }
+                else if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+                {
+                    await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
+                    await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                    foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                    {
+                        await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    }
+                }
+                transaction.Complete();
+                return fileTransfer.FileTransferId;
             }
-            transaction.Complete();
-            return fileTransfer.FileTransferId;
+        });
+        if (retryResult.Outcome == OutcomeType.Failure)
+        {
+            throw retryResult.FinalException;
+        }
+        else
+        {
+            return retryResult.Result;
         }
     }
 }
