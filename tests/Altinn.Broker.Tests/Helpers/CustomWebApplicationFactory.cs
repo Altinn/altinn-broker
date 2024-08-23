@@ -8,10 +8,6 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
-using Hangfire.Common;
-using Hangfire.MemoryStorage;
-using Hangfire.PostgreSql;
-using Hangfire.States;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -103,6 +99,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
+
+            var serviceProvider = services.BuildServiceProvider();
+            var hangfireJobStorage = serviceProvider.GetRequiredService<JobStorage>(); // Force Hangfire database migration to run pre-test
         });
     }
 
