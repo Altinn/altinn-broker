@@ -50,10 +50,17 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
         }
         else if (!request.DoNotUpdateStatus)
         {
-            using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)) 
-            { 
-                await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-                await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+            var retryResult = await TransactionPolicy.RetryPolicy(_logger).ExecuteAndCaptureAsync(async () =>
+            {
+                using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+                {
+                    await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
+                    await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                }
+            });
+            if (retryResult.Outcome == OutcomeType.Failure)
+            {
+                throw retryResult.FinalException;
             }
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
