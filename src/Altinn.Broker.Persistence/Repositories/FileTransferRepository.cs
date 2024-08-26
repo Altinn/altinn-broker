@@ -340,6 +340,8 @@ public class FileTransferRepository : IFileTransferRepository
         {
             commandString.AppendLine("AND f.created < @to");
         }
+        commandString.AppendLine("ORDER BY f.created ASC");
+        commandString.AppendLine("LIMIT 100");
 
         commandString.AppendLine(";");
 
@@ -393,6 +395,8 @@ public class FileTransferRepository : IFileTransferRepository
         {
             commandString.AppendLine("AND f.created < @to");
         }
+        commandString.AppendLine("ORDER BY f.created ASC"); 
+        commandString.AppendLine("LIMIT 100"); 
 
         await using (var command = _dataSource.CreateCommand(
             commandString.ToString()))

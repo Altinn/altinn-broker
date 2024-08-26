@@ -185,7 +185,7 @@ public class FileTransferController : Controller
     }
 
     /// <summary>
-    /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files.
+    /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 first ordered by time created.
     /// </summary>
     /// <returns></returns>
     [HttpGet]
