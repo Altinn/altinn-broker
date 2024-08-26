@@ -82,7 +82,6 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
 
         try
         {
-            // TODO, we need logic to timeout/fail uploads that never complete
             var checksum = await _brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
             if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
             {
