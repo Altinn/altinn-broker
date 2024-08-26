@@ -294,59 +294,49 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
-        StringBuilder commandString = new StringBuilder();
-        commandString.AppendLine("SELECT DISTINCT afs.file_transfer_id_fk, 'Recipient'");
-        commandString.AppendLine("FROM broker.actor_file_transfer_status afs ");
-        commandString.AppendLine("INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afs.file_transfer_id_fk");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true");
-        commandString.AppendLine("WHERE afs.actor_id_fk = @actorId AND f.resource_id = @resourceId");
-        if (fileTransferSearch.Status.HasValue)
-        {
-            commandString.AppendLine("AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus");
-        }
+        string commandString = @"
+            SELECT DISTINCT afs.file_transfer_id_fk, 'Recipient', f.created
+            FROM broker.actor_file_transfer_status afs 
+            INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afs.file_transfer_id_fk
+            INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
+            WHERE afs.actor_id_fk = @actorId AND f.resource_id = @resourceId
+            {0}
+            {1}
+
+            UNION
+
+            SELECT f.file_transfer_id_pk, 'Sender', f.created 
+            FROM broker.file_transfer f 
+            INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk 
+            INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
+            WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId
+            {0}
+            {1}
+
+            ORDER BY created DESC
+            LIMIT 100;";
+
+        string statusCondition = fileTransferSearch.Status.HasValue
+            ? "AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus"
+            : "";
+
+        string dateCondition = "";
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created between @from AND @to");
+            dateCondition = "AND f.created between @from AND @to";
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            commandString.AppendLine("AND f.created > @from");
+            dateCondition = "AND f.created > @from";
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created < @to");
+            dateCondition = "AND f.created < @to";
         }
 
-        commandString.AppendLine("UNION");
+        commandString = string.Format(commandString, statusCondition, dateCondition);
 
-        commandString.AppendLine("SELECT f.file_transfer_id_pk, 'Sender' ");
-        commandString.AppendLine("FROM broker.file_transfer f ");
-        commandString.AppendLine("INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk ");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true");
-        commandString.AppendLine("WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId");
-        if (fileTransferSearch.Status.HasValue)
-        {
-            commandString.AppendLine("AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus");
-        }
-        if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
-        {
-            commandString.AppendLine("AND f.created between @from AND @to");
-        }
-        else if (fileTransferSearch.From.HasValue)
-        {
-            commandString.AppendLine("AND f.created > @from");
-        }
-        else if (fileTransferSearch.To.HasValue)
-        {
-            commandString.AppendLine("AND f.created < @to");
-        }
-        commandString.AppendLine("ORDER BY f.created ASC");
-        commandString.AppendLine("LIMIT 100");
-
-        commandString.AppendLine(";");
-
-        await using (var command = _dataSource.CreateCommand(
-            commandString.ToString()))
+        await using (var command = _dataSource.CreateCommand(commandString))
         {
             command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
             command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
@@ -373,44 +363,61 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
-        StringBuilder commandString = new StringBuilder();
-        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk");
-        commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk AND afs.actor_id_fk = @recipientId ORDER BY afs.actor_file_transfer_status_description_id_fk desc LIMIT 1) AS recipientfilestatus ON true");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filestatus ON true");
-        commandString.AppendLine("WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId");
-        if (fileTransferSearch.Status.HasValue)
-        {
-            commandString.AppendLine("AND file_transfer_status_description_id_fk = @fileStatus");
-        }
+        string commandString = @"
+            SELECT DISTINCT f.file_transfer_id_pk, f.created
+            FROM broker.file_transfer f
+            INNER JOIN LATERAL (
+                SELECT afs.actor_file_transfer_status_description_id_fk 
+                FROM broker.actor_file_transfer_status afs 
+                WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk AND afs.actor_id_fk = @recipientId 
+                ORDER BY afs.actor_file_transfer_status_description_id_fk desc 
+                LIMIT 1
+            ) AS recipientfilestatus ON true
+            INNER JOIN LATERAL (
+                SELECT fs.file_transfer_status_description_id_fk 
+                FROM broker.file_transfer_status fs 
+                WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk 
+                ORDER BY fs.file_transfer_status_id_pk desc 
+                LIMIT 1 
+            ) AS filestatus ON true
+            WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId
+            {0}
+            {1}
+            ORDER BY created DESC
+            LIMIT 100;";
+
+        string statusCondition = fileTransferSearch.Status.HasValue
+            ? "AND file_transfer_status_description_id_fk = @fileStatus"
+            : "";
+
+        string dateCondition = "";
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created between @from AND @to");
+            dateCondition = "AND f.created BETWEEN @from AND @to";
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            commandString.AppendLine("AND f.created > @from");
+            dateCondition = "AND f.created > @from";
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created < @to");
+            dateCondition = "AND f.created < @to";
         }
-        commandString.AppendLine("ORDER BY f.created ASC"); 
-        commandString.AppendLine("LIMIT 100"); 
 
-        await using (var command = _dataSource.CreateCommand(
-            commandString.ToString()))
+        commandString = string.Format(commandString, statusCondition, dateCondition);
+
+        await using (var command = _dataSource.CreateCommand(commandString))
         {
             command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
             command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
+            command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
+
             if (fileTransferSearch.From.HasValue)
-                command.Parameters.AddWithValue("@From", fileTransferSearch.From);
+                command.Parameters.AddWithValue("@from", fileTransferSearch.From);
             if (fileTransferSearch.To.HasValue)
-                command.Parameters.AddWithValue("@To", fileTransferSearch.To);
+                command.Parameters.AddWithValue("@to", fileTransferSearch.To);
             if (fileTransferSearch.Status.HasValue)
                 command.Parameters.AddWithValue("@fileStatus", (int)fileTransferSearch.Status);
-            if (fileTransferSearch.RecipientStatus.HasValue)
-                command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
 
             var files = new List<Guid>();
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -424,7 +431,6 @@ public class FileTransferRepository : IFileTransferRepository
             return files;
         }
     }
-
     public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
     {
         await using (var command = _dataSource.CreateCommand(
