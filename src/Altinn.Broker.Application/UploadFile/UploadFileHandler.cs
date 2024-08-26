@@ -1,6 +1,7 @@
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
@@ -78,6 +79,7 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
         }
 
         await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
+
         try
         {
             var checksum = await _brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
@@ -95,22 +97,31 @@ public class UploadFileHandler : IHandler<UploadFileRequest, Guid>
         catch (Exception e)
         {
             _logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
-            await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
-            await _eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-            return Errors.UploadFailed;
+             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+             {
+                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
+                await _eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                return Errors.UploadFailed;
+            }, _logger, cancellationToken);
         }
-        await _fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
-        await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-        await _eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-        if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
-            await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+            await _fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
+            if (serviceOwner.StorageProvider.Type == StorageProviderType.Altinn3Azure)
             {
-                await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
+                await _eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
             }
-        }
-        return fileTransfer.FileTransferId;
+            else if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+            {
+                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
+                await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                {
+                    await _eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                }
+            }
+            return fileTransfer.FileTransferId;
+        }, _logger, cancellationToken);
     }
 }

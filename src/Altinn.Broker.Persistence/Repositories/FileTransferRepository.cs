@@ -17,9 +17,9 @@ public class FileTransferRepository : IFileTransferRepository
     private NpgsqlDataSource _dataSource;
     private readonly IActorRepository _actorRepository;
 
-    public FileTransferRepository(NpgsqlDataSource connectionProvider, IActorRepository actorRepository)
+    public FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
         _actorRepository = actorRepository;
     }
 
@@ -459,34 +459,36 @@ public class FileTransferRepository : IFileTransferRepository
 
     private async Task SetMetadata(Guid fileTransferId, Dictionary<string, string> property, CancellationToken cancellationToken)
     {
-        using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
-        using var transaction = connection.BeginTransaction();
-        using var command = new NpgsqlCommand(
-            "INSERT INTO broker.file_transfer_property (property_id_pk, file_transfer_id_fk, key, value) " +
-            "VALUES (DEFAULT, @fileTransferId, @key, @value)",
-            connection);
-
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        command.Parameters.Add(new NpgsqlParameter("@key", NpgsqlDbType.Varchar));
-        command.Parameters.Add(new NpgsqlParameter("@value", NpgsqlDbType.Varchar));
-
-        try
+        if (property.Count == 0)
         {
-            foreach (var propertyEntry in property)
-            {
-                command.Parameters[1].Value = propertyEntry.Key;
-                command.Parameters[2].Value = propertyEntry.Value;
-                if (command.ExecuteNonQuery() != 1)
-                {
-                    throw new NpgsqlException("Failed while inserting property");
-                }
-            }
-            transaction.Commit();
+            return;
         }
-        catch (Exception)
+
+        var valuesList = new List<string>();
+        var parameters = new List<NpgsqlParameter>();
+        var index = 0;
+
+        foreach (var propertyEntry in property)
         {
-            transaction.Rollback();
-            throw;
+            valuesList.Add($"(@fileTransferId, @key{index}, @value{index})");
+            parameters.Add(new NpgsqlParameter($"@key{index}", NpgsqlDbType.Varchar) { Value = propertyEntry.Key });
+            parameters.Add(new NpgsqlParameter($"@value{index}", NpgsqlDbType.Varchar) { Value = propertyEntry.Value });
+            index++;
+        }
+
+        var valuesString = string.Join(", ", valuesList);
+        var query = $@"
+        INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value)
+        VALUES {valuesString}";
+
+        using var command = _dataSource.CreateCommand(query);
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddRange(parameters.ToArray());
+
+        var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken);
+        if (rowsAffected != property.Count)
+        {
+            throw new NpgsqlException("Failed while inserting properties");
         }
     }
 

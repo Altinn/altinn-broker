@@ -1,6 +1,9 @@
-﻿using Altinn.Broker.Application.ExpireFileTransfer;
+﻿using System.Transactions;
+
+using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
@@ -10,6 +13,8 @@ using Hangfire;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
+
+using Polly;
 
 using Serilog.Context;
 
@@ -67,8 +72,7 @@ public class InitializeFileTransferHandler : IHandler<InitializeFileTransferRequ
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await _fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
-        LogContext.PushProperty("fileTransferId", fileTransferId);
-        await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
+        LogContext.PushProperty("fileTransferId", fileTransferId);        
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => _actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
         {
@@ -85,9 +89,12 @@ public class InitializeFileTransferHandler : IHandler<InitializeFileTransferRequ
             Force = false
         }, cancellationToken), fileExpirationTime);
         await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
-        await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
-
-        return fileTransferId;
+        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+        {
+            await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
+            return fileTransferId;
+        }, _logger, cancellationToken);
     }
 }
 

@@ -10,10 +10,10 @@ internal class ActorFileTransferStatusRepository : IActorFileTransferStatusRepos
     private readonly IActorRepository _actorRepository;
     private NpgsqlDataSource _dataSource;
 
-    public ActorFileTransferStatusRepository(IActorRepository actorRepository, NpgsqlDataSource connectionProvider)
+    public ActorFileTransferStatusRepository(IActorRepository actorRepository, NpgsqlDataSource dataSource)
     {
         _actorRepository = actorRepository;
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
     public async Task<List<ActorFileTransferStatusEntity>> GetActorEvents(Guid fileTransferId, CancellationToken cancellationToken)

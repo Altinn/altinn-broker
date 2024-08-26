@@ -8,9 +8,9 @@ public class IdempotencyEventRepository : IIdempotencyEventRepository
 {
     private NpgsqlDataSource _dataSource;
 
-    public IdempotencyEventRepository(NpgsqlDataSource connectionProvider)
+    public IdempotencyEventRepository(NpgsqlDataSource dataSource)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
 

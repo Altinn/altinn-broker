@@ -8,9 +8,9 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 {
     private readonly NpgsqlDataSource _dataSource;
 
-    public ServiceOwnerRepository(NpgsqlDataSource connectionProvider)
+    public ServiceOwnerRepository(NpgsqlDataSource dataSource)
     {
-        _dataSource = connectionProvider;
+        _dataSource = dataSource;
     }
 
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
