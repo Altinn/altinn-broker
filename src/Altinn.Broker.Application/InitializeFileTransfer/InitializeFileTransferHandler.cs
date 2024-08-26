@@ -3,6 +3,7 @@
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
@@ -88,23 +89,12 @@ public class InitializeFileTransferHandler : IHandler<InitializeFileTransferRequ
             Force = false
         }, cancellationToken), fileExpirationTime);
         await _fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
-        var retryResult = await TransactionPolicy.RetryPolicy(_logger).ExecuteAndCaptureAsync(async () =>
+        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
-            {
-                await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
-                await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
-                transaction.Complete();
-                return fileTransferId;
-            }
-        });
-        if (retryResult.Outcome == OutcomeType.Failure)
-        {
-            throw retryResult.FinalException;
-        } else
-        {
-            return retryResult.Result;
-        }
+            await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
+            await _eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
+            return fileTransferId;
+        }, _logger, cancellationToken);
     }
 }
 
