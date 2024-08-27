@@ -43,11 +43,11 @@ module saveMigrationConnectionString '../keyvault/upsertSecret.bicep' = {
   }
 }
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
   name: '${namePrefix}-dbserver'
   location: location
   properties: {
-    version: '15'
+    version: '16'
     administratorLogin: databaseUser
     administratorLoginPassword: administratorLoginPassword
     storage: {
@@ -72,7 +72,7 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-0
   }
 }
 
-resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2023-12-01-preview' = {
   name: 'azure.extensions'
   parent: postgres
   dependsOn: [database]
@@ -82,7 +82,7 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   }
 }
 
-resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = {
   name: 'azure-access'
   parent: postgres
   dependsOn: [configurations] // Needs to depend on database to avoid updating at the same time
