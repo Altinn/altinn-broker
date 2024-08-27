@@ -74,7 +74,7 @@ runs:
       id: verify-deployment
       with:
         timeout-minutes: 3
-        azcliversion: 2.56.0
+        azcliversion: 2.63.0
         inlineScript: |
           chmod +x ./.github/tools/revisionVerifier.sh
           ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ inputs.AZURE_NAME_PREFIX }}-rg
