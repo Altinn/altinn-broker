@@ -62,6 +62,13 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
   }
   sku: sku
 }
+resource databaseProtection 'Microsoft.DBforPostgreSQL/flexibleServers/advancedThreatProtectionSettings@2023-12-01-preview' = {
+  name: 'Default'
+  parent: postgres
+  properties: {
+    state: 'Enabled'
+  }
+}
 
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
   name: databaseName
