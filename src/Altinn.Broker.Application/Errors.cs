@@ -26,4 +26,6 @@ public static class Errors
     public static Error InvalidTimeToLiveFormat = new Error(18, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
     public static Error TimeToLiveCannotExceed365Days = new Error(19, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
     public static Error FileSizeTooBig = new Error(20, "File size exceeds maximum", HttpStatusCode.BadRequest);
+    public static Error InvalidGracePeriodFormat = new Error(21, "Invalid grace period format. Should follow ISO8601 standard for duration. Example: 'PT2H' for 2 hours.", HttpStatusCode.BadRequest);
+    public static Error GracePeriodCannotExceed24Hours = new Error(22, "Grace period cannot exceed 24 hours", HttpStatusCode.BadRequest);
 }

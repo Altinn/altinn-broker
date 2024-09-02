@@ -81,4 +81,24 @@ public class ResourceRepository : IResourceRepository
         command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
         command.ExecuteNonQuery();
     }
+    public async Task UpdateDeleteFileTransferAfterAllRecipientsConfirmed(string resourceId, bool deleteFileTransferAfterAllRecipientsConfirmed, CancellationToken cancellationToken = default)
+    {
+        await using var command = _dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET delete_file_transfer_after_all_recipients_confirmed = @deleteFileTransferAfterAllRecipientsConfirmed " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@deleteFileTransferAfterAllRecipientsConfirmed", deleteFileTransferAfterAllRecipientsConfirmed);
+        command.ExecuteNonQuery();
+    }
+    public async Task UpdateDeleteFileTransferGracePeriod(string resourceId, TimeSpan deleteFileTransferGracePeriod, CancellationToken cancellationToken = default)
+    {
+        await using var command = _dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET delete_file_transfer_grace_period = @deleteFileTransferGracePeriod " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@deleteFileTransferGracePeriod", deleteFileTransferGracePeriod);
+        command.ExecuteNonQuery();
+    }
 }
