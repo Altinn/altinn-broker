@@ -8,6 +8,6 @@ public class ResourceEntity
     public required string ServiceOwnerId { get; set; }
     public long? MaxFileTransferSize { get; set; }
     public TimeSpan? FileTransferTimeToLive { get; set; }
-    public bool DeleteFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
-    public TimeSpan? DeleteFileTransferGracePeriod { get; set; }
+    public bool PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
+    public TimeSpan? PurgeFileTransferGracePeriod { get; set; }
 }

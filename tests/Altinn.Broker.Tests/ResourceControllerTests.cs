@@ -89,4 +89,42 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
         });
         Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
     }
+    [Fact]
+    public async Task Update_Resource_purge_file_transfer_grace_period()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferGracePeriod = "PT2H"
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
+    [Fact]
+    public async Task Update_Resource_purge_file_transfer_grace_period_Over_Limit_Should_Fail()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferGracePeriod = "PT25H"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+        var response2 = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferGracePeriod = "P3D"
+        });
+        Assert.True(response2.StatusCode == HttpStatusCode.BadRequest, await response2.Content.ReadAsStringAsync());
+    }
+    [Fact]
+    public async Task Update_Resource_purge_file_transfer_after_all_recipients_confirmed()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferAfterAllRecipientsConfirmed = true
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        var response2 = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferAfterAllRecipientsConfirmed = false
+        });
+        Assert.True(response2.IsSuccessStatusCode, await response2.Content.ReadAsStringAsync());
+    }
 }

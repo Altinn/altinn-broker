@@ -27,8 +27,8 @@ public class ResourceController : Controller
             ResourceId = resourceId,
             MaxFileTransferSize = resourceExt.MaxFileTransferSize,
             FileTransferTimeToLive = resourceExt.FileTransferTimeToLive,
-            DeleteFileTransferAfterAllRecipientsConfirmed = resourceExt.DeleteFileTransferAfterAllRecipientsConfirmed,
-            DeleteFileTransferGracePeriod = resourceExt.DeleteFileTransferGracePeriod
+            PurgeFileTransferAfterAllRecipientsConfirmed = resourceExt.PurgeFileTransferAfterAllRecipientsConfirmed,
+            PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod
         }, cancellationToken);
 
         return result.Match(

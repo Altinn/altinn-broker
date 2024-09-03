@@ -37,16 +37,16 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
             return Errors.NoAccessToResource;
         };
 
-        if (request.DeleteFileTransferAfterAllRecipientsConfirmed is not null)
+        if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
         {
-            await _resourceRepository.UpdateDeleteFileTransferAfterAllRecipientsConfirmed(resource.Id, (bool)request.DeleteFileTransferAfterAllRecipientsConfirmed, cancellationToken);
+            await _resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(resource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
         }
-        if (request.DeleteFileTransferGracePeriod is not null)
+        if (request.PurgeFileTransferGracePeriod is not null)
         {
-            var updateDeleteFileTransferGracePeriodResult = await UpdateDeleteFileTransferGracePeriod(resource, request.DeleteFileTransferGracePeriod, cancellationToken);
-            if (updateDeleteFileTransferGracePeriodResult.IsT1)
+            var updatePurgeFileTransferGracePeriodResult = await UpdatePurgeFileTransferGracePeriod(resource, request.PurgeFileTransferGracePeriod, cancellationToken);
+            if (updatePurgeFileTransferGracePeriodResult.IsT1)
             {
-                return updateDeleteFileTransferGracePeriodResult.AsT1;
+                return updatePurgeFileTransferGracePeriodResult.AsT1;
             }
         }
         if (request.MaxFileTransferSize is not null)
@@ -103,22 +103,22 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
         await _resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLive, cancellationToken);
         return Task.CompletedTask;
     }
-    private async Task<OneOf<Task, Error>> UpdateDeleteFileTransferGracePeriod(ResourceEntity resource, string deleteFileTransferGracePeriodString, CancellationToken cancellationToken)
+    private async Task<OneOf<Task, Error>> UpdatePurgeFileTransferGracePeriod(ResourceEntity resource, string PurgeFileTransferGracePeriodString, CancellationToken cancellationToken)
     {
-        TimeSpan deleteFileTransferGracePeriod;
+        TimeSpan PurgeFileTransferGracePeriod;
         try
         {
-            deleteFileTransferGracePeriod = XmlConvert.ToTimeSpan(deleteFileTransferGracePeriodString);
+            PurgeFileTransferGracePeriod = XmlConvert.ToTimeSpan(PurgeFileTransferGracePeriodString);
         }
         catch (FormatException)
         {
             return Errors.InvalidGracePeriodFormat;
         }
-        if (deleteFileTransferGracePeriod > XmlConvert.ToTimeSpan(_maxGracePeriod))
+        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(_maxGracePeriod))
         {
             return Errors.GracePeriodCannotExceed24Hours;
         }
-        await _resourceRepository.UpdateDeleteFileTransferGracePeriod(resource.Id, deleteFileTransferGracePeriod, cancellationToken);
+        await _resourceRepository.UpdatePurgeFileTransferGracePeriod(resource.Id, PurgeFileTransferGracePeriod, cancellationToken);
         return Task.CompletedTask;
     }
 }
