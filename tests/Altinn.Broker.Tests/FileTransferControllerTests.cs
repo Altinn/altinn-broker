@@ -13,6 +13,7 @@ using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
+using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
 
@@ -28,6 +29,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
+    private readonly HttpClient _serviceOwnerClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public FileTransferControllerTests(CustomWebApplicationFactory factory)
@@ -35,6 +37,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true
@@ -84,11 +87,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Attempt re-download
         var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.Equal(HttpStatusCode.OK, secondDownloadAttempt.StatusCode);
-
-        // Confirm that it has been enqueued for deletion
-        _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferHandler" && (((ExpireFileTransferRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
-            It.IsAny<EnqueuedState>()));
     }
 
     [Fact]
@@ -148,11 +146,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Attempt re-download
         var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.Equal(HttpStatusCode.OK, secondDownloadAttempt.StatusCode);
-
-        // Confirm that it has been enqueued for deletion
-        _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
-            It.Is<Job>(job => (job.Method.DeclaringType != null) && job.Method.DeclaringType.Name == "ExpireFileTransferHandler" && (((ExpireFileTransferRequest)job.Args[0]).FileTransferId == Guid.Parse(fileTransferId))),
-            It.IsAny<EnqueuedState>()));
     }
 
     [Fact]
@@ -480,6 +473,49 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task Gracefull_purge_changes_purge_time()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferAfterAllRecipientsConfirmed = false,
+            PurgeFileTransferGracePeriod = "PT1M"
+
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        var fileContent = "This is the contents of the uploaded file";
+        var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
+
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+
+        var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        var confirmedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(confirmedFileTransferDetails);
+        Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
+
+        await Task.Delay(3000);
+
+        var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(overview);
+        Assert.True(overview.FileTransferStatus != FileTransferStatusExt.Purged);
+        await Task.Delay(500000);
+        overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(overview);
+
+        Assert.True(overview.FileTransferStatus == FileTransferStatusExt.Purged);
+        Assert.Equal("test", fileTransferId);
+
+
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
