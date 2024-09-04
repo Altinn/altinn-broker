@@ -77,6 +77,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                         }
                     };
                 });
+            services.AddHangfire(c => c.UseMemoryStorage());
+            services.AddHangfireServer();
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))

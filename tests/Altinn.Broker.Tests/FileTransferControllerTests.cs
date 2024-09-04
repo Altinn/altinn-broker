@@ -508,7 +508,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(overview);
         Assert.True(overview.FileTransferStatus != FileTransferStatusExt.Purged);
-        await Task.Delay(500000);
+
         overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(overview);
 
