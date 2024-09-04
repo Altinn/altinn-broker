@@ -83,7 +83,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Attempt re-download
         var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
-        Assert.Equal(HttpStatusCode.Forbidden, secondDownloadAttempt.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondDownloadAttempt.StatusCode);
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
@@ -147,7 +147,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Attempt re-download
         var secondDownloadAttempt = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
-        Assert.Equal(HttpStatusCode.Forbidden, secondDownloadAttempt.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondDownloadAttempt.StatusCode);
 
         // Confirm that it has been enqueued for deletion
         _factory.HangfireBackgroundJobClient?.Verify(jobClient => jobClient.Create(
@@ -361,7 +361,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var fileContent = "This is the contents of the uploaded file";
         var fileContentBytes = Encoding.UTF8.GetBytes(fileContent);
         var checksum = CalculateChecksum(fileContentBytes);
-        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();       
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
         fileTransfer.Checksum = checksum;
 
         // Act

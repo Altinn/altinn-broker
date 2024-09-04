@@ -101,7 +101,7 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
                     _backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
-                        Force = false
+                        Force = true
                     }, cancellationToken), DateTime.UtcNow.Add(gracePeriod).AddMinutes(1));
                 }
             }
