@@ -102,7 +102,7 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
-                    }, cancellationToken), DateTime.UtcNow.Add(gracePeriod).AddMinutes(1));
+                    }, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
                 }
             }
             return Task.CompletedTask;
