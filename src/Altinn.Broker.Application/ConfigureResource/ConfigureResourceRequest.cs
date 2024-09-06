@@ -7,4 +7,6 @@ public class ConfigureResourceRequest
     public required string ResourceId { get; set; }
     public long? MaxFileTransferSize { get; set; }
     public string? FileTransferTimeToLive { get; set; }
+    public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
+    public string? PurgeFileTransferGracePeriod { get; set; }
 }

@@ -35,7 +35,7 @@ public class DownloadFileHandler : IHandler<DownloadFileRequest, DownloadFileRes
         {
             return Errors.FileTransferNotFound;
         }
-        if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Published)
+        if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Published && fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.AllConfirmedDownloaded)
         {
             return Errors.FileTransferNotAvailable;
         }
