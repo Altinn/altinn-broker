@@ -483,7 +483,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         await Test_Graceful_purge_changes_purge_time("PT1M");
     }
 
-
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);

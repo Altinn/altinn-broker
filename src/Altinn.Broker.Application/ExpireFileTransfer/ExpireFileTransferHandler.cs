@@ -67,7 +67,6 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
             return TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
                 var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status < Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
-
                 foreach (var recipient in recipientsWhoHaveNotDownloaded)
                 {
                     _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());

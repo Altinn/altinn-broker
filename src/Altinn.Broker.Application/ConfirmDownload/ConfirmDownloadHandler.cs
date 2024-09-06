@@ -88,7 +88,6 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
                 _backgroundJobClient.Delete(fileTransfer.HangfireJobId);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
-
                     _backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
