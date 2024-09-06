@@ -476,11 +476,11 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Gracefull_purge_changes_purge_time()
+    public async Task Graceful_purge_changes_purge_time()
     {
-        await Test_Gracefull_purge_changes_purge_time("PT12H");
-        await Test_Gracefull_purge_changes_purge_time("PT1H");
-        await Test_Gracefull_purge_changes_purge_time("PT1M");
+        await Test_Graceful_purge_changes_purge_time("PT12H");
+        await Test_Graceful_purge_changes_purge_time("PT1H");
+        await Test_Graceful_purge_changes_purge_time("PT1M");
     }
 
 
@@ -521,7 +521,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             return BitConverter.ToString(hash).Replace("-", "").ToLower();
         }
     }
-    private async Task Test_Gracefull_purge_changes_purge_time(string time = "PT12H")
+    private async Task Test__purge_changes_purge_time(string time = "PT12H")
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
