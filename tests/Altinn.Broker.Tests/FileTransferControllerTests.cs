@@ -520,7 +520,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             return BitConverter.ToString(hash).Replace("-", "").ToLower();
         }
     }
-    private async Task Test__purge_changes_purge_time(string time = "PT12H")
+    private async Task Test_Graceful_purge_changes_purge_time(string time = "PT12H")
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {

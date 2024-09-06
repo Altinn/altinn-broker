@@ -13,7 +13,7 @@ k6 option variables:
 - VUs: How many virtual users running tests at the same time. 
 - iterations: how many tests TOTAL should be completed. vus/iterations=test per vus. 0 means infinite iterations for as long as the test will run. 
 - httpDebug: full/summary. Outputs infomration about http requests and responses
-- duration: How long the test should be running. The test also adds a 30 seconds gracefull stop period on top of this. 
+- duration: How long the test should be running. The test also adds a 30 seconds graceful stop period on top of this. 
 
 We run load tests using k6. To run without installing k6 you can use docker compose(base url has to be http://host.docker.internal:5096):
 ```docker compose -f docker-compose-loadtest.yml up k6-test``` 
