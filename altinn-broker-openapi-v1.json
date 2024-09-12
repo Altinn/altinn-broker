@@ -202,7 +202,7 @@
           "File"
         ],
         "summary": "List files available for the caller",
-        "description": "This endpoint retrieves a list of files available given for the caller given the query parameters.",
+        "description": "Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 first ordered by time created.",
         "operationId": "List files",
         "parameters": [
           {
