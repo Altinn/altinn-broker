@@ -142,24 +142,12 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         var organizationNumberPattern = new Regex(Constants.OrgNumberPattern);
         if (recipients?.Length > 0)
         {
-            var invalidRecipients = recipients.Where(r => !organizationNumberPattern.IsMatch(r)).ToList();
-
-            if (invalidRecipients.Any())
-            {
-                return BadRequest($"Invalid recipient format");
-            }
-
             var recipientsString = string.Join(',', recipients);
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}",
-                recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
         }
-        else if (onBehalfOfConsumer is not null)
+        else
         {
-            if (!organizationNumberPattern.IsMatch(onBehalfOfConsumer))
-            {
-                return BadRequest($"Invalid onBehalfOfConsumer format");
-            }
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer);
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer.SanitizeForLogs());
         }
 
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
