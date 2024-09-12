@@ -10,6 +10,7 @@ using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
@@ -150,7 +151,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
 
             var recipientsString = string.Join(',', recipients);
             logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}",
-                recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
+                recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
         }
         else if (onBehalfOfConsumer is not null)
         {
