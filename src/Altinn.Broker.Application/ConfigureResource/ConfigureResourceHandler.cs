@@ -3,6 +3,7 @@
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
 
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId);
+        logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {

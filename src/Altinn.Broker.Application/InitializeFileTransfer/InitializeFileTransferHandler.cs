@@ -32,7 +32,7 @@ public class InitializeFileTransferHandler(
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId);
+        logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId.SanitizeForLogs());
         var hasAccess = await resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {

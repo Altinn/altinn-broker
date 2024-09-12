@@ -152,7 +152,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}",
                 recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
         }
-        else
+        else if (onBehalfOfConsumer is not null)
         {
             if (!organizationNumberPattern.IsMatch(onBehalfOfConsumer))
             {

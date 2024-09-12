@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -27,7 +28,7 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
 
     public async Task<OneOf<List<Guid>, Error>> Process(LegacyGetFilesRequest request, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Legacy get files for {resourceId}", request.ResourceId ?? "all resources");
+        logger.LogInformation("Legacy get files for {resourceId}", request.ResourceId is null ? "all resources" : request.ResourceId.SanitizeForLogs());
         LegacyFileSearchEntity fileSearch = new()
         {
             ResourceId = request.ResourceId ?? string.Empty
