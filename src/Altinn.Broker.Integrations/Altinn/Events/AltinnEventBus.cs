@@ -22,11 +22,12 @@ public class AltinnEventBus : IEventBus
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<AltinnEventBus> _logger;
 
-    public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger, IPartyRepository partyRepository)
+    public AltinnEventBus(HttpClient httpClient, IAltinnRegisterService altinnRegisterService, IBackgroundJobClient backgroundJobClient, IOptions<AltinnOptions> altinnOptions, ILogger<AltinnEventBus> logger, IPartyRepository partyRepository)
     {
         _httpClient = httpClient;
         _altinnOptions = altinnOptions.Value;
         _altinnRegisterService = altinnRegisterService;
+        _backgroundJobClient = backgroundJobClient;
         _partyRepository = partyRepository;
         _logger = logger;
     }
