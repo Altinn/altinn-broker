@@ -11,6 +11,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
 {
     public async Task<OneOf<DownloadFileResponse, Error>> Process(DownloadFileRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Starting download of file transfer {FileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {

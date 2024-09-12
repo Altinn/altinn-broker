@@ -21,6 +21,7 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Uploading file for file transfer {fileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {

@@ -18,12 +18,13 @@ using Microsoft.Extensions.Options;
 
 using OneOf;
 
-public class ConfirmDownloadHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<ConfirmDownloadHandler> logger, IOptions<ApplicationSettings> applicationSettings) : IHandler<ConfirmDownloadRequest, Task>
+public class ConfirmDownloadHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
 {
     private readonly string _defaultGracePeriod = applicationSettings.Value.DefaultGracePeriod;
 
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Confirming download for file transfer {fileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {

@@ -5,18 +5,20 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IOptions<ApplicationSettings> applicationSettings) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
     private readonly string _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
 
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId);
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {

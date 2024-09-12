@@ -27,6 +27,7 @@ public class LegacyGetFilesHandler(IAuthorizationService resourceRightsRepositor
 
     public async Task<OneOf<List<Guid>, Error>> Process(LegacyGetFilesRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Legacy get files for {resourceId}", request.ResourceId ?? "all resources");
         LegacyFileSearchEntity fileSearch = new()
         {
             ResourceId = request.ResourceId ?? string.Empty

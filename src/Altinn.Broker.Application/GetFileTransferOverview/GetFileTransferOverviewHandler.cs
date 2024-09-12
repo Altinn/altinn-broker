@@ -9,10 +9,11 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransferOverview;
 
-public class GetFileTransferOverviewHandler(IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IResourceManager resourceManager, ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
+public class GetFileTransferOverviewHandler(IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
 {
     public async Task<OneOf<GetFileTransferOverviewResponse, Error>> Process(GetFileTransferOverviewRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Retrieving file overview for file transfer {fileTransferId}. Legacy: {legacy}", request.FileTransferId, request.IsLegacy);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {

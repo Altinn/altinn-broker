@@ -13,6 +13,7 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
 {
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Getting file transfers for {resourceId}", request.ResourceId);
         var hasAccess = await resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
