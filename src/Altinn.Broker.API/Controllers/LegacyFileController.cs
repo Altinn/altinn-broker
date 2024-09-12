@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
@@ -136,14 +138,26 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         }
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken ?? token);
-        string recipientsString = string.Empty;
+        var organizationNumberPattern = new Regex(Constants.OrgNumberPattern);
         if (recipients?.Length > 0)
         {
-            recipientsString = string.Join(',', recipients);
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
+            var invalidRecipients = recipients.Where(r => !organizationNumberPattern.IsMatch(r)).ToList();
+
+            if (invalidRecipients.Any())
+            {
+                return BadRequest($"Invalid recipient format");
+            }
+
+            var recipientsString = string.Join(',', recipients);
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}",
+                recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
         }
         else
         {
+            if (!organizationNumberPattern.IsMatch(onBehalfOfConsumer))
+            {
+                return BadRequest($"Invalid onBehalfOfConsumer format");
+            }
             logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer);
         }
 
