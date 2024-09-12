@@ -18,63 +18,44 @@ using OneOf;
 using Polly;
 
 namespace Altinn.Broker.Application.ExpireFileTransfer;
-public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Task>
+public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferHandler> logger) : IHandler<ExpireFileTransferRequest, Task>
 {
-    private readonly IFileTransferRepository _fileTransferRepository;
-    private readonly IFileTransferStatusRepository _fileTransferStatusRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IBrokerStorageService _brokerStorageService;
-    private readonly IEventBus _eventBus;
-    private readonly ILogger<ExpireFileTransferHandler> _logger;
-
-    public ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferHandler> logger)
-    {
-        _fileTransferRepository = fileTransferRepository;
-        _fileTransferStatusRepository = fileTransferStatusRepository;
-        _serviceOwnerRepository = serviceOwnerRepository;
-        _resourceRepository = resourceRepository;
-        _brokerStorageService = brokerStorageService;
-        _eventBus = eventBus;
-        _logger = logger;
-    }
-
     [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> Process(ExpireFileTransferRequest request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
+        logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
         var fileTransfer = await GetFileTransferAsync(request.FileTransferId, cancellationToken);
         var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);
         var serviceOwner = await GetServiceOwnerAsync(resource.ServiceOwnerId);
 
         if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
-            _logger.LogInformation("FileTransfer has already been set to purged");
+            logger.LogInformation("FileTransfer has already been set to purged");
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
 
-            await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
+            await brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
             if (!request.DoNotUpdateStatus)
             {
                 await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
                 {
-                    await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-                    await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                    await fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
+                    await eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                     return Task.CompletedTask;
-                }, _logger, cancellationToken);
+                }, logger, cancellationToken);
             }
             return TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
                 var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status < Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
                 foreach (var recipient in recipientsWhoHaveNotDownloaded)
                 {
-                    _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-                    await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
+                    await eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
                 }
-                if (recipientsWhoHaveNotDownloaded.Count > 0) await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                if (recipientsWhoHaveNotDownloaded.Count > 0) await eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                 return Task.CompletedTask;
-            }, _logger, cancellationToken);
+            }, logger, cancellationToken);
         }
         else
         {
@@ -85,7 +66,7 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
 
     private async Task<FileTransferEntity> GetFileTransferAsync(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        var fileTransfer = await _fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
             throw new Exception("FileTransfer not found");
@@ -94,7 +75,7 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
     }
     private async Task<ServiceOwnerEntity> GetServiceOwnerAsync(string serviceOwnerId)
     {
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
         if (serviceOwner is null)
         {
             throw new Exception("ServiceOwner not found");
@@ -103,7 +84,7 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
     }
     private async Task<ResourceEntity> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
+        var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
             throw new Exception("Resource not found");

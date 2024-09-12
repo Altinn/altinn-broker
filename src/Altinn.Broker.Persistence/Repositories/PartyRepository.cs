@@ -4,18 +4,11 @@ using Altinn.Broker.Core.Repositories;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class PartyRepository : IPartyRepository
+public class PartyRepository(NpgsqlDataSource dataSource) : IPartyRepository
 {
-    private readonly NpgsqlDataSource _dataSource;
-
-    public PartyRepository(NpgsqlDataSource dataSource)
-    {
-        _dataSource = dataSource;
-    }
-
     public async Task<PartyEntity?> GetParty(string organizationId, CancellationToken cancellationToken)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "SELECT organization_number_pk, party_id, created from broker.party " +
             "WHERE organization_number_pk = @organizationId ");
         command.Parameters.AddWithValue("@organizationId", organizationId);
@@ -36,7 +29,7 @@ public class PartyRepository : IPartyRepository
 
     public async Task InitializeParty(string organizationId, string partyId)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.party (organization_number_pk, party_id, created) " +
             "VALUES (@organizationId, @partyId, NOW())");
         command.Parameters.AddWithValue("@organizationId", organizationId);

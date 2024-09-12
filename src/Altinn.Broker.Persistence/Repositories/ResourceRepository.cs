@@ -4,19 +4,11 @@ using Altinn.Broker.Core.Repositories;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ResourceRepository : IResourceRepository
+public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository) : IResourceRepository
 {
-    private readonly NpgsqlDataSource _dataSource;
-    private readonly IAltinnResourceRepository _altinnResourceRepository;
-    public ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository)
-    {
-        _dataSource = dataSource;
-        _altinnResourceRepository = altinnResourceRepository;
-    }
-
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
@@ -41,7 +33,7 @@ public class ResourceRepository : IResourceRepository
         }
         if (resource is null)
         {
-            resource = await _altinnResourceRepository.GetResource(resourceId, cancellationToken);
+            resource = await altinnResourceRepository.GetResource(resourceId, cancellationToken);
             if (resource is null || string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
             {
                 return null;
@@ -52,7 +44,7 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk) " +
             "VALUES (@resourceId, @organizationNumber, @maxFileTransferSize, @fileTransferTimeToLive, NOW(), @serviceOwnerId)");
         command.Parameters.AddWithValue("@resourceId", resource.Id);
@@ -64,7 +56,7 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task UpdateMaxFileTransferSize(string resource, long maxSize, CancellationToken cancellationToken)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET max_file_transfer_size = @maxFileTransferSize " +
             "WHERE resource_id_pk = @resourceId");
@@ -75,7 +67,7 @@ public class ResourceRepository : IResourceRepository
 
     public async Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET file_transfer_time_to_live = @fileTransferTimeToLive " +
             "WHERE resource_id_pk = @resourceId");
@@ -85,7 +77,7 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task UpdatePurgeFileTransferAfterAllRecipientsConfirmed(string resourceId, bool PurgeFileTransferAfterAllRecipientsConfirmed, CancellationToken cancellationToken = default)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET purge_file_transfer_after_all_recipients_confirmed = @PurgeFileTransferAfterAllRecipientsConfirmed " +
             "WHERE resource_id_pk = @resourceId");
@@ -95,7 +87,7 @@ public class ResourceRepository : IResourceRepository
     }
     public async Task UpdatePurgeFileTransferGracePeriod(string resourceId, TimeSpan PurgeFileTransferGracePeriod, CancellationToken cancellationToken = default)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET purge_file_transfer_grace_period = @PurgeFileTransferGracePeriod " +
             "WHERE resource_id_pk = @resourceId");

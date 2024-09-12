@@ -28,16 +28,8 @@ namespace Altinn.Broker.Controllers;
 [ApiController]
 [Route("broker/api/v1/filetransfer")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-public class FileTransferController : Controller
+public class FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository) : Controller
 {
-    private readonly ILogger<FileTransferController> _logger;
-    private readonly IIdempotencyEventRepository _idempotencyEventRepository;
-
-    public FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository)
-    {
-        _logger = logger;
-        _idempotencyEventRepository = idempotencyEventRepository;
-    }
 
     /// <summary>
     /// Initialize a file transfer and file upload
@@ -49,7 +41,7 @@ public class FileTransferController : Controller
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Initializing file transfer");
+        logger.LogInformation("Initializing file transfer");
         var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt, token);
 
         var commandResult = await handler.Process(commandRequest, cancellationToken);
@@ -75,7 +67,7 @@ public class FileTransferController : Controller
     )
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
+        logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
         Request.EnableBuffering();
 
         var commandResult = await handler.Process(new UploadFileRequest()
@@ -109,7 +101,7 @@ public class FileTransferController : Controller
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(form.Metadata);
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Initializing and uploading fileTransfer");
+        logger.LogInformation("Initializing and uploading fileTransfer");
         var initializeRequest = InitializeFileTransferMapper.MapToRequest(form.Metadata, token);
         var initializeResult = await initializeFileTransferHandler.Process(initializeRequest, cancellationToken);
         if (initializeResult.IsT1)
@@ -145,7 +137,7 @@ public class FileTransferController : Controller
         CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Getting filetransfer overview for {fileTransferId}", fileTransferId.ToString());
+        logger.LogInformation("Getting filetransfer overview for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferOverviewRequest()
         {
             FileTransferId = fileTransferId,
@@ -171,7 +163,7 @@ public class FileTransferController : Controller
         CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Getting fileTransfer details for {fileTransferId}", fileTransferId.ToString());
+        logger.LogInformation("Getting fileTransfer details for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferDetailsRequest()
         {
             FileTransferId = fileTransferId,
@@ -201,7 +193,7 @@ public class FileTransferController : Controller
         CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Getting fileTransfers with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
+        logger.LogInformation("Getting fileTransfers with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
         var queryResult = await handler.Process(new GetFileTransfersRequest()
         {
             Token = token,
@@ -231,7 +223,7 @@ public class FileTransferController : Controller
          CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
+        logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
             FileTransferId = fileTransferId,
@@ -257,7 +249,7 @@ public class FileTransferController : Controller
         CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithToken(token);
-        _logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
+        logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
         var requestData = new ConfirmDownloadRequest()
         {
             FileTransferId = fileTransferId,
@@ -265,7 +257,7 @@ public class FileTransferController : Controller
         };
         var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, cancellationToken));
         var uniqueString = $"confirmDownload_{fileTransferId}_{token.Consumer}";
-        var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, _idempotencyEventRepository, cancellationToken);
+        var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, idempotencyEventRepository, cancellationToken);
         return commandResult.Match(
             (_) => Ok(null),
             Problem

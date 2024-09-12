@@ -10,24 +10,14 @@ using Microsoft.Extensions.Options;
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IOptions<ApplicationSettings> applicationSettings) : IHandler<ConfigureResourceRequest, Task>
 {
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IAuthorizationService _resourceRightsRepository;
-    private readonly long _maxFileUploadSize;
-    private readonly string _maxGracePeriod;
-
-    public ConfigureResourceHandler(IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IOptions<ApplicationSettings> applicationSettings)
-    {
-        _resourceRepository = resourceRepository;
-        _resourceRightsRepository = resourceRightsRepository;
-        _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
-        _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
-    }
+    private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
+    private readonly string _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
 
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
     {
-        var resource = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
@@ -39,7 +29,7 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
 
         if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
         {
-            await _resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(resource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
+            await resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(resource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
         }
         if (request.PurgeFileTransferGracePeriod is not null)
         {
@@ -82,7 +72,7 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
         {
             return Errors.MaxUploadSizeOverGlobal;
         }
-        await _resourceRepository.UpdateMaxFileTransferSize(resource.Id, maxFileTransferSize, cancellationToken);
+        await resourceRepository.UpdateMaxFileTransferSize(resource.Id, maxFileTransferSize, cancellationToken);
         return Task.CompletedTask;
     }
     private async Task<OneOf<Task, Error>> UpdateFileTransferTimeToLive(ResourceEntity resource, string fileTransferTimeToLiveString, CancellationToken cancellationToken)
@@ -100,7 +90,7 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
         {
             return Errors.TimeToLiveCannotExceed365Days;
         }
-        await _resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLive, cancellationToken);
+        await resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLive, cancellationToken);
         return Task.CompletedTask;
     }
     private async Task<OneOf<Task, Error>> UpdatePurgeFileTransferGracePeriod(ResourceEntity resource, string PurgeFileTransferGracePeriodString, CancellationToken cancellationToken)
@@ -118,7 +108,7 @@ public class ConfigureResourceHandler : IHandler<ConfigureResourceRequest, Task>
         {
             return Errors.GracePeriodCannotExceed24Hours;
         }
-        await _resourceRepository.UpdatePurgeFileTransferGracePeriod(resource.Id, PurgeFileTransferGracePeriod, cancellationToken);
+        await resourceRepository.UpdatePurgeFileTransferGracePeriod(resource.Id, PurgeFileTransferGracePeriod, cancellationToken);
         return Task.CompletedTask;
     }
 }

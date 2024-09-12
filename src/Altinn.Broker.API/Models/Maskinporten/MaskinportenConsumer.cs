@@ -2,21 +2,15 @@
 
 namespace Altinn.Broker.Models.Maskinporten;
 
-public class MaskinportenConsumer
-{
-    [JsonConstructor]
-    public MaskinportenConsumer(
-        string authority,
-        string id
+[method: JsonConstructor]
+public class MaskinportenConsumer(
+    string authority,
+    string id
     )
-    {
-        Authority = authority;
-        ID = id;
-    }
-
+{
     [JsonPropertyName("authority")]
-    public string Authority { get; }
+    public string Authority { get; } = authority;
 
     [JsonPropertyName("ID")]
-    public string ID { get; }
+    public string ID { get; } = id;
 }

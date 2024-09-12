@@ -42,16 +42,11 @@ public class HangfireStorageCompatibilityTests(CustomWebApplicationFactory facto
         Assert.True((long)postCommitCommand.ExecuteScalar() == 1);
     }
 
-    internal class TestConnectionFactory : IConnectionFactory
+    internal class TestConnectionFactory(NpgsqlDataSource dataSource) : IConnectionFactory
     {
-        private readonly NpgsqlDataSource _dataSource;
-        public TestConnectionFactory(NpgsqlDataSource dataSource)
-        {
-            _dataSource = dataSource;
-        }
         public NpgsqlConnection GetOrCreateConnection()
         {
-            return _dataSource.CreateConnection();
+            return dataSource.CreateConnection();
         }
     }   
 }
