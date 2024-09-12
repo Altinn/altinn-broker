@@ -19,4 +19,16 @@ public class ResourceExt
     /// </summary>
     [JsonPropertyName("fileTransferTimeToLive")]
     public string? FileTransferTimeToLive { get; set; }
+
+    /// <summary>
+    /// If the file transfer should be deleted after all recipients have confirmed
+    /// </summary>
+    [JsonPropertyName("PurgeFileTransferAfterAllRecipientsConfirmed")]
+    public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; }
+
+    /// <summary>
+    /// The grace period before a file transfer is deleted after all recipients have confirmed (ISO8601 Duration format)
+    /// </summary>
+    [JsonPropertyName("PurgeFileTransferGracePeriod")]
+    public string? PurgeFileTransferGracePeriod { get; set; }
 }

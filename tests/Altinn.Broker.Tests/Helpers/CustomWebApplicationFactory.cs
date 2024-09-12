@@ -29,8 +29,6 @@ using Polly;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-    internal Mock<IBackgroundJobClient>? HangfireBackgroundJobClient;
-    internal Mock<IRecurringJobManager>? HangfireRecurringJobClient;
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
@@ -109,7 +107,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(eventBus.Object);
             var sp = services.BuildServiceProvider();
             var _backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
-
             var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
             var result = policy.ExecuteAndCapture(() => _backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
             if (result.Outcome == OutcomeType.Failure)

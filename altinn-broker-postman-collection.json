@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "edc0afde-1074-4685-9bd7-e28205f1abfa",
+		"_postman_id": "eeea7c88-1d7d-47f3-8148-1f33b641af3e",
 		"name": "Altinn.Broker",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "32732086"
+		"_exporter_id": "1775784"
 	},
 	"item": [
 		{
@@ -860,7 +860,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\",\r\n    \"fileTransferTimeToLive\": \"P30D\"\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\",\r\n    \"fileTransferTimeToLive\": \"P30D\",\r\n    \"deleteFileTransferAfterAllRecipientsConfirmed\" : false\r\n\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1062,7 +1062,7 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"    eval(pm.variables.get(\"pmlib_code\"))",
+									"    eval(pm.variables.get(\"pmlib_code\"))\r",
 									"    const jwt = pmlib.jwtSign(\r",
 									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")), \r",
 									"    payload = {\r",
@@ -1078,7 +1078,8 @@
 									"pm.variables.set('sender_jwt', jwt);\r",
 									""
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						},
 						{
@@ -1089,7 +1090,8 @@
 									"pm.globals.set(\"test_token\", responseData.access_token);\r",
 									""
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],

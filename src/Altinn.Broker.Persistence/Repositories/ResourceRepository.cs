@@ -17,7 +17,7 @@ public class ResourceRepository : IResourceRepository
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = _dataSource.CreateCommand(
-            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk " +
+            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
@@ -34,7 +34,9 @@ public class ResourceRepository : IResourceRepository
                 MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
                 FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
                 Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk"))
+                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
+                PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
+                PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period"))
             };
         }
         if (resource is null)
@@ -79,6 +81,26 @@ public class ResourceRepository : IResourceRepository
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
+        command.ExecuteNonQuery();
+    }
+    public async Task UpdatePurgeFileTransferAfterAllRecipientsConfirmed(string resourceId, bool PurgeFileTransferAfterAllRecipientsConfirmed, CancellationToken cancellationToken = default)
+    {
+        await using var command = _dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET purge_file_transfer_after_all_recipients_confirmed = @PurgeFileTransferAfterAllRecipientsConfirmed " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@PurgeFileTransferAfterAllRecipientsConfirmed", PurgeFileTransferAfterAllRecipientsConfirmed);
+        command.ExecuteNonQuery();
+    }
+    public async Task UpdatePurgeFileTransferGracePeriod(string resourceId, TimeSpan PurgeFileTransferGracePeriod, CancellationToken cancellationToken = default)
+    {
+        await using var command = _dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET purge_file_transfer_grace_period = @PurgeFileTransferGracePeriod " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@PurgeFileTransferGracePeriod", PurgeFileTransferGracePeriod);
         command.ExecuteNonQuery();
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Transactions;
 
+using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
@@ -10,6 +11,7 @@ using Altinn.Broker.Core.Services.Enums;
 using Hangfire;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -49,28 +51,28 @@ public class ExpireFileTransferHandler : IHandler<ExpireFileTransferRequest, Tas
         {
             _logger.LogInformation("FileTransfer has already been set to purged");
         }
-        else if (!request.DoNotUpdateStatus)
-        {
-            await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
-            {
-                await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-                await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-                return Task.CompletedTask;
-            }, _logger, cancellationToken);
-        }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
-            await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
 
+            await _brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
+            if (!request.DoNotUpdateStatus)
+            {
+                await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+                {
+                    await _fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
+                    await _eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                    return Task.CompletedTask;
+                }, _logger, cancellationToken);
+            }
             return TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status <= Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
+                var recipientsWhoHaveNotDownloaded = fileTransfer.RecipientCurrentStatuses.Where(latestStatus => latestStatus.Status < Core.Domain.Enums.ActorFileTransferStatus.DownloadConfirmed).ToList();
                 foreach (var recipient in recipientsWhoHaveNotDownloaded)
                 {
                     _logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
                     await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
                 }
-                await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                if (recipientsWhoHaveNotDownloaded.Count > 0) await _eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
                 return Task.CompletedTask;
             }, _logger, cancellationToken);
         }

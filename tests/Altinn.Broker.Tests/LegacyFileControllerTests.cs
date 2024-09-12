@@ -18,6 +18,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
+    private readonly HttpClient _serviceOwnerClient;
     private readonly HttpClient _legacyClient;
     private readonly HttpClient _webhookClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
@@ -27,6 +28,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _legacyClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_LEGACY_TOKEN);
+        _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _webhookClient = factory.CreateClient();
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
@@ -405,6 +407,10 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            PurgeFileTransferAfterAllRecipientsConfirmed = false
+        });
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
         var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");

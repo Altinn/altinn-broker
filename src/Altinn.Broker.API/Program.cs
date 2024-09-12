@@ -69,6 +69,7 @@ static void BuildAndRun(string[] args)
 
     var app = builder.Build();
     app.UseMiddleware<RequestLoggingMiddleware>();
+    app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseSerilogRequestLogging();
 
     if (app.Environment.IsDevelopment())

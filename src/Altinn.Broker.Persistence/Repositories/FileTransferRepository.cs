@@ -105,7 +105,7 @@ public class FileTransferRepository : IFileTransferRepository
                     },
                     RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
                     PropertyList = await GetMetadata(fileTransferId, cancellationToken)
-            };
+                };
             }
             else
             {
