@@ -147,7 +147,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         }
         else
         {
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer.SanitizeForLogs());
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer?.SanitizeForLogs());
         }
 
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
