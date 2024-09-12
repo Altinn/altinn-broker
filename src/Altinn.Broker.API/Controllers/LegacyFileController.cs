@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
@@ -8,6 +10,7 @@ using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
@@ -26,14 +29,8 @@ namespace Altinn.Broker.Controllers;
 [Route("broker/api/legacy/v1/file")]
 [Authorize(AuthenticationSchemes = AuthorizationConstants.Legacy)]
 [Authorize(Policy = AuthorizationConstants.Legacy)]
-public class LegacyFileController : Controller
+public class LegacyFileController(ILogger<LegacyFileController> logger) : Controller
 {
-    private readonly ILogger<LegacyFileController> _logger;
-
-    public LegacyFileController(ILogger<LegacyFileController> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// Initialize a file upload
@@ -46,7 +43,7 @@ public class LegacyFileController : Controller
 
         LogContextHelpers.EnrichLogsWithLegacyInitializeFile(initializeExt);
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
-        _logger.LogInformation("Legacy - Initializing file");
+        logger.LogInformation("Legacy - Initializing file");
         var commandRequest = LegacyInitializeFileMapper.MapToRequest(initializeExt, token);
         var commandResult = await handler.Process(commandRequest, cancellationToken);
         return commandResult.Match(
@@ -73,7 +70,7 @@ public class LegacyFileController : Controller
         CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
-        _logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
+        logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
         Request.EnableBuffering();
         var commandResult = await handler.Process(new UploadFileRequest()
         {
@@ -104,7 +101,7 @@ public class LegacyFileController : Controller
         CallerIdentity legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
-        _logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
+        logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
         var queryResult = await handler.Process(new GetFileTransferOverviewRequest()
         {
             FileTransferId = fileId,
@@ -142,15 +139,15 @@ public class LegacyFileController : Controller
         }
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken ?? token);
-        string recipientsString = string.Empty;
+        var organizationNumberPattern = new Regex(Constants.OrgNumberPattern);
         if (recipients?.Length > 0)
         {
-            recipientsString = string.Join(',', recipients);
-            _logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString);
+            var recipientsString = string.Join(',', recipients);
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
         }
         else
         {
-            _logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer);
+            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer?.SanitizeForLogs());
         }
 
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
@@ -185,7 +182,7 @@ public class LegacyFileController : Controller
     {
         CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
-        _logger.LogInformation("Downloading file {fileId}", fileId.ToString());
+        logger.LogInformation("Downloading file {fileId}", fileId.ToString());
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
             FileTransferId = fileId,
@@ -213,7 +210,7 @@ public class LegacyFileController : Controller
     {
         CallerIdentity? legacyToken = CreateLegacyToken(onBehalfOfConsumer, token);
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
-        _logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
+        logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
         var commandResult = await handler.Process(new ConfirmDownloadRequest()
         {
             FileTransferId = fileId,

@@ -2,23 +2,14 @@
 
 namespace Altinn.Broker.Helpers;
 
-public class ValidateElementsInList : ValidationAttribute
+public class ValidateElementsInList(Type attributeType, params object[] attributeArgs) : ValidationAttribute
 {
-    private readonly Type _attributeType;
-    private readonly object[] _attributeArgs;
-
-    public ValidateElementsInList(Type attributeType, params object[] attributeArgs)
-    {
-        _attributeType = attributeType;
-        _attributeArgs = attributeArgs;
-    }
-
     protected override ValidationResult IsValid(object? value, ValidationContext validationContext)
     {
         var list = value as IEnumerable<string>;
         if (list != null)
         {
-            var attributeInstance = (ValidationAttribute)Activator.CreateInstance(_attributeType, _attributeArgs)!;
+            var attributeInstance = (ValidationAttribute)Activator.CreateInstance(attributeType, attributeArgs)!;
             foreach (var item in list)
             {
                 if (!attributeInstance.IsValid(item))

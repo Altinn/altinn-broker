@@ -1,6 +1,7 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -9,36 +10,22 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransfers;
 
-public class GetFileTransfersHandler : IHandler<GetFileTransfersRequest, List<Guid>>
+public class GetFileTransfersHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<GetFileTransfersRequest, List<Guid>>
 {
-    private readonly IAuthorizationService _resourceRightsRepository;
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IFileTransferRepository _fileTransferRepository;
-    private readonly IActorRepository _actorRepository;
-    private readonly ILogger<GetFileTransfersHandler> _logger;
-
-    public GetFileTransfersHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger)
-    {
-        _resourceRightsRepository = resourceRightsRepository;
-        _resourceRepository = resourceRepository;
-        _fileTransferRepository = fileTransferRepository;
-        _actorRepository = actorRepository;
-        _logger = logger;
-    }
-
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, CancellationToken cancellationToken)
     {
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        logger.LogInformation("Getting file transfers for {resourceId}", request.ResourceId.SanitizeForLogs());
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var service = await _resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        var service = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (service is null)
         {
             return Errors.InvalidResourceDefinition;
         };
-        var callingActor = await _actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
+        var callingActor = await actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
         if (callingActor is null)
         {
             return new List<Guid>();
@@ -64,11 +51,11 @@ public class GetFileTransfersHandler : IHandler<GetFileTransfersRequest, List<Gu
         if (request.RecipientStatus.HasValue)
         {
             fileTransferSearchEntity.RecipientStatus = request.RecipientStatus;
-            return await _fileTransferRepository.GetFileTransfersForRecipientWithRecipientStatus(fileTransferSearchEntity, cancellationToken);
+            return await fileTransferRepository.GetFileTransfersForRecipientWithRecipientStatus(fileTransferSearchEntity, cancellationToken);
         }
         else
         {
-            return await _fileTransferRepository.GetFileTransfersAssociatedWithActor(fileTransferSearchEntity, cancellationToken);
+            return await fileTransferRepository.GetFileTransfersAssociatedWithActor(fileTransferSearchEntity, cancellationToken);
         }
     }
 }

@@ -14,23 +14,16 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("health")]
-public class HealthController : ControllerBase
+public class HealthController(NpgsqlDataSource databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions) : ControllerBase
 {
-    private readonly NpgsqlDataSource _databaseConnectionProvider;
-    private readonly AzureResourceManagerOptions _azureResourceManagerOptions;
-
-    public HealthController(NpgsqlDataSource databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions)
-    {
-        _databaseConnectionProvider = databaseConnectionProvider;
-        _azureResourceManagerOptions = azureResourceManagerOptions.Value;
-    }
+    private readonly AzureResourceManagerOptions _azureResourceManagerOptions = azureResourceManagerOptions.Value;
 
     [HttpGet]
     public async Task<ActionResult> HealthCheckAsync()
     {
         try
         {
-            using var command = _databaseConnectionProvider.CreateCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description");
+            using var command = databaseConnectionProvider.CreateCommand("SELECT COUNT(*) FROM broker.file_transfer_status_description");
             var count = (long)(command.ExecuteScalar() ?? 0);
             if (count == 0)
             {

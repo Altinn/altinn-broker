@@ -10,19 +10,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService : IBrokerStorageService
+public class BlobService(IResourceManager resourceManager, ILogger<BlobService> logger) : IBrokerStorageService
 {
-    private readonly IResourceManager _resourceManager;
-    private readonly ILogger<BlobService> _logger;
-    public BlobService(IResourceManager resourceManager, ILogger<BlobService> logger)
-    {
-        _resourceManager = resourceManager;
-        _logger = logger;
-    }
-
     private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
-        var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        var connectionString = await resourceManager.GetStorageConnectionString(serviceOwnerEntity);
         var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
         {
             Retry =
@@ -45,7 +37,7 @@ public class BlobService : IBrokerStorageService
         }
         catch (RequestFailedException requestFailedException)
         {
-            _logger.LogError("Error occurred while downloading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            logger.LogError("Error occurred while downloading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             throw;
         }
     }
@@ -66,7 +58,7 @@ public class BlobService : IBrokerStorageService
         }
         catch (RequestFailedException requestFailedException)
         {
-            _logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
@@ -81,7 +73,7 @@ public class BlobService : IBrokerStorageService
         }
         catch (RequestFailedException requestFailedException)
         {
-            _logger.LogError("Error occurred while deleting file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            logger.LogError("Error occurred while deleting file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             throw;
         }
     }

@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -8,29 +9,14 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransfers;
 
-public class LegacyGetFilesHandler : IHandler<LegacyGetFilesRequest, List<Guid>>
+public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<LegacyGetFilesRequest, List<Guid>>
 {
-    private readonly IAuthorizationService _resourceRightsRepository;
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IFileTransferRepository _fileTransferRepository;
-    private readonly IActorRepository _actorRepository;
-    private readonly ILogger<GetFileTransfersHandler> _logger;
-
-    public LegacyGetFilesHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger)
-    {
-        _resourceRightsRepository = resourceRightsRepository;
-        _resourceRepository = resourceRepository;
-        _fileTransferRepository = fileTransferRepository;
-        _actorRepository = actorRepository;
-        _logger = logger;
-    }
-
     private async Task<List<ActorEntity>> GetActors(string[] recipients, CancellationToken cancellationToken)
     {
         List<ActorEntity> actors = new();
         foreach (string recipient in recipients)
         {
-            var entity = await _actorRepository.GetActorAsync(recipient, cancellationToken);
+            var entity = await actorRepository.GetActorAsync(recipient, cancellationToken);
             if (entity is not null)
             {
                 actors.Add(entity);
@@ -42,6 +28,7 @@ public class LegacyGetFilesHandler : IHandler<LegacyGetFilesRequest, List<Guid>>
 
     public async Task<OneOf<List<Guid>, Error>> Process(LegacyGetFilesRequest request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Legacy get files for {resourceId}", request.ResourceId is null ? "all resources" : request.ResourceId.SanitizeForLogs());
         LegacyFileSearchEntity fileSearch = new()
         {
             ResourceId = request.ResourceId ?? string.Empty
@@ -53,7 +40,7 @@ public class LegacyGetFilesHandler : IHandler<LegacyGetFilesRequest, List<Guid>>
         }
         else
         {
-            fileSearch.Actor = await _actorRepository.GetActorAsync(request.OnBehalfOfConsumer ?? string.Empty, cancellationToken);
+            fileSearch.Actor = await actorRepository.GetActorAsync(request.OnBehalfOfConsumer ?? string.Empty, cancellationToken);
             if (fileSearch.Actor is null)
             {
                 return new List<Guid>();
@@ -80,6 +67,6 @@ public class LegacyGetFilesHandler : IHandler<LegacyGetFilesRequest, List<Guid>>
             fileSearch.FileTransferStatus = request.FileTransferStatus;
         }
 
-        return await _fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+        return await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
     }
 }

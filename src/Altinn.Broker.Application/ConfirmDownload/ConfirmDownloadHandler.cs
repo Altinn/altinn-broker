@@ -18,38 +18,19 @@ using Microsoft.Extensions.Options;
 
 using OneOf;
 
-public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
+public class ConfirmDownloadHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
 {
-    private readonly IFileTransferRepository _fileTransferRepository;
-    private readonly IFileTransferStatusRepository _fileTransferStatusRepository;
-    private readonly IActorFileTransferStatusRepository _actorFileTransferStatusRepository;
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IAuthorizationService _resourceRightsRepository;
-    private readonly IBackgroundJobClient _backgroundJobClient;
-    private readonly IEventBus _eventBus;
-    private readonly ILogger<ConfirmDownloadHandler> _logger;
-    private readonly string _defaultGracePeriod;
+    private readonly string _defaultGracePeriod = applicationSettings.Value.DefaultGracePeriod;
 
-    public ConfirmDownloadHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IResourceRepository resourceRepository, IAuthorizationService resourceRightsRepository, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<ConfirmDownloadHandler> logger, IOptions<ApplicationSettings> applicationSettings)
-    {
-        _fileTransferRepository = fileTransferRepository;
-        _fileTransferStatusRepository = fileTransferStatusRepository;
-        _actorFileTransferStatusRepository = actorFileTransferStatusRepository;
-        _resourceRepository = resourceRepository;
-        _resourceRightsRepository = resourceRightsRepository;
-        _backgroundJobClient = backgroundJobClient;
-        _eventBus = eventBus;
-        _logger = logger;
-        _defaultGracePeriod = applicationSettings.Value.DefaultGracePeriod;
-    }
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadRequest request, CancellationToken cancellationToken)
     {
-        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+        logger.LogInformation("Confirming download for file transfer {fileTransferId}", request.FileTransferId);
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;
@@ -76,19 +57,19 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
         }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
-            await _eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-            await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
+            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
+            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
             bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
             if (shouldConfirmAll)
             {
-                await _eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-                await _fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
-                var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
-                _backgroundJobClient.Delete(fileTransfer.HangfireJobId);
+                await eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
+                var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+                backgroundJobClient.Delete(fileTransfer.HangfireJobId);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
-                    _backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
+                    backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
@@ -97,7 +78,7 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
                 else
                 {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(_defaultGracePeriod);
-                    _backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
+                    backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
@@ -105,6 +86,6 @@ public class ConfirmDownloadHandler : IHandler<ConfirmDownloadRequest, Task>
                 }
             }
             return Task.CompletedTask;
-        }, _logger, cancellationToken);
+        }, logger, cancellationToken);
     }
 }

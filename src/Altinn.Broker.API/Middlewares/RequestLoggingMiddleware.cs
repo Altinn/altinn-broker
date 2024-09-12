@@ -1,20 +1,10 @@
 ﻿namespace Altinn.Broker.Middlewares;
 
-public class RequestLoggingMiddleware
-{
-    private readonly RequestDelegate _next;
-
-    private readonly ILogger<RequestLoggingMiddleware> _logger;
-
-    public RequestLoggingMiddleware(
-        RequestDelegate next,
-        ILogger<RequestLoggingMiddleware> logger
+public class RequestLoggingMiddleware(
+    RequestDelegate next,
+    ILogger<RequestLoggingMiddleware> logger
     )
-    {
-        _next = next;
-        _logger = logger;
-    }
-
+{
     private static readonly string[] IgnoredPaths =
     {
         "/health",
@@ -28,14 +18,14 @@ public class RequestLoggingMiddleware
         var requestPath = httpContext.Request.PathBase.Add(httpContext.Request.Path).ToString();
         if (!IgnoredPaths.Any(path => requestPath.ToLowerInvariant().StartsWith(path)))
         {
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Request for method {RequestMethod} at {RequestPath}",
                 requestMethod,
                 requestPath
             );
         }
 
-        await _next(httpContext);
+        await next(httpContext);
 
         // Log response
         var statusCode = httpContext.Response.StatusCode;
@@ -43,7 +33,7 @@ public class RequestLoggingMiddleware
         {
             if (statusCode >= 200 && statusCode < 400)
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                     requestMethod,
                     requestPath,
@@ -52,7 +42,7 @@ public class RequestLoggingMiddleware
             }
             else if (statusCode >= 400 && statusCode < 500)
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                     requestMethod,
                     requestPath,
@@ -61,7 +51,7 @@ public class RequestLoggingMiddleware
             }
             else if (statusCode >= 500)
             {
-                _logger.LogError(
+                logger.LogError(
                     "Response for method {RequestMethod} at {RequestPath} with status code {ResponseStatusCode}",
                     requestMethod,
                     requestPath,

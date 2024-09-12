@@ -12,22 +12,13 @@ using Serilog.Context;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class FileTransferRepository : IFileTransferRepository
+public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository) : IFileTransferRepository
 {
-    private NpgsqlDataSource _dataSource;
-    private readonly IActorRepository _actorRepository;
-
-    public FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository)
-    {
-        _dataSource = dataSource;
-        _actorRepository = actorRepository;
-    }
-
     public async Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
     {
         FileTransferEntity fileTransfer;
 
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             @"
                 SELECT 
                     f.file_transfer_id_pk, 
@@ -132,7 +123,7 @@ public class FileTransferRepository : IFileTransferRepository
     private async Task<List<ActorFileTransferStatusEntity>> GetLatestRecipientFileTransferStatuses(Guid fileTransferId, CancellationToken cancellationToken)
     {
         var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
-        await using (var command = _dataSource.CreateCommand(
+        await using (var command = dataSource.CreateCommand(
             @"
             SELECT afs.actor_id_fk, MAX(afs.actor_file_transfer_status_description_id_fk) as actor_file_transfer_status_description_id_fk, MAX(afs.actor_file_transfer_status_date) as actor_file_transfer_status_date, a.actor_external_id 
             FROM broker.file_transfer 
@@ -170,10 +161,10 @@ public class FileTransferRepository : IFileTransferRepository
             throw new ArgumentNullException("Storage provider must be set");
         }
         long actorId;
-        var actor = await _actorRepository.GetActorAsync(senderExternalId, cancellationToken);
+        var actor = await actorRepository.GetActorAsync(senderExternalId, cancellationToken);
         if (actor is null)
         {
-            actorId = await _actorRepository.AddActorAsync(new ActorEntity()
+            actorId = await actorRepository.AddActorAsync(new ActorEntity()
             {
                 ActorExternalId = senderExternalId
             }, cancellationToken);
@@ -183,7 +174,7 @@ public class FileTransferRepository : IFileTransferRepository
             actorId = actor.ActorId;
         }
         var fileTransferId = Guid.NewGuid();
-        await using NpgsqlCommand command = _dataSource.CreateCommand(
+        await using NpgsqlCommand command = dataSource.CreateCommand(
             "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
             "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
 
@@ -259,7 +250,7 @@ public class FileTransferRepository : IFileTransferRepository
 
         commandString.AppendLine(";");
 
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             commandString.ToString());
         if (!(fileTransferSearch.Actor is null))
         {
@@ -336,7 +327,7 @@ public class FileTransferRepository : IFileTransferRepository
 
         commandString = string.Format(commandString, statusCondition, dateCondition);
 
-        await using (var command = _dataSource.CreateCommand(commandString))
+        await using (var command = dataSource.CreateCommand(commandString))
         {
             command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
             command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
@@ -406,7 +397,7 @@ public class FileTransferRepository : IFileTransferRepository
 
         commandString = string.Format(commandString, statusCondition, dateCondition);
 
-        await using (var command = _dataSource.CreateCommand(commandString))
+        await using (var command = dataSource.CreateCommand(commandString))
         {
             command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
             command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
@@ -433,7 +424,7 @@ public class FileTransferRepository : IFileTransferRepository
     }
     public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
     {
-        await using (var command = _dataSource.CreateCommand(
+        await using (var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "file_location = @fileLocation, " +
@@ -451,7 +442,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "SELECT * " +
             "FROM broker.file_transfer_property " +
             "WHERE file_transfer_id_fk = @fileTransferId");
@@ -491,7 +482,7 @@ public class FileTransferRepository : IFileTransferRepository
         INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value)
         VALUES {valuesString}";
 
-        using var command = _dataSource.CreateCommand(query);
+        using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddRange(parameters.ToArray());
 
@@ -504,7 +495,7 @@ public class FileTransferRepository : IFileTransferRepository
 
     public async Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken)
     {
-        await using (var command = _dataSource.CreateCommand(
+        await using (var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "checksum = @checksum " +
@@ -517,7 +508,7 @@ public class FileTransferRepository : IFileTransferRepository
     }
     public async Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken)
     {
-        await using (var command = _dataSource.CreateCommand(
+        await using (var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "hangfire_job_id = @hangfireJobId " +

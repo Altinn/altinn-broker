@@ -7,30 +7,12 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.DownloadFile;
-public class DownloadFileHandler : IHandler<DownloadFileRequest, DownloadFileResponse>
+public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
 {
-    private readonly IResourceRepository _resourceRepository;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
-    private readonly IAuthorizationService _resourceRightsRepository;
-    private readonly IFileTransferRepository _fileTransferRepository;
-    private readonly IActorFileTransferStatusRepository _actorFileTransferStatusRepository;
-    private readonly IBrokerStorageService _brokerStorageService;
-    private readonly ILogger<DownloadFileHandler> _logger;
-
-    public DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileHandler> logger)
-    {
-        _resourceRepository = resourceRepository;
-        _serviceOwnerRepository = serviceOwnerRepository;
-        _resourceRightsRepository = resourceRightsRepository;
-        _fileTransferRepository = fileTransferRepository;
-        _actorFileTransferStatusRepository = actorFileTransferStatusRepository;
-        _brokerStorageService = brokerStorageService;
-        _logger = logger;
-    }
-
     public async Task<OneOf<DownloadFileResponse, Error>> Process(DownloadFileRequest request, CancellationToken cancellationToken)
     {
-        var fileTransfer = await _fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+        logger.LogInformation("Starting download of file transfer {FileTransferId}", request.FileTransferId);
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
@@ -47,23 +29,23 @@ public class DownloadFileHandler : IHandler<DownloadFileRequest, DownloadFileRes
         {
             return Errors.NoFileUploaded;
         }
-        var hasAccess = await _resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        var resource = await _resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+        var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
         };
-        var serviceOwner = await _serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var downloadStream = await _brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
-        await _actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
+        var downloadStream = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
+        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
         return new DownloadFileResponse()
         {
             FileName = fileTransfer.FileName,

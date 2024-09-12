@@ -4,18 +4,11 @@ using Altinn.Broker.Core.Repositories;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ServiceOwnerRepository : IServiceOwnerRepository
+public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwnerRepository
 {
-    private readonly NpgsqlDataSource _dataSource;
-
-    public ServiceOwnerRepository(NpgsqlDataSource dataSource)
-    {
-        _dataSource = dataSource;
-    }
-
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "SELECT service_owner_id_pk, service_owner_name, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type " +
             "FROM broker.service_owner " +
@@ -47,7 +40,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task InitializeServiceOwner(string sub, string name)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name) " +
             "VALUES (@sub, @name)");
         command.Parameters.AddWithValue("@sub", sub);
@@ -60,7 +53,7 @@ public class ServiceOwnerRepository : IServiceOwnerRepository
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
     {
-        await using var command = _dataSource.CreateCommand(
+        await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.storage_provider (created, resource_name, storage_provider_type, service_owner_id_fk) " +
             "VALUES (NOW(), @resourceName, @storageType, @serviceOwnerId)");
         command.Parameters.AddWithValue("@resourceName", resourceName);
