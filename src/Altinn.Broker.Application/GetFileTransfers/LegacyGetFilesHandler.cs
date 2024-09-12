@@ -8,7 +8,7 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransfers;
 
-public class LegacyGetFilesHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<LegacyGetFilesRequest, List<Guid>>
+public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<LegacyGetFilesRequest, List<Guid>>
 {
     private async Task<List<ActorEntity>> GetActors(string[] recipients, CancellationToken cancellationToken)
     {
