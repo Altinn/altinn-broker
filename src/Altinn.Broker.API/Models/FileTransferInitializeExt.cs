@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Helpers;
 
 namespace Altinn.Broker.Models;
@@ -37,7 +38,7 @@ public class FileTransferInitalizeExt
     /// The sender organization of the file
     /// </summary>
     [JsonPropertyName("sender")]
-    [RegularExpressionAttribute(@"^\d{4}:\d{9}$", ErrorMessage = "Organization numbers should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+    [RegularExpressionAttribute(Constants.OrgNumberPattern, ErrorMessage = "Organization numbers should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
     [Required]
     public string Sender { get; set; } = string.Empty;
 
@@ -45,7 +46,7 @@ public class FileTransferInitalizeExt
     /// The recipient organizations of the broker fileTransfer
     /// </summary>
     [JsonPropertyName("recipients")]
-    [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^\d{4}:\d{9}$", ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+    [ValidateElementsInList(typeof(RegularExpressionAttribute), Constants.OrgNumberPattern, ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
     [Required]
     [MinLength(1, ErrorMessage = "One or more recipients are required")]
     public List<string> Recipients { get; set; } = new List<string>();
