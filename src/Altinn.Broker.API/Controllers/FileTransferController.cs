@@ -1,4 +1,5 @@
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
 using Altinn.Broker.Application.DownloadFile;
@@ -46,8 +47,11 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
 
         var commandResult = await handler.Process(commandRequest, cancellationToken);
         return commandResult.Match(
-            fileTransferId => Ok(fileTransferId.ToString()),
-            Problem
+                fileTransferId => Ok(new FileTransferInitializeResponseExt()
+                {
+                    FileTransferId = fileTransferId
+                }),
+                Problem
         );
     }
 
@@ -78,7 +82,10 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             ContentLength = Request.ContentLength ?? Request.Body.Length
         }, cancellationToken);
         return commandResult.Match(
-            fileId => Ok(fileId.ToString()),
+            fileId => Ok(new FileTransferUploadResponseExt()
+            {
+                FileId = fileId
+            }),
             Problem
         );
     }
