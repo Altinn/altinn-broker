@@ -82,9 +82,9 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             ContentLength = Request.ContentLength ?? Request.Body.Length
         }, cancellationToken);
         return commandResult.Match(
-            fileId => Ok(new FileTransferUploadResponseExt()
+            fileTransferId => Ok(new FileTransferUploadResponseExt()
             {
-                FileId = fileId
+                FileTransferId = fileTransferId
             }),
             Problem
         );
