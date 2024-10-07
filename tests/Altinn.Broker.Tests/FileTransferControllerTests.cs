@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Xml;
 
+using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Models;
@@ -107,7 +108,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
-        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId;
 
         var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(fileTransferAfterInitialize);
@@ -359,7 +361,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
-        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, fileTransferId);
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
 
@@ -428,7 +431,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
-        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
 
         // Assert
@@ -509,7 +513,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
 
-        return await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
+        return fileTransferResponse?.FileTransferId.ToString() ?? string.Empty;
     }
 
     private string CalculateChecksum(byte[] data)
@@ -535,7 +540,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
-        var fileTransferId = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
 
         var jobstorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
