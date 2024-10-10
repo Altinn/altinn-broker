@@ -131,13 +131,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             options.Events = new JwtBearerEvents()
             {
                 OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context),
-                OnChallenge = c =>
+                OnChallenge = context =>
                 {
-                    if (c.AuthenticateFailure != null)
+                    if (context.AuthenticateFailure != null)
                     {
-                        c.HandleResponse();
+                        context.HandleResponse();
+                        return Task.CompletedTask;
                     }
-                    return Task.CompletedTask;
+                    return context.Response.CompleteAsync();
                 }
             };
         })
