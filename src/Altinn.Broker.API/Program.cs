@@ -130,16 +130,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             };
             options.Events = new JwtBearerEvents()
             {
-                OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context),
-                OnChallenge = context =>
-                {
-                    if (context.AuthenticateFailure != null)
-                    {
-                        context.HandleResponse();
-                        return Task.CompletedTask;
-                    }
-                    return context.Response.CompleteAsync();
-                }
+                OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context)
             };
         })
         .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
