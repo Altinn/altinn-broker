@@ -18,7 +18,7 @@
     <PackageReference Include="Hangfire.Core" Version="1.8.14" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.9" />
     <PackageReference Include="Microsoft.Azure.Management.Storage" Version="25.0.0" />
-    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="7.6.3" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.1.2" />
   </ItemGroup>
 
   <ItemGroup>
