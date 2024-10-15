@@ -16,7 +16,6 @@ changelog:
     - title: Other Changes
       labels:
         - kind/other
-        - kind/user-story
     - title: Dependency Upgrades 📦
       labels:
         - kind/dependencies
