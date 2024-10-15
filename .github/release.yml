@@ -9,6 +9,7 @@ changelog:
     - title: New Features 🎉
       labels:
         - kind/feature
+        - kind/feature-request
     - title: Bugfixes 🐛
       labels:
         - kind/bug
@@ -18,6 +19,9 @@ changelog:
     - title: Dependency Upgrades 📦
       labels:
         - kind/dependencies
+    - title: Enhancements
+      labels:
+        - kind/enhancement
     - title: Incident
       labels:
         - kind/incident
