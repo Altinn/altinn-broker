@@ -656,7 +656,7 @@
 			"name": "Resource Registry",
 			"item": [
 				{
-					"name": "Create resource",
+					"name": "Update resource",
 					"event": [
 						{
 							"listen": "test",
@@ -679,7 +679,7 @@
 								}
 							]
 						},
-						"method": "POST",
+						"method": "PUT",
 						"header": [],
 						"body": {
 							"mode": "raw",
