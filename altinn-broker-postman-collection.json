@@ -656,7 +656,7 @@
 			"name": "Resource Registry",
 			"item": [
 				{
-					"name": "Update resource",
+					"name": "Configure resource",
 					"event": [
 						{
 							"listen": "test",
