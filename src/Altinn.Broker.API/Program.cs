@@ -2,10 +2,10 @@ using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Options;
-using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
@@ -130,7 +130,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             };
             options.Events = new JwtBearerEvents()
             {
-                OnAuthenticationFailed = context => JWTBearerEventsHelper.OnAuthenticationFailed(context)
+                OnAuthenticationFailed = AltinnTokenEventsHelper.OnAuthenticationFailed,
+                OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
         .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
