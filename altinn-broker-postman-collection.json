@@ -656,7 +656,7 @@
 			"name": "Resource Registry",
 			"item": [
 				{
-					"name": "Create resource",
+					"name": "Configure resource",
 					"event": [
 						{
 							"listen": "test",
@@ -679,11 +679,11 @@
 								}
 							]
 						},
-						"method": "POST",
+						"method": "PUT",
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"identifier\": \"{{resource_id}}\",\r\n    \"title\": {\r\n        \"en\": \"Altinn Broker - Test\",\r\n        \"nb-no\": \"Altinn Broker - Test\",\r\n        \"nn-no\": \"Altinn Broker - Test\"\r\n    },\r\n    \"description\": {\r\n        \"en\": \"Altinn Broker test resource\",\r\n        \"nb-no\": \"Altinn Broker testressurs\",\r\n        \"nn-no\": \"Altinn Broker testressurs\"\r\n    },\r\n    \"rightDescription\": {\r\n        \"en\": \"Access to Altinn Broker test resource\",\r\n        \"nb-no\": \"Tilgang til Altinn Broker testressurs\",\r\n        \"nn-no\": \"Tilgang til Altinn Broker testressurs\"\r\n    },\r\n    \"homepage\": \"https://www.digdir.no/\",\r\n    \"status\": \"Active\",\r\n    \"contactPoints\": [],\r\n    \"isPartOf\": \"Altinn\",\r\n    \"resourceReferences\": [],\r\n    \"delegable\": false,\r\n    \"visible\": false,\r\n    \"hasCompetentAuthority\": {\r\n        \"organization\": \"991825827\",\r\n        \"orgcode\": \"TTD\",\r\n        \"name\": {\r\n            \"en\": \"Testdepartementet\",\r\n            \"nb-no\": \"Testdepartementet\",\r\n            \"nn-no\": \"Testdepartementet\"\r\n        }\r\n    },\r\n    \"keywords\": [],\r\n    \"limitedByRRR\": false,\r\n    \"selfIdentifiedUserEnabled\": false,\r\n    \"enterpriseUserEnabled\": false,\r\n    \"resourceType\": \"GenericAccessResource\"\r\n}",
+							"raw": "{\r\n    \"identifier\": \"{{resource_id}}\",\r\n    \"title\": {\r\n        \"en\": \"Altinn Broker - Test\",\r\n        \"nb\": \"Altinn Broker - Test\",\r\n        \"nn\": \"Altinn Broker - Test\"\r\n    },\r\n    \"description\": {\r\n        \"en\": \"Altinn Broker test resource\",\r\n        \"nb\": \"Altinn Broker testressurs\",\r\n        \"nn\": \"Altinn Broker testressurs\"\r\n    },\r\n    \"rightDescription\": {\r\n        \"en\": \"Access to Altinn Broker test resource\",\r\n        \"nb\": \"Tilgang til Altinn Broker testressurs\",\r\n        \"nn\": \"Tilgang til Altinn Broker testressurs\"\r\n    },\r\n    \"homepage\": \"https://www.digdir.no/\",\r\n    \"status\": \"Active\",\r\n    \"contactPoints\": [],\r\n    \"isPartOf\": \"Altinn\",\r\n    \"resourceReferences\": [],\r\n    \"delegable\": false,\r\n    \"visible\": false,\r\n    \"hasCompetentAuthority\": {\r\n        \"organization\": \"991825827\",\r\n        \"orgcode\": \"TTD\",\r\n        \"name\": {\r\n            \"en\": \"Testdepartementet\",\r\n            \"nb\": \"Testdepartementet\",\r\n            \"nn\": \"Testdepartementet\"\r\n        }\r\n    },\r\n    \"keywords\": [],\r\n    \"limitedByRRR\": false,\r\n    \"selfIdentifiedUserEnabled\": false,\r\n    \"enterpriseUserEnabled\": false,\r\n    \"resourceType\": \"GenericAccessResource\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
