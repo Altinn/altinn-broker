@@ -51,10 +51,6 @@ public class ConfirmDownloadHandler(IFileTransferRepository fileTransferReposito
         {
             return Task.CompletedTask;
         }
-        if (fileTransfer.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == request.Token.Consumer).Status == ActorFileTransferStatus.DownloadConfirmed)
-        {
-            return Task.CompletedTask;
-        }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
