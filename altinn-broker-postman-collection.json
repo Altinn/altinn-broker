@@ -860,7 +860,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"219239123\",\r\n    \"fileTransferTimeToLive\": \"P30D\",\r\n    \"deleteFileTransferAfterAllRecipientsConfirmed\" : false\r\n\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
