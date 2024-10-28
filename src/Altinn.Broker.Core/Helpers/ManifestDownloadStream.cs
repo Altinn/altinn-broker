@@ -6,7 +6,7 @@ using System.Xml.Serialization;
 using Altinn.Broker.Core.Domain;
 
 namespace Altinn.Broker.Core.Helpers;
-public class DownloadStream : Stream, IBrokerDownloadStream
+public class ManifestDownloadStream : Stream, IManifestDownloadStream
 {
     private ReadOnlyMemory<byte> _content;
 
@@ -48,7 +48,7 @@ public class DownloadStream : Stream, IBrokerDownloadStream
         }
     }
 
-    public DownloadStream(ReadOnlyMemory<byte> content)
+    public ManifestDownloadStream(ReadOnlyMemory<byte> content)
     {
         _content = content;
         _isOpen = true;

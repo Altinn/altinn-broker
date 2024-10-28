@@ -50,15 +50,15 @@ public class BrokerDownloadStreamTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => stream.AddManifestFile(file));
     }
 
-    private DownloadStream ReadFile(string path)
+    private ManifestDownloadStream ReadFile(string path)
     {
         var fileStream = File.OpenRead(path);
         var fileBuffer = new byte[fileStream.Length];
         fileStream.Read(fileBuffer, 0, fileBuffer.Length);
-        return new DownloadStream(fileBuffer);
+        return new ManifestDownloadStream(fileBuffer);
     }
 
-    private BrokerServiceManifest GetBrokerManifest(DownloadStream downloadStream)
+    private BrokerServiceManifest GetBrokerManifest(ManifestDownloadStream downloadStream)
     {
         using (var archive = new ZipArchive(downloadStream, ZipArchiveMode.Read, true))
         {
