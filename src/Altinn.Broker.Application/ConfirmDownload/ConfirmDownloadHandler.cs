@@ -51,7 +51,7 @@ public class ConfirmDownloadHandler(IFileTransferRepository fileTransferReposito
         {
             return Task.CompletedTask;
         }
-        if (fileTransfer.RecipientCurrentStatuses.All(recipientStatus => recipientStatus.Status != ActorFileTransferStatus.DownloadStarted)) //TODO: Replace with DownloadFinished when implemented
+        if (!fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == request.Token.Consumer && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted)) //TODO: Replace with DownloadFinished when implemented
         {
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }
