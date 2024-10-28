@@ -38,4 +38,19 @@
     <Content Include="Data\altinn-broker-test-resource-1.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Data\ManifestFileTests\Manifest.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\ManifestFileTests\payload.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\ManifestFileTests\Payload.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\ManifestFileTests\PayloadWithExistingManifest.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
