@@ -236,6 +236,25 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task ConfirmFileTransferBeforeDownloadStarted_Fails()
+    {
+        // Arrange
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var initializedFileTransfer = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFileTransfer);
+        await UploadDummyFileTransferAsync(fileTransferId);
+
+        // Act
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+
+        // Assert
+        Assert.False(confirmResponse.IsSuccessStatusCode);
+        var parsedError = await confirmResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ConfirmDownloadBeforeDownloadStarted.Message, parsedError.Detail);
+    }
+
+    [Fact]
     public async Task Search_SearchFileTransferWith_From_To_Success()
     {
         // Arrange

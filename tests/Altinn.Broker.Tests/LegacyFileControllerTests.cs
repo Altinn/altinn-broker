@@ -432,6 +432,8 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        Assert.True(downloadedFile.IsSuccessStatusCode);
 
         // Act
         var getResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileTransferId}/confirmdownload?onBehalfOfConsumer={file.Recipients[0]}", null);
