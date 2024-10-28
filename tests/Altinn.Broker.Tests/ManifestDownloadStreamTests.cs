@@ -9,7 +9,7 @@ using Altinn.Broker.Tests.Factories;
 using Xunit;
 
 namespace Altinn.Broker.Tests;
-public class BrokerDownloadStreamTests
+public class ManifestDownloadStreamTests
 {
 
     [Fact]
