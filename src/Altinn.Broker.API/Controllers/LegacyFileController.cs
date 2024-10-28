@@ -77,7 +77,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             FileTransferId = fileTransferId,
             Token = legacyToken,
             UploadStream = Request.Body,
-            IsLegacy = true
+            IsLegacy = true,
+            ContentLength = Request.ContentLength ?? Request.Body.Length
         }, cancellationToken);
         return commandResult.Match(
             fileId => Ok(fileId.ToString()),

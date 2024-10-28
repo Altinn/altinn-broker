@@ -443,6 +443,29 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(LegacyRecipientFileStatusExt.DownloadConfirmed, result?.Recipients[0]?.CurrentRecipientFileStatusCode);
         Assert.Equal(LegacyFileStatusExt.AllConfirmedDownloaded, result?.FileStatus);
     }
+
+    [Fact]
+    public async Task UploadTooBigFile_ToLegacyApi_FailsWithValidationError()
+    {
+        // Initialize
+        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/legacy/v1/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        string onBehalfOfConsumer = FileTransferInitializeExtTestFactory.BasicFileTransfer().Sender;
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
+        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        Assert.NotNull(fileAfterInitialize);
+        Assert.Equal(LegacyFileStatusExt.Initialized, fileAfterInitialize.FileStatus);
+
+        // Upload
+        var fileSize = 1024 * 1000 * 1000 + 1;
+        var content = new FakeFileStream(fileSize);
+        var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        streamContent.Headers.ContentLength = fileSize;
+        var uploadResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", streamContent);
+        Assert.Equal(HttpStatusCode.BadRequest, uploadResponse.StatusCode);
+    }
+
     private string GetMalwareScanResultJson(string filePath, string fileId)
     {
         string jsonBody = File.ReadAllText(filePath);

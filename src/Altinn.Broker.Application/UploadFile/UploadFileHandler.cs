@@ -1,5 +1,6 @@
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
@@ -50,14 +51,11 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
-        if (request.ContentLength > maxUploadSize)
+        if (request.ContentLength > GetMaxUploadSize(resource, request.IsLegacy))
         {
             return Errors.FileSizeTooBig;
         }
-
         await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
-
         try
         {
             var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
@@ -101,5 +99,18 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
             }
             return fileTransfer.FileTransferId;
         }, logger, cancellationToken);
+    }
+
+    private long GetMaxUploadSize(ResourceEntity resource, bool isLegacy)
+    {
+        if (isLegacy)
+        {
+            return 1024 * 1000 * 1000; // 1 GB
+        }
+        if (resource.MaxFileTransferSize is not null)
+        {
+            return resource.MaxFileTransferSize.Value;
+        }
+        return _maxFileUploadSize;
     }
 }
