@@ -1,5 +1,6 @@
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -45,6 +46,13 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             return Errors.ServiceOwnerNotConfigured;
         };
         var downloadStream = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
+        if (resource.UseManifestFileShim == true && request.IsLegacy) // For specific legacy resources during transition period
+        {
+            var fileBuffer = new byte[downloadStream.Length];
+            downloadStream.Read(fileBuffer, 0, fileBuffer.Length);
+            downloadStream = new ManifestDownloadStream(fileBuffer);
+            (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer);
+        }
         await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
         return new DownloadFileResponse()
         {
