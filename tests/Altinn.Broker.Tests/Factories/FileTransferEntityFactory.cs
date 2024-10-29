@@ -24,7 +24,7 @@ internal static class FileTransferEntityFactory
                         ActorExternalId = "0192:986252932"
                     },
                     Date = DateTime.UtcNow,
-                    FileTransferId = Guid.NewGuid()
+                    FileTransferId = fileTransferId
                 }
             },
             Sender = new ActorEntity()
@@ -36,7 +36,7 @@ internal static class FileTransferEntityFactory
             ExpirationTime = DateTime.UtcNow.AddHours(1),
             FileTransferStatusEntity = new FileTransferStatusEntity()
             {
-                FileTransferId = Guid.NewGuid(),
+                FileTransferId = fileTransferId,
                 Date = DateTime.UtcNow,
                 DetailedStatus = "Ready for download",
                 Status = FileTransferStatus.Published
