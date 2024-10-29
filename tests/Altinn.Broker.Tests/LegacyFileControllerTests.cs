@@ -558,15 +558,13 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     private async Task<long> UploadZipFile(string fileTransferId) {
-        var zipFile = File.OpenRead("Data/ManifestFileTests/Payload.zip");
-        var fileBuffer = new byte[zipFile.Length];
-        zipFile.Read(fileBuffer, 0, fileBuffer.Length);
+        var fileBuffer = File.ReadAllBytes("Data/ManifestFileTests/Payload.zip");
         using (var content = new ByteArrayContent(fileBuffer))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        return zipFile.Length;
+        return fileBuffer.Length;
     }
 }
