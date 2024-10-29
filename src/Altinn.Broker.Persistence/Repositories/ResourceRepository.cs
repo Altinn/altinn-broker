@@ -96,4 +96,15 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         command.Parameters.AddWithValue("@PurgeFileTransferGracePeriod", PurgeFileTransferGracePeriod);
         command.ExecuteNonQuery();
     }
+
+    public async Task UpdateUseManifestFileShim(string resourceId, bool useManifestFileShim, CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET use_manifest_file_shim = @UseManifestFileShim " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@UseManifestFileShim", useManifestFileShim);
+        command.ExecuteNonQuery();
+    }
 }

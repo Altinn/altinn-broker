@@ -9,4 +9,5 @@ public class ConfigureResourceRequest
     public string? FileTransferTimeToLive { get; set; }
     public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
     public string? PurgeFileTransferGracePeriod { get; set; }
+    public bool? UseManifestFileShim { get; set; }
 }

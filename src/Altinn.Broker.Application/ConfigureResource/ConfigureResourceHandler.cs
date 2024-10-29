@@ -58,6 +58,10 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateFileTransferTimeToLiveResult.AsT1;
             }
         }
+        if (request.UseManifestFileShim is not null)
+        {
+            await resourceRepository.UpdateUseManifestFileShim(resource.Id, request.UseManifestFileShim.Value, cancellationToken);
+        }
         return Task.CompletedTask;
     }
 
