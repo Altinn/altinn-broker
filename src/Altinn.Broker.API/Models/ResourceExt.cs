@@ -35,6 +35,6 @@ public class ResourceExt
     /// <summary>
     /// If the manifest file shim should be used in the transition solution where manifest files are added to downloaded files
     /// </summary>
-    [JsonPropertyName("UseManifestFileShim")]
+    [JsonPropertyName("useManifestFileShim")]
     public bool? UseManifestFileShim { get; set; }
 }
