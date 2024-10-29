@@ -58,8 +58,8 @@ public static class BrokerServiceManifestExtensions
     {
         var manifest = new BrokerServiceManifest
         {
-            ExternalServiceCode = "entity.ServiceCode",
-            ExternalServiceEditionCode = "entity.ServiceEditionCode",
+            ExternalServiceCode = entity.ResourceId,
+            ExternalServiceEditionCode = "Altinn3",
             SendersReference = entity.SendersFileTransferReference,
             Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
             SentDate = DateTime.UtcNow,
