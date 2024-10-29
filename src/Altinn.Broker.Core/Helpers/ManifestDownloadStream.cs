@@ -227,7 +227,7 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
             using (var manifestStream = newManifestEntry.Open())
             {
                 var manifest = fileTransferEntity.CreateManifest();
-                await SerializeManifestAsync(manifest, manifestStream);
+                WriteSerializeManifestToZip(manifest, manifestStream);
             }
         }
 
@@ -247,15 +247,16 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         var span = _content.Span;
         return span[0] == 0x50 && span[1] == 0x4B && span[2] == 0x03 && span[3] == 0x04;
     }
-    private async Task SerializeManifestAsync(BrokerServiceManifest manifest, Stream stream)
+    private void WriteSerializeManifestToZip(BrokerServiceManifest manifest, Stream stream)
     {
         var ns = new XmlSerializerNamespaces();
         ns.Add("", "http://schema.altinn.no/services/ServiceEngine/Broker/2015/06");
         ns.Add("xsd", "http://www.w3.org/2001/XMLSchema");
         ns.Add("xsi", "http://www.w3.org/2001/XMLSchema-instance");
-
         var serializer = new XmlSerializer(typeof(BrokerServiceManifest));
-        var xmlWriter = XmlWriter.Create(stream, new XmlWriterSettings { OmitXmlDeclaration = false, Indent = true, Encoding = Encoding.Unicode });
-        await Task.Run(() => serializer.Serialize(xmlWriter, manifest, ns));
+        using (var xmlWriter = XmlWriter.Create(stream, new XmlWriterSettings { OmitXmlDeclaration = false, Indent = true, Encoding = Encoding.Unicode }))
+        {
+            serializer.Serialize(xmlWriter, manifest, ns);
+        }
     }
 }
