@@ -451,12 +451,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
-    public async Task UploadTooBigFile_ToLegacyApi_FailsWithValidationError()
-    {
-        Assert.True(true);
-    }
-
-    [Fact]
     public async Task DownloadZipFile_WithManifestShimEnabled_ManifestIsAdded()
     {
         // Arrange
