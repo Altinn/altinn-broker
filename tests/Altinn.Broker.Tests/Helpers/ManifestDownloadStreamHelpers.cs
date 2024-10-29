@@ -28,7 +28,12 @@ internal static class ManifestDownloadStreamHelpers
                 using (var reader = new StreamReader(memoryStream, Encoding.Unicode))
                 {
                     var xmlContent = reader.ReadToEnd();
-                    xmlContent = xmlContent.Substring(xmlContent.IndexOf("<BrokerServiceManifest"));
+                    var manifestIndex = xmlContent.IndexOf("<BrokerServiceManifest");
+                    if (manifestIndex == -1)
+                    {
+                        return null;
+                    }
+                    xmlContent = xmlContent.Substring(manifestIndex);
                     using (var cleanStream = new MemoryStream(Encoding.Unicode.GetBytes(xmlContent)))
                     {
                         var serializer = new XmlSerializer(
