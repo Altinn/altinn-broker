@@ -60,7 +60,11 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         }
         if (request.UseManifestFileShim is not null)
         {
-            await resourceRepository.UpdateUseManifestFileShim(resource.Id, request.UseManifestFileShim.Value, cancellationToken);
+            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, cancellationToken);
+            if (updateManifestFileShimResult.IsT1)
+            {
+                return updateManifestFileShimResult.AsT1;
+            }
         }
         return Task.CompletedTask;
     }
@@ -116,6 +120,14 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
             return Errors.GracePeriodCannotExceed24Hours;
         }
         await resourceRepository.UpdatePurgeFileTransferGracePeriod(resource.Id, PurgeFileTransferGracePeriod, cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}", 
+            resource.Id.SanitizeForLogs(), useManifestFileShim);
+        await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);
         return Task.CompletedTask;
     }
 }
