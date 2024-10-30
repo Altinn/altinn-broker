@@ -14,4 +14,6 @@ internal class TestConstants
     internal const string RESOURCE_WITH_NO_ACCESS = "altinn-broker-test-resource-failed-access";
 
     internal const string RESOURCE_WITH_NO_SERVICE_OWNER = "altinn-broker-test-resource-with-blank-serviceowner";
+
+    internal const string RESOURCE_WITH_MANIFEST_SHIM = "manifest-shim-resource";
 }

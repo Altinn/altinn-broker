@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "eb3386d2-82bf-4c01-aeac-9c965f0b0e88",
+		"_postman_id": "cff6671d-26f7-481b-badd-7f1185b5290d",
 		"name": "Altinn.Broker",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "38611559"
+		"_exporter_id": "7106668"
 	},
 	"item": [
 		{
@@ -490,7 +490,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"FileName\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileTransferReference\": \"archiveno-20425\",\n  \"sender\": \"0192:991825827\",\n  \"recipients\": [\n    \"0192:986252932\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
+							"raw": "{\n  \"FileName\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileTransferReference\": \"archiveno-20425\",\n  \"sender\": \"0192:{{serviceowner_orgnumber}}\",\n  \"recipients\": [\n    \"0192:{{recipient_orgnumber}}\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
 							"options": {
 								"raw": {
 									"headerFamily": "json",
@@ -860,7 +860,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\"\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1073741824\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"purgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"useManifestFileShim\": false\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1198,7 +1198,8 @@
 								"exec": [
 									"pm.globals.set(\"recipient_token\", responseBody);"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -1216,7 +1217,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read&org=ttd&orgNo=986252932",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read&org=ttd&orgNo={{recipient_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1242,7 +1243,7 @@
 								},
 								{
 									"key": "orgNo",
-									"value": "986252932"
+									"value": "{{recipient_orgnumber}}"
 								}
 							]
 						}
@@ -1339,6 +1340,11 @@
 			"type": "string"
 		},
 		{
+			"key": "recipient_orgnumber",
+			"value": "Organization number of test recipient. Nine digits, no prefix.",
+			"type": "string"
+		},
+		{
 			"key": "client_id",
 			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.samarbeid.digdir.no/integrations)",
 			"type": "string"
@@ -1366,8 +1372,7 @@
 		{
 			"key": "platform_subscription_key",
 			"value": "Contact us to get a subscription key for use with Altinn APIs",
-			"type": "string",
-			"disabled": true
+			"type": "string"
 		},
 		{
 			"key": "local_testing",

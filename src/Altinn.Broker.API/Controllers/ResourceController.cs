@@ -28,7 +28,8 @@ public class ResourceController : Controller
             MaxFileTransferSize = resourceExt.MaxFileTransferSize,
             FileTransferTimeToLive = resourceExt.FileTransferTimeToLive,
             PurgeFileTransferAfterAllRecipientsConfirmed = resourceExt.PurgeFileTransferAfterAllRecipientsConfirmed,
-            PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod
+            PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod,
+            UseManifestFileShim = resourceExt.UseManifestFileShim
         }, cancellationToken);
 
         return result.Match(

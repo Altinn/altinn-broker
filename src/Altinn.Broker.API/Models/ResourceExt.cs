@@ -23,12 +23,18 @@ public class ResourceExt
     /// <summary>
     /// If the file transfer should be deleted after all recipients have confirmed
     /// </summary>
-    [JsonPropertyName("PurgeFileTransferAfterAllRecipientsConfirmed")]
+    [JsonPropertyName("purgeFileTransferAfterAllRecipientsConfirmed")]
     public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; }
 
     /// <summary>
     /// The grace period before a file transfer is deleted after all recipients have confirmed (ISO8601 Duration format)
     /// </summary>
-    [JsonPropertyName("PurgeFileTransferGracePeriod")]
+    [JsonPropertyName("purgeFileTransferGracePeriod")]
     public string? PurgeFileTransferGracePeriod { get; set; }
+
+    /// <summary>
+    /// If the manifest file shim should be used in the transition solution where manifest files are added to downloaded files
+    /// </summary>
+    [JsonPropertyName("useManifestFileShim")]
+    public bool? UseManifestFileShim { get; set; }
 }

@@ -10,4 +10,5 @@ public class ResourceEntity
     public TimeSpan? FileTransferTimeToLive { get; set; }
     public bool PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
     public TimeSpan? PurgeFileTransferGracePeriod { get; set; }
+    public bool? UseManifestFileShim { get; set; }
 }

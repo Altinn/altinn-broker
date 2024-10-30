@@ -24,4 +24,9 @@ internal static class FileTransferInitializeExtTestFactory
         Sender = "0192:991825827",
         SendersFileTransferReference = "test-data"
     };
+    internal static FileTransferInitalizeExt BasicFileTransfer_ManifestShim() {
+        var basicFileTransfer = BasicFileTransfer();
+        basicFileTransfer.ResourceId = TestConstants.RESOURCE_WITH_MANIFEST_SHIM;
+        return basicFileTransfer;
+    } 
 }
