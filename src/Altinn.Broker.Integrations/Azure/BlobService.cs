@@ -8,23 +8,16 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService : IBrokerStorageService
+public class BlobService(IResourceManager resourceManager, IHttpContextAccessor httpContextAccessor, ILogger<BlobService> logger) : IBrokerStorageService
 {
-    private readonly IResourceManager _resourceManager;
-    private readonly ILogger<BlobService> _logger;
-    public BlobService(IResourceManager resourceManager, ILogger<BlobService> logger)
-    {
-        _resourceManager = resourceManager;
-        _logger = logger;
-    }
-
     private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
-        var connectionString = await _resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        var connectionString = await resourceManager.GetStorageConnectionString(serviceOwnerEntity);
         var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
         {
             Retry =
@@ -47,14 +40,15 @@ public class BlobService : IBrokerStorageService
         }
         catch (RequestFailedException requestFailedException)
         {
-            _logger.LogError("Error occurred while downloading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            logger.LogError("Error occurred while downloading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             throw;
         }
     }
 
     public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
-        _logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
+        var length = httpContextAccessor.HttpContext.Request.ContentLength;
+        logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
         var fullBlobUrl = $"{blobClient.Uri}";
@@ -64,11 +58,11 @@ public class BlobService : IBrokerStorageService
             try
             {
                 long position = 0;
-                while (position < stream.Length) 
+                while (position < length) 
                 {
                     // Read and upload chunks
                     int bufferSize = 32 * 1024 * 1024; // 32 MB chunks
-                    if ((stream.Length - position) < bufferSize)
+                    if ((length - position) < bufferSize)
                     {
                         bufferSize = (int)(stream.Length - position);
                     }
@@ -88,7 +82,7 @@ public class BlobService : IBrokerStorageService
                         blockList.Add(blockId);
                         position += bytesRead;
                         md5.TransformBlock(buffer, 0, bytesRead, null, 0);
-                        _logger.LogDebug($"Current speed of file transfer {fileTransferEntity.FileTransferId} is {(position / (stopwatch.ElapsedMilliseconds)).ToString("N0")} KB/s");
+                        logger.LogDebug($"Current speed of file transfer {fileTransferEntity.FileTransferId} is {(position / (stopwatch.ElapsedMilliseconds)).ToString("N0")} KB/s");
                     }
 
                     // Commit the upload
@@ -100,9 +94,9 @@ public class BlobService : IBrokerStorageService
                         },
 
                     });
-                    _logger.LogInformation($"Committed blocks: {response.GetRawResponse().ReasonPhrase}");
+                    logger.LogInformation($"Committed blocks: {response.GetRawResponse().ReasonPhrase}");
                 }
-                _logger.LogInformation($"Successfully committed {position.ToString("N0")} bytes");
+                logger.LogInformation($"Successfully committed {position.ToString("N0")} bytes");
                 md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
                 return BitConverter.ToString(md5.Hash).Replace("-", "").ToLowerInvariant();
 
@@ -130,7 +124,7 @@ public class BlobService : IBrokerStorageService
         }
         catch (RequestFailedException requestFailedException)
         {
-            _logger.LogError("Error occurred while deleting file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            logger.LogError("Error occurred while deleting file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             throw;
         }
     }
