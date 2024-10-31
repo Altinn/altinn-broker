@@ -51,7 +51,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var progressHandler = new ProgressHandler();
-        using (var md5 = MD5.Create())
+        using (var blobMd5 = MD5.Create())
         {
             try
             {
@@ -74,12 +74,12 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     // Use ArraySegment to avoid creating new MemoryStream instances
                     var segment = new ArraySegment<byte>(buffer, 0, bytesRead);
                     using var blockStream = new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false);
-
-                    md5.TransformBlock(buffer, 0, bytesRead, null, 0);
+                    using var blockMd5 = MD5.Create();
+                    var blockHash = blockMd5.ComputeHash(buffer, 0, bytesRead);
                     var blockResponse = await blockBlobClient.StageBlockAsync(
                         blockId,
                         blockStream,
-                        md5.Hash,
+                        blockHash,
                         conditions: null,
                         progressHandler,
                         cancellationToken: cancellationToken
@@ -92,6 +92,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
                     blockList.Add(blockId);
                     position += bytesRead;
+                    blobMd5.TransformBlock(buffer, 0, bytesRead, null, 0);
 
                     if (position % (50 * BufferSize) == 0) // Log every 50 blocks
                     {
@@ -118,8 +119,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 }
 
                 logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
-                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(md5.Hash).Replace("-", "").ToLowerInvariant();
+                blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
             }
             catch (Exception ex)
             {
