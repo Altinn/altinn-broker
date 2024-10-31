@@ -1,6 +1,6 @@
 using Slack.Webhooks;
 
-namespace Altinn.Correspondence.Integrations.Slack
+namespace Altinn.Broker.Integrations.Slack
 {
     public class SlackDevClient : ISlackClient
     {

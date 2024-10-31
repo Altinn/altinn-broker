@@ -12,7 +12,7 @@ using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Altinn.Correspondence.Integrations.Slack;
+using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
 
 namespace Altinn.Broker.Integrations;
