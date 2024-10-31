@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Primitives;
 
+namespace Altinn.Broker.Helpers;
 public class SecurityHeadersMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
