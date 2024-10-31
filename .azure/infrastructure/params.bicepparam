@@ -13,7 +13,6 @@ param migrationsStorageAccountName = readEnvironmentVariable('MIGRATION_STORAGE_
 param maskinportenJwk = readEnvironmentVariable('MASKINPORTEN_JWK')
 param maskinportenClientId = readEnvironmentVariable('MASKINPORTEN_CLIENT_ID')
 param platformSubscriptionKey = readEnvironmentVariable('PLATFORM_SUBSCRIPTION_KEY')
-param notificationEmail = readEnvironmentVariable('NOTIFICATION_EMAIL')
 
 // SKUs
 param keyVaultSku = {

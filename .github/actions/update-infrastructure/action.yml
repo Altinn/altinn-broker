@@ -39,9 +39,6 @@ inputs:
   PLATFORM_SUBSCRIPTION_KEY:
     description: "Subscription key for platform"
     required: true
-  NOTIFICATION_EMAIL:
-    description: "Email for notifications"
-    required: true
 
 
 runs:
@@ -86,7 +83,6 @@ runs:
         MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
-        NOTIFICATION_EMAIL: ${{ inputs.NOTIFICATION_EMAIL }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep
