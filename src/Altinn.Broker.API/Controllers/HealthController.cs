@@ -51,4 +51,11 @@ public class HealthController(NpgsqlDataSource databaseConnectionProvider, IOpti
 
         return Ok("Environment properly configured");
     }
+
+    [HttpGet]
+    [Route("ready")]
+    public async Task<ActionResult> Ready()
+    {
+        return Ok();
+    }
 }
