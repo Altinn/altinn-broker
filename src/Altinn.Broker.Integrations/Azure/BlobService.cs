@@ -22,7 +22,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         {
             Retry =
             {
-                NetworkTimeout = TimeSpan.FromHours(48)
+                NetworkTimeout = TimeSpan.FromHours(48),
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
@@ -53,15 +53,15 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
         var fullBlobUrl = $"{blobClient.Uri}";
         BlockBlobClient blockBlobClient = new BlockBlobClient(new Uri(fullBlobUrl));
-        //using (var md5 = MD5.Create()) 
-        //{
+        using (var md5 = MD5.Create()) 
+        {
             try
             {
                 long position = 0;
                 while (position < length) 
                 {
                     // Read and upload chunks
-                    int bufferSize = 32 * 1024 * 1024; // 32 MB chunks
+                    int bufferSize = 256 * 1024 * 1024; // 256 MB chunks
                     if ((length - position) < bufferSize)
                     {
                         bufferSize = (int)(stream.Length - position);
@@ -97,7 +97,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     logger.LogInformation($"Committed blocks: {response.GetRawResponse().ReasonPhrase}");
                 }
                 logger.LogInformation($"Successfully committed {position.ToString("N0")} bytes");
-               //md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
                 return "test";
 
             }
@@ -111,7 +111,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 Console.WriteLine($"Upload for {fileTransferEntity.FileTransferId} completed in {stopwatch.ElapsedMilliseconds.ToString("N0")} ms");
             }
             return null;
-        //}
+        }
 
     }
 
