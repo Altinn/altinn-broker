@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 
 using Altinn.Broker.Core.Domain;
@@ -10,6 +11,8 @@ using Azure.Storage.Blobs.Specialized;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+
+using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
@@ -49,32 +52,37 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
     {
         var length = httpContextAccessor.HttpContext.Request.ContentLength!;
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        using (var blobMd5 = MD5.Create())
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();        
+        try
         {
-            try
+            BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+            BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
+            
+            // Use smaller chunks to reduce memory pressure
+            const int BufferSize = 1 * 1024 * 1024; // 1MB chunks
+            using var buffer = new PooledBuffer(BufferSize); // Using object pool for buffers
+            var blockList = new List<string>();
+            long position = 0;
+            
+            while (position < length)
             {
-                BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
-                BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
-
-                // Reuse the same buffer throughout the upload
-                const int BufferSize = 4 * 1024 * 1024; // 4MB chunks for better memory management
-                byte[] buffer = new byte[BufferSize];
-                var blockList = new List<string>();
-                long position = 0;
-
-                while (position < length)
+                // Periodically yield to allow other operations
+                if (position % (10 * BufferSize) == 0)
                 {
-                    int bytesRead = await stream.ReadAsync(buffer, 0, BufferSize, cancellationToken);
-                    if (bytesRead <= 0) break;
+                    await Task.Yield();
+                }
 
-                    var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+                int bytesRead = await stream.ReadAsync(buffer.Array, 0, BufferSize, cancellationToken);
+                if (bytesRead <= 0) break;
 
-                    // Use ArraySegment to avoid creating new MemoryStream instances
-                    var segment = new ArraySegment<byte>(buffer, 0, bytesRead);
-                    using var blockStream = new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false);
-                    using var blockMd5 = MD5.Create();
-                    var blockHash = blockMd5.ComputeHash(buffer, 0, bytesRead);
+                var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+                using var blockStream = new MemoryStream(buffer.Array, 0, bytesRead, writable: false);
+
+                // Add exponential backoff retry for block uploads
+                using var blockMd5 = MD5.Create();
+                var blockHash = blockMd5.ComputeHash(buffer.Array, 0, bytesRead);
+                await RetryPolicy.ExecuteAsync(async () =>
+                {
                     var blockResponse = await blockBlobClient.StageBlockAsync(
                         blockId,
                         blockStream,
@@ -88,50 +96,53 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     {
                         throw new Exception($"Failed to upload block {blockId}");
                     }
+                });
 
-                    blockList.Add(blockId);
-                    position += bytesRead;
-                    blobMd5.TransformBlock(buffer, 0, bytesRead, null, 0);
+                blockList.Add(blockId);
+                position += bytesRead;
 
-                    if (position % (50 * BufferSize) == 0) // Log every 50 blocks
-                    {
-                        var speedKBps = position / (stopwatch.ElapsedMilliseconds + 1); // Avoid divide by zero
-                        logger.LogInformation($"Upload progress: {position}/{length} bytes ({speedKBps:N0} KB/s)");
-                    }
-
-                    // Commit blocks every 50,000 blocks or at the end
-                    if (blockList.Count >= 50000 || position >= length)
-                    {
-                        var response = await blockBlobClient.CommitBlockListAsync(
-                            blockList,
-                            new CommitBlockListOptions
-                            {
-                                Conditions = new BlobRequestConditions { IfNoneMatch = new ETag("*") }
-                            },
-                            cancellationToken
-                        );
-
-                        logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
-                        blockList.Clear();
-                        break;
-                    }
+                // Log progress less frequently
+                if (position % (50 * BufferSize) == 0)
+                {
+                    var speedKBps = position / (stopwatch.ElapsedMilliseconds + 1);
+                    logger.LogDebug($"Upload progress: {position}/{length} bytes ({speedKBps:N0} KB/s)");
                 }
 
-                logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
-                blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
+                // Commit blocks in smaller batches
+                if (blockList.Count >= 10000 || position >= length)
+                {
+                    await CommitBlocks(blockBlobClient, blockList, cancellationToken);
+                    blockList.Clear();
+                }
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
-                return null;
-            }
-            finally
-            {
-                stopwatch.Stop();
-            }
+
+            logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
+            return blobClient.Uri.ToString();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
+            throw;
         }
     }
+
+    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, CancellationToken cancellationToken)
+    {
+        await RetryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await client.CommitBlockListAsync(
+                blockList,
+                new CommitBlockListOptions
+                {
+                    Conditions = new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+                },
+                cancellationToken
+            );
+            
+            logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
+        });
+    }
+
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
@@ -146,4 +157,42 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             throw;
         }
     }
+}
+
+
+// Helper class for buffer pooling
+public class PooledBuffer : IDisposable
+{
+    private static readonly ArrayPool<byte> Pool = ArrayPool<byte>.Shared;
+    public byte[] Array { get; private set; }
+
+    public PooledBuffer(int size)
+    {
+        Array = Pool.Rent(size);
+    }
+
+    public void Dispose()
+    {
+        if (Array != null)
+        {
+            Pool.Return(Array);
+            Array = null!;
+        }
+    }
+}
+
+// Retry policy definition
+public static class RetryPolicy
+{
+    private static readonly IAsyncPolicy RetryWithBackoff = Policy
+        .Handle<Exception>()
+        .WaitAndRetryAsync(
+            3,
+            attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
+            (ex, timeSpan) => {
+                // Log retry attempt
+            }
+        );
+
+    public static Task ExecuteAsync(Func<Task> action) => RetryWithBackoff.ExecuteAsync(action);
 }
