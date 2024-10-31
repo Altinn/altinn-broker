@@ -72,14 +72,17 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     {
         LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
-        Request.EnableBuffering();
 
+        if (Request.ContentLength is null)
+        {
+            return Problem("Content-length header is required");
+        }
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
             Token = token,
             UploadStream = Request.Body,
-            ContentLength = Request.ContentLength ?? Request.Body.Length
+            ContentLength = Request.ContentLength.Value
         }, cancellationToken);
         return commandResult.Match(
             fileTransferId => Ok(new FileTransferUploadResponseExt()
