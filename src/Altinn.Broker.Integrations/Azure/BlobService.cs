@@ -47,72 +47,90 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
     public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
-        var length = httpContextAccessor.HttpContext.Request.ContentLength;
+        var length = httpContextAccessor.HttpContext.Request.ContentLength!;
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
-        var fullBlobUrl = $"{blobClient.Uri}";
-        BlockBlobClient blockBlobClient = new BlockBlobClient(new Uri(fullBlobUrl));
-        using (var md5 = MD5.Create()) 
+        var progressHandler = new ProgressHandler();
+        using (var md5 = MD5.Create())
         {
             try
             {
+                BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+                BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
+
+                // Reuse the same buffer throughout the upload
+                const int BufferSize = 4 * 1024 * 1024; // 4MB chunks for better memory management
+                byte[] buffer = new byte[BufferSize];
+                var blockList = new List<string>();
                 long position = 0;
-                while (position < length) 
+
+                while (position < length)
                 {
-                    // Read and upload chunks
-                    int bufferSize = 256 * 1024 * 1024; // 256 MB chunks
-                    if ((length - position) < bufferSize)
+                    int bytesRead = await stream.ReadAsync(buffer, 0, BufferSize, cancellationToken);
+                    if (bytesRead <= 0) break;
+
+                    var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+                    // Use ArraySegment to avoid creating new MemoryStream instances
+                    var segment = new ArraySegment<byte>(buffer, 0, bytesRead);
+                    using var blockStream = new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false);
+
+                    md5.TransformBlock(buffer, 0, bytesRead, null, 0);
+                    var blockResponse = await blockBlobClient.StageBlockAsync(
+                        blockId,
+                        blockStream,
+                        md5.Hash,
+                        conditions: null,
+                        progressHandler,
+                        cancellationToken: cancellationToken
+                    );
+
+                    if (blockResponse.GetRawResponse().Status != 201)
                     {
-                        bufferSize = (int)(stream.Length - position);
+                        throw new Exception($"Failed to upload block {blockId}");
                     }
-                    var buffer = new byte[bufferSize];
-                    int bytesRead;
-                    var blockList = new List<string>();
 
-                    while (blockList.Count < 50000 && (bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    blockList.Add(blockId);
+                    position += bytesRead;
+
+                    if (position % (50 * BufferSize) == 0) // Log every 50 blocks
                     {
-                        var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                        using var ms = new MemoryStream(buffer, 0, bytesRead); // Will be continously disposed of every iteration such that our memory use stays equal to buffer size
-                        var blockResponse = await blockBlobClient.StageBlockAsync(blockId, ms);
-                        if (blockResponse.GetRawResponse().Status != 201)
-                        {
-                            throw new Exception($"Failed to upload block {blockId}");
-                        }
-                        blockList.Add(blockId);
-                        position += bytesRead;
-                        //md5.TransformBlock(buffer, 0, bytesRead, null, 0);
-                        logger.LogDebug($"Current speed of file transfer {fileTransferEntity.FileTransferId} is {(position / (stopwatch.ElapsedMilliseconds)).ToString("N0")} KB/s");
+                        var speedKBps = position / (stopwatch.ElapsedMilliseconds + 1); // Avoid divide by zero
+                        logger.LogInformation($"Upload progress: {position}/{length} bytes ({speedKBps:N0} KB/s)");
                     }
 
-                    // Commit the upload
-                    var response = await blockBlobClient.CommitBlockListAsync(blockList, new CommitBlockListOptions()
+                    // Commit blocks every 50,000 blocks or at the end
+                    if (blockList.Count >= 50000 || position >= length)
                     {
-                        Conditions = new BlobRequestConditions
-                        {
-                            IfNoneMatch = new ETag("*")
-                        },
+                        var response = await blockBlobClient.CommitBlockListAsync(
+                            blockList,
+                            new CommitBlockListOptions
+                            {
+                                Conditions = new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+                            },
+                            cancellationToken
+                        );
 
-                    });
-                    logger.LogInformation($"Committed blocks: {response.GetRawResponse().ReasonPhrase}");
+                        logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
+                        blockList.Clear();
+                        break;
+                    }
                 }
-                logger.LogInformation($"Successfully committed {position.ToString("N0")} bytes");
-                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return "test";
 
+                logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
+                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return BitConverter.ToString(md5.Hash).Replace("-", "").ToLowerInvariant();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
+                return null;
             }
             finally
             {
                 stopwatch.Stop();
-                Console.WriteLine($"Upload for {fileTransferEntity.FileTransferId} completed in {stopwatch.ElapsedMilliseconds.ToString("N0")} ms");
             }
-            return null;
         }
-
     }
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
