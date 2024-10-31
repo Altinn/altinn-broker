@@ -50,7 +50,6 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         var length = httpContextAccessor.HttpContext.Request.ContentLength!;
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var progressHandler = new ProgressHandler();
         using (var blobMd5 = MD5.Create())
         {
             try
@@ -81,7 +80,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         blockStream,
                         blockHash,
                         conditions: null,
-                        progressHandler,
+                        null,
                         cancellationToken: cancellationToken
                     );
 
