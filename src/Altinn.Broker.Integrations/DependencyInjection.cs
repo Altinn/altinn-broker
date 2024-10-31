@@ -23,10 +23,7 @@ public static class DependencyInjection
         services.AddSingleton<IBrokerStorageService, BlobService>();
         services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IResourceRepository, ResourceRepository>();
-        services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
-        services.AddScoped<IEventBus, AltinnEventBus>();
-        services.AddScoped<IAltinnRegisterService, AltinnRegisterService>();
 
         var maskinportenSettings = new MaskinportenSettings();
         configuration.GetSection(nameof(MaskinportenSettings)).Bind(maskinportenSettings);
@@ -39,9 +36,11 @@ public static class DependencyInjection
         }
         else
         {
-            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
+            services.AddSingleton<IEventBus, ConsoleLogEventBus>();
+            /*services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
+
             services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
-                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();*/
 
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnRegisterService).FullName, maskinportenSettings);
             services.AddHttpClient<IAltinnRegisterService, AltinnRegisterService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
