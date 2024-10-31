@@ -53,8 +53,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
         var fullBlobUrl = $"{blobClient.Uri}";
         BlockBlobClient blockBlobClient = new BlockBlobClient(new Uri(fullBlobUrl));
-        using (var md5 = MD5.Create()) 
-        {
+        //using (var md5 = MD5.Create()) 
+        //{
             try
             {
                 long position = 0;
@@ -81,7 +81,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         }
                         blockList.Add(blockId);
                         position += bytesRead;
-                        md5.TransformBlock(buffer, 0, bytesRead, null, 0);
+                        //md5.TransformBlock(buffer, 0, bytesRead, null, 0);
                         logger.LogDebug($"Current speed of file transfer {fileTransferEntity.FileTransferId} is {(position / (stopwatch.ElapsedMilliseconds)).ToString("N0")} KB/s");
                     }
 
@@ -97,8 +97,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     logger.LogInformation($"Committed blocks: {response.GetRawResponse().ReasonPhrase}");
                 }
                 logger.LogInformation($"Successfully committed {position.ToString("N0")} bytes");
-                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(md5.Hash).Replace("-", "").ToLowerInvariant();
+               //md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return "test";
 
             }
             catch (Exception ex)
@@ -111,7 +111,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 Console.WriteLine($"Upload for {fileTransferEntity.FileTransferId} completed in {stopwatch.ElapsedMilliseconds.ToString("N0")} ms");
             }
             return null;
-        }
+        //}
 
     }
 
