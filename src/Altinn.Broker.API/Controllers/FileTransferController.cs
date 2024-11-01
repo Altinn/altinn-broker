@@ -40,7 +40,6 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Initializing file transfer");
