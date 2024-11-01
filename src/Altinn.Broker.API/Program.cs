@@ -13,6 +13,7 @@ using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
+using Altinn.Broker.Helpers;
 
 using Hangfire;
 
@@ -71,6 +72,7 @@ static void BuildAndRun(string[] args)
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseSerilogRequestLogging();
+    app.UseExceptionHandler();
 
     if (app.Environment.IsDevelopment())
     {
@@ -96,6 +98,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddEndpointsApiExplorer();
     services.AddSwaggerGen();
     services.AddApplicationInsightsTelemetry();
+    services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));

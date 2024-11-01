@@ -22,7 +22,7 @@ param maskinportenClientId string
 @secure()
 param platformSubscriptionKey string
 @secure()
-param notificationEmail string
+param slackUrl string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -44,6 +44,10 @@ var secrets = [
   {
     name: 'platform-subscription-key'
     value: platformSubscriptionKey
+  }
+  {
+    name: 'slack-url'
+    value: slackUrl
   }
 ]
 
@@ -124,7 +128,6 @@ module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
     location: location
     namePrefix: namePrefix
     migrationsStorageAccountName: migrationsStorageAccountName
-    emailReceiver: notificationEmail
   }
 }
 
