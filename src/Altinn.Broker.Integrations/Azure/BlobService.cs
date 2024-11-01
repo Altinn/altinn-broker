@@ -5,6 +5,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Services;
 
 using Azure;
+using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -48,7 +49,28 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         }
     }
 
-    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
+    public async Task<string> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
+    {
+        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+        try
+        {
+            BlobUploadOptions options = new BlobUploadOptions()
+            {
+                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
+            };
+            var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
+            var metadata = blobMetadata.Value;
+            var hash = Convert.ToHexString(metadata.ContentHash).ToLowerInvariant();
+            return hash;
+        }
+        catch (RequestFailedException requestFailedException)
+        {
+            logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            throw;
+        }
+    }
+    /*public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
         var length = httpContextAccessor.HttpContext.Request.ContentLength!;
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
@@ -124,7 +146,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
             throw;
         }
-    }
+    }*/
 
     private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, CancellationToken cancellationToken)
     {
