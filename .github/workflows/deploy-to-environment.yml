@@ -70,6 +70,7 @@ jobs:
         MASKINPORTEN_JWK: ${{ secrets.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
+        SLACK_URL: ${{ secrets.SLACK_URL }}
 
     - name: Migrate database
       uses: ./.github/actions/migrate-database

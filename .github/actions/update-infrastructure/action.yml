@@ -39,6 +39,9 @@ inputs:
   PLATFORM_SUBSCRIPTION_KEY:
     description: "Subscription key for platform"
     required: true
+  SLACK_URL:
+    description: "Email for Slack channel to post to"
+    required: true
 
 
 runs:
@@ -83,6 +86,7 @@ runs:
         MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
+        SLACK_URL: ${{ inputs.SLACK_URL }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep
