@@ -90,7 +90,7 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
         }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
+            await fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
             if (serviceOwner.StorageProvider.Type == StorageProviderType.Altinn3Azure)
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
