@@ -40,7 +40,7 @@ inputs:
     description: "Subscription key for platform"
     required: true
   SLACK_URL:
-    description: "Email for Slack channel to post to"
+    description: "URL for Slack channel to post to"
     required: true
 
 
