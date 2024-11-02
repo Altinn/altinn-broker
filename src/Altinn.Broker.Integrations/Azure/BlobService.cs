@@ -141,7 +141,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         int defaultSize = (1024 * 1024) * 32; // 32 Mebibytes
         int maxBlocks = 50000; // Max number of blocks in a block blob
         int maxBlockSize = (1024 * 1024) * 2000; //2k Mebibytes
-        if ((defaultSize * maxBlocks) > contentLength) // ~1.6TB
+        if (((long)defaultSize * maxBlocks) > contentLength) // ~1.6TB
         {
             return defaultSize;
         }
