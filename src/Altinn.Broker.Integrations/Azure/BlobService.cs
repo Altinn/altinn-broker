@@ -48,27 +48,31 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         }
     }
 
-    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
+    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+    Stream stream, CancellationToken cancellationToken)
     {
         var length = httpContextAccessor.HttpContext.Request.ContentLength!; // Temporary fix for getting content length
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
             BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
-            
-            int BufferSize = CaclulateBlockSize(length.Value);
-            using var buffer = new PooledBuffer(BufferSize);
+
+            int bufferSize = 1024 * 1024 * 128;
+            using var buffer = new PooledBuffer(bufferSize);
             var blockList = new List<string>();
             long position = 0;
             using var blobMd5 = MD5.Create();
 
+            const int BLOCKS_BEFORE_COMMIT = 10000;
+            int blocksInBatch = 0;
+
             while (position < length)
             {
-                int bytesRead = await stream.ReadAsync(buffer.Array, 0, BufferSize, cancellationToken);
+                int bytesRead = await stream.ReadAsync(buffer.Array, 0, bufferSize, cancellationToken);
                 if (bytesRead <= 0) break;
-                
+
                 var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                 using var blockStream = new MemoryStream(buffer.Array, 0, bytesRead, writable: false);
 
@@ -90,21 +94,43 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     {
                         throw new Exception($"Failed to upload block {blockId}");
                     }
-                    logger.LogDebug($"Upload progress for {fileTransferEntity.FileTransferId}: {position}/{length} bytes ({position / (stopwatch.ElapsedMilliseconds + 1):N0} KB/s)");
+
+                    double uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                    logger.LogDebug($"Upload progress for {fileTransferEntity.FileTransferId}: " +
+                        $"{position}/{length} bytes ({uploadSpeedMBps:N2} MB/s)");
                 });
 
                 blockList.Add(blockId);
                 position += bytesRead;
+                blocksInBatch++;
 
-                if (position % (10 * BufferSize) == 0)
+                // Commit intermediate blocks if we've accumulated enough
+                if (blocksInBatch >= BLOCKS_BEFORE_COMMIT)
                 {
-                    logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: {position}/{length} bytes ({position / (stopwatch.ElapsedMilliseconds + 1):N0} KB/s)");
+                    logger.LogInformation($"Committing intermediate batch of {blocksInBatch} blocks at position " +
+                        $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB");
+
+                    await CommitBlocks(blockBlobClient, blockList, intermediate: true, cancellationToken);
+                    blocksInBatch = 0;
+                    // Keep the block list for the final commit
+                }
+
+                if (position % (10L * bufferSize) == 0)
+                {
+                    double uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                    logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: " +
+                        $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
                 }
             }
-            await CommitBlocks(blockBlobClient, blockList, cancellationToken);
+
+            // Final commit with all blocks
+            await CommitBlocks(blockBlobClient, blockList, intermediate: false, cancellationToken);
             blockList.Clear();
 
-            logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
+            double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+            logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
+                $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
+
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
             {
@@ -119,43 +145,21 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         }
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, CancellationToken cancellationToken)
+    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool intermediate,
+        CancellationToken cancellationToken)
     {
         await RetryPolicy.ExecuteAsync(async () =>
         {
-            var response = await client.CommitBlockListAsync(
-                blockList,
-                new CommitBlockListOptions
-                {
-                    Conditions = new BlobRequestConditions { IfNoneMatch = new ETag("*") }
-                },
-                cancellationToken
-            );
-            
+            var options = new CommitBlockListOptions
+            {
+                // Only use ifNoneMatch condition for the final commit to prevent overwriting
+                Conditions = intermediate ? null : new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+            };
+
+            var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
             logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
         });
     }
-
-    private int CaclulateBlockSize(long contentLength)
-    {
-        int defaultSize = (1024 * 1024) * 32; // 32 Mebibytes
-        int maxBlocks = 50000; // Max number of blocks in a block blob
-        int maxBlockSize = (1024 * 1024) * 2000; //2k Mebibytes
-        if (((long)defaultSize * maxBlocks) > contentLength) // ~1.6TB
-        {
-            return defaultSize;
-        }
-        var requiredBlockSize = contentLength / maxBlocks;
-        if (requiredBlockSize < maxBlockSize)
-        {
-            return maxBlockSize;
-        }
-        else
-        {
-            throw new ArgumentException($"File size is too large to upload. The limit is {(maxBlockSize * maxBlocks) / (1024^4)} TiB"); // ~100 TB
-        }
-    }
-
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
