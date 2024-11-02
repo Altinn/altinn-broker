@@ -5,7 +5,6 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Services;
 
 using Azure;
-using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -49,30 +48,9 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         }
     }
 
-    public async Task<string> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
+    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
-        try
-        {
-            BlobUploadOptions options = new BlobUploadOptions()
-            {
-                TransferValidation = new UploadTransferValidationOptions { ChecksumAlgorithm = StorageChecksumAlgorithm.MD5 }
-            };
-            var blobMetadata = await blobClient.UploadAsync(stream, options, cancellationToken);
-            var metadata = blobMetadata.Value;
-            var hash = Convert.ToHexString(metadata.ContentHash).ToLowerInvariant();
-            return hash;
-        }
-        catch (RequestFailedException requestFailedException)
-        {
-            logger.LogError("Error occurred while uploading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
-            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            throw;
-        }
-    }
-    /*public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken)
-    {
-        var length = httpContextAccessor.HttpContext.Request.ContentLength!;
+        var length = httpContextAccessor.HttpContext.Request.ContentLength!; // Temporary fix for getting content length
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();        
         try
@@ -80,35 +58,27 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
             BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
             
-            // Use smaller chunks to reduce memory pressure
-            const int BufferSize = 1 * 1024 * 1024; // 1MB chunks
-            using var buffer = new PooledBuffer(BufferSize); // Using object pool for buffers
+            int BufferSize = CaclulateBlockSize(length.Value);
+            using var buffer = new PooledBuffer(BufferSize);
             var blockList = new List<string>();
             long position = 0;
-            
+            using var blobMd5 = MD5.Create();
+
             while (position < length)
             {
-                // Periodically yield to allow other operations
-                if (position % (10 * BufferSize) == 0)
-                {
-                    await Task.Yield();
-                }
-
                 int bytesRead = await stream.ReadAsync(buffer.Array, 0, BufferSize, cancellationToken);
                 if (bytesRead <= 0) break;
-
+                
                 var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                 using var blockStream = new MemoryStream(buffer.Array, 0, bytesRead, writable: false);
 
-                // Add exponential backoff retry for block uploads
-                using var blockMd5 = MD5.Create();
-                var blockHash = blockMd5.ComputeHash(buffer.Array, 0, bytesRead);
+                blobMd5.TransformBlock(buffer.Array, 0, bytesRead, null, 0);
                 await RetryPolicy.ExecuteAsync(async () =>
                 {
                     var blockResponse = await blockBlobClient.StageBlockAsync(
                         blockId,
                         blockStream,
-                        blockHash,
+                        MD5.HashData(buffer.Array),
                         conditions: null,
                         null,
                         cancellationToken: cancellationToken
@@ -118,16 +88,15 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     {
                         throw new Exception($"Failed to upload block {blockId}");
                     }
+                    logger.LogDebug($"Upload progress for {fileTransferEntity.FileTransferId}: {position}/{length} bytes ({position / (stopwatch.ElapsedMilliseconds + 1):N0} KB/s)");
                 });
 
                 blockList.Add(blockId);
                 position += bytesRead;
 
-                // Log progress less frequently
-                if (position % (50 * BufferSize) == 0)
+                if (position % (10 * BufferSize) == 0)
                 {
-                    var speedKBps = position / (stopwatch.ElapsedMilliseconds + 1);
-                    logger.LogDebug($"Upload progress: {position}/{length} bytes ({speedKBps:N0} KB/s)");
+                    logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: {position}/{length} bytes ({position / (stopwatch.ElapsedMilliseconds + 1):N0} KB/s)");
                 }
 
                 // Commit blocks in smaller batches
@@ -139,14 +108,19 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             }
 
             logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
-            return blobClient.Uri.ToString();
+            blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            if (blobMd5.Hash is null)
+            {
+                throw new Exception("Failed to calculate MD5 hash of uploaded file");
+            }
+            return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
             throw;
         }
-    }*/
+    }
 
     private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, CancellationToken cancellationToken)
     {
@@ -163,6 +137,26 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             
             logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
         });
+    }
+
+    private int CaclulateBlockSize(long contentLength)
+    {
+        int defaultSize = (1024 * 1024) * 32; // 32 Mebibytes
+        int maxBlocks = 50000; // Max number of blocks in a block blob
+        int maxBlockSize = (1024 * 1024) * 2000; //2k Mebibytes
+        if ((defaultSize * maxBlocks) < contentLength) // ~1.6TB
+        {
+            return defaultSize;
+        }
+        var requiredBlockSize = contentLength / maxBlocks;
+        if (requiredBlockSize < maxBlockSize)
+        {
+            return maxBlockSize;
+        }
+        else
+        {
+            throw new ArgumentException($"File size is too large to upload. The limit is {(maxBlockSize * maxBlocks) / (1024^4)} TiB"); // ~100 TB
+        }
     }
 
 
@@ -185,7 +179,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 // Helper class for buffer pooling
 public class PooledBuffer : IDisposable
 {
-    private static readonly ArrayPool<byte> Pool = ArrayPool<byte>.Shared;
+    private static readonly ArrayPool<byte> Pool = ArrayPool<byte>.Shared; // Because static, shared between all instances
     public byte[] Array { get; private set; }
 
     public PooledBuffer(int size)
