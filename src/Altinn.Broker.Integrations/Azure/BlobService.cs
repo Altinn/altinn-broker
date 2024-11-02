@@ -100,14 +100,9 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 {
                     logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: {position}/{length} bytes ({position / (stopwatch.ElapsedMilliseconds + 1):N0} KB/s)");
                 }
-
-                // Commit blocks in smaller batches
-                if (blockList.Count >= 10000 || position >= length)
-                {
-                    await CommitBlocks(blockBlobClient, blockList, cancellationToken);
-                    blockList.Clear();
-                }
             }
+            await CommitBlocks(blockBlobClient, blockList, cancellationToken);
+            blockList.Clear();
 
             logger.LogInformation($"Successfully uploaded {position:N0} bytes in {stopwatch.ElapsedMilliseconds:N0}ms");
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
@@ -146,7 +141,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         int defaultSize = (1024 * 1024) * 32; // 32 Mebibytes
         int maxBlocks = 50000; // Max number of blocks in a block blob
         int maxBlockSize = (1024 * 1024) * 2000; //2k Mebibytes
-        if ((defaultSize * maxBlocks) < contentLength) // ~1.6TB
+        if ((defaultSize * maxBlocks) > contentLength) // ~1.6TB
         {
             return defaultSize;
         }
