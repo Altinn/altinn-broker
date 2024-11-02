@@ -75,10 +75,12 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 blobMd5.TransformBlock(buffer.Array, 0, bytesRead, null, 0);
                 await RetryPolicy.ExecuteAsync(async () =>
                 {
+                    using var blockMd5 = MD5.Create();
+                    blockStream.Position = 0;
                     var blockResponse = await blockBlobClient.StageBlockAsync(
                         blockId,
                         blockStream,
-                        MD5.HashData(buffer.Array),
+                        blockMd5.ComputeHash(buffer.Array, 0, bytesRead),
                         conditions: null,
                         null,
                         cancellationToken: cancellationToken
