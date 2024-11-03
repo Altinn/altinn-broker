@@ -61,25 +61,22 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
             int desiredBlockSize = 1024 * 1024 * 32; // 32MB
             using var accumulationBuffer = new MemoryStream();
-            using var buffer = new PooledBuffer(1024 * 1024); // 1MB read buffer
+            using var buffer = new PooledBuffer(1024 * 1024); // 1MB read buffer, todo set as same as network buffer size
             var blockList = new List<string>();
             long position = 0;
             using var blobMd5 = MD5.Create();
 
-            const int BLOCKS_BEFORE_COMMIT = 10000;
+            const int BLOCKS_BEFORE_COMMIT = 1000;
             int blocksInBatch = 0;
 
             while (position < length)
             {
-                // Read into smaller buffer first
                 int bytesRead = await stream.ReadAsync(buffer.Array, 0, buffer.Array.Length, cancellationToken);
                 if (bytesRead <= 0) break;
 
-                // Write to accumulation buffer
                 accumulationBuffer.Write(buffer.Array, 0, bytesRead);
                 position += bytesRead;
 
-                // Check if we've accumulated enough data or reached the end
                 bool isLastBlock = position >= length;
                 if (accumulationBuffer.Length >= desiredBlockSize || isLastBlock)
                 {
@@ -126,13 +123,9 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         logger.LogInformation($"Committing intermediate batch of {blocksInBatch} blocks at position " +
                             $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB");
 
-                        await CommitBlocks(blockBlobClient, blockList, intermediate: true, cancellationToken);
+                        await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count == blocksInBatch, cancellationToken);
                         blocksInBatch = 0;
                         // Keep the block list for the final commit
-                    }
-
-                    if (position % (10L * desiredBlockSize) == 0)
-                    {
                         double uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
                         logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: " +
                             $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
@@ -141,7 +134,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             }
 
             // Final commit with all blocks
-            await CommitBlocks(blockBlobClient, blockList, intermediate: false, cancellationToken);
+            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, cancellationToken);
             blockList.Clear();
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
@@ -162,15 +155,15 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         }
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool intermediate,
+    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit,
         CancellationToken cancellationToken)
     {
         await RetryPolicy.ExecuteAsync(async () =>
         {
             var options = new CommitBlockListOptions
             {
-                // Only use ifNoneMatch condition for the final commit to prevent overwriting
-                Conditions = intermediate ? null : new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+                // Only use ifNoneMatch for the first commit to ensure concurrent upload attempts do not work simultaneously
+                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null
             };
 
             var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
