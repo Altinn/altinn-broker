@@ -88,8 +88,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
                     blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
 
-                    await RetryPolicy.ExecuteAsync(async () =>
-                    {
+                    //await RetryPolicy.ExecuteAsync(async () =>
+                    //{
                         using var blockMd5 = MD5.Create();
                         blockStream.Position = 0;
                         var blockResponse = await blockBlobClient.StageBlockAsync(
@@ -109,7 +109,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         double uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
                         logger.LogDebug($"Upload progress for {fileTransferEntity.FileTransferId}: " +
                             $"{position}/{length} bytes ({uploadSpeedMBps:N2} MB/s)");
-                    });
+                    //});
 
                     blockList.Add(blockId);
                     blocksInBatch++;
@@ -126,7 +126,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count == blocksInBatch, cancellationToken);
                         blocksInBatch = 0;
                         // Keep the block list for the final commit
-                        double uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                        uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
                         logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: " +
                             $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
                     }
@@ -158,8 +158,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
     private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit,
         CancellationToken cancellationToken)
     {
-        await RetryPolicy.ExecuteAsync(async () =>
-        {
+        //await RetryPolicy.ExecuteAsync(async () =>
+        //{
             var options = new CommitBlockListOptions
             {
                 // Only use ifNoneMatch for the first commit to ensure concurrent upload attempts do not work simultaneously
@@ -168,7 +168,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
             var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
             logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
-        });
+        //});
     }
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
