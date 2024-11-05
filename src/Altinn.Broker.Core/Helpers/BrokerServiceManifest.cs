@@ -59,8 +59,8 @@ public static class BrokerServiceManifestExtensions
         var manifest = new BrokerServiceManifest
         {
             
-            ExternalServiceCode = (bool)resource.UseManifestFileShim ? resource.ExternalServiceCodeLegacy : null,
-            ExternalServiceEditionCode = (bool)resource.UseManifestFileShim ? resource.ExternalServiceEditionCodeLegacy : null,
+            ExternalServiceCode = resource.UseManifestFileShim == true ? resource.ExternalServiceCodeLegacy : null,
+            ExternalServiceEditionCode = resource.UseManifestFileShim == true ? resource.ExternalServiceEditionCodeLegacy : null,
             SendersReference = entity.SendersFileTransferReference,
             Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
             SentDate = DateTime.UtcNow,

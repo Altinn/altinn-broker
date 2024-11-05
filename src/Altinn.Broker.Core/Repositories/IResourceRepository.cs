@@ -10,6 +10,6 @@ public interface IResourceRepository
     Task UpdatePurgeFileTransferAfterAllRecipientsConfirmed(string resourceId, bool PurgeFileTransferAfterAllRecipientsConfirmed, CancellationToken cancellationToken = default);
     Task UpdatePurgeFileTransferGracePeriod(string resourceId, TimeSpan PurgeFileTransferGracePeriod, CancellationToken cancellationToken = default);
     Task UpdateUseManifestFileShim(string resourceId, bool useManifestFileShim, CancellationToken cancellationToken = default);
-    Task UpdateExternalServiceCodeLegacy(string resourceId, string ExternalServiceCodeLegacy, CancellationToken cancellationToken = default);
-    Task UpdateExternalServiceEditionCodeLegacy(string resourceId, string ExternalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
+    Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default);
+    Task UpdateExternalServiceEditionCodeLegacy(string resourceId, string externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
 }
