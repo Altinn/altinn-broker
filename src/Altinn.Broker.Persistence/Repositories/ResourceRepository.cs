@@ -9,7 +9,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period, use_manifest_file_shim " +
+            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period, use_manifest_file_shim, external_service_code_legacy, external_service_edition_code_legacy " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
@@ -29,7 +29,9 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
                 ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
                 PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
                 PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
-                UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim"))
+                UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
+                ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
+                ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_edition_code_legacy"))
             };
         }
         if (resource is null)
@@ -105,6 +107,26 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@UseManifestFileShim", useManifestFileShim);
+        command.ExecuteNonQuery();
+    }
+    public async Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET external_service_code_legacy = @externalServiceCodeLegacy " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@externalServiceCodeLegacy", externalServiceCodeLegacy);
+        command.ExecuteNonQuery();
+    }
+    public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, string externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET external_service_edition_code_legacy = @externalServiceEditionCodeLegacy " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@externalServiceEditionCodeLegacy", externalServiceEditionCodeLegacy);
         command.ExecuteNonQuery();
     }
 }

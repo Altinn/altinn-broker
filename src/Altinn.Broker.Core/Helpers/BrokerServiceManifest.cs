@@ -54,12 +54,12 @@ public class PropertyEntry
 
 public static class BrokerServiceManifestExtensions
 {
-    public static BrokerServiceManifest CreateManifest(this FileTransferEntity entity)
+    public static BrokerServiceManifest CreateManifest(this FileTransferEntity entity, ResourceEntity resource)
     {
         var manifest = new BrokerServiceManifest
         {
-            ExternalServiceCode = entity.ResourceId,
-            ExternalServiceEditionCode = "Altinn3",
+            ExternalServiceCode = resource.ExternalServiceCodeLegacy,
+            ExternalServiceEditionCode = resource.ExternalServiceEditionCodeLegacy,
             SendersReference = entity.SendersFileTransferReference,
             Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
             SentDate = DateTime.UtcNow,

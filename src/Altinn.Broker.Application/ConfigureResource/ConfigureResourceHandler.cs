@@ -66,6 +66,22 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateManifestFileShimResult.AsT1;
             }
         }
+        if (request.ExternalServiceCodeLegacy is not null)
+        {
+            var updateExternalServiceCodeLegacyResult = await UpdateExternalServiceCodeLegacy(resource, request.ExternalServiceCodeLegacy, cancellationToken);
+            if (updateExternalServiceCodeLegacyResult.IsT1)
+            {
+                return updateExternalServiceCodeLegacyResult.AsT1;
+            }
+        }
+        if (request.ExternalServiceEditionCodeLegacy is not null)
+        {
+            var updateExternalServiceEditionCodeLegacyResult = await UpdateExternalServiceEditionCodeLegacy(resource, request.ExternalServiceEditionCodeLegacy, cancellationToken);
+            if (updateExternalServiceEditionCodeLegacyResult.IsT1)
+            {
+                return updateExternalServiceEditionCodeLegacyResult.AsT1;
+            }
+        }
         return Task.CompletedTask;
     }
 
@@ -128,6 +144,17 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}", 
             resource.Id.SanitizeForLogs(), useManifestFileShim);
         await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    private async Task<OneOf<Task, Error>> UpdateExternalServiceCodeLegacy(ResourceEntity resource, string ExternalServiceCodeLegacy, CancellationToken cancellationToken)
+    {
+        await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, ExternalServiceCodeLegacy, cancellationToken);
+        return Task.CompletedTask;
+    }
+    private async Task<OneOf<Task, Error>> UpdateExternalServiceEditionCodeLegacy(ResourceEntity resource, string ExternalServiceEditionCodeLegacy, CancellationToken cancellationToken)
+    {
+        await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, ExternalServiceEditionCodeLegacy, cancellationToken);
         return Task.CompletedTask;
     }
 }

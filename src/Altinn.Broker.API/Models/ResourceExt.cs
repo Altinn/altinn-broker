@@ -37,4 +37,10 @@ public class ResourceExt
     /// </summary>
     [JsonPropertyName("useManifestFileShim")]
     public bool? UseManifestFileShim { get; set; }
+
+    [JsonPropertyName("externalServiceCodeLegacy")]
+    public string? ExternalServiceCodeLegacy { get; set; }
+
+    [JsonPropertyName("externalServiceEditionCodeLegacy")]
+    public string? ExternalServiceEditionCodeLegacy { get; set; }
 }

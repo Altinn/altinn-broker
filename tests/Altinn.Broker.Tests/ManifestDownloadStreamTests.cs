@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Core.Helpers;
+﻿using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
@@ -11,10 +12,18 @@ public class ManifestDownloadStreamTests
     [Fact]
     public async Task StreamWithoutManifest_AddManifest_ManifestIsAddedAsync()
     {
+        var resource = new ResourceEntity
+        {
+            Id = "manifest-shim-resource",
+            ServiceOwnerId = "someServiceOwnerId",
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "someExternalServiceCode",
+            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+        };
         var stream = ReadFile("Data/ManifestFileTests/Payload.zip");
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
-        await stream.AddManifestFile(file);
+        await stream.AddManifestFile(file, resource);
         Assert.True(stream.Length > originalFileLength);
         var brokerManifest = stream.GetBrokerManifest();
         Assert.Equal(brokerManifest.Reportee, file.RecipientCurrentStatuses.First().Actor.ActorExternalId);
@@ -24,11 +33,19 @@ public class ManifestDownloadStreamTests
     [Fact]
     public async Task StreamWithManifest_AddManifest_ExistingManifestIsReplacedAsync()
     {
+        var resource = new ResourceEntity
+        {
+            Id = "manifest-shim-resource",
+            ServiceOwnerId = "someServiceOwnerId",
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "someExternalServiceCode",
+            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+        };
         var stream = ReadFile("Data/ManifestFileTests/PayloadWithExistingManifest.zip");
         var originalBrokerManifest = stream.GetBrokerManifest();
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
-        await stream.AddManifestFile(file);
+        await stream.AddManifestFile(file, resource);
         var newBrokerManifest = stream.GetBrokerManifest();
         Assert.NotEqual(stream.Length, originalFileLength);
         Assert.NotEqual(originalBrokerManifest.Reportee, newBrokerManifest.Reportee);
@@ -41,9 +58,17 @@ public class ManifestDownloadStreamTests
     [Fact]
     public async Task StreamThatIsNotZip_AddManifest_FailsAsync()
     {
+        var resource = new ResourceEntity
+        {
+            Id = "manifest-shim-resource",
+            ServiceOwnerId = "someServiceOwnerId",
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "someExternalServiceCode",
+            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+        };
         var stream = ReadFile("Data/ManifestFileTests/payload.txt");    
         var file = FileTransferEntityFactory.BasicFileTransfer();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => stream.AddManifestFile(file));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => stream.AddManifestFile(file, resource));
     }
 
     private ManifestDownloadStream ReadFile(string path)
