@@ -18,6 +18,10 @@ namespace Altinn.Broker.Integrations.Azure;
 
 public class BlobService(IResourceManager resourceManager, IHttpContextAccessor httpContextAccessor, ILogger<BlobService> logger) : IBrokerStorageService
 {
+    private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
+    private const int BLOCKS_BEFORE_COMMIT = 1000;
+    private const int UPLOAD_THREADS = 3; // Test how much we can read from the stream first
+
     private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
         var connectionString = await resourceManager.GetStorageConnectionString(serviceOwnerEntity);
@@ -74,7 +78,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 int bytesRead = await stream.ReadAsync(buffer.Array, 0, buffer.Array.Length, cancellationToken);
                 if (bytesRead <= 0) break;
 
-                accumulationBuffer.Write(buffer.Array, 0, bytesRead);
+                /*accumulationBuffer.Write(buffer.Array, 0, bytesRead);
                 position += bytesRead;
 
                 bool isLastBlock = position >= length;
@@ -130,12 +134,12 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         logger.LogInformation($"Upload progress for {fileTransferEntity.FileTransferId}: " +
                             $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
                     }
-                }
+                }*/
             }
 
             // Final commit with all blocks
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, cancellationToken);
-            blockList.Clear();
+            /*await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, cancellationToken);
+            blockList.Clear();*/
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
@@ -152,6 +156,26 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         {
             logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
             throw;
+        }
+    }
+
+    private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
+    {
+        using var blockMd5 = MD5.Create();
+        using var blockStream = new MemoryStream(blockData, writable: false);
+        blockStream.Position = 0;
+        var blockResponse = await client.StageBlockAsync(
+            blockId,
+            blockStream,
+            blockMd5.ComputeHash(blockData),
+            conditions: null,
+            null,
+            cancellationToken: cancellationToken
+        );
+
+        if (blockResponse.GetRawResponse().Status != 201)
+        {
+            throw new Exception($"Failed to upload block {blockId}");
         }
     }
 
