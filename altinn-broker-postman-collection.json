@@ -860,7 +860,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1073741824\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"purgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"useManifestFileShim\": false\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"ExternalServiceCodeLegacy\": \"\",\r\n    \"ExternalServiceEditionCodeLegacy\": \"\",\r\n    \"UseManifestFileShim\": false\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1333,7 +1333,7 @@
 			}
 		}
 	],
-	"variable": [
+"variable": [
 		{
 			"key": "serviceowner_orgnumber",
 			"value": "Organization number of service owner / \"tjeneste-eier\". Nine digits, no prefix.",

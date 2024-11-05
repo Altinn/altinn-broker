@@ -66,7 +66,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateManifestFileShimResult.AsT1;
             }
         }
-        if (request.ExternalServiceCodeLegacy is not null)
+        if (request.ExternalServiceCodeLegacy is not null && request.UseManifestFileShim == true)
         {
             var updateExternalServiceCodeLegacyResult = await UpdateExternalServiceCodeLegacy(resource, request.ExternalServiceCodeLegacy, cancellationToken);
             if (updateExternalServiceCodeLegacyResult.IsT1)
@@ -74,7 +74,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateExternalServiceCodeLegacyResult.AsT1;
             }
         }
-        if (request.ExternalServiceEditionCodeLegacy is not null)
+        if (request.ExternalServiceEditionCodeLegacy is not null && request.UseManifestFileShim == true)
         {
             var updateExternalServiceEditionCodeLegacyResult = await UpdateExternalServiceEditionCodeLegacy(resource, request.ExternalServiceEditionCodeLegacy, cancellationToken);
             if (updateExternalServiceEditionCodeLegacyResult.IsT1)
