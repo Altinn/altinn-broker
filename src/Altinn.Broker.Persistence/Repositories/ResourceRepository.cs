@@ -119,7 +119,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         command.Parameters.AddWithValue("@externalServiceCodeLegacy", externalServiceCodeLegacy);
         command.ExecuteNonQuery();
     }
-    public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
+    public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +

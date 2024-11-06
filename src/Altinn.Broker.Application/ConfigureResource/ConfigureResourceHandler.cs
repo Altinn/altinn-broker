@@ -66,15 +66,14 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateManifestFileShimResult.AsT1;
             }
         }
-        if (request.ExternalServiceCodeLegacy is not null && request.UseManifestFileShim == true)
+        if (request.UseManifestFileShim == true)
         {
-            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+            if (string.IsNullOrEmpty(request.ExternalServiceCodeLegacy) && request.ExternalServiceEditionCodeLegacy is null && request.ExternalServiceEditionCodeLegacy != 0)
 
-        }
-        if (request.ExternalServiceEditionCodeLegacy is not null && request.UseManifestFileShim == true)
-        {
-            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
-
+            {
+                await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+                await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
+            }
 
         }
         return Task.CompletedTask;
@@ -141,15 +140,4 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);
         return Task.CompletedTask;
     }
-
-    // private async Task<OneOf<Task, Error>> UpdateExternalServiceCodeLegacy(ResourceEntity resource, string ExternalServiceCodeLegacy, CancellationToken cancellationToken)
-    // {
-    //     await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, ExternalServiceCodeLegacy, cancellationToken);
-    //     return Task.CompletedTask;
-    // }
-    // private async Task<OneOf<Task, Error>> UpdateExternalServiceEditionCodeLegacy(ResourceEntity resource, string ExternalServiceEditionCodeLegacy, CancellationToken cancellationToken)
-    // {
-    //     await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, ExternalServiceEditionCodeLegacy, cancellationToken);
-    //     return Task.CompletedTask;
-    // }
 }
