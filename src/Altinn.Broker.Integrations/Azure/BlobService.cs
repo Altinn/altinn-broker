@@ -108,7 +108,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                         logger.LogInformation($"Committing intermediate batch of {blocksInBatch} blocks at position " +
                             $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB");
 
-                        await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count == blocksInBatch, cancellationToken);
+                        await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count == blocksInBatch, null, cancellationToken);
                         blocksInBatch = 0;
                         // Keep the block list for the final commit
                         var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
@@ -119,19 +119,20 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             }
 
             // Final commit with all blocks
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, cancellationToken);
+            blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            if (blobMd5.Hash is null)
+            {
+                throw new Exception("Failed to calculate MD5 hash of uploaded file");
+            }
+            var finalMd5 = BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
+            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, finalMd5, cancellationToken);
             blockList.Clear();
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            if (blobMd5.Hash is null)
-            {
-                throw new Exception("Failed to calculate MD5 hash of uploaded file");
-            }
-            return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
+            return finalMd5;
         }
         catch (Exception ex)
         {
@@ -163,7 +164,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         });
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit,
+    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, string? finalMd5,
         CancellationToken cancellationToken)
     {
         await RetryPolicy.ExecuteAsync(async () =>
@@ -171,7 +172,11 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             var options = new CommitBlockListOptions
             {
                 // Only use ifNoneMatch for the first commit to ensure concurrent upload attempts do not work simultaneously
-                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null
+                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null,
+                Metadata = finalMd5 is null ? null : new Dictionary<string, string>
+                {
+                    { "x-ms-blob-content-md5", finalMd5 }
+                }
             };
 
             var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
