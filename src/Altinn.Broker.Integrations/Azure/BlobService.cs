@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Security.Cryptography;
 
 using Altinn.Broker.Core.Domain;
@@ -20,7 +19,7 @@ namespace Altinn.Broker.Integrations.Azure;
 public class BlobService(IResourceManager resourceManager, IHttpContextAccessor httpContextAccessor, ILogger<BlobService> logger) : IBrokerStorageService
 {
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
-    private const int BLOCKS_BEFORE_COMMIT = 1000;
+    private const int BLOCKS_BEFORE_COMMIT = 5;
 
     private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
@@ -124,15 +123,14 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
             }
-            var finalMd5 = BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, finalMd5, cancellationToken);
+            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, blobMd5.Hash, cancellationToken);
             blockList.Clear();
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            return finalMd5;
+            return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
         }
         catch (Exception ex)
         {
@@ -156,7 +154,6 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 null,
                 cancellationToken: cancellationToken
             );
-
             if (blockResponse.GetRawResponse().Status != 201)
             {
                 throw new Exception($"Failed to upload block {blockId}");
@@ -164,7 +161,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         });
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, string? finalMd5,
+    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
         CancellationToken cancellationToken)
     {
         await RetryPolicy.ExecuteAsync(async () =>
@@ -172,9 +169,12 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             var options = new CommitBlockListOptions
             {
                 // Only use ifNoneMatch for the first commit to ensure concurrent upload attempts do not work simultaneously
-                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null
+                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null,
+                HttpHeaders = finalMd5 is null ? null : new BlobHttpHeaders
+                {
+                    ContentHash = finalMd5
+                }
             };
-
             var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
             logger.LogInformation($"Committed {blockList.Count} blocks: {response.GetRawResponse().ReasonPhrase}");
         });
