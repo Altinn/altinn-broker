@@ -18,7 +18,7 @@ public class ManifestDownloadStreamTests
             ServiceOwnerId = "someServiceOwnerId",
             UseManifestFileShim = true,
             ExternalServiceCodeLegacy = "someExternalServiceCode",
-            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+            ExternalServiceEditionCodeLegacy = 123
         };
         var stream = ReadFile("Data/ManifestFileTests/Payload.zip");
         var originalFileLength = stream.Length;
@@ -39,7 +39,7 @@ public class ManifestDownloadStreamTests
             ServiceOwnerId = "someServiceOwnerId",
             UseManifestFileShim = true,
             ExternalServiceCodeLegacy = "someExternalServiceCode",
-            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+            ExternalServiceEditionCodeLegacy = 123
         };
         var stream = ReadFile("Data/ManifestFileTests/PayloadWithExistingManifest.zip");
         var originalBrokerManifest = stream.GetBrokerManifest();
@@ -64,7 +64,7 @@ public class ManifestDownloadStreamTests
             ServiceOwnerId = "someServiceOwnerId",
             UseManifestFileShim = true,
             ExternalServiceCodeLegacy = "someExternalServiceCode",
-            ExternalServiceEditionCodeLegacy = "someExternalServiceEditionCode"
+            ExternalServiceEditionCodeLegacy = 123
         };
         var stream = ReadFile("Data/ManifestFileTests/payload.txt");    
         var file = FileTransferEntityFactory.BasicFileTransfer();

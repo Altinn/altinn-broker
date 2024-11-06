@@ -11,5 +11,5 @@ public class ConfigureResourceRequest
     public string? PurgeFileTransferGracePeriod { get; set; }
     public bool? UseManifestFileShim { get; set; }
     public string? ExternalServiceCodeLegacy { get; set; }
-    public string? ExternalServiceEditionCodeLegacy { get; set; }
+    public int? ExternalServiceEditionCodeLegacy { get; set; }
 }

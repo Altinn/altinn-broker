@@ -42,5 +42,5 @@ public class ResourceExt
     public string? ExternalServiceCodeLegacy { get; set; }
 
     [JsonPropertyName("externalServiceEditionCodeLegacy")]
-    public string? ExternalServiceEditionCodeLegacy { get; set; }
+    public int? ExternalServiceEditionCodeLegacy { get; set; }
 }

@@ -15,7 +15,7 @@ public class BrokerServiceManifest
     public string ExternalServiceCode { get; set; }
 
     [XmlElement("ExternalServiceEditionCode")]
-    public string ExternalServiceEditionCode { get; set; }
+    public int? ExternalServiceEditionCode { get; set; }
 
     [XmlElement("SendersReference")]
     public string SendersReference { get; set; }

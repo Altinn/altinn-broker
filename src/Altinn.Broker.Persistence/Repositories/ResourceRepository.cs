@@ -31,7 +31,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
                 PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
                 UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
                 ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
-                ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_edition_code_legacy"))
+                ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy"))
             };
         }
         if (resource is null)
@@ -119,7 +119,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         command.Parameters.AddWithValue("@externalServiceCodeLegacy", externalServiceCodeLegacy);
         command.ExecuteNonQuery();
     }
-    public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, string externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
+    public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +

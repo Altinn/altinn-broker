@@ -11,5 +11,5 @@ public interface IResourceRepository
     Task UpdatePurgeFileTransferGracePeriod(string resourceId, TimeSpan PurgeFileTransferGracePeriod, CancellationToken cancellationToken = default);
     Task UpdateUseManifestFileShim(string resourceId, bool useManifestFileShim, CancellationToken cancellationToken = default);
     Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default);
-    Task UpdateExternalServiceEditionCodeLegacy(string resourceId, string externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
+    Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
 }
