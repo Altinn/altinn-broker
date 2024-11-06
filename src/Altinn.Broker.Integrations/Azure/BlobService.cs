@@ -65,7 +65,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
             int desiredBlockSize = 1024 * 1024 * 32; // 32MB
             using var accumulationBuffer = new MemoryStream();
-            using var buffer = new PooledBuffer(1024 * 1024); // 1MB read buffer, todo set as same as network buffer size
+            using var buffer = new PooledBuffer(1024 * 64); // 1MB read buffer, todo set as same as network buffer size
             var blockList = new List<string>();
             long position = 0;
             using var blobMd5 = MD5.Create();
