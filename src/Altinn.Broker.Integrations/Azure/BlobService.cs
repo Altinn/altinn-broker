@@ -5,6 +5,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Services;
 
 using Azure;
+using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -20,7 +21,6 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 {
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
     private const int BLOCKS_BEFORE_COMMIT = 1000;
-    private const int UPLOAD_THREADS = 3; // Test how much we can read from the stream first
 
     private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
@@ -42,8 +42,14 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         BlobClient blobClient = await GetBlobClient(fileTransfer.FileTransferId, serviceOwnerEntity);
         try
         {
-            var content = await blobClient.DownloadContentAsync(cancellationToken);
-            return content.Value.Content.ToStream();
+            var content = await blobClient.DownloadStreamingAsync(new BlobDownloadOptions()
+            {
+                TransferValidation = new DownloadTransferValidationOptions()
+                {
+                    AutoValidateChecksum = false
+                }
+            }, cancellationToken);
+            return content.Value.Content;
         }
         catch (RequestFailedException requestFailedException)
         {
