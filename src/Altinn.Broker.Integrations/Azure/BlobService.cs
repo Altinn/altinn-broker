@@ -172,11 +172,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             var options = new CommitBlockListOptions
             {
                 // Only use ifNoneMatch for the first commit to ensure concurrent upload attempts do not work simultaneously
-                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null,
-                Metadata = finalMd5 is null ? null : new Dictionary<string, string>
-                {
-                    { "x-ms-blob-content-md5", finalMd5 }
-                }
+                Conditions = firstCommit ? new BlobRequestConditions { IfNoneMatch = new ETag("*") } : null
             };
 
             var response = await client.CommitBlockListAsync(blockList, options, cancellationToken);
