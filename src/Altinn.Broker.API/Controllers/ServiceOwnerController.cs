@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Xml;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
@@ -7,8 +6,6 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.ServiceOwner;
-
-using Hangfire;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -33,7 +30,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
 
         await serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name);
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
-        await resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
+        resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
 
