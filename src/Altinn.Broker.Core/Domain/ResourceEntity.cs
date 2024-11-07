@@ -11,4 +11,6 @@ public class ResourceEntity
     public bool PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
     public TimeSpan? PurgeFileTransferGracePeriod { get; set; }
     public bool? UseManifestFileShim { get; set; }
+    public string? ExternalServiceCodeLegacy { get; set; }
+    public int? ExternalServiceEditionCodeLegacy { get; set; }
 }

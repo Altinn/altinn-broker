@@ -3,5 +3,5 @@
 namespace Altinn.Broker.Core.Helpers;
 internal interface IManifestDownloadStream
 {
-    Task AddManifestFile(FileTransferEntity fileTransferEntity);
+    Task AddManifestFile(FileTransferEntity fileTransferEntity, ResourceEntity resource);
 }

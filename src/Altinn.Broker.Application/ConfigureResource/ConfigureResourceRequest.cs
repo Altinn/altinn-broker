@@ -10,4 +10,6 @@ public class ConfigureResourceRequest
     public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
     public string? PurgeFileTransferGracePeriod { get; set; }
     public bool? UseManifestFileShim { get; set; }
+    public string? ExternalServiceCodeLegacy { get; set; }
+    public int? ExternalServiceEditionCodeLegacy { get; set; }
 }

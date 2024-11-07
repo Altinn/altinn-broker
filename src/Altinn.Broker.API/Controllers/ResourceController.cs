@@ -29,7 +29,9 @@ public class ResourceController : Controller
             FileTransferTimeToLive = resourceExt.FileTransferTimeToLive,
             PurgeFileTransferAfterAllRecipientsConfirmed = resourceExt.PurgeFileTransferAfterAllRecipientsConfirmed,
             PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod,
-            UseManifestFileShim = resourceExt.UseManifestFileShim
+            UseManifestFileShim = resourceExt.UseManifestFileShim,
+            ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
+            ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy
         }, cancellationToken);
 
         return result.Match(
