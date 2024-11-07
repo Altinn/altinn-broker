@@ -17,6 +17,8 @@ using Azure.ResourceManager.Storage.Models;
 using Azure.Storage;
 using Azure.Storage.Sas;
 
+using Hangfire;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -32,23 +34,32 @@ public class AzureResourceManagerService : IResourceManager
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly TokenCredential _credentials;
+    private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<AzureResourceManagerService> _logger;
     private string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
     private string? GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => serviceOwnerEntity.StorageProvider?.ResourceName;
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
-    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, ILogger<AzureResourceManagerService> logger)
+    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, IBackgroundJobClient backgroundJobClient, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _hostEnvironment = hostingEnvironment;
         _credentials = new DefaultAzureCredential();
         _armClient = new ArmClient(_credentials);
         _serviceOwnerRepository = serviceOwnerRepository;
+        _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
 
-    public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
+    public void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Creating storage providers for {serviceOwnerEntity.Name}");
+        var virusScanStorageProviderJob = _backgroundJobClient.Enqueue<IResourceManager>(service => service.Deploy(serviceOwnerEntity, true, cancellationToken));
+        _backgroundJobClient.ContinueJobWith<IResourceManager>(virusScanStorageProviderJob, service => service.Deploy(serviceOwnerEntity, false, cancellationToken));
+    }
+
+    public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, bool virusScan, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
         _logger.LogInformation($"Using app identity for deploying Azure resources"); // TODO remove
@@ -70,7 +81,9 @@ public class AzureResourceManagerService : IResourceManager
         storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
-        await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
+        if (virusScan) { 
+            await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
+        }
         var blobService = storageAccount.Value.GetBlobService();
         string containerName = "brokerfiles";
         if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
@@ -78,7 +91,7 @@ public class AzureResourceManagerService : IResourceManager
             await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, containerName, new BlobContainerData(), cancellationToken);
         }
 
-        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, StorageProviderType.Altinn3Azure);
+        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, virusScan ? StorageProviderType.Altinn3Azure : StorageProviderType.Altinn3AzureWithoutVirusScan);
         _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 

@@ -31,13 +31,9 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTransferTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
         await serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name);
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
-        BackgroundJob.Enqueue(
-            () => resourceManager.Deploy(serviceOwner!, cancellationToken)
-        );
-
+        await resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
 

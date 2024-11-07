@@ -1,5 +1,6 @@
 ﻿public enum StorageProviderType
 {
     Altinn3Azure,
-    Azurite
+    Azurite,
+    Altinn3AzureWithoutVirusScan
 }

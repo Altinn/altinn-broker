@@ -10,7 +10,9 @@ public interface IResourceManager
     /// </summary>
     /// <param name="serviceOwnerEntity"></param>
     /// <returns></returns>
-    Task Deploy(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
+    Task Deploy(ServiceOwnerEntity serviceOwnerEntity, bool virusScan, CancellationToken cancellationToken);
+
+    void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
     Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity);
 }
