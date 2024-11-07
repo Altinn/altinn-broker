@@ -9,14 +9,13 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService(IResourceManager resourceManager, IHttpContextAccessor httpContextAccessor, ILogger<BlobService> logger) : IBrokerStorageService
+public class BlobService(IResourceManager resourceManager, ILogger<BlobService> logger) : IBrokerStorageService
 {
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
     private const int BLOCKS_BEFORE_COMMIT = 5;
@@ -35,7 +34,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         return containerClient;
     }
 
-    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, string actorExternalReference, CancellationToken cancellationToken)
+    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
         var blobContainerClient = await GetBlobContainerClient(fileTransfer.FileTransferId, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
@@ -58,9 +57,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
     }
 
     public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
-    Stream stream, CancellationToken cancellationToken)
+    Stream stream, long streamLength, CancellationToken cancellationToken)
     {
-        var length = httpContextAccessor.HttpContext.Request.ContentLength!;
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
@@ -76,7 +74,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
             int blocksInBatch = 0;
 
-            while (position < length)
+            while (position < streamLength)
             {
                 int bytesRead = await stream.ReadAsync(networkReadBuffer, 0, networkReadBuffer.Length, cancellationToken);
                 if (bytesRead <= 0) break;
@@ -84,7 +82,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                 accumulationBuffer.Write(networkReadBuffer, 0, bytesRead);
                 position += bytesRead;
 
-                bool isLastBlock = position >= length;
+                bool isLastBlock = position >= streamLength;
                 if (accumulationBuffer.Length >= BLOCK_SIZE || isLastBlock)
                 {
                     accumulationBuffer.Position = 0;

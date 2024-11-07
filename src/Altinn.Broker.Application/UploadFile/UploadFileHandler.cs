@@ -60,7 +60,7 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
 
         try
         {
-            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
+            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
             if (checksum is null)
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", cancellationToken);
