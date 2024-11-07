@@ -21,7 +21,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
     private const int BLOCKS_BEFORE_COMMIT = 5;
 
-    private async Task<BlobClient> GetBlobClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<BlobContainerClient> GetBlobContainerClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
     {
         var connectionString = await resourceManager.GetStorageConnectionString(serviceOwnerEntity);
         var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
@@ -32,20 +32,20 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
-        BlobClient blobClient = containerClient.GetBlobClient(fileId.ToString());
-        return blobClient;
+        return containerClient;
     }
 
-    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
+    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, string actorExternalReference, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = await GetBlobClient(fileTransfer.FileTransferId, serviceOwnerEntity);
+        var blobContainerClient = await GetBlobContainerClient(fileTransfer.FileTransferId, serviceOwnerEntity);
+        var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
         try
         {
             var content = await blobClient.DownloadStreamingAsync(new BlobDownloadOptions()
             {
                 TransferValidation = new DownloadTransferValidationOptions()
                 {
-                    AutoValidateChecksum = false
+                    AutoValidateChecksum = false // TODO, remove?
                 }
             }, cancellationToken);
             return content.Value.Content;
@@ -65,8 +65,8 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
-            BlockBlobClient blockBlobClient = new BlockBlobClient(blobClient.Uri);
+            var blobContainerClient = await GetBlobContainerClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+            BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
             using var accumulationBuffer = new MemoryStream();
             var networkReadBuffer = new byte[1024*1024]; 
@@ -90,18 +90,12 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
                     accumulationBuffer.Position = 0;
                     var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                     byte[] blockData = accumulationBuffer.ToArray();
-                    using var blockStream = new MemoryStream(blockData, writable: false);
                     blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
-
                     await UploadBlock(blockBlobClient, blockId, blockData, cancellationToken);
 
                     blockList.Add(blockId);
                     blocksInBatch++;
-
-                    // Clear accumulation buffer for next block
-                    accumulationBuffer.SetLength(0);
-
-                    // Commit intermediate blocks if we've accumulated enough
+                    accumulationBuffer.SetLength(0); // Clear accumulation buffer for next block
                     if (blocksInBatch >= BLOCKS_BEFORE_COMMIT)
                     {
                         logger.LogInformation($"Committing intermediate batch of {blocksInBatch} blocks at position " +
@@ -156,7 +150,7 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
             );
             if (blockResponse.GetRawResponse().Status != 201)
             {
-                throw new Exception($"Failed to upload block {blockId}");
+                throw new Exception($"Failed to upload block {blockId}: {blockResponse.GetRawResponse().Content}");
             }
         });
     }
@@ -182,7 +176,9 @@ public class BlobService(IResourceManager resourceManager, IHttpContextAccessor 
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
-        BlobClient blobClient = await GetBlobClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+        var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
+
         try
         {
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
