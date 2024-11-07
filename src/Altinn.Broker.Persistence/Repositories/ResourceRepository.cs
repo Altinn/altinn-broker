@@ -126,7 +126,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "SET external_service_edition_code_legacy = @externalServiceEditionCodeLegacy " +
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
-        command.Parameters.AddWithValue("@externalServiceEditionCodeLegacy", externalServiceEditionCodeLegacy);
+                command.Parameters.AddWithValue("@externalServiceEditionCodeLegacy", (object?)externalServiceEditionCodeLegacy ?? DBNull.Value); 
         command.ExecuteNonQuery();
     }
 }
