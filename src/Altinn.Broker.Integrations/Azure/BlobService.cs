@@ -4,7 +4,6 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Services;
 
 using Azure;
-using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -40,13 +39,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
         var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
         try
         {
-            var content = await blobClient.DownloadStreamingAsync(new BlobDownloadOptions()
-            {
-                TransferValidation = new DownloadTransferValidationOptions()
-                {
-                    AutoValidateChecksum = false // TODO, remove?
-                }
-            }, cancellationToken);
+            var content = await blobClient.DownloadStreamingAsync(new BlobDownloadOptions(), cancellationToken);
             return content.Value.Content;
         }
         catch (RequestFailedException requestFailedException)
