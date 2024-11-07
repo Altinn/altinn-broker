@@ -68,11 +68,14 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         }
         if (request.UseManifestFileShim == true)
         {
-            if (string.IsNullOrEmpty(request.ExternalServiceCodeLegacy) && request.ExternalServiceEditionCodeLegacy is null && request.ExternalServiceEditionCodeLegacy != 0)
-
+            if (!string.IsNullOrEmpty(request.ExternalServiceCodeLegacy) && request.ExternalServiceEditionCodeLegacy is not null && request.ExternalServiceEditionCodeLegacy != 0)
             {
                 await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
                 await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
+            } 
+            else
+            {
+                throw new ArgumentException("ExternalServiceCodeLegacy and ExternalServiceEditionCodeLegacy must be set when UseManifestFileShim is true");
             }
 
         }
