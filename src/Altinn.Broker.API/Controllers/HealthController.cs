@@ -37,18 +37,6 @@ public class HealthController(NpgsqlDataSource databaseConnectionProvider, IOpti
             return BadRequest("Exception thrown while trying to query database");
         }
 
-        // Verify that resource manager has access to our subscription
-        var credentials = new DefaultAzureCredential();
-        var armClient = new ArmClient(credentials);
-        var subscription = armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_azureResourceManagerOptions.SubscriptionId}"));
-        var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroupCount = resourceGroupCollection.Count();
-        if (resourceGroupCount < 1)
-        {
-            return BadRequest($"Resource groups not found under subscription with id: {subscription.Id}. Are the service principal environment variables set?");
-        }
-        await resourceGroupCollection.GetAsync(_azureResourceManagerOptions.ApplicationResourceGroupName);
-
         return Ok("Environment properly configured");
     }
 }
