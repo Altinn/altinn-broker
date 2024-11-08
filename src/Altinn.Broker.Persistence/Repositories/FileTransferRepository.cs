@@ -154,12 +154,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         return fileTransferStatuses;
     }
 
-    public async Task<Guid> AddFileTransfer(ServiceOwnerEntity serviceOwner, ResourceEntity resource, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, long? fileTransferSize, string? hangfireJobId, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, bool disableVirusScan, CancellationToken cancellationToken = default)
     {
-        if (serviceOwner.StorageProvider is null)
-        {
-            throw new ArgumentNullException("Storage provider must be set");
-        }
         long actorId;
         var actor = await actorRepository.GetActorAsync(senderExternalId, cancellationToken);
         if (actor is null)
@@ -178,17 +174,16 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
             "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
 
-
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@resourceId", resource.Id);
         command.Parameters.AddWithValue("@fileName", fileName);
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
-        command.Parameters.AddWithValue("@fileTransferSize", fileTransferSize is null ? DBNull.Value : fileTransferSize);
+        command.Parameters.AddWithValue("@fileTransferSize", DBNull.Value);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@storageProviderId", serviceOwner.StorageProvider.Id);
-        command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
+        command.Parameters.AddWithValue("@storageProviderId", storageProviderEntity.Id);
+        command.Parameters.AddWithValue("@hangfireJobId", DBNull.Value);
         command.Parameters.AddWithValue("@expirationTime", expirationTime);
 
         await command.ExecuteNonQueryAsync(cancellationToken);

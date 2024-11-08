@@ -6,4 +6,5 @@
     public StorageProviderType Type { get; set; }
 
     public required string ResourceName { get; set; }
+    public required string ServiceOwnerId { get; set; }
 }

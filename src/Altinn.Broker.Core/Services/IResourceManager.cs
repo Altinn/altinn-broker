@@ -3,7 +3,7 @@
 namespace Altinn.Broker.Core.Services;
 public interface IResourceManager
 {
-    Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
+    Task<DeploymentStatus> GetDeploymentStatus(StorageProviderEntity storageProviderEntity, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deploys the required resources for the ServiceOwner. Must be idempotent.
@@ -14,5 +14,5 @@ public interface IResourceManager
 
     void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
-    Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity);
+    Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity);
 }

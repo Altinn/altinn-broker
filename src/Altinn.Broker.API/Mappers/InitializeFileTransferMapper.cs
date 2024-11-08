@@ -17,7 +17,8 @@ internal static class InitializeFileTransferMapper
             SendersFileTransferReference = fileTransferInitializeExt.SendersFileTransferReference,
             PropertyList = fileTransferInitializeExt.PropertyList,
             RecipientExternalIds = fileTransferInitializeExt.Recipients,
-            Checksum = fileTransferInitializeExt.Checksum
+            Checksum = fileTransferInitializeExt.Checksum,
+            DisableVirusScan = fileTransferInitializeExt.DisableVirusScan ?? false
         };
     }
 }

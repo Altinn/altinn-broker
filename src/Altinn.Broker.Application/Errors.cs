@@ -25,4 +25,6 @@ public static class Errors
     public static Error InvalidGracePeriodFormat = new Error(17, "Invalid grace period format. Should follow ISO8601 standard for duration. Example: 'PT2H' for 2 hours.", HttpStatusCode.BadRequest);
     public static Error GracePeriodCannotExceed24Hours = new Error(18, "Grace period cannot exceed 24 hours", HttpStatusCode.BadRequest);
     public static Error ConfirmDownloadBeforeDownloadStarted = new Error(19, "Cannot confirm before the files have been downloaded", HttpStatusCode.BadRequest);
+    public static Error NotApprovedForDisabledVirusScan = new Error(20, "In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack.", HttpStatusCode.BadRequest);
+    public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
 }

@@ -1,6 +1,4 @@
-﻿using System.Transactions;
-
-using Altinn.Broker.Application.ExpireFileTransfer;
+﻿using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -10,11 +8,10 @@ using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
-
-using Polly;
 
 using Serilog.Context;
 
@@ -28,6 +25,7 @@ public class InitializeFileTransferHandler(
     IActorFileTransferStatusRepository actorFileTransferStatusRepository,
     IBackgroundJobClient backgroundJobClient,
     IEventBus eventBus,
+    IHostEnvironment hostEnvironment,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, CancellationToken cancellationToken)
@@ -44,12 +42,23 @@ public class InitializeFileTransferHandler(
             return Errors.InvalidResourceDefinition;
         };
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
-        if (serviceOwner?.StorageProvider is null)
+        if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         }
+        if (request.DisableVirusScan 
+            && hostEnvironment.IsProduction() 
+            && !resource.ApprovedForDisabledVirusScan)
+        {
+            return Errors.NotApprovedForDisabledVirusScan;
+        }
+        var storageProvider = serviceOwner.GetStorageProvider(request.DisableVirusScan);
+        if (storageProvider is null)
+        {
+            return Errors.StorageProviderNotReady;
+        }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
-        var fileTransferId = await fileTransferRepository.AddFileTransfer(serviceOwner, resource, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, null, null, cancellationToken);
+        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, request.DisableVirusScan, cancellationToken);
         LogContext.PushProperty("fileTransferId", fileTransferId);        
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try

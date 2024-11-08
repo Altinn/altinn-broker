@@ -6,5 +6,18 @@ public class ServiceOwnerOverviewExt
 
     public required string Name { get; set; }
 
+    public List<StorageProviderExt> StorageProviders;
+}
+
+public class StorageProviderExt
+{
+    public required StorageProviderTypeExt Type { get; set; }
     public required DeploymentStatusExt DeploymentStatus { get; set; }
+    public required string DeploymentEnvironment { get; set; }
+}
+
+public enum StorageProviderTypeExt
+{
+    AltinnAzure = 0,
+    AltinnAzureWithoutVirusScan = 1,
 }

@@ -17,7 +17,7 @@ namespace Altinn.Broker.Controllers;
 [Route("broker/api/v1/serviceowner")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
-public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IResourceManager resourceManager) : Controller
+public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, IResourceManager resourceManager) : Controller
 {
     [HttpPost]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
@@ -43,12 +43,22 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return NotFound();
         }
 
-        var deploymentStatus = await resourceManager.GetDeploymentStatus(serviceOwner, cancellationToken);
-
+        var deploymentStatuses = new Dictionary<StorageProviderEntity, DeploymentStatus>();
+        foreach (var storageProvider in serviceOwner.StorageProviders)
+        {
+            var deploymentStatus = await resourceManager.GetDeploymentStatus(storageProvider, cancellationToken);
+            deploymentStatuses.Add(storageProvider, deploymentStatus);
+        }
+        
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,
-            DeploymentStatus = (DeploymentStatusExt)deploymentStatus
+            StorageProviders = deploymentStatuses.Zip(serviceOwner.StorageProviders, (status, provider) => new StorageProviderExt()
+            {
+                Type = (StorageProviderTypeExt)provider.Type,
+                DeploymentEnvironment = hostEnvironment.EnvironmentName,
+                DeploymentStatus = (DeploymentStatusExt)status.Value
+            }).ToList()
         };
     }
 

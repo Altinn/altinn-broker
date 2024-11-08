@@ -19,9 +19,10 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
     private const int BLOCKS_BEFORE_COMMIT = 5;
 
-    private async Task<BlobContainerClient> GetBlobContainerClient(Guid fileId, ServiceOwnerEntity serviceOwnerEntity)
+    private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
-        var connectionString = await resourceManager.GetStorageConnectionString(serviceOwnerEntity);
+        var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
+        var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
         var blobServiceClient = new BlobServiceClient(connectionString, new BlobClientOptions()
         {
             Retry =
@@ -35,7 +36,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
-        var blobContainerClient = await GetBlobContainerClient(fileTransfer.FileTransferId, serviceOwnerEntity);
+        var blobContainerClient = await GetBlobContainerClient(fileTransfer, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
         try
         {
@@ -50,13 +51,13 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
     }
 
     public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
-    Stream stream, long streamLength, CancellationToken cancellationToken)
+                                          Stream stream, long streamLength, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var blobContainerClient = await GetBlobContainerClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+            var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
             BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
             using var accumulationBuffer = new MemoryStream();
@@ -167,7 +168,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
 
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
-        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity.FileTransferId, serviceOwnerEntity);
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
 
         try

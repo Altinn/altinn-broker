@@ -29,19 +29,19 @@ public class AzureResourceManagerService : IResourceManager
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
-    private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
         new ConcurrentDictionary<string, (DateTime Created, string Token)>();
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly TokenCredential _credentials;
+    private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<AzureResourceManagerService> _logger;
-    private string GetResourceGroupName(ServiceOwnerEntity serviceOwnerEntity) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerEntity.Id.Replace(":", "-")}-rg";
-    private string? GetStorageAccountName(ServiceOwnerEntity serviceOwnerEntity) => serviceOwnerEntity.StorageProvider?.ResourceName;
+    private string GetResourceGroupName(string serviceOwnerId) => $"serviceowner-{_resourceManagerOptions.Environment}-{serviceOwnerId.Replace(":", "-")}-rg";
+    private string? GetStorageAccountName(StorageProviderEntity storageProviderEntity) => storageProviderEntity.ResourceName;
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
-    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IHostEnvironment hostingEnvironment, IServiceOwnerRepository serviceOwnerRepository, IBackgroundJobClient backgroundJobClient, ILogger<AzureResourceManagerService> logger)
+    public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostingEnvironment, IBackgroundJobClient backgroundJobClient, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
         _hostEnvironment = hostingEnvironment;
@@ -55,15 +55,22 @@ public class AzureResourceManagerService : IResourceManager
     public void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Creating storage providers for {serviceOwnerEntity.Name}");
-        var virusScanStorageProviderJob = _backgroundJobClient.Enqueue<IResourceManager>(service => service.Deploy(serviceOwnerEntity, true, cancellationToken));
-        _backgroundJobClient.ContinueJobWith<IResourceManager>(virusScanStorageProviderJob, service => service.Deploy(serviceOwnerEntity, false, cancellationToken));
+        if (_hostEnvironment.IsDevelopment())
+        {
+            _backgroundJobClient.Enqueue<IServiceOwnerRepository>(service => service.InitializeStorageProvider(serviceOwnerEntity.Id, "Dummy value", StorageProviderType.Altinn3Azure));
+        } 
+        else
+        {
+            var virusScanStorageProviderJob = _backgroundJobClient.Enqueue<IResourceManager>(service => service.Deploy(serviceOwnerEntity, true, cancellationToken));
+            _backgroundJobClient.ContinueJobWith<IResourceManager>(virusScanStorageProviderJob, service => service.Deploy(serviceOwnerEntity, false, cancellationToken));
+        }
     }
 
     public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, bool virusScan, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Starting deployment for {serviceOwnerEntity.Name}");
         _logger.LogInformation($"Using app identity for deploying Azure resources"); // TODO remove
-        var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
+        var resourceGroupName = GetResourceGroupName(serviceOwnerEntity.Id);
 
         var storageAccountName = GenerateStorageAccountName();
         _logger.LogInformation($"Resource group: {resourceGroupName}");
@@ -146,53 +153,52 @@ public class AzureResourceManagerService : IResourceManager
         return "aibroker" + obfuscationString + "sa";
     }
 
-    public async Task<DeploymentStatus> GetDeploymentStatus(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
+    public async Task<DeploymentStatus> GetDeploymentStatus(StorageProviderEntity storageProvider, CancellationToken cancellationToken)
     {
         if (_hostEnvironment.IsDevelopment())
         {
             return DeploymentStatus.Ready;
         }
         var subscription = GetSubscription();
-        _logger.LogInformation($"Looking up {GetResourceGroupName(serviceOwnerEntity)} in {subscription.Id}");
+        _logger.LogInformation($"Looking up {GetResourceGroupName(storageProvider.ServiceOwnerId)} in {subscription.Id}");
         var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
+        var resourceGroupExists = await resourceGroupCollection.ExistsAsync(GetResourceGroupName(storageProvider.ServiceOwnerId), cancellationToken);
         if (!resourceGroupExists)
         {
-            _logger.LogInformation($"Could not find resource group for {serviceOwnerEntity.Name}");
+            _logger.LogInformation($"Could not find resource group for {storageProvider.ServiceOwnerId}");
             return DeploymentStatus.NotStarted;
         }
 
-        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(serviceOwnerEntity), cancellationToken);
+        var resourceGroup = await resourceGroupCollection.GetAsync(GetResourceGroupName(storageProvider.ServiceOwnerId), cancellationToken);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
+        var storageAccountName = GetStorageAccountName(storageProvider);
         var storageAccountExists = storageAccountName != null && await storageAccountCollection.ExistsAsync(storageAccountName, cancellationToken: cancellationToken);
         if (!storageAccountExists)
         {
-            _logger.LogInformation($"Could not find storage account for {serviceOwnerEntity.Name}");
+            _logger.LogInformation($"Could not find storage account for {storageProvider.ServiceOwnerId}");
             return DeploymentStatus.DeployingResources;
         }
 
         return DeploymentStatus.Ready;
     }
 
-    public async Task<string> GetStorageConnectionString(ServiceOwnerEntity serviceOwnerEntity)
+    public async Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity)
     {
-        _logger.LogInformation($"Retrieving connection string for {serviceOwnerEntity.Name}");
-        var storageAccountName = GetStorageAccountName(serviceOwnerEntity);
-        if (storageAccountName == null)
-        {
-            throw new InvalidOperationException("Storage account has not been deployed");
-        }
-        if (serviceOwnerEntity.StorageProvider?.Type == StorageProviderType.Azurite)
+        _logger.LogInformation($"Retrieving connection string for storage provider {storageProviderEntity.Id}");
+        if (_hostEnvironment.IsDevelopment())
         {
             return AzureConstants.AzuriteUrl;
         }
-        var sasToken = await GetSasToken(serviceOwnerEntity, storageAccountName);
-        return $"BlobEndpoint=https://{storageAccountName}.blob.core.windows.net/brokerfiles?{sasToken}";
+        if (storageProviderEntity.ResourceName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        var sasToken = await GetSasToken(storageProviderEntity, storageProviderEntity.ResourceName);
+        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net/brokerfiles?{sasToken}";
     }
 
 
-    private async Task<string> GetSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
+    private async Task<string> GetSasToken(StorageProviderEntity storageProviderEntity, string storageAccountName)
     {
         if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
         {
@@ -210,7 +216,7 @@ public class AzureResourceManagerService : IResourceManager
             }
             (DateTime Created, string Token) newSasToken = default;
             newSasToken.Created = DateTime.UtcNow;
-            newSasToken.Token = await CreateSasToken(serviceOwnerEntity, storageAccountName);
+            newSasToken.Token = await CreateSasToken(storageProviderEntity, storageAccountName);
 
             _sasTokens.TryAdd(storageAccountName, newSasToken);
 
@@ -221,10 +227,10 @@ public class AzureResourceManagerService : IResourceManager
             _semaphore.Release();
         }
     }
-    private async Task<string> CreateSasToken(ServiceOwnerEntity serviceOwnerEntity, string storageAccountName)
+    private async Task<string> CreateSasToken(StorageProviderEntity storageProviderEntity, string storageAccountName)
     {
-        _logger.LogInformation("Creating new SAS token for " + serviceOwnerEntity.Name);
-        var resourceGroupName = GetResourceGroupName(serviceOwnerEntity);
+        _logger.LogInformation($"Creating new SAS token for {storageProviderEntity.ServiceOwnerId}: {storageProviderEntity.ResourceName}");
+        var resourceGroupName = GetResourceGroupName(storageProviderEntity.ServiceOwnerId);
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);

@@ -17,5 +17,6 @@ public class FileTransferEntity
     public required string FileName { get; set; }
     public long FileTransferSize { get; set; } = 0;
     public string? Checksum { get; set; }
+    public bool UseVirusScan { get; set; }
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
 }

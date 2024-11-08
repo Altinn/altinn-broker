@@ -11,4 +11,5 @@ public class ResourceEntity
     public bool PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
     public TimeSpan? PurgeFileTransferGracePeriod { get; set; }
     public bool? UseManifestFileShim { get; set; }
+    public bool ApprovedForDisabledVirusScan { get; set; } = false;
 }

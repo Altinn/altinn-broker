@@ -19,20 +19,41 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
 
         using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         ServiceOwnerEntity? serviceOwner = null;
+        var storageProviders = new List<StorageProviderEntity>();
+
         while (reader.Read())
         {
-            serviceOwner = new ServiceOwnerEntity
+            if (serviceOwner == null)
             {
-                Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
-                Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
-                StorageProvider = reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")) ? null : new StorageProviderEntity()
+                serviceOwner = new ServiceOwnerEntity
                 {
+                    Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
+                    Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
+                    StorageProviders = new List<StorageProviderEntity>()
+                };
+            }
+
+            if (!reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")))
+            {
+                var storageProvider = new StorageProviderEntity
+                {
+                    ServiceOwnerId = serviceOwnerId,
                     Created = reader.GetDateTime(reader.GetOrdinal("created")),
                     Id = reader.GetInt64(reader.GetOrdinal("storage_provider_id_pk")),
                     ResourceName = reader.GetString(reader.GetOrdinal("resource_name")),
                     Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type")))
+                };
+
+                if (!storageProviders.Any(sp => sp.Id == storageProvider.Id))
+                {
+                    storageProviders.Add(storageProvider);
                 }
-            };
+            }
+        }
+
+        if (serviceOwner != null)
+        {
+            serviceOwner.StorageProviders = storageProviders;
         }
 
         return serviceOwner;
@@ -47,8 +68,6 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
         command.Parameters.AddWithValue("@name", name);
         var commandText = command.CommandText;
         command.ExecuteNonQuery();
-
-
     }
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
