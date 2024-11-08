@@ -14,7 +14,7 @@ using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class BlobService(IResourceManager resourceManager, ILogger<BlobService> logger) : IBrokerStorageService
+public class AzureStorageService(IResourceManager resourceManager, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
     private const int BLOCKS_BEFORE_COMMIT = 5;
@@ -27,7 +27,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
         {
             Retry =
             {
-                NetworkTimeout = TimeSpan.FromHours(48),
+                NetworkTimeout = TimeSpan.FromHours(24),
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
@@ -55,9 +55,9 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         try
         {
-            var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
             BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
             using var accumulationBuffer = new MemoryStream();
@@ -120,14 +120,15 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, $"Failed to upload file {fileTransferEntity.FileTransferId}");
+            logger.LogError("Error occurred while uploading file: {errorMessage}: {stackTrace} ", ex.Message, ex.StackTrace);
+            await blobContainerClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
     }
 
     private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
-        await RetryPolicy.ExecuteAsync(async () =>
+        await BlobRetryPolicy.ExecuteAsync(async () =>
         {
             using var blockMd5 = MD5.Create();
             using var blockStream = new MemoryStream(blockData, writable: false);
@@ -150,7 +151,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
     private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
         CancellationToken cancellationToken)
     {
-        await RetryPolicy.ExecuteAsync(async () =>
+        await BlobRetryPolicy.ExecuteAsync(async () =>
         {
             var options = new CommitBlockListOptions
             {
@@ -183,8 +184,7 @@ public class BlobService(IResourceManager resourceManager, ILogger<BlobService> 
     }
 }
 
-// Retry policy definition
-public static class RetryPolicy
+internal static class BlobRetryPolicy
 {
     private static readonly IAsyncPolicy RetryWithBackoff = Policy
         .Handle<Exception>()

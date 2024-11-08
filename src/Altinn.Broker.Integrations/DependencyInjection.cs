@@ -20,7 +20,7 @@ public static class DependencyInjection
     public static void AddIntegrations(this IServiceCollection services, IConfiguration configuration, bool isDevelopment)
     {
         services.AddSingleton<IResourceManager, AzureResourceManagerService>();
-        services.AddSingleton<IBrokerStorageService, BlobService>();
+        services.AddSingleton<IBrokerStorageService, AzureStorageService>();
         services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IResourceRepository, ResourceRepository>();
         services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
@@ -30,17 +30,17 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        if (false)
+        if (isDevelopment)
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
         }
         else
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
-            /*services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
 
             services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
-                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();*/
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();
 
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnRegisterService).FullName, maskinportenSettings);
             services.AddHttpClient<IAltinnRegisterService, AltinnRegisterService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
