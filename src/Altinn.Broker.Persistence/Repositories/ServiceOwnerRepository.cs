@@ -10,7 +10,7 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
     {
         await using var command = dataSource.CreateCommand(
             "SELECT service_owner_id_pk, service_owner_name, " +
-            "storage_provider_id_pk, created, resource_name, storage_provider_type " +
+            "storage_provider_id_pk, created, resource_name, storage_provider_type, active " +
             "FROM broker.service_owner " +
             "LEFT JOIN broker.storage_provider sp on sp.service_owner_id_fk = service_owner_id_pk " +
             "WHERE service_owner_id_pk = @serviceOwnerId " +

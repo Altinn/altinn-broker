@@ -32,6 +32,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.file_transfer_size,
                     f.expiration_time, 
                     f.hangfire_job_id,
+                    f.use_virus_scan,
                     sender.actor_external_id as senderActorExternalReference,
                     fs_latest.file_transfer_status_description_id_fk, 
                     fs_latest.file_transfer_status_date, 
@@ -95,7 +96,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
                     },
                     RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
-                    PropertyList = await GetMetadata(fileTransferId, cancellationToken)
+                    PropertyList = await GetMetadata(fileTransferId, cancellationToken),
+                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
                 };
             }
             else
@@ -154,7 +156,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         return fileTransferStatuses;
     }
 
-    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, bool disableVirusScan, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, bool useVirusScan, CancellationToken cancellationToken = default)
     {
         long actorId;
         var actor = await actorRepository.GetActorAsync(senderExternalId, cancellationToken);
@@ -171,8 +173,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
         var fileTransferId = Guid.NewGuid();
         await using NpgsqlCommand command = dataSource.CreateCommand(
-            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id) " +
-            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId)");
+            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
+            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan)");
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@resourceId", resource.Id);
@@ -185,6 +187,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.AddWithValue("@storageProviderId", storageProviderEntity.Id);
         command.Parameters.AddWithValue("@hangfireJobId", DBNull.Value);
         command.Parameters.AddWithValue("@expirationTime", expirationTime);
+        command.Parameters.AddWithValue("@useVirusScan", useVirusScan);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
 

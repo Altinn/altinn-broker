@@ -14,7 +14,7 @@ public interface IFileTransferRepository
         DateTimeOffset expirationTime,
         Dictionary<string, string> propertyList,
         string? checksum,
-        bool disableVirusScan,
+        bool useVirusScan,
         CancellationToken cancellationToken);
     Task<Domain.FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);

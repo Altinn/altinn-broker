@@ -1,4 +1,7 @@
-﻿ALTER TABLE broker.altinn_resource
+﻿ALTER TABLE broker.file_transfer
+ADD use_virus_scan bool NOT NULL DEFAULT true;
+
+ALTER TABLE broker.altinn_resource
 ADD approved_for_disabled_virus_scan bool NOT NULL DEFAULT false;
 
 ALTER TABLE broker.storage_provider

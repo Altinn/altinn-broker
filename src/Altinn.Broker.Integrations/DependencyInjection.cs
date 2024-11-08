@@ -33,6 +33,7 @@ public static class DependencyInjection
         if (isDevelopment)
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
+            services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         }
         else
         {

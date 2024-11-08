@@ -11,8 +11,9 @@ internal static class FileTransferStatusDetailsExtMapper
         var fileTransferOverview = FileTransferStatusOverviewExtMapper.MapToExternalModel(fileTransfer);
         return new FileTransferStatusDetailsExt()
         {
-            Checksum = fileTransferOverview.Checksum,
             FileTransferId = fileTransfer.FileTransferId,
+            ResourceId = fileTransfer.ResourceId,
+            Checksum = fileTransferOverview.Checksum,
             FileName = fileTransferOverview.FileName,
             Sender = fileTransferOverview.Sender,
             FileTransferStatus = fileTransferOverview.FileTransferStatus,

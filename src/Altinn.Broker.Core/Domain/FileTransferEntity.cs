@@ -10,7 +10,6 @@ public class FileTransferEntity
     public DateTimeOffset FileTransferStatusChanged { get; set; }
     public required DateTimeOffset Created { get; set; }
     public required DateTimeOffset ExpirationTime { get; set; }
-    public DateTimeOffset? GracefulExpirationTime { get; set; }
     public required List<ActorFileTransferStatusEntity> RecipientCurrentStatuses { get; set; } // Joined in
     public string? FileLocation { get; set; }
     public string? HangfireJobId { get; set; }
