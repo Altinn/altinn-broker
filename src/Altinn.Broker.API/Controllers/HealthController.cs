@@ -16,8 +16,6 @@ namespace Altinn.Broker.Controllers;
 [Route("health")]
 public class HealthController(NpgsqlDataSource databaseConnectionProvider, IOptions<AzureResourceManagerOptions> azureResourceManagerOptions) : ControllerBase
 {
-    private readonly AzureResourceManagerOptions _azureResourceManagerOptions = azureResourceManagerOptions.Value;
-
     [HttpGet]
     public async Task<ActionResult> HealthCheckAsync()
     {
