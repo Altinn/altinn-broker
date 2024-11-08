@@ -7,4 +7,5 @@
 
     public required string ResourceName { get; set; }
     public required string ServiceOwnerId { get; set; }
+    public required bool Active { get; set; }
 }

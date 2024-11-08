@@ -41,10 +41,11 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
                     Created = reader.GetDateTime(reader.GetOrdinal("created")),
                     Id = reader.GetInt64(reader.GetOrdinal("storage_provider_id_pk")),
                     ResourceName = reader.GetString(reader.GetOrdinal("resource_name")),
-                    Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type")))
+                    Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type"))),
+                    Active = reader.GetBoolean(reader.GetOrdinal("active"))
                 };
 
-                if (!storageProviders.Any(sp => sp.Id == storageProvider.Id))
+                if (storageProvider.Active && !storageProviders.Any(sp => sp.Id == storageProvider.Id))
                 {
                     storageProviders.Add(storageProvider);
                 }
