@@ -10,9 +10,10 @@ using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Persistence.Repositories;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Altinn.Broker.Integrations.Slack;
+using Slack.Webhooks;
 
 namespace Altinn.Broker.Integrations;
 public static class DependencyInjection
@@ -50,6 +51,16 @@ public static class DependencyInjection
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAuthorizationService).FullName, maskinportenSettings);
             services.AddHttpClient<IAuthorizationService, AltinnAuthorizationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>();
+        }
+        var generalSettings = new GeneralSettings();
+        configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
+        if (string.IsNullOrWhiteSpace(generalSettings.SlackUrl))
+        {
+            services.AddSingleton<ISlackClient>(new SlackDevClient(""));
+        } 
+        else
+        {
+            services.AddSingleton<ISlackClient>(new SlackClient(generalSettings.SlackUrl));
         }
     }
 }

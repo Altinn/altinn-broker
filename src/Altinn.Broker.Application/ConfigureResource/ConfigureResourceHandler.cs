@@ -61,6 +61,9 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         if (request.UseManifestFileShim is not null)
         {
             var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, cancellationToken);
+            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
+            
             if (updateManifestFileShimResult.IsT1)
             {
                 return updateManifestFileShimResult.AsT1;

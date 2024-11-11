@@ -196,7 +196,7 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
     }
 
 
-    public async Task AddManifestFile(FileTransferEntity fileTransferEntity)
+    public async Task AddManifestFile(FileTransferEntity fileTransferEntity, ResourceEntity resource)
     {
         ValidateNotClosed();
 
@@ -226,7 +226,7 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
             var newManifestEntry = archive.CreateEntry("Manifest.xml");
             using (var manifestStream = newManifestEntry.Open())
             {
-                var manifest = fileTransferEntity.CreateManifest();
+                var manifest = fileTransferEntity.CreateManifest(resource);
                 WriteSerializeManifestToZip(manifest, manifestStream);
             }
         }

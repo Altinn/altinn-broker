@@ -15,7 +15,7 @@ public class BrokerServiceManifest
     public string ExternalServiceCode { get; set; }
 
     [XmlElement("ExternalServiceEditionCode")]
-    public string ExternalServiceEditionCode { get; set; }
+    public int? ExternalServiceEditionCode { get; set; }
 
     [XmlElement("SendersReference")]
     public string SendersReference { get; set; }
@@ -54,12 +54,13 @@ public class PropertyEntry
 
 public static class BrokerServiceManifestExtensions
 {
-    public static BrokerServiceManifest CreateManifest(this FileTransferEntity entity)
+    public static BrokerServiceManifest CreateManifest(this FileTransferEntity entity, ResourceEntity resource)
     {
         var manifest = new BrokerServiceManifest
         {
-            ExternalServiceCode = entity.ResourceId,
-            ExternalServiceEditionCode = "Altinn3",
+            
+            ExternalServiceCode = resource.UseManifestFileShim == true ? resource.ExternalServiceCodeLegacy : null,
+            ExternalServiceEditionCode = resource.UseManifestFileShim == true ? resource.ExternalServiceEditionCodeLegacy : null,
             SendersReference = entity.SendersFileTransferReference,
             Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
             SentDate = DateTime.UtcNow,

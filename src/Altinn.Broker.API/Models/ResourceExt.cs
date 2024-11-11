@@ -1,10 +1,14 @@
 using System.Text.Json.Serialization;
 
+using Altinn.Broker.Helpers;
+
 namespace Altinn.Broker.Models;
 
 /// <summary>
 /// API input model for file initialization.
 /// </summary>
+[ValidateUseManifestFileShim]
+
 public class ResourceExt
 {
 
@@ -37,4 +41,10 @@ public class ResourceExt
     /// </summary>
     [JsonPropertyName("useManifestFileShim")]
     public bool? UseManifestFileShim { get; set; }
+
+    [JsonPropertyName("externalServiceCodeLegacy")]
+    public string? ExternalServiceCodeLegacy { get; set; }
+
+    [JsonPropertyName("externalServiceEditionCodeLegacy")]
+    public int? ExternalServiceEditionCodeLegacy { get; set; }
 }
