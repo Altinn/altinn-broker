@@ -17,7 +17,7 @@ namespace Altinn.Broker.Integrations.Azure;
 public class AzureStorageService(IResourceManager resourceManager, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
     private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
-    private const int BLOCKS_BEFORE_COMMIT = 5;
+    private const int BLOCKS_BEFORE_COMMIT = 1000;
     private const int UPLOAD_THREADS = 3;
 
     private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
@@ -32,6 +32,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
+        await containerClient.CreateIfNotExistsAsync();
         return containerClient;
     }
 
@@ -68,8 +69,8 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
             using var blobMd5 = MD5.Create();
 
             int blocksInBatch = 0;
-            var commitTasks = new List<Task>();
-            var semaphore = new SemaphoreSlim(UPLOAD_THREADS); // Limit to 3 concurrent commit operations
+            var uploadTasks = new List<Task>();
+            var semaphore = new SemaphoreSlim(UPLOAD_THREADS); // Limit concurrent operations
 
             while (position < streamLength)
             {
@@ -86,54 +87,50 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
                     var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                     byte[] blockData = accumulationBuffer.ToArray();
                     blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
-                    await UploadBlock(blockBlobClient, blockId, blockData, cancellationToken);
 
                     blockList.Add(blockId);
                     blocksInBatch++;
                     accumulationBuffer.SetLength(0); // Clear accumulation buffer for next block
-
-                    if (blocksInBatch >= BLOCKS_BEFORE_COMMIT)
+                    await semaphore.WaitAsync(cancellationToken);
+                    uploadTasks.Add(UploadBlockAsync(blockBlobClient, blockId, blockData, cancellationToken));
+                    async Task UploadBlockAsync(BlockBlobClient client, string currentBlockId, byte[] currentBlockData, CancellationToken cancellationToken)
                     {
-                        logger.LogInformation($"Queuing commit of {blocksInBatch} blocks at position " +
-                            $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB");
-
-                        var blocksToCommit = blockList.ToList();
-                        var isFirstCommit = blockList.Count == blocksInBatch;
-
-                        commitTasks.Add(CommitBlocksAsync());
-                        async Task CommitBlocksAsync()
+                        try
                         {
-                            try
-                            {
-                                await semaphore.WaitAsync(cancellationToken);
-                                await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
+                            await UploadBlock(client, currentBlockId, currentBlockData, cancellationToken);
 
-                                var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
-                                logger.LogInformation($"Completed intermediate commit. Upload progress for {fileTransferEntity.FileTransferId}: " +
-                                    $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
-                            }
-                            finally
-                            {
-                                semaphore.Release();
-                            }
+                            var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                            logger.LogInformation($"Uploaded block {blockList.Count}. Progress: " +
+                                $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
                         }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    }
 
-                        blocksInBatch = 0;
+                    if (uploadTasks.Count >= BLOCKS_BEFORE_COMMIT)
+                    {
+                        await Task.WhenAll(uploadTasks);
+
+                        // Commit the blocks we have so far
+                        var blocksToCommit = blockList.ToList();
+                        var isFirstCommit = blockList.Count <= BLOCKS_BEFORE_COMMIT;
+                        await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
+
+                        uploadTasks.Clear();
                     }
                 }
             }
+            await Task.WhenAll(uploadTasks);
 
-            // Wait for all pending commits to complete
-            await Task.WhenAll(commitTasks);
-
-            // Final commit with all blocks
+            // Final commit with MD5 hash
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
             {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
             }
             await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, blobMd5.Hash, cancellationToken);
-            blockList.Clear();
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
@@ -149,10 +146,9 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
         }
     }
 
-
     private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
-        await BlobRetryPolicy.ExecuteAsync(async () =>
+        await BlobRetryPolicy.ExecuteAsync(logger, async () =>
         {
             using var blockMd5 = MD5.Create();
             using var blockStream = new MemoryStream(blockData, writable: false);
@@ -175,7 +171,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
     private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
         CancellationToken cancellationToken)
     {
-        await BlobRetryPolicy.ExecuteAsync(async () =>
+        await BlobRetryPolicy.ExecuteAsync(logger, async () =>
         {
             var options = new CommitBlockListOptions
             {
@@ -210,15 +206,15 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
 
 internal static class BlobRetryPolicy
 {
-    private static readonly IAsyncPolicy RetryWithBackoff = Policy
+    private static IAsyncPolicy RetryWithBackoff(ILogger logger) => Policy
         .Handle<Exception>()
         .WaitAndRetryAsync(
             3,
             attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
             (ex, timeSpan) => {
-                // Log retry attempt
+                logger.LogWarning($"Error during retries: {ex.Message}");
             }
         );
 
-    public static Task ExecuteAsync(Func<Task> action) => RetryWithBackoff.ExecuteAsync(action);
+    public static Task ExecuteAsync(ILogger logger, Func<Task> action) => RetryWithBackoff(logger).ExecuteAsync(action);
 }
