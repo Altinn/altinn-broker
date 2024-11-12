@@ -6,13 +6,14 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
     private readonly string _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
@@ -82,7 +83,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         {
             return Errors.MaxUploadSizeCannotBeZero;
         }
-        if (maxFileTransferSize > _maxFileUploadSize)
+        if (hostEnvironment.IsProduction() && maxFileTransferSize > _maxFileUploadSize && !resource.ApprovedForDisabledVirusScan)
         {
             return Errors.MaxUploadSizeOverGlobal;
         }

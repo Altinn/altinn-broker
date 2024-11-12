@@ -18,7 +18,7 @@ public static class Errors
     public static Error FileTransferNotPublished = new Error(10, "A file transfer can only be confirmed to be downloaded when it is published. See file transfer status.", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeNegative = new Error(11, "Max file transfer size cannot be negative", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeZero = new Error(12, "Max file transfer size cannot be zero", HttpStatusCode.BadRequest);
-    public static Error MaxUploadSizeOverGlobal = new Error(13, "Max file transfer size cannot be set higher than the global max file transfer size", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeOverGlobal = new Error(13, "Max file transfer size cannot be set higher than the global max file transfer size of 2GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack.", HttpStatusCode.BadRequest);
     public static Error InvalidTimeToLiveFormat = new Error(14, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
     public static Error TimeToLiveCannotExceed365Days = new Error(15, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
     public static Error FileSizeTooBig = new Error(16, "File size exceeds maximum", HttpStatusCode.BadRequest);
