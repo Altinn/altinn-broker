@@ -16,8 +16,7 @@ public static class DependencyInjection
 {
     public static void AddPersistence(this IServiceCollection services, IConfiguration config)
     {
-        //services.AddSingleton<DatabaseConnectionProvider>();
-        services.AddSingleton<NpgsqlDataSource>(BuildAzureNpgsqlDataSource(config));
+        services.AddSingleton(BuildAzureNpgsqlDataSource(config));
         services.AddSingleton<IActorRepository, ActorRepository>();
         services.AddSingleton<IFileTransferRepository, FileTransferRepository>();
         services.AddSingleton<IFileTransferStatusRepository, FileTransferStatusRepository>();

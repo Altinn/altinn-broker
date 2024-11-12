@@ -38,9 +38,7 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddSingleton<IEventBus, ConsoleLogEventBus>();
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
-
             services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                 .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();
 
