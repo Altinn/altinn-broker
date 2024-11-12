@@ -32,7 +32,6 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
             }
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
-        await containerClient.CreateIfNotExistsAsync();
         return containerClient;
     }
 
