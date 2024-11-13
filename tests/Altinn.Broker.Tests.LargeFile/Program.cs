@@ -39,7 +39,6 @@ public class Program
             password = GetRequiredInput("Enter the test tools password");
         }
         Console.WriteLine($"Writing {uploadSize / (1024.0 * 1024.0 * 1024.0):N2} GiB with a buffer size of {BufferSize / (1024.0):N2} KiB");
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12; // TODO, remove?
         using var httpClient = new HttpClient()
         {
             Timeout = TimeSpan.FromHours(48)
@@ -49,8 +48,6 @@ public class Program
 
         var fileTransferId = await InitializeFileTransfer(httpClient, baseUrl);
         await UploadFileToBroker(httpClient, fileTransferId, baseUrl, uploadSize);
-        await ConfirmDownload(httpClient, fileTransferId, baseUrl);
-
     }
 
     private static string GetRequiredInput(string prompt, string? defaultValue = null)
@@ -75,7 +72,7 @@ public class Program
     {
         var httpRequestMessage = new HttpRequestMessage()
         {
-            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write&org=ttd&orgNo={orgNumber}")
+            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:broker.read&org=ttd&orgNo={orgNumber}")
         };
         var authenticationString = $"{testToolsUsername}:{testToolsPassword}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(authenticationString));
@@ -122,20 +119,9 @@ public class Program
         }
         finally
         {
-            httpClient.Dispose();
             stopwatch.Stop();
             Console.WriteLine($"Upload completed in {stopwatch.ElapsedMilliseconds.ToString("N0")} ms");
         }
-    }
-
-    private static async Task ConfirmDownload(HttpClient httpClient, string fileTransferId, string baseUrl)
-    {
-        var httpRequestMessage = new HttpRequestMessage()
-        {
-            RequestUri = new Uri(baseUrl + $"/broker/api/v1/filetransfer/{fileTransferId}/confirmdownload"),
-            Method = HttpMethod.Post
-        };
-        await httpClient.SendAsync(httpRequestMessage);
     }
 
     private static FileTransferInitalizeExt BasicFileTransfer() => new FileTransferInitalizeExt()
