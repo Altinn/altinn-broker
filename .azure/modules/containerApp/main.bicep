@@ -55,6 +55,9 @@ var containerAppEnvVars = [
   }
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
   { name: 'GeneralSettings__SlackUrl', secretRef: 'slack-url' }
+  { name: 'AzureStorageOptions__BlockSize', value: 4194304 }
+  { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: 3 }
+  { name: 'AzureStorageOptions__BlocksBeforeCommit', value: 1000 }
 ]
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
