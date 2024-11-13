@@ -104,7 +104,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
-    services.Configure<ApplicationSettings>(config.GetSection(key: nameof(ApplicationSettings)));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());

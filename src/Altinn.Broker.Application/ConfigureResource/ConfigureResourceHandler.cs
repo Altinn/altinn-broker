@@ -8,16 +8,12 @@ using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
-    private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
-    private readonly string _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
-
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
@@ -83,7 +79,15 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.MaxUploadSizeCannotBeZero;
         }
-        if (hostEnvironment.IsProduction() && maxFileTransferSize > _maxFileUploadSize && !resource.ApprovedForDisabledVirusScan)
+        if (hostEnvironment.IsProduction()
+            && !resource.ApprovedForDisabledVirusScan
+            && maxFileTransferSize > ApplicationConstants.MaxVirusScanUploadSize)
+        {
+            return Errors.MaxUploadSizeForVirusScan;
+        }
+        if (hostEnvironment.IsProduction()
+            && resource.ApprovedForDisabledVirusScan
+            && maxFileTransferSize > ApplicationConstants.MaxFileUploadSize)
         {
             return Errors.MaxUploadSizeOverGlobal;
         }
@@ -119,7 +123,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.InvalidGracePeriodFormat;
         }
-        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(_maxGracePeriod))
+        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(ApplicationConstants.MaxGracePeriod))
         {
             return Errors.GracePeriodCannotExceed24Hours;
         }

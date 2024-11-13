@@ -10,26 +10,23 @@ using Hangfire;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.UploadFile;
 
-public class UploadFileHandler(IAuthorizationService resourceRightsRepository, 
-                               IResourceRepository resourceRepository,
-                               IServiceOwnerRepository serviceOwnerRepository,
-                               IFileTransferRepository fileTransferRepository,
-                               IFileTransferStatusRepository fileTransferStatusRepository,
-                               IBrokerStorageService brokerStorageService, 
-                               IBackgroundJobClient backgroundJobClient,
-                               IEventBus eventBus,
-                               IHostEnvironment hostEnvironment,
-                               IOptions<ApplicationSettings> applicationSettings,
-                               ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
+public class UploadFileHandler(
+    IAuthorizationService resourceRightsRepository,
+    IResourceRepository resourceRepository,
+    IServiceOwnerRepository serviceOwnerRepository,
+    IFileTransferRepository fileTransferRepository,
+    IFileTransferStatusRepository fileTransferStatusRepository,
+    IBrokerStorageService brokerStorageService,
+    IBackgroundJobClient backgroundJobClient,
+    IEventBus eventBus,
+    IHostEnvironment hostEnvironment,
+    ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
-    private readonly long _maxVirusScanFileSize = 2L * 1024 * 1024 * 1024;
-
     public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", request.FileTransferId);
@@ -66,7 +63,7 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository,
         {
             return Errors.StorageProviderNotReady;
         }
-        if (fileTransfer.UseVirusScan && request.ContentLength > _maxVirusScanFileSize)
+        if (fileTransfer.UseVirusScan && request.ContentLength > ApplicationConstants.MaxVirusScanUploadSize)
         {
             return Errors.FileSizeTooBig;
         }
