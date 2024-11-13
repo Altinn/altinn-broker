@@ -45,7 +45,7 @@ public class Program
         };
         var token = await GetAccessToken(httpClient, username, password, "991825827");
         httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + token);
-
+        await ConfigureResource(httpClient, baseUrl, uploadSize);
         var fileTransferId = await InitializeFileTransfer(httpClient, baseUrl);
         await UploadFileToBroker(httpClient, fileTransferId, baseUrl, uploadSize);
     }
@@ -72,7 +72,7 @@ public class Program
     {
         var httpRequestMessage = new HttpRequestMessage()
         {
-            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:broker.read&org=ttd&orgNo={orgNumber}")
+            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:resourceregistry/resource.write&org=ttd&orgNo={orgNumber}")
         };
         var authenticationString = $"{testToolsUsername}:{testToolsPassword}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(authenticationString));
@@ -80,6 +80,21 @@ public class Program
         var response = await httpClient.SendAsync(httpRequestMessage);
         var responseContent = await response.Content.ReadAsStringAsync();
         return responseContent;
+    }
+
+    private static async Task ConfigureResource(HttpClient httpClient, string baseUrl, long uploadSize)
+    {
+        var configureResourceBody = new ResourceExt()
+        {
+            MaxFileTransferSize = uploadSize + 1
+        };
+        var httpRequestMessage = new HttpRequestMessage()
+        {
+            RequestUri = new Uri(baseUrl + "/broker/api/v1/resource"),
+            Method = HttpMethod.Put,
+            Content = new StringContent(JsonSerializer.Serialize(configureResourceBody), Encoding.UTF8, "application/json")
+        };
+        await httpClient.SendAsync(httpRequestMessage);
     }
 
     private static async Task<string> InitializeFileTransfer(HttpClient httpClient, string baseUrl)
