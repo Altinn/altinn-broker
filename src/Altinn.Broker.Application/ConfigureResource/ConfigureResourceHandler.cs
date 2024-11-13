@@ -55,12 +55,17 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
                 return updateFileTransferTimeToLiveResult.AsT1;
             }
         }
+        if (request.ExternalServiceCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+        }
+        if (request.ExternalServiceEditionCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
+        }
         if (request.UseManifestFileShim is not null)
         {
-            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, cancellationToken);
-            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
-            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
-            
+            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy, cancellationToken);   
             if (updateManifestFileShimResult.IsT1)
             {
                 return updateManifestFileShimResult.AsT1;
@@ -131,8 +136,14 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         return Task.CompletedTask;
     }
 
-    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, CancellationToken cancellationToken)
+    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, string? externalServiceCode, int? externalServiceCodeEdition, CancellationToken cancellationToken)
     {
+        var actualExternalServiceCode = resource.ExternalServiceCodeLegacy ?? externalServiceCode;
+        var actualExternalServiceCodeEdition = resource.ExternalServiceEditionCodeLegacy ?? externalServiceCodeEdition;
+        if (actualExternalServiceCode is null || actualExternalServiceCodeEdition is null)
+        {
+            return Errors.NeedServiceCodeForManifestShim;
+        }
         logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}", 
             resource.Id.SanitizeForLogs(), useManifestFileShim);
         await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);
