@@ -90,9 +90,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.MaxUploadSizeForVirusScan;
         }
-        if (hostEnvironment.IsProduction()
-            && resource.ApprovedForDisabledVirusScan
-            && maxFileTransferSize > ApplicationConstants.MaxFileUploadSize)
+        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize)
         {
             return Errors.MaxUploadSizeOverGlobal;
         }
