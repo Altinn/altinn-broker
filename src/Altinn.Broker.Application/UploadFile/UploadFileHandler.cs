@@ -28,7 +28,7 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository,
                                IOptions<ApplicationSettings> applicationSettings,
                                ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
-    private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
+    private readonly long _maxVirusScanFileSize = 2L * 1024 * 1024 * 1024;
 
     public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, CancellationToken cancellationToken)
     {
@@ -66,8 +66,11 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository,
         {
             return Errors.StorageProviderNotReady;
         }
-        var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
-        if (request.ContentLength > maxUploadSize)
+        if (fileTransfer.UseVirusScan && request.ContentLength > _maxVirusScanFileSize)
+        {
+            return Errors.FileSizeTooBig;
+        }
+        if (resource?.MaxFileTransferSize is not null && request.ContentLength > resource.MaxFileTransferSize)
         {
             return Errors.FileSizeTooBig;
         }
