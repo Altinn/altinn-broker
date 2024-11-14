@@ -55,7 +55,7 @@ var containerAppEnvVars = [
   }
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
   { name: 'GeneralSettings__SlackUrl', secretRef: 'slack-url' }
-  { name: 'AzureStorageOptions__BlockSize', value: '4194304' }
+  { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]

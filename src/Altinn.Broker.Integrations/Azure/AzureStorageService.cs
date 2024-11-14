@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 
 using Azure;
@@ -9,17 +10,14 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class AzureStorageService(IResourceManager resourceManager, ILogger<AzureStorageService> logger) : IBrokerStorageService
+public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
-    private const int BLOCK_SIZE = 1024 * 1024 * 32; // 32MB
-    private const int BLOCKS_BEFORE_COMMIT = 1000;
-    private const int UPLOAD_THREADS = 3;
-
     private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
@@ -69,7 +67,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
 
             int blocksInBatch = 0;
             var uploadTasks = new List<Task>();
-            var semaphore = new SemaphoreSlim(UPLOAD_THREADS); // Limit concurrent operations
+            var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads); // Limit concurrent operations
 
             while (position < streamLength)
             {
@@ -80,7 +78,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
                 position += bytesRead;
 
                 bool isLastBlock = position >= streamLength;
-                if (accumulationBuffer.Length >= BLOCK_SIZE || isLastBlock)
+                if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize || isLastBlock)
                 {
                     accumulationBuffer.Position = 0;
                     var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
@@ -108,13 +106,13 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
                         }
                     }
 
-                    if (uploadTasks.Count >= BLOCKS_BEFORE_COMMIT)
+                    if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
                     {
                         await Task.WhenAll(uploadTasks);
 
                         // Commit the blocks we have so far
                         var blocksToCommit = blockList.ToList();
-                        var isFirstCommit = blockList.Count <= BLOCKS_BEFORE_COMMIT;
+                        var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
                         await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
 
                         uploadTasks.Clear();
@@ -129,7 +127,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
             {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
             }
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= BLOCKS_BEFORE_COMMIT, blobMd5.Hash, cancellationToken);
+            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit, blobMd5.Hash, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
