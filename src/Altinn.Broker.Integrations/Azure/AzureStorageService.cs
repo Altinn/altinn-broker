@@ -57,9 +57,9 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
+        BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
         try
         {
-            BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
             using var accumulationBuffer = new MemoryStream();
             var networkReadBuffer = new byte[1024 * 1024];
@@ -140,7 +140,7 @@ public class AzureStorageService(IResourceManager resourceManager, ILogger<Azure
         catch (Exception ex)
         {
             logger.LogError("Error occurred while uploading file: {errorMessage}: {stackTrace} ", ex.Message, ex.StackTrace);
-            await blobContainerClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await blockBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
     }
