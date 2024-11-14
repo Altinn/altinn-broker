@@ -14,6 +14,7 @@ internal static class FileTransferStatusDetailsExtMapper
             FileTransferId = fileTransfer.FileTransferId,
             ResourceId = fileTransfer.ResourceId,
             Checksum = fileTransferOverview.Checksum,
+            UseVirusScan = fileTransferOverview.UseVirusScan,
             FileName = fileTransferOverview.FileName,
             Sender = fileTransferOverview.Sender,
             FileTransferStatus = fileTransferOverview.FileTransferStatus,
