@@ -67,7 +67,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
 
             int blocksInBatch = 0;
             var uploadTasks = new List<Task>();
-            var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads); // Limit concurrent operations
+            using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads); // Limit concurrent uploads
 
             while (position < streamLength)
             {
