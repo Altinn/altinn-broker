@@ -6,7 +6,7 @@ public class ServiceOwnerOverviewExt
 
     public required string Name { get; set; }
 
-    public List<StorageProviderExt> StorageProviders { get; set; }
+    public required List<StorageProviderExt> StorageProviders { get; set; } = new List<StorageProviderExt>();
 }
 
 public class StorageProviderExt
