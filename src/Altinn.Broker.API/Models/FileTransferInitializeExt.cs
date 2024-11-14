@@ -68,6 +68,7 @@ public class FileTransferInitalizeExt
     /// <summary>
     /// Disable virus scan. Requires special permission in production.
     /// </summary>
+    [JsonPropertyName("disableVirusScan")]
     public bool? DisableVirusScan { get; set; } = false;
 }
 
