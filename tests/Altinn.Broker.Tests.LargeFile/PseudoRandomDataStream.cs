@@ -1,6 +1,4 @@
-﻿using System.Security.Cryptography;
-
-namespace Altinn.Broker.Tests.LargeFile;
+﻿namespace Altinn.Broker.Tests.LargeFile;
 /**
  * Pseudo-random generator
 */

@@ -75,7 +75,7 @@ public class Program
             RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:resourceregistry/resource.write&org=ttd&orgNo={orgNumber}")
         };
         var authenticationString = $"{testToolsUsername}:{testToolsPassword}";
-        var base64EncodedAuthenticationString = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(authenticationString));
+        var base64EncodedAuthenticationString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(authenticationString));
         httpRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
         var response = await httpClient.SendAsync(httpRequestMessage);
         var responseContent = await response.Content.ReadAsStringAsync();
