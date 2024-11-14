@@ -33,6 +33,11 @@ public class FileTransferOverviewExt
     public string? Checksum { get; set; } = string.Empty;
 
     /// <summary>
+    /// Is virus scan enabled for the file transfer
+    /// </summary>
+    public bool UseVirusScan { get; set; }
+
+    /// <summary>
     /// File size in bytes
     /// </summary>
     public long FileTransferSize { get; set; }

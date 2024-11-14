@@ -21,22 +21,20 @@ public static class DependencyInjection
     public static void AddIntegrations(this IServiceCollection services, IConfiguration configuration, bool isDevelopment)
     {
         services.AddSingleton<IResourceManager, AzureResourceManagerService>();
-        services.AddSingleton<IBrokerStorageService, BlobService>();
+        services.AddSingleton<IBrokerStorageService, AzureStorageService>();
         services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IResourceRepository, ResourceRepository>();
-        services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
-        services.AddScoped<IEventBus, AltinnEventBus>();
-        services.AddScoped<IAltinnRegisterService, AltinnRegisterService>();
 
         var maskinportenSettings = new MaskinportenSettings();
         configuration.GetSection(nameof(MaskinportenSettings)).Bind(maskinportenSettings);
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        if (false)
+        if (isDevelopment)
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
+            services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         }
         else
         {

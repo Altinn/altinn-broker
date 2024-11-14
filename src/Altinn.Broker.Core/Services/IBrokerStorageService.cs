@@ -10,8 +10,8 @@ public interface IBrokerStorageService
     /// </summary>
     /// <param name="serviceOwnerEntity">The service owner entity.</param>
     /// <param name="stream">The stream to upload.</param>
-    /// <returns>A string containing the MD5 checksum</returns>
-    Task<string> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken);
+    /// <returns>A string containing the MD5 checksum. Null if failure.</returns>
+    Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, long streamLength, CancellationToken cancellationToken);
 
     Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken);
     Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);

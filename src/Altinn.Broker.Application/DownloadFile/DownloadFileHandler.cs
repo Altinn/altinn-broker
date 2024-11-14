@@ -48,7 +48,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         var downloadStream = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
         if (resource.UseManifestFileShim == true && request.IsLegacy) // For specific legacy resources during transition period
         {
-            var fileBuffer = new byte[downloadStream.Length];
+            var fileBuffer = new byte[fileTransfer.FileTransferSize];
             downloadStream.Read(fileBuffer, 0, fileBuffer.Length);
             downloadStream = new ManifestDownloadStream(fileBuffer);
             (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);

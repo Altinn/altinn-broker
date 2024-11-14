@@ -5,8 +5,8 @@ namespace Altinn.Broker.Core.Repositories;
 public interface IFileTransferRepository
 {
     Task<Guid> AddFileTransfer(
-        ServiceOwnerEntity serviceOwner,
         ResourceEntity service,
+        StorageProviderEntity storageProviderEntity,
         string fileName,
         string sendersFileTransferReference,
         string senderExternalId,
@@ -14,8 +14,7 @@ public interface IFileTransferRepository
         DateTimeOffset expirationTime,
         Dictionary<string, string> propertyList,
         string? checksum,
-        long? fileTransferSize,
-        string? hangfireJobId,
+        bool useVirusScan,
         CancellationToken cancellationToken);
     Task<Domain.FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);

@@ -13,7 +13,6 @@ internal static class FileTransferStatusOverviewExtMapper
     {
         return new FileTransferOverviewExt()
         {
-            Checksum = fileTransfer.Checksum,
             ResourceId = fileTransfer.ResourceId,
             FileTransferSize = fileTransfer.FileTransferSize,
             FileTransferId = fileTransfer.FileTransferId,
@@ -26,7 +25,9 @@ internal static class FileTransferStatusOverviewExtMapper
             Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
             SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
             Created = fileTransfer.Created,
-            ExpirationTime = fileTransfer.ExpirationTime
+            ExpirationTime = fileTransfer.ExpirationTime,
+            Checksum = fileTransfer.Checksum,
+            UseVirusScan = fileTransfer.UseVirusScan
         };
     }
 

@@ -13,19 +13,35 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.Events;
-public class AltinnEventBus(
-    HttpClient httpClient, 
-    IAltinnRegisterService altinnRegisterService, 
-    IBackgroundJobClient backgroundJobClient,
-    IPartyRepository partyRepository,
-    IOptions<AltinnOptions> altinnOptions, 
-    ILogger<AltinnEventBus> logger) : IEventBus
+public class AltinnEventBus : IEventBus
 {
-    private readonly AltinnOptions _altinnOptions = altinnOptions.Value;
+    private readonly AltinnOptions _altinnOptions;
+    private readonly HttpClient _httpClient;
+    private readonly IAltinnRegisterService _altinnRegisterService;
+    private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IPartyRepository _partyRepository;
+    private readonly ILogger<AltinnEventBus> _logger;
+
+    public AltinnEventBus(
+        HttpClient httpClient, 
+        IAltinnRegisterService altinnRegisterService, 
+        IBackgroundJobClient backgroundJobClient,
+        IPartyRepository partyRepository,
+        IOptions<AltinnOptions> altinnOptions, 
+        ILogger<AltinnEventBus> logger)
+    {
+        _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri(altinnOptions.Value.PlatformGatewayUrl);
+        _altinnRegisterService = altinnRegisterService;
+        _backgroundJobClient = backgroundJobClient;
+        _partyRepository = partyRepository;
+        _logger = logger;
+        _altinnOptions = altinnOptions.Value;
+    }
 
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
     {
-        backgroundJobClient.Enqueue(() => Publish(type, resourceId, fileTransferId, Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken));
+        _backgroundJobClient.Enqueue(() => Publish(type, resourceId, fileTransferId, Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken));
     }
 
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
@@ -33,11 +49,11 @@ public class AltinnEventBus(
         string? partyId = null;
         if (subjectOrganizationNumber != null)
         {
-            var party = await partyRepository.GetParty(subjectOrganizationNumber, cancellationToken);
+            var party = await _partyRepository.GetParty(subjectOrganizationNumber, cancellationToken);
             if (party == null)
             {
-                partyId = await altinnRegisterService.LookUpOrganizationId(subjectOrganizationNumber, cancellationToken);
-                if (partyId != null) await partyRepository.InitializeParty(subjectOrganizationNumber, partyId);
+                partyId = await _altinnRegisterService.LookUpOrganizationId(subjectOrganizationNumber, cancellationToken);
+                if (partyId != null) await _partyRepository.InitializeParty(subjectOrganizationNumber, partyId);
             }
         }
         var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber, eventId, time);
@@ -46,11 +62,11 @@ public class AltinnEventBus(
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
         };
         var requestBody = JsonContent.Create(cloudEvent, options: serializerOptions, mediaType: new System.Net.Http.Headers.MediaTypeHeaderValue("application/cloudevents+json"));
-        var response = await httpClient.PostAsync("events/api/v1/events", requestBody, cancellationToken);
+        var response = await _httpClient.PostAsync("events/api/v1/events", requestBody, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with filetransfer id {fileTransferId}.", type, resourceId, fileTransferId);
-            logger.LogError("Statuscode was: {}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken));
+            _logger.LogError("Unexpected null or invalid json response when posting cloud event {type} of {resourceId} with filetransfer id {fileTransferId}.", type, resourceId, fileTransferId);
+            _logger.LogError("Statuscode was: {}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken));
         }
     }
 

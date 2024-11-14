@@ -13,4 +13,5 @@ public class ResourceEntity
     public bool? UseManifestFileShim { get; set; }
     public string? ExternalServiceCodeLegacy { get; set; }
     public int? ExternalServiceEditionCodeLegacy { get; set; }
+    public bool ApprovedForDisabledVirusScan { get; set; } = false;
 }

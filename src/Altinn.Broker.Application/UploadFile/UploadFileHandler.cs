@@ -8,17 +8,25 @@ using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.UploadFile;
 
-public class UploadFileHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IBrokerStorageService brokerStorageService, IBackgroundJobClient backgroundJobClient, IEventBus eventBus, ILogger<UploadFileHandler> logger, IOptions<ApplicationSettings> applicationSettings) : IHandler<UploadFileRequest, Guid>
+public class UploadFileHandler(
+    IAuthorizationService resourceRightsRepository,
+    IResourceRepository resourceRepository,
+    IServiceOwnerRepository serviceOwnerRepository,
+    IFileTransferRepository fileTransferRepository,
+    IFileTransferStatusRepository fileTransferStatusRepository,
+    IBrokerStorageService brokerStorageService,
+    IBackgroundJobClient backgroundJobClient,
+    IEventBus eventBus,
+    IHostEnvironment hostEnvironment,
+    ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
-    private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
-
     public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", request.FileTransferId);
@@ -46,12 +54,20 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
             return Errors.InvalidResourceDefinition;
         };
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
-        if (serviceOwner?.StorageProvider is null)
+        if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         };
-        var maxUploadSize = resource?.MaxFileTransferSize ?? _maxFileUploadSize;
-        if (request.ContentLength > maxUploadSize)
+        var storageProvider = serviceOwner.GetStorageProvider(fileTransfer.UseVirusScan);
+        if (storageProvider is null)
+        {
+            return Errors.StorageProviderNotReady;
+        }
+        if (fileTransfer.UseVirusScan && request.ContentLength > ApplicationConstants.MaxVirusScanUploadSize)
+        {
+            return Errors.FileSizeTooBig;
+        }
+        if (resource?.MaxFileTransferSize is not null && request.ContentLength > resource.MaxFileTransferSize)
         {
             return Errors.FileSizeTooBig;
         }
@@ -60,7 +76,13 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
 
         try
         {
-            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
+            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
+            if (checksum is null)
+            {
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", cancellationToken);
+                return Errors.UploadFailed;
+            }
+
             if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
             {
                 await fileTransferRepository.SetChecksum(request.FileTransferId, checksum, cancellationToken);
@@ -84,13 +106,13 @@ public class UploadFileHandler(IAuthorizationService resourceRightsRepository, I
         }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await fileTransferRepository.SetStorageDetails(request.FileTransferId, serviceOwner.StorageProvider.Id, request.FileTransferId.ToString(), request.UploadStream.Length, cancellationToken);
-            if (serviceOwner.StorageProvider.Type == StorageProviderType.Altinn3Azure)
+            await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
+            if (storageProvider.Type == StorageProviderType.Altinn3Azure && !hostEnvironment.IsDevelopment())
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
                 await eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
             }
-            else if (serviceOwner.StorageProvider.Type == StorageProviderType.Azurite) // When running in Azurite storage emulator, there is no async malwarescan that runs before publish
+            else
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
                 await eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);

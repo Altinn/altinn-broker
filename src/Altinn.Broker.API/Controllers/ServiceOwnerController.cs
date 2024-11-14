@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Xml;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
@@ -7,8 +6,6 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.ServiceOwner;
-
-using Hangfire;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +17,7 @@ namespace Altinn.Broker.Controllers;
 [Route("broker/api/v1/serviceowner")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
-public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IResourceManager resourceManager) : Controller
+public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, IResourceManager resourceManager) : Controller
 {
     [HttpPost]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
@@ -31,13 +28,9 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        var fileTransferTimeToLive = XmlConvert.ToTimeSpan(serviceOwnerInitializeExt.DeletionTime);
         await serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name);
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
-        BackgroundJob.Enqueue(
-            () => resourceManager.Deploy(serviceOwner!, cancellationToken)
-        );
-
+        resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
 
@@ -50,12 +43,22 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return NotFound();
         }
 
-        var deploymentStatus = await resourceManager.GetDeploymentStatus(serviceOwner, cancellationToken);
-
+        var deploymentStatuses = new Dictionary<StorageProviderEntity, DeploymentStatus>();
+        foreach (var storageProvider in serviceOwner.StorageProviders)
+        {
+            var deploymentStatus = await resourceManager.GetDeploymentStatus(storageProvider, cancellationToken);
+            deploymentStatuses.Add(storageProvider, deploymentStatus);
+        }
+        
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,
-            DeploymentStatus = (DeploymentStatusExt)deploymentStatus
+            StorageProviders = deploymentStatuses.Zip(serviceOwner.StorageProviders, (status, provider) => new StorageProviderExt()
+            {
+                Type = (StorageProviderTypeExt)provider.Type,
+                DeploymentEnvironment = hostEnvironment.EnvironmentName,
+                DeploymentStatus = (DeploymentStatusExt)status.Value
+            }).ToList()
         };
     }
 

@@ -6,17 +6,14 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IOptions<ApplicationSettings> applicationSettings, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
-    private readonly long _maxFileUploadSize = applicationSettings.Value.MaxFileUploadSize;
-    private readonly string _maxGracePeriod = applicationSettings.Value.MaxGracePeriod;
-
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
@@ -58,12 +55,17 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
                 return updateFileTransferTimeToLiveResult.AsT1;
             }
         }
+        if (request.ExternalServiceCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+        }
+        if (request.ExternalServiceEditionCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
+        }
         if (request.UseManifestFileShim is not null)
         {
-            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, cancellationToken);
-            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
-            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy, cancellationToken);
-            
+            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy, cancellationToken);   
             if (updateManifestFileShimResult.IsT1)
             {
                 return updateManifestFileShimResult.AsT1;
@@ -82,7 +84,13 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         {
             return Errors.MaxUploadSizeCannotBeZero;
         }
-        if (maxFileTransferSize > _maxFileUploadSize)
+        if (hostEnvironment.IsProduction()
+            && !resource.ApprovedForDisabledVirusScan
+            && maxFileTransferSize > ApplicationConstants.MaxVirusScanUploadSize)
+        {
+            return Errors.MaxUploadSizeForVirusScan;
+        }
+        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize)
         {
             return Errors.MaxUploadSizeOverGlobal;
         }
@@ -118,7 +126,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         {
             return Errors.InvalidGracePeriodFormat;
         }
-        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(_maxGracePeriod))
+        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(ApplicationConstants.MaxGracePeriod))
         {
             return Errors.GracePeriodCannotExceed24Hours;
         }
@@ -126,8 +134,14 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IO
         return Task.CompletedTask;
     }
 
-    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, CancellationToken cancellationToken)
+    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, string? externalServiceCode, int? externalServiceCodeEdition, CancellationToken cancellationToken)
     {
+        var actualExternalServiceCode = resource.ExternalServiceCodeLegacy ?? externalServiceCode;
+        var actualExternalServiceCodeEdition = resource.ExternalServiceEditionCodeLegacy ?? externalServiceCodeEdition;
+        if (actualExternalServiceCode is null || actualExternalServiceCodeEdition is null)
+        {
+            return Errors.NeedServiceCodeForManifestShim;
+        }
         logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}", 
             resource.Id.SanitizeForLogs(), useManifestFileShim);
         await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);

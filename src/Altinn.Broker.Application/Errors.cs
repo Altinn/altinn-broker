@@ -18,11 +18,15 @@ public static class Errors
     public static Error FileTransferNotPublished = new Error(10, "A file transfer can only be confirmed to be downloaded when it is published. See file transfer status.", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeNegative = new Error(11, "Max file transfer size cannot be negative", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeZero = new Error(12, "Max file transfer size cannot be zero", HttpStatusCode.BadRequest);
-    public static Error MaxUploadSizeOverGlobal = new Error(13, "Max file transfer size cannot be set higher than the global max file transfer size", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeForVirusScan = new Error(13, "Max file transfer size cannot be set higher than the 2GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack.", HttpStatusCode.BadRequest);
     public static Error InvalidTimeToLiveFormat = new Error(14, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
     public static Error TimeToLiveCannotExceed365Days = new Error(15, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
     public static Error FileSizeTooBig = new Error(16, "File size exceeds maximum", HttpStatusCode.BadRequest);
     public static Error InvalidGracePeriodFormat = new Error(17, "Invalid grace period format. Should follow ISO8601 standard for duration. Example: 'PT2H' for 2 hours.", HttpStatusCode.BadRequest);
     public static Error GracePeriodCannotExceed24Hours = new Error(18, "Grace period cannot exceed 24 hours", HttpStatusCode.BadRequest);
     public static Error ConfirmDownloadBeforeDownloadStarted = new Error(19, "Cannot confirm before the files have been downloaded", HttpStatusCode.BadRequest);
+    public static Error NotApprovedForDisabledVirusScan = new Error(20, "In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack.", HttpStatusCode.BadRequest);
+    public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
+    public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it.", HttpStatusCode.BadRequest);
+    public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
 }
