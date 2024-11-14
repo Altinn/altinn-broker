@@ -10,7 +10,6 @@ public class PseudoRandomDataStream : Stream
     private long _length;
     private XorShiftRandom _rng;
     private Timer _timer;
-    private long _buffersRead = 0;
     private int timerElapsedCount = 0;
 
     long bytesRead = 0;
@@ -58,9 +57,8 @@ public class PseudoRandomDataStream : Stream
         long bytesLeftToRead = _length - _position;
         int bytesToRead = (int)Math.Min(count, Math.Min(bytesLeftToRead, int.MaxValue));
         if (bytesToRead <= 0) return 0;
-        _rng.NextBytes(buffer, offset, bytesToRead);
+        _rng.NextBytes(buffer, 0, bytesToRead);
         _position += bytesToRead;
-        _buffersRead++;
         return bytesToRead;
     }
 
@@ -105,6 +103,7 @@ public class PseudoRandomDataStream : Stream
 
     protected override void Dispose(bool disposing)
     {
+        _timer.Dispose();
         base.Dispose(disposing);
     }
 }
