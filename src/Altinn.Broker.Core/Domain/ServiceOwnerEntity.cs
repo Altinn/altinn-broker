@@ -7,7 +7,6 @@ public class ServiceOwnerEntity
     public required string Id { get; set; }
     public required string Name { get; set; }
     public List<StorageProviderEntity> StorageProviders { get; set; }
-    public StorageProviderEntity? StorageProvider { get; set; }
 
     public StorageProviderEntity? GetStorageProvider(bool withVirusScan)
     {
