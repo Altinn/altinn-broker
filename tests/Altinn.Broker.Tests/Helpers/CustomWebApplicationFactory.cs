@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Threading;
 
 using Altinn.Broker.API.Configuration;
@@ -99,8 +100,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
-            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-            authorizationService.Setup(x => x.CheckUserAccess(TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<ClaimsPrincipal?>(), It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<ClaimsPrincipal?>(), TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
             services.AddSingleton(authorizationService.Object);
 
             var eventBus = new Mock<IEventBus>();

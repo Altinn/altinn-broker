@@ -1,4 +1,5 @@
-﻿using System.Transactions;
+﻿using System.Security.Claims;
+using System.Transactions;
 
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
@@ -21,7 +22,7 @@ namespace Altinn.Broker.Application.ExpireFileTransfer;
 public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferHandler> logger) : IHandler<ExpireFileTransferRequest, Task>
 {
     [AutomaticRetry(Attempts = 0)]
-    public async Task<OneOf<Task, Error>> Process(ExpireFileTransferRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<Task, Error>> Process(ExpireFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
         var fileTransfer = await GetFileTransferAsync(request.FileTransferId, cancellationToken);

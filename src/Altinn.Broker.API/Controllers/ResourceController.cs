@@ -32,7 +32,7 @@ public class ResourceController : Controller
             UseManifestFileShim = resourceExt.UseManifestFileShim,
             ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
             ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
 
         return result.Match(
             (_) => Ok(null),

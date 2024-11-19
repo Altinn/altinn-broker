@@ -45,7 +45,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         logger.LogInformation("Initializing file transfer");
         var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt, token);
 
-        var commandResult = await handler.Process(commandRequest, cancellationToken);
+        var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
                 fileTransferId => Ok(new FileTransferInitializeResponseExt()
                 {
@@ -83,7 +83,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             Token = token,
             UploadStream = Request.Body,
             ContentLength = Request.ContentLength.Value
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileTransferId => Ok(new FileTransferUploadResponseExt()
             {
@@ -113,7 +113,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Initializing and uploading fileTransfer");
         var initializeRequest = InitializeFileTransferMapper.MapToRequest(form.Metadata, token);
-        var initializeResult = await initializeFileTransferHandler.Process(initializeRequest, cancellationToken);
+        var initializeResult = await initializeFileTransferHandler.Process(initializeRequest, HttpContext.User, cancellationToken);
         if (initializeResult.IsT1)
         {
             Problem(initializeResult.AsT1);
@@ -126,7 +126,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             FileTransferId = fileTransferId,
             Token = token,
             UploadStream = Request.Body
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return uploadResult.Match(
             FileId => Ok(FileId.ToString()),
             Problem
@@ -152,7 +152,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         {
             FileTransferId = fileTransferId,
             Token = token
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(FileTransferStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
             Problem
@@ -178,7 +178,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         {
             FileTransferId = fileTransferId,
             Token = token
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(FileTransferStatusDetailsExtMapper.MapToExternalModel(result.FileTransfer, result.FileTransferEvents, result.ActorEvents)),
             Problem
@@ -212,7 +212,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             RecipientStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
             From = from,
             To = to
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             Ok,
             Problem
@@ -238,7 +238,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         {
             FileTransferId = fileTransferId,
             Token = token
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match<ActionResult>(
             result => File(result.DownloadStream, "application/octet-stream", result.FileName),
             Problem
@@ -265,7 +265,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
             FileTransferId = fileTransferId,
             Token = token
         };
-        var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, cancellationToken));
+        var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, HttpContext.User, cancellationToken));
         var uniqueString = $"confirmDownload_{fileTransferId}_{token.Consumer}";
         var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, idempotencyEventRepository, cancellationToken);
         return commandResult.Match(

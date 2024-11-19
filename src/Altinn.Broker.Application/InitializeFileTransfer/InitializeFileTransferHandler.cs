@@ -1,4 +1,6 @@
-﻿using Altinn.Broker.Application.ExpireFileTransfer;
+﻿using System.Security.Claims;
+
+using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -28,10 +30,10 @@ public class InitializeFileTransferHandler(
     IHostEnvironment hostEnvironment,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
-    public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId.SanitizeForLogs());
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
@@ -74,7 +76,7 @@ public class InitializeFileTransferHandler(
         {
             FileTransferId = fileTransferId,
             Force = false
-        }, cancellationToken), fileExpirationTime);
+        }, null, cancellationToken), fileExpirationTime);
         await fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {

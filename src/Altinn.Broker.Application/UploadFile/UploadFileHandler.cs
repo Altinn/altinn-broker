@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
@@ -27,7 +29,7 @@ public class UploadFileHandler(
     IHostEnvironment hostEnvironment,
     ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
-    public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
@@ -35,7 +37,7 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;
