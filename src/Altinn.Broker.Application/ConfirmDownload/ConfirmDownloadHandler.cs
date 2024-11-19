@@ -80,7 +80,7 @@ public class ConfirmDownloadHandler(
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
-                    }, user, cancellationToken));
+                    }, null, cancellationToken));
                 }
                 else
                 {
