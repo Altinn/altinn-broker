@@ -18,23 +18,25 @@ namespace Altinn.Broker.Integrations.Altinn.Authorization;
 public class AltinnAuthorizationService : IAuthorizationService
 {
     private readonly HttpClient _httpClient;
-    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IResourceRepository _resourceRepository;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<AltinnAuthorizationService> _logger;
 
-    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IHttpContextAccessor httpContextAccessor, IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<AltinnAuthorizationService> logger)
+    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<AltinnAuthorizationService> logger)
     {
         httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", altinnOptions.Value.PlatformSubscriptionKey);
         _httpClient = httpClient;
-        _httpContextAccessor = httpContextAccessor;
         _resourceRepository = resourceRepository;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
-    public async Task<bool> CheckUserAccess(string resourceId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, List<ResourceAccessLevel> rights, bool IsLegacyUser = false, CancellationToken cancellationToken = default)
     {
+        if (user is null)
+        {
+            throw new InvalidOperationException("This operation cannot be called outside an authenticated HttpContext");
+        }
         if (IsLegacyUser || _hostEnvironment.IsDevelopment())
         {
             return true;
@@ -44,7 +46,6 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             return false;
         }
-        var user = _httpContextAccessor.HttpContext?.User;
         if (user is null)
         {
             _logger.LogError("Unexpected null value. User was null when checking access to resource");

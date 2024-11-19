@@ -45,7 +45,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         logger.LogInformation("Legacy - Initializing file");
         var commandRequest = LegacyInitializeFileMapper.MapToRequest(initializeExt, token);
-        var commandResult = await handler.Process(commandRequest, cancellationToken);
+        var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileId => Ok(fileId.ToString()),
             Problem
@@ -78,7 +78,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             Token = legacyToken,
             UploadStream = Request.Body,
             IsLegacy = true
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileId => Ok(fileId.ToString()),
             Problem
@@ -107,7 +107,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             FileTransferId = fileId,
             Token = legacyToken,
             IsLegacy = true
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
             Problem
@@ -160,7 +160,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             From = from,
             To = to,
             Recipients = recipients
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             Ok,
             Problem
@@ -188,7 +188,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             FileTransferId = fileId,
             Token = legacyToken,
             IsLegacy = true
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return queryResult.Match<ActionResult>(
             result => File(result.DownloadStream, "application/octet-stream", result.FileName),
             Problem
@@ -216,7 +216,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             FileTransferId = fileId,
             Token = legacyToken,
             IsLegacy = true
-        }, cancellationToken);
+        }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             Ok,
             Problem

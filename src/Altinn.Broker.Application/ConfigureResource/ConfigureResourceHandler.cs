@@ -1,4 +1,5 @@
-﻿using System.Xml;
+﻿using System.Security.Claims;
+using System.Xml;
 
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
@@ -14,7 +15,7 @@ using OneOf;
 namespace Altinn.Broker.Application.ConfigureResource;
 public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
-    public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Xml;
 
 using Altinn.Broker.Application;
@@ -28,7 +29,7 @@ public class ConfirmDownloadHandler(
     IEventBus eventBus,
     ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
 {
-    public async Task<OneOf<Task, Error>> Process(ConfirmDownloadRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<Task, Error>> Process(ConfirmDownloadRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Confirming download for file transfer {fileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
@@ -36,7 +37,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;
@@ -79,7 +80,7 @@ public class ConfirmDownloadHandler(
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
-                    }, cancellationToken));
+                    }, user, cancellationToken));
                 }
                 else
                 {
@@ -88,7 +89,7 @@ public class ConfirmDownloadHandler(
                     {
                         FileTransferId = request.FileTransferId,
                         Force = true
-                    }, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
+                    }, null, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
                 }
             }
             return Task.CompletedTask;

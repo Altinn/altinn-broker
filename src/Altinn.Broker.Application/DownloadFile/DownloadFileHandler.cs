@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -10,7 +12,7 @@ using OneOf;
 namespace Altinn.Broker.Application.DownloadFile;
 public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
 {
-    public async Task<OneOf<DownloadFileResponse, Error>> Process(DownloadFileRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<DownloadFileResponse, Error>> Process(DownloadFileRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Starting download of file transfer {FileTransferId}", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
@@ -30,7 +32,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.NoFileUploaded;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

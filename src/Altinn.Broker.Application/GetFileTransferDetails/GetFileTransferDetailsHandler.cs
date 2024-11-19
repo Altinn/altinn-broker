@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -10,7 +12,7 @@ namespace Altinn.Broker.Application.GetFileTransferDetails;
 
 public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferRepository, IAuthorizationService resourceRightsRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, ILogger<GetFileTransferDetailsHandler> logger) : IHandler<GetFileTransferDetailsRequest, GetFileTransferDetailsResponse>
 {
-    public async Task<OneOf<GetFileTransferDetailsResponse, Error>> Process(GetFileTransferDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<OneOf<GetFileTransferDetailsResponse, Error>> Process(GetFileTransferDetailsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting file transfer details for {fileTransferId}.", request.FileTransferId);
         var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
@@ -23,7 +25,7 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
