@@ -15,6 +15,7 @@ jobs:
     name: Internal test
     uses: ./.github/workflows/deploy-to-environment.yml
     if: always() && !failure() && !cancelled() 
+    needs: [test]
     permissions: 
       id-token: write
       contents: read
