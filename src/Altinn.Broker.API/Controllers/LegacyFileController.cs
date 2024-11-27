@@ -26,7 +26,7 @@ namespace Altinn.Broker.Controllers;
 /// The LegacyFileController allows integration from the Altinn 2 BrokerBridge component to allow legacy users access to Altinn 3 Broker
 /// </summary>
 [ApiController]
-[Route("broker/api/legacy/v1/file")]
+[Route("broker/api/v1/legacy/file")]
 [Authorize(AuthenticationSchemes = AuthorizationConstants.Legacy)]
 [Authorize(Policy = AuthorizationConstants.Legacy)]
 public class LegacyFileController(ILogger<LegacyFileController> logger) : Controller

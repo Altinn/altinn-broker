@@ -46,11 +46,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task InitializeAndUpload_Success()
     {
         // Initialize
-        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/legacy/v1/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/v1/legacy/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         string onBehalfOfConsumer = FileTransferInitializeExtTestFactory.BasicFileTransfer().Sender;
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
-        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
         Assert.NotNull(fileAfterInitialize);
         Assert.Equal(LegacyFileStatusExt.Initialized, fileAfterInitialize.FileStatus);
 
@@ -59,10 +59,10 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         using (var content = new ByteArrayContent(uploadedFileBytes))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
+            var uploadResponse = await _legacyClient.PostAsync($"broker/api/v1/legacy/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
         Assert.NotNull(fileAfterUpload);
         Assert.Equal(LegacyFileStatusExt.Published, fileAfterUpload.FileStatus); // When running integration test this happens instantly as of now.
     }
@@ -90,7 +90,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&recipients={file.Recipients[0]}"
@@ -110,11 +110,11 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task InitializeAndUpload_FailsDueToAntivirus()
     {
         // Initialize
-        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/legacy/v1/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/v1/legacy/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         string onBehalfOfConsumer = FileTransferInitializeExtTestFactory.BasicFileTransfer().Sender;
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
-        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
         Assert.NotNull(fileAfterInitialize);
         Assert.Equal(LegacyFileStatusExt.Initialized, fileAfterInitialize.FileStatus);
 
@@ -123,14 +123,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         using (var content = new ByteArrayContent(uploadedFileBytes))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
+            var uploadResponse = await _legacyClient.PostAsync($"broker/api/v1/legacy/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
 
         var jsonBody = GetMalwareScanResultJson("Data/MalwareScanResult_Malicious.json", fileId);
         await SendMalwareScanResult(jsonBody);
 
-        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
+        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
         Assert.NotNull(fileAfterUpload);
         Assert.Equal(LegacyFileStatusExt.Failed, fileAfterUpload.FileStatus);
         Assert.StartsWith("Malware", fileAfterUpload.FileStatusText);
@@ -160,7 +160,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&recipients={file.Recipients[0]}");
@@ -196,7 +196,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&recipients={file.Recipients[1]}");
@@ -232,7 +232,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?recipientStatus={status}"
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[0]}");
@@ -265,15 +265,15 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
 
-        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[1]}");
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[1]}");
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
 
         // Act
-        var getResponse_rep1 = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?status=Published&recipientStatus={status}"
+        var getResponse_rep1 = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?status=Published&recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[0]}");
-        var getResponse_rep2 = await _legacyClient.GetAsync($"broker/api/legacy/v1/file?status=Published&recipientStatus={status}"
+        var getResponse_rep2 = await _legacyClient.GetAsync($"broker/api/v1/legacy/file?status=Published&recipientStatus={status}"
         + $"&from={HttpUtility.UrlEncode(from.UtcDateTime.ToString("o"))}&to={HttpUtility.UrlEncode(to.UtcDateTime.ToString("o"))}"
         + $"&resourceId={file.ResourceId}"
         + $"&onBehalfOfConsumer={file.Recipients[1]}");
@@ -307,7 +307,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}?onBehalfOfConsumer={file.Recipients[0]}");
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}?onBehalfOfConsumer={file.Recipients[0]}");
         var fileData = await getResponse.Content.ReadFromJsonAsync<LegacyFileOverviewExt>(_responseSerializerOptions);
 
         // Assert        
@@ -336,7 +336,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}?onBehalfOfConsumer={onBehalfOfConsumer}");
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}?onBehalfOfConsumer={onBehalfOfConsumer}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
@@ -352,7 +352,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         string fileId2 = await InitializeFile();
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file"
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file"
         + $"?status=Published"
         + $"&recipientStatus=Initialized"
         + $"&resourceId={file.ResourceId}"
@@ -375,7 +375,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         string fileId = "00000000-0000-0000-0000-000000000000";
 
         // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
@@ -406,7 +406,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
 
         // Act
-        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
 
         // Assert
@@ -436,12 +436,12 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
         Assert.True(downloadedFile.IsSuccessStatusCode);
 
         // Act
-        var getResponse = await _legacyClient.PostAsync($"broker/api/legacy/v1/file/{fileTransferId}/confirmdownload?onBehalfOfConsumer={file.Recipients[0]}", null);
-        var statusResponse = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}?onBehalfOfConsumer={file.Recipients[0]}");
+        var getResponse = await _legacyClient.PostAsync($"broker/api/v1/legacy/file/{fileTransferId}/confirmdownload?onBehalfOfConsumer={file.Recipients[0]}", null);
+        var statusResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}?onBehalfOfConsumer={file.Recipients[0]}");
         var result = await statusResponse.Content.ReadFromJsonAsync<LegacyFileOverviewExt>(_responseSerializerOptions);
 
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -462,7 +462,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
         // Act
-        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
         Assert.True(downloadedFileBytes.Length > uploadedFileLength);
         var manifestDownloadStream = new ManifestDownloadStream(downloadedFileBytes);
@@ -487,7 +487,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
         // Act
-        var downloadedFile = await _legacyClient.GetAsync($"broker/api/legacy/v1/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
         var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
         Assert.Equal(downloadedFileBytes.Length, uploadedFileLength);
         var manifestDownloadStream = new ManifestDownloadStream(downloadedFileBytes);
