@@ -85,10 +85,15 @@ public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepos
     }
     private async Task<ResourceEntity> GetResource(string resourceId, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(resourceId))
+        {
+            throw new ArgumentNullException(nameof(resourceId), "Resource ID cannot be null or empty");
+        }
+
         var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
-            throw new Exception("Resource not found");
+            throw new Exception("Resource " + resourceId + " not found in Broker Resource store");
         }
         return resource;
     }
