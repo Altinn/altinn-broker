@@ -23,11 +23,13 @@ public class ManifestDownloadStreamTests
         var stream = ReadFile("Data/ManifestFileTests/Payload.zip");
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
+        DateTime expectedSentDate = file.Created.ToLocalTime().DateTime;
         await stream.AddManifestFile(file, resource);
         Assert.True(stream.Length > originalFileLength);
         var brokerManifest = stream.GetBrokerManifest();
         Assert.Equal(brokerManifest.Reportee, file.RecipientCurrentStatuses.First().Actor.ActorExternalId);
         Assert.Equal(brokerManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.Equal(brokerManifest.SentDate, expectedSentDate);
     }
 
     [Fact]
@@ -45,6 +47,7 @@ public class ManifestDownloadStreamTests
         var originalBrokerManifest = stream.GetBrokerManifest();
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
+        DateTime expectedSentDate = file.Created.ToLocalTime().DateTime;
         await stream.AddManifestFile(file, resource);
         var newBrokerManifest = stream.GetBrokerManifest();
         Assert.NotEqual(stream.Length, originalFileLength);
@@ -53,7 +56,29 @@ public class ManifestDownloadStreamTests
         Assert.NotEqual(originalBrokerManifest.SentDate, newBrokerManifest.SentDate);
         Assert.Equal(newBrokerManifest.Reportee, file.RecipientCurrentStatuses.First().Actor.ActorExternalId);
         Assert.Equal(newBrokerManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.Equal(newBrokerManifest.SentDate, expectedSentDate);
     }
+
+
+    [Fact]
+    public async Task jallaTest()
+    {
+        DateTimeOffset orgDateTimeOffset = DateTimeOffset.Now;
+        DateTime orgDateTime = DateTime.Now;
+
+        DateTime conv1 = orgDateTimeOffset.LocalDateTime;
+        DateTime conv2 = orgDateTimeOffset.DateTime;
+        DateTime conv3 = (orgDateTimeOffset.ToLocalTime()).DateTime;
+
+        string s = "orgOffset: " + orgDateTimeOffset.ToString() + Environment.NewLine
+            + "orgDateTime: " + orgDateTime.ToString() + Environment.NewLine
+            + "conv1: " + conv1.ToString() + Environment.NewLine
+            + "conv2: " + conv2.ToString() + Environment.NewLine
+            + "conv2: " + conv3.ToString() + Environment.NewLine;
+
+        Assert.NotEmpty(s);
+    }
+
 
     [Fact]
     public async Task StreamThatIsNotZip_AddManifest_FailsAsync()

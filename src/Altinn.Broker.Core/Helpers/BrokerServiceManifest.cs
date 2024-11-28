@@ -63,7 +63,7 @@ public static class BrokerServiceManifestExtensions
             ExternalServiceEditionCode = resource.UseManifestFileShim == true ? resource.ExternalServiceEditionCodeLegacy : null,
             SendersReference = entity.SendersFileTransferReference,
             Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
-            SentDate = DateTime.UtcNow,
+            SentDate = entity.Created.ToLocalTime().DateTime,
             FileList = new List<FileEntry>
                 {
                     new FileEntry { FileName = entity.FileName }
