@@ -59,27 +59,6 @@ public class ManifestDownloadStreamTests
         Assert.Equal(newBrokerManifest.SentDate, expectedSentDate);
     }
 
-
-    [Fact]
-    public async Task jallaTest()
-    {
-        DateTimeOffset orgDateTimeOffset = DateTimeOffset.Now;
-        DateTime orgDateTime = DateTime.Now;
-
-        DateTime conv1 = orgDateTimeOffset.LocalDateTime;
-        DateTime conv2 = orgDateTimeOffset.DateTime;
-        DateTime conv3 = (orgDateTimeOffset.ToLocalTime()).DateTime;
-
-        string s = "orgOffset: " + orgDateTimeOffset.ToString() + Environment.NewLine
-            + "orgDateTime: " + orgDateTime.ToString() + Environment.NewLine
-            + "conv1: " + conv1.ToString() + Environment.NewLine
-            + "conv2: " + conv2.ToString() + Environment.NewLine
-            + "conv2: " + conv3.ToString() + Environment.NewLine;
-
-        Assert.NotEmpty(s);
-    }
-
-
     [Fact]
     public async Task StreamThatIsNotZip_AddManifest_FailsAsync()
     {
