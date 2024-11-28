@@ -78,7 +78,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Token = token,
+            Token = legacyToken,
             UploadStream = Request.Body,
             ContentLength = Request.ContentLength.Value,
             IsLegacy = true
