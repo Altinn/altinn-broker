@@ -71,13 +71,16 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
 
         LogContextHelpers.EnrichLogsWithToken(legacyToken);
         logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
-        Request.EnableBuffering();
+        if (Request.ContentLength is null)
+        {
+            return Problem("Content-length header is required");
+        }
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Token = legacyToken,
+            Token = token,
             UploadStream = Request.Body,
-            ContentLength = Request.Body.Length,
+            ContentLength = Request.ContentLength.Value,
             IsLegacy = true
         }, HttpContext.User, cancellationToken);
         return commandResult.Match(

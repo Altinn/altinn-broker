@@ -64,6 +64,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
         var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
         Assert.NotNull(fileAfterUpload);
+        Assert.True(fileAfterUpload.FileSize == uploadedFileBytes.Length);
         Assert.Equal(LegacyFileStatusExt.Published, fileAfterUpload.FileStatus); // When running integration test this happens instantly as of now.
     }
 
