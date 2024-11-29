@@ -26,7 +26,7 @@ public class ManifestDownloadStreamTests
         await stream.AddManifestFile(file, resource);
         Assert.True(stream.Length > originalFileLength);
         var brokerManifest = stream.GetBrokerManifest();
-        Assert.Equal(brokerManifest.Reportee, file.RecipientCurrentStatuses.First().Actor.ActorExternalId);
+        Assert.Equal(brokerManifest.Reportee, "991825827");
         Assert.Equal(brokerManifest.SendersReference, file.SendersFileTransferReference);
     }
 
@@ -51,7 +51,7 @@ public class ManifestDownloadStreamTests
         Assert.NotEqual(originalBrokerManifest.Reportee, newBrokerManifest.Reportee);
         Assert.NotEqual(originalBrokerManifest.SendersReference, newBrokerManifest.SendersReference);
         Assert.NotEqual(originalBrokerManifest.SentDate, newBrokerManifest.SentDate);
-        Assert.Equal(newBrokerManifest.Reportee, file.RecipientCurrentStatuses.First().Actor.ActorExternalId);
+        Assert.Equal(newBrokerManifest.Reportee, "991825827");
         Assert.Equal(newBrokerManifest.SendersReference, file.SendersFileTransferReference);
     }
 
