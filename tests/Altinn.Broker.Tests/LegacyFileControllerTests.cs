@@ -471,7 +471,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
         // Assert
         Assert.NotNull(addedManifest);
-        Assert.Equal(addedManifest.Reportee, file.Recipients[0]);
+        Assert.Equal("991825827", addedManifest.Reportee);
         Assert.Equal(addedManifest.SendersReference, file.SendersFileTransferReference);
         Assert.True(addedManifest.PropertyList.All(property => file.PropertyList[property.PropertyKey] == property.PropertyValue));
     }
