@@ -51,7 +51,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         if (resource.UseManifestFileShim == true && request.IsLegacy) // For specific legacy resources during transition period
         {
             var fileBuffer = new byte[fileTransfer.FileTransferSize];
-            downloadStream.Read(fileBuffer, 0, fileBuffer.Length);
+            downloadStream.ReadExactly(fileBuffer, 0, fileBuffer.Length);
             downloadStream = new ManifestDownloadStream(fileBuffer);
             (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);
         }

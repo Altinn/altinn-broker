@@ -62,7 +62,7 @@ public static class BrokerServiceManifestExtensions
             ExternalServiceCode = resource.UseManifestFileShim == true ? resource.ExternalServiceCodeLegacy : null,
             ExternalServiceEditionCode = resource.UseManifestFileShim == true ? resource.ExternalServiceEditionCodeLegacy : null,
             SendersReference = entity.SendersFileTransferReference,
-            Reportee = entity.RecipientCurrentStatuses.First().Actor.ActorExternalId,
+            Reportee = entity.Sender.ActorExternalId.Split(':', StringSplitOptions.None)[1],
             SentDate = entity.Created.ToLocalTime().DateTime,
             FileList = new List<FileEntry>
                 {
