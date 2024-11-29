@@ -23,12 +23,14 @@ public class ManifestDownloadStreamTests
         var stream = ReadFile("Data/ManifestFileTests/Payload.zip");
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
+        DateTime expectedSentDate = file.Created.ToLocalTime().DateTime;
         await stream.AddManifestFile(file, resource);
         Assert.True(stream.Length > originalFileLength);
         var brokerManifest = stream.GetBrokerManifest();
         Assert.NotNull(brokerManifest);
         Assert.Equal("991825827", brokerManifest.Reportee);
         Assert.Equal(brokerManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.Equal(brokerManifest.SentDate, expectedSentDate);
     }
 
     [Fact]
@@ -46,6 +48,7 @@ public class ManifestDownloadStreamTests
         var originalBrokerManifest = stream.GetBrokerManifest();
         var originalFileLength = stream.Length;
         var file = FileTransferEntityFactory.BasicFileTransfer();
+        DateTime expectedSentDate = file.Created.ToLocalTime().DateTime;
         await stream.AddManifestFile(file, resource);
         var newBrokerManifest = stream.GetBrokerManifest();
         Assert.NotEqual(stream.Length, originalFileLength);
@@ -54,6 +57,7 @@ public class ManifestDownloadStreamTests
         Assert.NotEqual(originalBrokerManifest.SentDate, newBrokerManifest.SentDate);        
         Assert.Equal("991825827", newBrokerManifest.Reportee);
         Assert.Equal(newBrokerManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.Equal(newBrokerManifest.SentDate, expectedSentDate);
     }
 
     [Fact]
