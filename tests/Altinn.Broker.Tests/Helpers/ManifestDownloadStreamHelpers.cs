@@ -15,7 +15,7 @@ internal static class ManifestDownloadStreamHelpers
     {
         using (var archive = new ZipArchive(downloadStream, ZipArchiveMode.Read, true))
         {
-            var manifestEntry = archive.GetEntry("Manifest.xml");
+            var manifestEntry = archive.GetEntry("manifest.xml");
             if (manifestEntry is null)
             {
                 return null;
