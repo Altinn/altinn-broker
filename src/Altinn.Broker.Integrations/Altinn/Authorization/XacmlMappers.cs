@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Integration.Altinn.Authorization;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 
@@ -57,13 +58,18 @@ public static class XacmlMappers
 
     /// If id is required this should be included by the caller. 
     /// Attribute eventId is tagged with `includeInResponse`</remarks>
-    internal static XacmlJsonCategory CreateResourceCategory(ResourceEntity resourceEntity)
+    internal static XacmlJsonCategory CreateResourceCategory(string resourceId, string party, string? instanceId)
     {
         XacmlJsonCategory resourceCategory = new() { Attribute = new List<XacmlJsonAttribute>() };
 
-        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceId, resourceEntity.Id, DefaultType, DefaultIssuer));
-
+        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceId, resourceId, DefaultType, DefaultIssuer));
+        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(UrnConstants.OrganizationNumberAttribute, party, DefaultType, DefaultIssuer));
+        if (instanceId is not null)
+        {
+            resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceInstance, instanceId, DefaultType, DefaultIssuer));
+        }
         return resourceCategory;
+
     }
 
     internal static XacmlJsonCategory CreateSubjectCategory(ClaimsPrincipal user)

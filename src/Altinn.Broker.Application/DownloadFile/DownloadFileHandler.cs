@@ -20,23 +20,19 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.FileTransferNotFound;
         }
+        var hasAccess = await resourceRightsRepository.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoAccessToResource;
+        };
         if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Published && fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.AllConfirmedDownloaded)
         {
             return Errors.FileTransferNotAvailable;
-        }
-        if (!fileTransfer.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
-        {
-            return Errors.FileTransferNotFound;
         }
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
             return Errors.NoFileUploaded;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
-        if (!hasAccess)
-        {
-            return Errors.NoAccessToResource;
-        };
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {

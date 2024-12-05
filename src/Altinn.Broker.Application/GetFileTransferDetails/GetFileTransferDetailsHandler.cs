@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -20,15 +21,10 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         {
             return Errors.FileTransferNotFound;
         }
-        if (fileTransfer.Sender.ActorExternalId != request.Token.Consumer &&
-            !fileTransfer.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
-        {
-            return Errors.FileTransferNotFound;
-        }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckAccessAsSenderOrRecipient(user, fileTransfer, false, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.NoAccessToResource;
+            return Errors.FileTransferNotFound;
         };
         var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
         var actorEvents = await actorFileTransferStatusRepository.GetActorEvents(request.FileTransferId, cancellationToken);

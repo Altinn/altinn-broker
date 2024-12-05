@@ -100,8 +100,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
-            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<ClaimsPrincipal?>(), It.IsAny<string>(), It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-            authorizationService.Setup(x => x.CheckUserAccess(It.IsAny<ClaimsPrincipal?>(), TestConstants.RESOURCE_WITH_NO_ACCESS, It.IsAny<List<ResourceAccessLevel>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+            authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckAccessAsRecipient(It.IsAny<ClaimsPrincipal?>(), It.IsAny<FileTransferEntity>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckAccessAsSenderOrRecipient(It.IsAny<ClaimsPrincipal?>(), It.IsAny<FileTransferEntity>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             services.AddSingleton(authorizationService.Object);
 
             var eventBus = new Mock<IEventBus>();

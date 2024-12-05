@@ -37,7 +37,7 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;

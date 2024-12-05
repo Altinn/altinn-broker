@@ -15,7 +15,6 @@ using Altinn.Broker.Core.Services.Enums;
 using Hangfire;
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -37,15 +36,11 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, request.IsLegacy, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.FileTransferNotFound;
         };
-        if (!fileTransfer.RecipientCurrentStatuses.Any(actorEvent => actorEvent.Actor.ActorExternalId == request.Token.Consumer))
-        {
-            return Errors.FileTransferNotFound;
-        }
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
             return Errors.NoFileUploaded;

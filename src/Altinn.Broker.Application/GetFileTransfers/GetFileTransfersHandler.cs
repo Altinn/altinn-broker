@@ -2,7 +2,6 @@ using System.Security.Claims;
 
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
@@ -17,7 +16,13 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting file transfers for {resourceId}", request.ResourceId.SanitizeForLogs());
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        var callingParty = user?.GetCallerOrganizationId();
+        if (callingParty is null)
+        {
+            logger.LogError("Caller not found");
+            return Errors.NoAccessToResource;
+        }
+        var hasAccess = await resourceRightsRepository.CheckAccessForSearch(user, request.ResourceId, callingParty, false, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
