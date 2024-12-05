@@ -216,14 +216,10 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         using (var archive = new ZipArchive(modifiedZipStream, ZipArchiveMode.Update, true))
         {
             // Remove existing manifest files
-            var manifestEntry = archive.GetEntry("manifest.xml");
-            manifestEntry?.Delete();
-            manifestEntry = archive.GetEntry("Manifest.xml");
+            var manifestEntry = archive.Entries.FirstOrDefault(entry => entry.Name.ToLowerInvariant() == "manifest.xml");
             manifestEntry?.Delete();
 
-            var recipientsEntry = archive.GetEntry("recipients.xml");
-            recipientsEntry?.Delete();
-            recipientsEntry = archive.GetEntry("Recipients.xml");
+            var recipientsEntry = archive.Entries.FirstOrDefault(entry => entry.Name.ToLowerInvariant() == "recipients.xml");
             recipientsEntry?.Delete();
 
             // Create new manifest entry
