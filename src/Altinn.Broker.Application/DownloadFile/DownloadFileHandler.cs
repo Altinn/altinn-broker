@@ -53,7 +53,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);
         }
         var caller = request.OnBehalfOf ?? user?.GetCallerOrganizationId();
-        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, "0192:" + caller, cancellationToken);
+        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller.WithPrefix(), cancellationToken);
         return new DownloadFileResponse()
         {
             FileName = fileTransfer.FileName,

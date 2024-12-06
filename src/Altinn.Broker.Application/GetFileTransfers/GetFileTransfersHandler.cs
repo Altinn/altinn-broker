@@ -33,7 +33,7 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
         {
             return Errors.InvalidResourceDefinition;
         };
-        var callingActor = await actorRepository.GetActorAsync(caller, cancellationToken);
+        var callingActor = await actorRepository.GetActorAsync(caller.WithPrefix(), cancellationToken);
         if (callingActor is null)
         {
             return new List<Guid>();

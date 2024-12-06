@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
@@ -44,7 +45,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         return new ResourceEntity()
         {
             Id = altinnResourceResponse.Identifier,
-            ServiceOwnerId = $"0192:{altinnResourceResponse.HasCompetentAuthority.Organization}",
+            ServiceOwnerId = altinnResourceResponse.HasCompetentAuthority.Organization.WithPrefix(),
             OrganizationNumber = altinnResourceResponse.HasCompetentAuthority.Organization,
         };
     }
