@@ -31,13 +31,13 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        /*if (isDevelopment)
+        if (string.IsNullOrWhiteSpace(maskinportenSettings.ClientId))
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
             services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();
         }
         else
-        {*/
+        {
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
             services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                 .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();
@@ -49,7 +49,7 @@ public static class DependencyInjection
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAuthorizationService).FullName, maskinportenSettings);
             services.AddHttpClient<IAuthorizationService, AltinnAuthorizationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>();
-        //}
+        }
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
         if (string.IsNullOrWhiteSpace(generalSettings.SlackUrl))
