@@ -11,7 +11,6 @@ using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.Azure.Management.Storage.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,15 +20,13 @@ public class AltinnAuthorizationService : IAuthorizationService
 {
     private readonly HttpClient _httpClient;
     private readonly IResourceRepository _resourceRepository;
-    private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<AltinnAuthorizationService> _logger;
 
-    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<AltinnAuthorizationService> logger)
+    public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
     {
         httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", altinnOptions.Value.PlatformSubscriptionKey);
         _httpClient = httpClient;
         _resourceRepository = resourceRepository;
-        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
