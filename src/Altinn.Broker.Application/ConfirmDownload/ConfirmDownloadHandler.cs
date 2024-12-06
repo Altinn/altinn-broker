@@ -50,7 +50,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        var caller = request.onBehalfOf ?? user?.GetCallerOrganizationId();
+        var caller = request.onBehalfOf ?? "0192:" + user?.GetCallerOrganizationId();
         if (fileTransfer.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == caller).Status == ActorFileTransferStatus.DownloadConfirmed)
         {
             return Task.CompletedTask;

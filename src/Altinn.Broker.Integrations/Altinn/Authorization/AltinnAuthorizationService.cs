@@ -38,7 +38,7 @@ public class AltinnAuthorizationService : IAuthorizationService
 
     public async Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, bool isLegacyUser, CancellationToken cancellationToken = default)
     {
-        var recipients = fileTransfer.RecipientCurrentStatuses.Where(status => status.Status == ActorFileTransferStatus.Initialized);
+        var recipients = fileTransfer.RecipientCurrentStatuses.DistinctBy(recipient => recipient.Actor.ActorExternalId);
         foreach (var recipient in recipients)
         {
             if (await CheckUserAccess(user, fileTransfer.ResourceId, recipient.Actor.ActorExternalId.WithoutPrefix(), fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, isLegacyUser, cancellationToken))
