@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Integration.Altinn.Authorization;
+using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 

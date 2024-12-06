@@ -7,11 +7,9 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
