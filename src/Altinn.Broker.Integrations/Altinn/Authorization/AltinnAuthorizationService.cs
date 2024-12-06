@@ -2,6 +2,7 @@
 using System.Security.Claims;
 
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
@@ -40,7 +41,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         var recipients = fileTransfer.RecipientCurrentStatuses.Where(status => status.Status == ActorFileTransferStatus.Initialized);
         foreach (var recipient in recipients)
         {
-            if (await CheckUserAccess(user, fileTransfer.ResourceId, recipient.Actor.ActorExternalId.Replace("0192:", ""), fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, isLegacyUser, cancellationToken))
+            if (await CheckUserAccess(user, fileTransfer.ResourceId, recipient.Actor.ActorExternalId.WithoutPrefix(), fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, isLegacyUser, cancellationToken))
             {
                 return true;
             }
@@ -79,7 +80,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             return bypass.Value;
         }
-        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.Replace("0192:", ""), fileTransferId, rights, resource.Id);
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.WithoutPrefix(), fileTransferId, rights, resource.Id);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {

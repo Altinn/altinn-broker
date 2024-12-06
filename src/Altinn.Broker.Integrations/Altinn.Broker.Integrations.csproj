@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Common\Altinn.Broker.Common.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Persistence\Altinn.Broker.Persistence.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Application\Altinn.Broker.Application.csproj" />

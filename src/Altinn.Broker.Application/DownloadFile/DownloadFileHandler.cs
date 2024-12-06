@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -51,7 +52,8 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             downloadStream = new ManifestDownloadStream(fileBuffer);
             (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);
         }
-        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, request.Token.Consumer, cancellationToken);
+        var caller = request.OnBehalfOf ?? user?.GetCallerOrganizationId();
+        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller, cancellationToken);
         return new DownloadFileResponse()
         {
             FileName = fileTransfer.FileName,

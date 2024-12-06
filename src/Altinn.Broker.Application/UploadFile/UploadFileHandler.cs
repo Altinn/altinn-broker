@@ -42,10 +42,6 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         };
-        if (request.Token.Consumer != fileTransfer.Sender.ActorExternalId)
-        {
-            return Errors.FileTransferNotFound;
-        }
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
             return Errors.FileTransferAlreadyUploaded;

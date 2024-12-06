@@ -5,6 +5,7 @@ using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -49,20 +50,21 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        if (fileTransfer.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == request.Token.Consumer).Status == ActorFileTransferStatus.DownloadConfirmed)
+        var caller = request.onBehalfOf ?? user?.GetCallerOrganizationId();
+        if (fileTransfer.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == caller).Status == ActorFileTransferStatus.DownloadConfirmed)
         {
             return Task.CompletedTask;
         }
-        if (!fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == request.Token.Consumer && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted)) //TODO: Replace with DownloadFinished when implemented
+        if (!fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == caller && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted)) //TODO: Replace with DownloadFinished when implemented
         {
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), request.Token.Consumer, cancellationToken);
+            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, cancellationToken);
             await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
-            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, request.Token.Consumer, cancellationToken);
-            bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != request.Token.Consumer).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
+            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, cancellationToken);
+            bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != caller).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
             if (shouldConfirmAll)
             {
                 await eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);

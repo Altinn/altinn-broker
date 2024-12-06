@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
@@ -16,13 +17,13 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting file transfers for {resourceId}", request.ResourceId.SanitizeForLogs());
-        var callingParty = user?.GetCallerOrganizationId();
-        if (callingParty is null)
+        var caller = user?.GetCallerOrganizationId();
+        if (caller is null)
         {
             logger.LogError("Caller not found");
             return Errors.NoAccessToResource;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessForSearch(user, request.ResourceId, callingParty, false, cancellationToken);
+        var hasAccess = await resourceRightsRepository.CheckAccessForSearch(user, request.ResourceId, caller, false, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
@@ -32,7 +33,7 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
         {
             return Errors.InvalidResourceDefinition;
         };
-        var callingActor = await actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
+        var callingActor = await actorRepository.GetActorAsync(caller, cancellationToken);
         if (callingActor is null)
         {
             return new List<Guid>();
