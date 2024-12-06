@@ -40,7 +40,7 @@ public class UploadFileHandler(
         var hasAccess = await resourceRightsRepository.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {

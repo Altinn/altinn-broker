@@ -24,7 +24,7 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         var hasAccess = await resourceRightsRepository.CheckAccessAsSenderOrRecipient(user, fileTransfer, false, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
         var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
         var actorEvents = await actorFileTransferStatusRepository.GetActorEvents(request.FileTransferId, cancellationToken);

@@ -40,7 +40,7 @@ public class ConfirmDownloadHandler(
         var hasAccess = await resourceRightsRepository.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
@@ -51,6 +51,11 @@ public class ConfirmDownloadHandler(
             return Errors.FileTransferNotPublished;
         }
         var caller = (request.onBehalfOf ?? user?.GetCallerOrganizationId())?.WithPrefix();
+        if (string.IsNullOrWhiteSpace(caller)) 
+        {
+            logger.LogError("Caller is not set");
+            return Errors.NoAccessToResource;
+        }
         if (fileTransfer.RecipientCurrentStatuses.First(recipientStatus => recipientStatus.Actor.ActorExternalId == caller).Status == ActorFileTransferStatus.DownloadConfirmed)
         {
             return Task.CompletedTask;

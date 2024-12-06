@@ -23,7 +23,7 @@ public class GetFileTransferOverviewHandler(IAuthorizationService resourceRights
         var hasAccess = await resourceRightsRepository.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
         return new GetFileTransferOverviewResponse()
         {
