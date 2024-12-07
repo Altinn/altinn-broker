@@ -191,7 +191,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             FileTransferId = fileId,
             IsLegacy = true,
-            onBehalfOf = onBehalfOfConsumer
+            OnBehalfOf = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             Ok,

@@ -50,7 +50,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        var caller = (request.onBehalfOf ?? user?.GetCallerOrganizationId())?.WithPrefix();
+        var caller = (request.OnBehalfOf ?? user?.GetCallerOrganizationId())?.WithPrefix();
         if (string.IsNullOrWhiteSpace(caller)) 
         {
             logger.LogError("Caller is not set");
