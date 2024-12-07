@@ -24,7 +24,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.InvalidResourceDefinition;
         }
-        if (resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+        if (resource.ServiceOwnerId is null || resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
         {
             return Errors.NoAccessToResource;
         };
