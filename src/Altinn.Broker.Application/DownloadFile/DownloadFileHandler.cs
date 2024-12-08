@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.DownloadFile;
-public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
+public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
 {
     public async Task<OneOf<DownloadFileResponse, Error>> Process(DownloadFileRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -21,7 +21,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

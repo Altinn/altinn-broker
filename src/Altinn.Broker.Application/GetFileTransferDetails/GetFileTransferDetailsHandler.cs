@@ -11,7 +11,7 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransferDetails;
 
-public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferRepository, IAuthorizationService resourceRightsRepository, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, ILogger<GetFileTransferDetailsHandler> logger) : IHandler<GetFileTransferDetailsRequest, GetFileTransferDetailsResponse>
+public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferRepository, IAuthorizationService authorizationService, IFileTransferStatusRepository fileTransferStatusRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, ILogger<GetFileTransferDetailsHandler> logger) : IHandler<GetFileTransferDetailsRequest, GetFileTransferDetailsResponse>
 {
     public async Task<OneOf<GetFileTransferDetailsResponse, Error>> Process(GetFileTransferDetailsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -21,7 +21,7 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessAsSenderOrRecipient(user, fileTransfer, false, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, false, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

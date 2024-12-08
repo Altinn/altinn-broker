@@ -24,7 +24,7 @@ public class ConfirmDownloadHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
     IActorFileTransferStatusRepository actorFileTransferStatusRepository,
     IResourceRepository resourceRepository,
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IBackgroundJobClient backgroundJobClient,
     IEventBus eventBus,
     ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
@@ -37,7 +37,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

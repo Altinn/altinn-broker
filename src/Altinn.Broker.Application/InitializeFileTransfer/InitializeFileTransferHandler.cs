@@ -21,7 +21,7 @@ namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
     IFileTransferStatusRepository fileTransferStatusRepository,
     IActorFileTransferStatusRepository actorFileTransferStatusRepository,
@@ -33,7 +33,7 @@ public class InitializeFileTransferHandler(
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId.SanitizeForLogs());
-        var hasAccess = await resourceRightsRepository.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

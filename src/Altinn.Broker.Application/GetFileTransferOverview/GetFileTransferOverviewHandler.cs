@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
@@ -10,7 +11,7 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransferOverview;
 
-public class GetFileTransferOverviewHandler(IAuthorizationService resourceRightsRepository, IFileTransferRepository fileTransferRepository, ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
+public class GetFileTransferOverviewHandler(IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
 {
     public async Task<OneOf<GetFileTransferOverviewResponse, Error>> Process(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -20,7 +21,7 @@ public class GetFileTransferOverviewHandler(IAuthorizationService resourceRights
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

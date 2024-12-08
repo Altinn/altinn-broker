@@ -18,7 +18,7 @@ using OneOf;
 namespace Altinn.Broker.Application.UploadFile;
 
 public class UploadFileHandler(
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IFileTransferRepository fileTransferRepository,
@@ -37,7 +37,7 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

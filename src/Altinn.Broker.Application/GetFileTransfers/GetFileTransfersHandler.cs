@@ -12,7 +12,7 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransfers;
 
-public class GetFileTransfersHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<GetFileTransfersRequest, List<Guid>>
+public class GetFileTransfersHandler(IAuthorizationService authorizationService, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<GetFileTransfersRequest, List<Guid>>
 {
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -23,7 +23,7 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
             logger.LogError("Caller not found");
             return Errors.NoAccessToResource;
         }
-        var hasAccess = await resourceRightsRepository.CheckAccessForSearch(user, request.ResourceId, caller, false, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessForSearch(user, request.ResourceId, caller, false, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
