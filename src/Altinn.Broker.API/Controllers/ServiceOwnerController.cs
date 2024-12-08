@@ -1,6 +1,7 @@
 ﻿using System.Net;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -20,24 +21,24 @@ namespace Altinn.Broker.Controllers;
 public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, IResourceManager resourceManager) : Controller
 {
     [HttpPost]
-    public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
+    public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
-        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
+        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
         if (existingServiceOwner is not null)
         {
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await serviceOwnerRepository.InitializeServiceOwner(token.Consumer, serviceOwnerInitializeExt.Name);
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
+        await serviceOwnerRepository.InitializeServiceOwner(HttpContext.User.GetCallerOrganizationId(), serviceOwnerInitializeExt.Name);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
         resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
 
     [HttpGet]
-    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner([ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, CancellationToken cancellationToken)
+    public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(token.Consumer);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
         if (serviceOwner is null)
         {
             return NotFound();

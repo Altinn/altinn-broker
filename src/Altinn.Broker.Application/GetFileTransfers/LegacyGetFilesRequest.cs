@@ -5,7 +5,6 @@ namespace Altinn.Broker.Application.GetFileTransfers;
 
 public class LegacyGetFilesRequest
 {
-    public required CallerIdentity Token { get; set; }
     public string? ResourceId { get; set; }
     public FileTransferStatus? FileTransferStatus { get; set; }
     public ActorFileTransferStatus? RecipientFileTransferStatus { get; set; }

@@ -2,6 +2,7 @@
 using System.Xml;
 
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
@@ -23,7 +24,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.InvalidResourceDefinition;
         }
-        if (resource.ServiceOwnerId != request.Token.Consumer)
+        if (resource.ServiceOwnerId is null || resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
         {
             return Errors.NoAccessToResource;
         };

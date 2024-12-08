@@ -8,6 +8,7 @@ using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
@@ -38,12 +39,11 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <returns></returns>
     [HttpPost]
     [Authorize(Policy = AuthorizationConstants.Sender)]
-    public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Initializing file transfer");
-        var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt, token);
+        var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt);
 
         var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
@@ -65,12 +65,10 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> UploadStreamed(
         Guid fileTransferId,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] UploadFileHandler handler,
         CancellationToken cancellationToken
     )
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
 
         if (Request.ContentLength is null)
@@ -80,7 +78,6 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Token = token,
             UploadStream = Request.Body,
             ContentLength = Request.ContentLength.Value
         }, HttpContext.User, cancellationToken);
@@ -103,16 +100,14 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> InitializeAndUpload(
         [FromForm] FileTransferInitializeAndUploadExt form,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] InitializeFileTransferHandler initializeFileTransferHandler,
         [FromServices] UploadFileHandler UploadFileHandler,
         CancellationToken cancellationToken
     )
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(form.Metadata);
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Initializing and uploading fileTransfer");
-        var initializeRequest = InitializeFileTransferMapper.MapToRequest(form.Metadata, token);
+        var initializeRequest = InitializeFileTransferMapper.MapToRequest(form.Metadata);
         var initializeResult = await initializeFileTransferHandler.Process(initializeRequest, HttpContext.User, cancellationToken);
         if (initializeResult.IsT1)
         {
@@ -124,7 +119,6 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         var uploadResult = await UploadFileHandler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Token = token,
             UploadStream = Request.Body
         }, HttpContext.User, cancellationToken);
         return uploadResult.Match(
@@ -142,16 +136,13 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferOverviewExt>> GetFileTransferOverview(
         Guid fileTransferId,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] GetFileTransferOverviewHandler handler,
         CancellationToken cancellationToken)
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Getting filetransfer overview for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferOverviewRequest()
         {
-            FileTransferId = fileTransferId,
-            Token = token
+            FileTransferId = fileTransferId
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(FileTransferStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
@@ -168,16 +159,13 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
         Guid fileTransferId,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] GetFileTransferDetailsHandler handler,
         CancellationToken cancellationToken)
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Getting fileTransfer details for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferDetailsRequest()
         {
-            FileTransferId = fileTransferId,
-            Token = token
+            FileTransferId = fileTransferId
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(FileTransferStatusDetailsExtMapper.MapToExternalModel(result.FileTransfer, result.FileTransferEvents, result.ActorEvents)),
@@ -198,15 +186,12 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] GetFileTransfersHandler handler,
         CancellationToken cancellationToken)
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Getting fileTransfers with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
         var queryResult = await handler.Process(new GetFileTransfersRequest()
         {
-            Token = token,
             ResourceId = resourceId,
             Status = status is not null ? (FileTransferStatus)status : null,
             RecipientStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
@@ -228,16 +213,13 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> DownloadFile(
         Guid fileTransferId,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] DownloadFileHandler handler,
          CancellationToken cancellationToken)
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
-            FileTransferId = fileTransferId,
-            Token = token
+            FileTransferId = fileTransferId
         }, HttpContext.User, cancellationToken);
         return queryResult.Match<ActionResult>(
             result => File(result.DownloadStream, "application/octet-stream", result.FileName),
@@ -254,19 +236,16 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> ConfirmDownload(
         Guid fileTransferId,
-        [ModelBinder(typeof(MaskinportenModelBinder))] CallerIdentity token,
         [FromServices] ConfirmDownloadHandler handler,
         CancellationToken cancellationToken)
     {
-        LogContextHelpers.EnrichLogsWithToken(token);
         logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
         var requestData = new ConfirmDownloadRequest()
         {
-            FileTransferId = fileTransferId,
-            Token = token
+            FileTransferId = fileTransferId
         };
         var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, HttpContext.User, cancellationToken));
-        var uniqueString = $"confirmDownload_{fileTransferId}_{token.Consumer}";
+        var uniqueString = $"confirmDownload_{fileTransferId}_{HttpContext.User.GetCallerOrganizationId()}";
         var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, idempotencyEventRepository, cancellationToken);
         return commandResult.Match(
             (_) => Ok(null),
