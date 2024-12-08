@@ -27,7 +27,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.NoAccessToResource;
         };
-        if (request.IsLegacy && request.OnBehalfOf is not null && !fileTransfer.IsRecipient(request.OnBehalfOf))
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsRecipient(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
         }
@@ -57,7 +57,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             downloadStream = new ManifestDownloadStream(fileBuffer);
             (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);
         }
-        var caller = request.OnBehalfOf ?? user?.GetCallerOrganizationId();
+        var caller = request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId();
         await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller.WithPrefix(), cancellationToken);
         return new DownloadFileResponse()
         {

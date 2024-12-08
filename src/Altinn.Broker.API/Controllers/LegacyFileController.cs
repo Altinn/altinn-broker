@@ -166,7 +166,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             FileTransferId = fileId,
             IsLegacy = true,
-            OnBehalfOf = onBehalfOfConsumer
+            OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
         return queryResult.Match<ActionResult>(
             result => File(result.DownloadStream, "application/octet-stream", result.FileName),
