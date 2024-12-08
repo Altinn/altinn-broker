@@ -1,6 +1,7 @@
-﻿using Altinn.Broker.Core.Domain;
+﻿using Altinn.Broker.Common;
+using Altinn.Broker.Core.Domain;
 
-namespace Altinn.Broker.Common;
+namespace Altinn.Broker.Core;
 public static class FileTransferExtensions
 {
     public static bool IsSender(this FileTransferEntity fileTransfer, string onBehalfOf)

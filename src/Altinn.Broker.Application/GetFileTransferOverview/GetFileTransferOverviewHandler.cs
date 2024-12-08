@@ -1,8 +1,7 @@
 using System.Security.Claims;
 
-using Altinn.Broker.Common;
+using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;

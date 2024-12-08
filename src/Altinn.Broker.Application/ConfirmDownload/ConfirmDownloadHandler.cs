@@ -6,6 +6,7 @@ using Altinn.Broker.Application.ConfirmDownload;
 using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
+using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
