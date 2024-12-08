@@ -207,7 +207,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
         }
-        else
+        else if (!(fileTransferSearch.Actor is null))
         {
             commandString.AppendLine("AND afs.actor_id_fk = @actorId");
         }
