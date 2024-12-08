@@ -23,7 +23,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     [HttpPost]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
-        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
+        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
         if (existingServiceOwner is not null)
         {
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
@@ -38,7 +38,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     [HttpGet]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
         if (serviceOwner is null)
         {
             return NotFound();
