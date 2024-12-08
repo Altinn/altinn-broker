@@ -1,6 +1,3 @@
-
-using Altinn.Broker.Core.Domain;
-
 namespace Altinn.Broker.Application.UploadFile;
 
 public class UploadFileRequest

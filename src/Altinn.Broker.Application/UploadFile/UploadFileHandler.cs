@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -42,6 +43,10 @@ public class UploadFileHandler(
         {
             return Errors.NoAccessToResource;
         };
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSender(request.OnBehalfOfConsumer))
+        {
+            return Errors.NoAccessToResource;
+        }
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
             return Errors.FileTransferAlreadyUploaded;

@@ -97,7 +97,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             FileTransferId = fileId,
             IsLegacy = true,
-            OnBehalfOf = onBehalfOfConsumer
+            OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
@@ -191,7 +191,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             FileTransferId = fileId,
             IsLegacy = true,
-            OnBehalfOf = onBehalfOfConsumer
+            OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             Ok,

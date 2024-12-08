@@ -26,6 +26,10 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.NoAccessToResource;
         };
+        if (request.IsLegacy && request.OnBehalfOf is not null && !fileTransfer.IsRecipient(request.OnBehalfOf))
+        {
+            return Errors.NoAccessToResource;
+        }
         if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Published && fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.AllConfirmedDownloaded)
         {
             return Errors.FileTransferNotAvailable;

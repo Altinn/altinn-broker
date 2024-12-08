@@ -42,6 +42,10 @@ public class ConfirmDownloadHandler(
         {
             return Errors.NoAccessToResource;
         };
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsRecipient(request.OnBehalfOfConsumer))
+        {
+            return Errors.NoAccessToResource;
+        }
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
             return Errors.NoFileUploaded;
@@ -50,7 +54,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        var caller = (request.OnBehalfOf ?? user?.GetCallerOrganizationId())?.WithPrefix();
+        var caller = (request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId())?.WithPrefix();
         if (string.IsNullOrWhiteSpace(caller)) 
         {
             logger.LogError("Caller is not set");
