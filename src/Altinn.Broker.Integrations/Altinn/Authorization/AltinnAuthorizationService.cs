@@ -51,7 +51,7 @@ public class AltinnAuthorizationService : IAuthorizationService
 
     public async Task<bool> CheckAccessAsSenderOrRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, bool isLegacyUser, CancellationToken cancellationToken = default)
     {
-        return await CheckAccessAsSender(user, fileTransfer.ResourceId, "", isLegacyUser, cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, isLegacyUser, cancellationToken);
+        return await CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId.WithoutPrefix(), isLegacyUser, cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, isLegacyUser, cancellationToken);
     }
 
     private async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, string party, string? fileTransferId, List<ResourceAccessLevel> rights, bool isLegacyUser, CancellationToken cancellationToken = default)
