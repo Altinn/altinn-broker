@@ -2,10 +2,8 @@
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Common;
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
-using Altinn.Broker.Middlewares;
 using Altinn.Broker.Models.ServiceOwner;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -29,8 +27,8 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await serviceOwnerRepository.InitializeServiceOwner(HttpContext.User.GetCallerOrganizationId(), serviceOwnerInitializeExt.Name);
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId());
+        await serviceOwnerRepository.InitializeServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix(), serviceOwnerInitializeExt.Name);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
         resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
