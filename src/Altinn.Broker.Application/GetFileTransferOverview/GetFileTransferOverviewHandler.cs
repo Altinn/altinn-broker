@@ -24,7 +24,7 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
-        };
+        }
         if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSenderOrRecipient(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
