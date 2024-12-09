@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Altinn.Broker.Core.Helpers.Models;
+namespace Altinn.Broker.Common.Helpers.Models;
 public class TokenConsumer
 {
     [JsonPropertyName("authority")]

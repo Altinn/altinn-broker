@@ -1,19 +1,19 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Altinn.Broker.Core.Helpers.Models;
+namespace Altinn.Broker.Common.Helpers.Models;
 public class SystemUserAuthorizationDetails
 {
     [JsonPropertyName("type")]
-    public string Type { get; set; }
+    public required string Type { get; set; }
 
     [JsonPropertyName("systemuser_id")]
-    public List<string> SystemUserId { get; set; }
+    public required List<string> SystemUserId { get; set; }
 
     [JsonPropertyName("systemuser_org")]
-    public SystemUserOrg SystemUserOrg { get; set; }
+    public required SystemUserOrg SystemUserOrg { get; set; }
 
     [JsonPropertyName("system_id")]
-    public string SystemId { get; set; }
+    public required string SystemId { get; set; }
 }
 
 public class SystemUserAuthorization
@@ -25,8 +25,8 @@ public class SystemUserAuthorization
 public class SystemUserOrg
 {
     [JsonPropertyName("authority")]
-    public string Authority { get; set; }
+    public required string Authority { get; set; }
 
     [JsonPropertyName("ID")]
-    public string ID { get; set; }
+    public required string ID { get; set; }
 }

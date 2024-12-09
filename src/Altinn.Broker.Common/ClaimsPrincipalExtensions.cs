@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text.Json;
 
-using Altinn.Broker.Core.Helpers.Models;
+using Altinn.Broker.Common.Helpers.Models;
 
 namespace Altinn.Broker.Common;
 public static class ClaimsPrincipalExtensions
