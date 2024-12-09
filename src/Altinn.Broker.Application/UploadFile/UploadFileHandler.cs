@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -18,7 +19,7 @@ using OneOf;
 namespace Altinn.Broker.Application.UploadFile;
 
 public class UploadFileHandler(
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IFileTransferRepository fileTransferRepository,
@@ -37,14 +38,14 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
-        if (request.Token.Consumer != fileTransfer.Sender.ActorExternalId)
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSender(request.OnBehalfOfConsumer))
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         }
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {

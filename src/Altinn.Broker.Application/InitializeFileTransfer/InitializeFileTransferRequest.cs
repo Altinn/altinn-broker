@@ -4,7 +4,6 @@ using Altinn.Broker.Core.Domain;
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferRequest
 {
-    public required CallerIdentity Token { get; set; }
     public required string ResourceId { get; set; }
     public required string FileName { get; set; }
     public required string SendersFileTransferReference { get; set; }

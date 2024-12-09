@@ -6,11 +6,10 @@ namespace Altinn.Broker.Mappers;
 
 internal static class InitializeFileTransferMapper
 {
-    internal static InitializeFileTransferRequest MapToRequest(FileTransferInitalizeExt fileTransferInitializeExt, CallerIdentity token)
+    internal static InitializeFileTransferRequest MapToRequest(FileTransferInitalizeExt fileTransferInitializeExt)
     {
         return new InitializeFileTransferRequest()
         {
-            Token = token,
             ResourceId = fileTransferInitializeExt.ResourceId,
             FileName = fileTransferInitializeExt.FileName,
             SenderExternalId = fileTransferInitializeExt.Sender,
