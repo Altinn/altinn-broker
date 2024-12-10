@@ -24,11 +24,4 @@ public static class LogContextHelpers
         LogContext.PushProperty("sendersFileTransferReference", fileInitalizeExt.SendersFileTransferReference);
         LogContext.PushProperty("checksum", fileInitalizeExt.Checksum);
     }
-
-    public static void EnrichLogsWithToken(CallerIdentity token)
-    {
-        LogContext.PushProperty("consumer", token.Consumer);
-        LogContext.PushProperty("scope", token.Scope);
-        LogContext.PushProperty("clientId", token.ClientId);
-    }
 }

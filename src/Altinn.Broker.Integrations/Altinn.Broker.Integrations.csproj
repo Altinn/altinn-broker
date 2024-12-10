@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Altinn.ApiClients.Maskinporten" Version="9.1.0" />
-    <PackageReference Include="Altinn.Common.PEP" Version="4.0.0" />
+    <PackageReference Include="Altinn.Common.PEP" Version="4.1.1" />
     <PackageReference Include="Altinn.Platform.Models" Version="1.6.1" />
     <PackageReference Include="Azure.Identity" Version="1.12.0" />
     <PackageReference Include="Azure.ResourceManager" Version="1.12.0" />
@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Altinn.Broker.Common\Altinn.Broker.Common.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Core\Altinn.Broker.Core.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Persistence\Altinn.Broker.Persistence.csproj" />
     <ProjectReference Include="..\Altinn.Broker.Application\Altinn.Broker.Application.csproj" />

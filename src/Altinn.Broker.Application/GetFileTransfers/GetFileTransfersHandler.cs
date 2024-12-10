@@ -1,8 +1,8 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
@@ -12,12 +12,18 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransfers;
 
-public class GetFileTransfersHandler(IAuthorizationService resourceRightsRepository, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<GetFileTransfersRequest, List<Guid>>
+public class GetFileTransfersHandler(IAuthorizationService authorizationService, IResourceRepository resourceRepository, IFileTransferRepository fileTransferRepository, IActorRepository actorRepository, ILogger<GetFileTransfersHandler> logger) : IHandler<GetFileTransfersRequest, List<Guid>>
 {
     public async Task<OneOf<List<Guid>, Error>> Process(GetFileTransfersRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting file transfers for {resourceId}", request.ResourceId.SanitizeForLogs());
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken: cancellationToken);
+        var caller = user?.GetCallerOrganizationId();
+        if (caller is null)
+        {
+            logger.LogError("Caller not found");
+            return Errors.NoAccessToResource;
+        }
+        var hasAccess = await authorizationService.CheckAccessForSearch(user, request.ResourceId, caller, false, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
@@ -27,7 +33,7 @@ public class GetFileTransfersHandler(IAuthorizationService resourceRightsReposit
         {
             return Errors.InvalidResourceDefinition;
         };
-        var callingActor = await actorRepository.GetActorAsync(request.Token.Consumer, cancellationToken);
+        var callingActor = await actorRepository.GetActorAsync(caller.WithPrefix(), cancellationToken);
         if (callingActor is null)
         {
             return new List<Guid>();
