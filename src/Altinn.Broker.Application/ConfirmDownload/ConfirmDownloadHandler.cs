@@ -4,6 +4,7 @@ using System.Xml;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
 using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core;
@@ -27,7 +28,7 @@ public class ConfirmDownloadHandler(
     IResourceRepository resourceRepository,
     IAuthorizationService authorizationService,
     IBackgroundJobClient backgroundJobClient,
-    IEventBus eventBus,
+    EventBusMiddleware eventBus,
     ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfirmDownloadRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -56,7 +57,7 @@ public class ConfirmDownloadHandler(
             return Errors.FileTransferNotPublished;
         }
         var caller = (request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId())?.WithPrefix();
-        if (string.IsNullOrWhiteSpace(caller)) 
+        if (string.IsNullOrWhiteSpace(caller))
         {
             logger.LogError("Caller is not set");
             return Errors.NoAccessToResource;
@@ -71,13 +72,13 @@ public class ConfirmDownloadHandler(
         }
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, cancellationToken);
-            await eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, cancellationToken));
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken));
             await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, cancellationToken);
             bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != caller).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
             if (shouldConfirmAll)
             {
-                await eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken));
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
                 var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
                 backgroundJobClient.Delete(fileTransfer.HangfireJobId);

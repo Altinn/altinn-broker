@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Transactions;
 
+using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
@@ -19,7 +20,7 @@ using OneOf;
 using Polly;
 
 namespace Altinn.Broker.Application.ExpireFileTransfer;
-public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, IEventBus eventBus, ILogger<ExpireFileTransferHandler> logger) : IHandler<ExpireFileTransferRequest, Task>
+public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, EventBusMiddleware eventBus, IBackgroundJobClient backgroundJobClient, ILogger<ExpireFileTransferHandler> logger) : IHandler<ExpireFileTransferRequest, Task>
 {
     [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> Process(ExpireFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -42,7 +43,7 @@ public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepos
                 await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
                 {
                     await fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-                    await eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken));
                     return Task.CompletedTask;
                 }, logger, cancellationToken);
             }
@@ -52,9 +53,9 @@ public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepos
                 foreach (var recipient in recipientsWhoHaveNotDownloaded)
                 {
                     logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-                    await eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken));
                 }
-                if (recipientsWhoHaveNotDownloaded.Count > 0) await eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                if (recipientsWhoHaveNotDownloaded.Count > 0) backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
         }

@@ -24,11 +24,11 @@ public class AltinnEventBus : IEventBus
     private readonly ILogger<AltinnEventBus> _logger;
 
     public AltinnEventBus(
-        HttpClient httpClient, 
-        IAltinnRegisterService altinnRegisterService, 
+        HttpClient httpClient,
+        IAltinnRegisterService altinnRegisterService,
         IBackgroundJobClient backgroundJobClient,
         IPartyRepository partyRepository,
-        IOptions<AltinnOptions> altinnOptions, 
+        IOptions<AltinnOptions> altinnOptions,
         ILogger<AltinnEventBus> logger)
     {
         _httpClient = httpClient;
@@ -42,7 +42,7 @@ public class AltinnEventBus : IEventBus
 
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
     {
-        _backgroundJobClient.Enqueue(() => Publish(type, resourceId, fileTransferId, Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken));
+        await Publish(type, resourceId, fileTransferId, Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken);
     }
 
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
