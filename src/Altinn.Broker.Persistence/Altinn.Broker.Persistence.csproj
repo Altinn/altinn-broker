@@ -20,7 +20,7 @@
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.9" />
     <PackageReference Include="Microsoft.Azure.Management.Storage" Version="25.0.0" />
     <PackageReference Include="Npgsql" Version="8.0.3" />
-    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.3" />
   </ItemGroup>
   
