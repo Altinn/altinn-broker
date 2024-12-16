@@ -5,6 +5,7 @@ using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.InitializeFileTransfer;
+using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.UploadFile;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -25,5 +26,6 @@ public static class DependencyInjection
         services.AddScoped<LegacyGetFilesHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
         services.AddScoped<ConfigureResourceHandler>();
+        services.AddScoped<EventBusMiddleware>();
     }
 }
