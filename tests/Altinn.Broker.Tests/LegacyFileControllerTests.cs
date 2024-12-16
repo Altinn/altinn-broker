@@ -1,4 +1,4 @@
-﻿using System.IO;
+﻿using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -533,13 +533,31 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     private async Task<long> UploadZipFile(string fileTransferId) {
-        var fileBuffer = File.ReadAllBytes("Data/ManifestFileTests/Payload.zip");
-        using (var content = new ByteArrayContent(fileBuffer))
+        var payloadFile = await GenerateDummyFile(10240);
+        using var zipStream = new MemoryStream();
+        using (var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+        {
+            var zippedFile = zipArchive.CreateEntry("payload.txt");
+            using (var zippedFileStream = zippedFile.Open())
+            {
+                await zippedFileStream.WriteAsync(payloadFile);
+            }
+        }
+        zipStream.Position = 0;
+        var zipBytes = zipStream.ToArray();
+        using (var content = new ByteArrayContent(zipStream.ToArray()))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        return fileBuffer.Length;
+        return zipStream.Length;
+    }
+
+    private async Task<byte[]> GenerateDummyFile(long bytes)
+    {
+        var fileBuffer = new byte[bytes];
+        new Random().NextBytes(fileBuffer);
+        return fileBuffer;
     }
 }
