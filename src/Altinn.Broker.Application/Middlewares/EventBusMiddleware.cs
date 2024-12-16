@@ -10,9 +10,8 @@ public class EventBusMiddleware
     {
         _eventBus = eventBus;
     }
-    [AutomaticRetry(Attempts = 0)]
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, Guid? guid = null)
     {
-        await _eventBus.Publish(type, resourceId, fileTransferId, subjectOrganizationNumber);
+        await _eventBus.Publish(type, resourceId, fileTransferId, subjectOrganizationNumber, guid);
     }
 }
