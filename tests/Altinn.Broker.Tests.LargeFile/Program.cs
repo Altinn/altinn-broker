@@ -72,7 +72,7 @@ public class Program
     {
         var httpRequestMessage = new HttpRequestMessage()
         {
-            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:resourceregistry/resource.write&org=ttd&orgNo={orgNumber}")
+            RequestUri = new Uri($"https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write altinn:serviceowner&org=ttd&orgNo={orgNumber}")
         };
         var authenticationString = $"{testToolsUsername}:{testToolsPassword}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(authenticationString));
