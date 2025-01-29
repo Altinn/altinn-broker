@@ -1277,7 +1277,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:resourceregistry/resource.write&org=ttd&orgNo={{serviceowner_orgnumber}}",
+							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:serviceowner&org=ttd&orgNo={{serviceowner_orgnumber}}",
 							"protocol": "https",
 							"host": [
 								"altinn-testtools-token-generator",
@@ -1295,7 +1295,7 @@
 								},
 								{
 									"key": "scopes",
-									"value": "altinn:resourceregistry/resource.write"
+									"value": "altinn:serviceowner"
 								},
 								{
 									"key": "org",
