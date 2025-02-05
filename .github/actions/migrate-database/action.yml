@@ -62,7 +62,7 @@ runs:
       with:
         azcliversion: 2.56.0
         inlineScript: |
-          az storage file upload --share-name migrations --account-name ${{ inputs.AZURE_STORAGE_ACCOUNT_NAME }} \
+          az storage file upload --share-name migrations --account-name ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME  }} \
             --source ./src/Altinn.Broker.Persistence/Migrations
 
     - name: Start migration job
