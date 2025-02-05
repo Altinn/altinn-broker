@@ -61,7 +61,7 @@ runs:
       uses: azure/CLI@v2
       with:
         azcliversion: 2.56.0
-        inlineScript: |e
+        inlineScript: |
           az storage file upload --share-name migrations --account-name ${{ inputs.AZURE_STORAGE_ACCOUNT_NAME }} \
             --source ./src/Altinn.Broker.Persistence/Migrations
 
