@@ -62,7 +62,7 @@ public class InitializeFileTransferHandler(
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
-        LogContext.PushProperty("fileTransferId", fileTransferId);
+        LogContext.PushProperty("instanceId", fileTransferId);        
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
         {

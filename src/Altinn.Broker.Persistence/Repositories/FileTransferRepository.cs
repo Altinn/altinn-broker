@@ -111,7 +111,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
     private static void EnrichLogs(FileTransferEntity fileTransferEntity)
     {
-        LogContext.PushProperty("fileTransferId", fileTransferEntity.FileTransferId);
+        LogContext.PushProperty("instanceId", fileTransferEntity.FileTransferId);
         LogContext.PushProperty("resourceId", fileTransferEntity.ResourceId);
         LogContext.PushProperty("sender", fileTransferEntity.Sender);
         LogContext.PushProperty("recipients", string.Join(',', fileTransferEntity.RecipientCurrentStatuses.Select(status => status.Actor.ActorExternalId)));
