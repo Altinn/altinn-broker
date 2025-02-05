@@ -24,28 +24,7 @@ using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
 
-// Using two-stage initialization to catch startup errors.
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Warning()
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.ApplicationInsights(
-        TelemetryConfiguration.CreateDefault(),
-        TelemetryConverter.Traces)
-    .CreateLogger();
-
-try
-{
-    BuildAndRun(args);
-}
-catch (Exception ex) when (ex is not OperationCanceledException)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+BuildAndRun(args);
 
 static void BuildAndRun(string[] args)
 {
