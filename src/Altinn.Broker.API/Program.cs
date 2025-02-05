@@ -71,6 +71,7 @@ static void BuildAndRun(string[] args)
     var app = builder.Build();
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<AcceptHeaderValidationMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseExceptionHandler();
 
