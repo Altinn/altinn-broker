@@ -9,7 +9,6 @@ using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
-using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
@@ -57,6 +56,7 @@ static void BuildAndRun(string[] args)
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
+        .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
         .Enrich.WithClientIp()
         .WriteTo.Console()
         .WriteTo.ApplicationInsights(
@@ -70,7 +70,6 @@ static void BuildAndRun(string[] args)
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
     var app = builder.Build();
-    app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseExceptionHandler();
