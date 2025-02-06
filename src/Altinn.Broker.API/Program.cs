@@ -9,7 +9,6 @@ using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
-using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
@@ -25,28 +24,7 @@ using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
 
-// Using two-stage initialization to catch startup errors.
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Warning()
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.ApplicationInsights(
-        TelemetryConfiguration.CreateDefault(),
-        TelemetryConverter.Traces)
-    .CreateLogger();
-
-try
-{
-    BuildAndRun(args);
-}
-catch (Exception ex) when (ex is not OperationCanceledException)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+BuildAndRun(args);
 
 static void BuildAndRun(string[] args)
 {
@@ -57,6 +35,8 @@ static void BuildAndRun(string[] args)
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
+        .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
+        .Enrich.WithClientIp()
         .WriteTo.Console()
         .WriteTo.ApplicationInsights(
             services.GetRequiredService<TelemetryConfiguration>(),
@@ -69,7 +49,6 @@ static void BuildAndRun(string[] args)
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
     var app = builder.Build();
-    app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
     app.UseSerilogRequestLogging();
