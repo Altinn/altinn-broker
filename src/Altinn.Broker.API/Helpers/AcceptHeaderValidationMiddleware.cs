@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace Altinn.Broker.Middlewares;
+namespace Altinn.Broker.Helpers;
 
 public class AcceptHeaderValidationMiddleware
 {
