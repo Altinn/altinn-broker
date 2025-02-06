@@ -20,9 +20,3 @@ param keyVaultSku = {
   name: 'standard'
   family: 'A'
 }
-param postgresSku = {
-  name: readEnvironmentVariable('ENVIRONMENT') == 'test'
-    ? 'Standard_B1ms'
-    : readEnvironmentVariable('ENVIRONMENT') == 'staging' ? 'Standard_B2s' : 'Standard_D2ads_v5'
-  tier: readEnvironmentVariable('ENVIRONMENT') == 'production' ? 'GeneralPurpose' : 'Burstable'
-}

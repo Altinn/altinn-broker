@@ -27,9 +27,6 @@ param slackUrl string
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
 
-import { Sku as PostgresSku } from '../modules/postgreSql/create.bicep'
-param postgresSku PostgresSku
-
 var resourceGroupName = '${namePrefix}-rg'
 
 var secrets = [
@@ -103,7 +100,6 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     srcKeyVault: srcKeyVault
     srcSecretName: brokerAdminPasswordSecretName
     administratorLoginPassword: brokerPgAdminPassword
-    sku: postgresSku
     tenantId: tenantId
     environment: environment
   }
