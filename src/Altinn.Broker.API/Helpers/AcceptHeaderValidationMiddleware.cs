@@ -23,7 +23,7 @@ public class AcceptHeaderValidationMiddleware
             
             if (producesAttribute != null)
             {
-                var validMimeTypes = producesAttribute?.ContentTypes.ToList() ?? new List<string>();
+                var validMimeTypes = producesAttribute.ContentTypes.ToList();
 
                 if (acceptHeaders.Length == 0)
                 {
@@ -45,7 +45,14 @@ public class AcceptHeaderValidationMiddleware
 
     private static bool IsValidAcceptHeader(string acceptHeader, IEnumerable<string> validMimeTypes)
     {
-        var AcceptedMimeTypes = acceptHeader.Split(',').Select(x => x.Trim()).ToList();
-        return acceptHeader == "*/*" || AcceptedMimeTypes.Any(mimeType => validMimeTypes.Contains(mimeType.Split(';')[0].Trim()));
+        var acceptedMimeTypes = acceptHeader.Split(',')
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => {
+                var parts = x.Split(';');
+                return parts[0].Trim().ToLowerInvariant();
+            })
+            .ToList();
+        return acceptHeader == "*/*" || acceptedMimeTypes.Any(mimeType => validMimeTypes.Contains(mimeType));
     }
 }
