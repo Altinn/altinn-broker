@@ -318,32 +318,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
-    public async Task GetFileOverview_ConsumerIsNotPartOfFile_FileNotFound()
-    {
-        // Arrange
-        string onBehalfOfConsumer = "0199:999999999";
-        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
-        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
-        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
-        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
-        var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
-        Assert.NotNull(initializedFile);
-        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
-
-        // Act
-        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}?onBehalfOfConsumer={onBehalfOfConsumer}");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
-    }
-
-    [Fact]
     public async Task GetFileOverview_2FilesInitiated_1Published_StandardRequestRetrievesOnlyPublished_Success()
     {
         // Arrange

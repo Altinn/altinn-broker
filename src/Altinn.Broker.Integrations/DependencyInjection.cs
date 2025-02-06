@@ -31,7 +31,7 @@ public static class DependencyInjection
         var altinnOptions = new AltinnOptions();
         configuration.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
 
-        if (isDevelopment)
+        if (string.IsNullOrWhiteSpace(maskinportenSettings.ClientId))
         {
             services.AddSingleton<IEventBus, ConsoleLogEventBus>();
             services.AddScoped<IAuthorizationService, AltinnAuthorizationService>();

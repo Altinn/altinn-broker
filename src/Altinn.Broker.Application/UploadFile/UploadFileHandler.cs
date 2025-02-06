@@ -1,6 +1,8 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -18,14 +20,14 @@ using OneOf;
 namespace Altinn.Broker.Application.UploadFile;
 
 public class UploadFileHandler(
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IFileTransferRepository fileTransferRepository,
     IFileTransferStatusRepository fileTransferStatusRepository,
     IBrokerStorageService brokerStorageService,
     IBackgroundJobClient backgroundJobClient,
-    IEventBus eventBus,
+    EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
@@ -37,14 +39,14 @@ public class UploadFileHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, fileTransfer.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         };
-        if (request.Token.Consumer != fileTransfer.Sender.ActorExternalId)
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSender(request.OnBehalfOfConsumer))
         {
-            return Errors.FileTransferNotFound;
+            return Errors.NoAccessToResource;
         }
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
@@ -99,10 +101,10 @@ public class UploadFileHandler(
         catch (Exception e)
         {
             logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
-             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
-             {
+            return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+            {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
-                await eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);
         }
@@ -112,15 +114,15 @@ public class UploadFileHandler(
             if (storageProvider.Type == StorageProviderType.Altinn3Azure && !hostEnvironment.IsDevelopment())
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-                await eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
             }
             else
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
-                await eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, cancellationToken);
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
                 foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
                 {
-                    await eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, cancellationToken);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid()));
                 }
             }
             return fileTransfer.FileTransferId;

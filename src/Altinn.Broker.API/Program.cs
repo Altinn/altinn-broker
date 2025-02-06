@@ -4,16 +4,14 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
-using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
-using Altinn.Broker.Helpers;
 
 using Hangfire;
 
@@ -26,28 +24,7 @@ using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
 
-// Using two-stage initialization to catch startup errors.
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Warning()
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.ApplicationInsights(
-        TelemetryConfiguration.CreateDefault(),
-        TelemetryConverter.Traces)
-    .CreateLogger();
-
-try
-{
-    BuildAndRun(args);
-}
-catch (Exception ex) when (ex is not OperationCanceledException)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+BuildAndRun(args);
 
 static void BuildAndRun(string[] args)
 {
@@ -58,6 +35,8 @@ static void BuildAndRun(string[] args)
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
+        .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
+        .Enrich.WithClientIp()
         .WriteTo.Console()
         .WriteTo.ApplicationInsights(
             services.GetRequiredService<TelemetryConfiguration>(),
@@ -65,11 +44,11 @@ static void BuildAndRun(string[] args)
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
+        .AddJsonFile("appsettings.local.json", true, true);
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
     var app = builder.Build();
-    app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseExceptionHandler();

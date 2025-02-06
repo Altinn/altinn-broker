@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 
 using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -21,19 +22,19 @@ namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
-    IAuthorizationService resourceRightsRepository,
+    IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
     IFileTransferStatusRepository fileTransferStatusRepository,
     IActorFileTransferStatusRepository actorFileTransferStatusRepository,
     IBackgroundJobClient backgroundJobClient,
-    IEventBus eventBus,
+    EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId.SanitizeForLogs());
-        var hasAccess = await resourceRightsRepository.CheckUserAccess(user, request.ResourceId, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
@@ -48,8 +49,8 @@ public class InitializeFileTransferHandler(
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        if (request.DisableVirusScan 
-            && hostEnvironment.IsProduction() 
+        if (request.DisableVirusScan
+            && hostEnvironment.IsProduction()
             && !resource.ApprovedForDisabledVirusScan)
         {
             return Errors.NotApprovedForDisabledVirusScan;
@@ -61,7 +62,7 @@ public class InitializeFileTransferHandler(
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
-        LogContext.PushProperty("fileTransferId", fileTransferId);        
+        LogContext.PushProperty("instanceId", fileTransferId);        
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
         {
@@ -81,7 +82,7 @@ public class InitializeFileTransferHandler(
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
-            await eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, cancellationToken);
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid()));
             return fileTransferId;
         }, logger, cancellationToken);
     }
