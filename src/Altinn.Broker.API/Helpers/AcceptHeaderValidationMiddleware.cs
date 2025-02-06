@@ -1,5 +1,3 @@
-using Azure.Storage.Blobs.Models;
-
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Helpers;
