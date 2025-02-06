@@ -23,6 +23,7 @@ resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
   properties: {
     Application_Type: 'web'
     WorkspaceResourceId: log_analytics_workspace.id
+    DisableIpMasking: true
   }
 }
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
