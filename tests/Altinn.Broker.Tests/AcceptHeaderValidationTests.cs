@@ -68,4 +68,20 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Assert
         Assert.Equal(HttpStatusCode.NotAcceptable, initializeFileTransferResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task InitializeFiletransfer_WithValidAcceptHeaderAmongMultipleAcceptHeadersWithQualityFactors_ReturnsOk()
+    {
+        // Arrange
+        _senderClient.DefaultRequestHeaders.Accept.Clear();
+        _senderClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/plain", 0.9));
+        _senderClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/markdown", 0.8));
+        _senderClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.5));
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, initializeFileTransferResponse.StatusCode);
+    }
 }
