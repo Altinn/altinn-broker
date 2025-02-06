@@ -45,6 +45,6 @@ public class AcceptHeaderValidationMiddleware
 
     private static bool IsValidAcceptHeader(string acceptHeader, IEnumerable<string> validMimeTypes)
     {
-        return acceptHeader == "*/*" || validMimeTypes.Any(acceptHeader.Contains);
+        return acceptHeader == "*/*" || validMimeTypes.Any(mimeType => string.Equals(mimeType, acceptHeader, StringComparison.OrdinalIgnoreCase));
     }
 }
