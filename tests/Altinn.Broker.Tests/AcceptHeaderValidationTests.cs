@@ -43,7 +43,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task InitializeFiletransfer_WithNoAcceptHeader_ReturnsNotAcceptable()
+    public async Task InitializeFiletransfer_WithNoAcceptHeader_ReturnsOk()
     {
         // Arrange
         _senderClient.DefaultRequestHeaders.Accept.Clear();
@@ -52,7 +52,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
 
         // Assert
-        Assert.Equal(HttpStatusCode.NotAcceptable, initializeFileTransferResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, initializeFileTransferResponse.StatusCode);
     }
 
     [Fact]
