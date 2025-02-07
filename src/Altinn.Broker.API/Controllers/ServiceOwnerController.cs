@@ -34,6 +34,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     }
 
     [HttpGet]
+    [Produces("application/json")]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());

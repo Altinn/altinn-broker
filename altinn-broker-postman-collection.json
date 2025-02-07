@@ -55,7 +55,7 @@
 										"header": [
 											{
 												"key": "Accept",
-												"value": "text/plain"
+												"value": "application/json"
 											}
 										],
 										"url": {
@@ -217,7 +217,7 @@
 										"header": [
 											{
 												"key": "Accept",
-												"value": "text/plain"
+												"value": "application/json"
 											}
 										],
 										"url": {
@@ -480,7 +480,7 @@
 							},
 							{
 								"key": "Accept",
-								"value": "text/plain"
+								"value": "application/json"
 							},
 							{
 								"key": "Ocp-Apim-Subscription-Key",
@@ -523,7 +523,7 @@
 									},
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"body": {
@@ -580,7 +580,7 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "text/plain"
+								"value": "application/json"
 							},
 							{
 								"key": "Ocp-Apim-Subscription-Key",
@@ -620,7 +620,7 @@
 								"header": [
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"url": {
@@ -967,7 +967,7 @@
 									},
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"url": {

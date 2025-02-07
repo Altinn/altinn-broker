@@ -38,6 +38,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <returns></returns>
     [HttpPost]
     [Authorize(Policy = AuthorizationConstants.Sender)]
+    [Produces("application/json")]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
@@ -46,11 +47,11 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
 
         var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
-                fileTransferId => Ok(new FileTransferInitializeResponseExt()
-                {
-                    FileTransferId = fileTransferId
-                }),
-                Problem
+            fileTransferId => Ok(new FileTransferInitializeResponseExt()
+            {
+                FileTransferId = fileTransferId
+            }),
+            Problem
         );
     }
 
@@ -61,6 +62,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [HttpPost]
     [Route("{fileTransferId}/upload")]
     [Consumes("application/octet-stream")]
+    [Produces("application/json")]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> UploadStreamed(
         Guid fileTransferId,
@@ -132,6 +134,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <returns></returns>
     [HttpGet]
     [Route("{fileTransferId}")]
+    [Produces("application/json")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferOverviewExt>> GetFileTransferOverview(
         Guid fileTransferId,
@@ -155,6 +158,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <returns></returns>
     [HttpGet]
     [Route("{fileTransferId}/details")]
+    [Produces("application/json")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
         Guid fileTransferId,
@@ -179,6 +183,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <returns></returns>
     [HttpGet]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
+    [Produces("application/json")]
     public async Task<ActionResult<List<Guid>>> GetFileTransfers(
         [FromQuery] string resourceId,
         [FromQuery] FileTransferStatusExt? status,
