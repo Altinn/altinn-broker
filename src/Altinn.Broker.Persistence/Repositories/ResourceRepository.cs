@@ -4,7 +4,7 @@ using Altinn.Broker.Core.Repositories;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository) : IResourceRepository
+public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository) : IResourceRepository
 {
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
@@ -41,7 +41,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             {
                 return null;
             }
-            await CreateResource(resource, cancellationToken);
+            if (await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId) is not null)
+            {
+                await CreateResource(resource, cancellationToken);
+            }
         }
         return resource;
     }
