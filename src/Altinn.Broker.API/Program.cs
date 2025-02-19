@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
@@ -76,7 +77,12 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
     services.AddEndpointsApiExplorer();
-    services.AddSwaggerGen();
+    services.AddSwaggerGen(options =>
+    {
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        options.IncludeXmlComments(xmlPath);
+    });
     services.AddApplicationInsightsTelemetry(new ApplicationInsightsServiceOptions()
     {
         EnableAdaptiveSampling = false

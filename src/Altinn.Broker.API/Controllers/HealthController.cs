@@ -6,6 +6,7 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("health")]
+[ApiExplorerSettings(IgnoreApi = true)]
 public class HealthController(NpgsqlDataSource databaseConnectionProvider) : ControllerBase
 {
     [HttpGet]

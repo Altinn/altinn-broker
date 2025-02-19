@@ -15,7 +15,21 @@ namespace Altinn.Broker.Controllers;
 [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
 public class ResourceController : Controller
 {
+    /// <summary>
+    /// Configures a resource with settings to be used within the broker service.
+    /// </summary>
+    /// <remarks>
+    /// Scopes: <br/> 
+    /// - altinn:serviceowner <br/>
+    /// </remarks>
+    /// <returns></returns>
     [HttpPut]
+    [Produces("application/json")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [Route("{resourceId}")]
     public async Task<ActionResult> ConfigureResource(string resourceId, [FromBody] ResourceExt resourceExt, [FromServices] ConfigureResourceHandler handler, CancellationToken cancellationToken)
     {

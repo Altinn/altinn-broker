@@ -38,12 +38,14 @@ public class InitializeFileTransferHandler(
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
-        };
+        }
+        ;
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
-        };
+        }
+        ;
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
         {
@@ -62,7 +64,7 @@ public class InitializeFileTransferHandler(
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
-        logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);     
+        logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try
         {

@@ -33,12 +33,20 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
 {
 
     /// <summary>
-    /// Initialize a file transfer and file upload
+    /// Initialize a file transfer
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.write
+    /// </remarks>
     /// <returns></returns>
     [HttpPost]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     [Produces("application/json")]
+    [ProducesResponseType(typeof(FileTransferInitializeResponseExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
@@ -58,11 +66,19 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <summary>
     /// Upload to an initialized file using a binary stream.
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.write
+    /// </remarks>
     /// <returns></returns>
     [HttpPost]
     [Route("{fileTransferId}/upload")]
     [Consumes("application/octet-stream")]
     [Produces("application/json")]
+    [ProducesResponseType(typeof(FileTransferUploadResponseExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> UploadStreamed(
         Guid fileTransferId,
@@ -92,10 +108,21 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     }
 
     /// <summary>
-    /// Initialize and upload a file using form-data
+    /// Initialize a filetransfer and uploads the file in the same request using form-data
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.write
+    /// </remarks>
     /// <returns></returns>
     [HttpPost]
+    [Consumes("multipart/form-data")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [Route("upload")]
     [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
@@ -129,12 +156,20 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     }
 
     /// <summary>
-    /// Get information about the file and its current status
+    /// Get information about the file transfer and its current status
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.read <br/>
+    /// - altinn:broker.write
+    /// </remarks>
     /// <returns></returns>
     [HttpGet]
     [Route("{fileTransferId}")]
     [Produces("application/json")]
+    [ProducesResponseType(typeof(FileTransferOverviewExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferOverviewExt>> GetFileTransferOverview(
         Guid fileTransferId,
@@ -153,12 +188,20 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     }
 
     /// <summary>
-    /// Get more detailed information about the file upload for auditing and troubleshooting purposes
+    /// Get more detailed information about the file transfer for auditing and troubleshooting purposes
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.read <br/>
+    /// - altinn:broker.write
+    /// </remarks>
     /// <returns></returns>
     [HttpGet]
     [Route("{fileTransferId}/details")]
     [Produces("application/json")]
+    [ProducesResponseType(typeof(FileTransferStatusDetailsExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     public async Task<ActionResult<FileTransferStatusDetailsExt>> GetFileTransferDetails(
         Guid fileTransferId,
@@ -178,12 +221,22 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     }
 
     /// <summary>
-    /// Get files that can be accessed by the caller according to specified filters. Result set is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 last created.
+    /// Get files that can be accessed by the caller according to specified filters
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.read <br/>
+    /// - altinn:broker.write <br/>
+    /// Result is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 last created.
+    /// </remarks>
     /// <returns></returns>
     [HttpGet]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
+    [ProducesResponseType(typeof(List<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<List<Guid>>> GetFileTransfers(
         [FromQuery] string resourceId,
         [FromQuery] FileTransferStatusExt? status,
@@ -211,8 +264,18 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <summary>
     /// Downloads the file
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br />
+    /// - altinn:broker.read <br/>
+    /// </remarks>
     /// <returns></returns>
     [HttpGet]
+    [Produces("application/octet-stream")]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [Route("{fileTransferId}/download")]
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> DownloadFile(
@@ -234,8 +297,18 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// <summary>
     /// Confirms that the file has been downloaded
     /// </summary>
+    /// <remarks>
+    /// Scopes: <br/> 
+    /// - altinn:broker.read <br/>
+    /// </remarks>
     /// <returns></returns>
     [HttpPost]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [Route("{fileTransferId}/confirmdownload")]
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> ConfirmDownload(
