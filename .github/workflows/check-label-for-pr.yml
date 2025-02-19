@@ -20,6 +20,7 @@ jobs:
             kind/other
             kind/user-story
             kind/dependencies
+            kind/documentation
             kind/enhancement
             kind/incident
             kind/chore
