@@ -81,7 +81,7 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   }
 }
 
-resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
   name: 'azure-access'
   parent: postgres
   dependsOn: [configurations] // Needs to depend on database to avoid updating at the same time
