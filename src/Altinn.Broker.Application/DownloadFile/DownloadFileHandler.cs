@@ -27,7 +27,6 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.NoAccessToResource;
         }
-        ;
         if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsRecipient(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
@@ -45,13 +44,11 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.InvalidResourceDefinition;
         }
-        ;
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
         }
-        ;
         var downloadStream = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, cancellationToken);
         if (resource.UseManifestFileShim == true && request.IsLegacy) // For specific legacy resources during transition period
         {
