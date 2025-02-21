@@ -5,7 +5,7 @@ using Altinn.Broker.Enums;
 namespace Altinn.Broker.Models;
 
 /// <summary>
-/// Overview of a broker file
+/// Overview of a broker file transfer
 /// </summary>
 public class FileTransferOverviewExt
 {
