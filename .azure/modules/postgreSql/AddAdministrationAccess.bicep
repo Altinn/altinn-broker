@@ -6,7 +6,7 @@ param namePrefix string
 resource databaseServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' existing = {
   name: '${namePrefix}-dbserver'
 }
-resource databaseAccess 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2022-12-01' = {
+resource databaseAccess 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
   name: principalId
   parent: databaseServer
   properties: {
