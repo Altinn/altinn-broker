@@ -27,6 +27,7 @@ namespace Altinn.Broker.Controllers;
 [Route("broker/api/v1/legacy/file")]
 [Authorize(AuthenticationSchemes = AuthorizationConstants.Legacy)]
 [Authorize(Policy = AuthorizationConstants.Legacy)]
+[ApiExplorerSettings(IgnoreApi = true)]
 public class LegacyFileController(ILogger<LegacyFileController> logger) : Controller
 {
 

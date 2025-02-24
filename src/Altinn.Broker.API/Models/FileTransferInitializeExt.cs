@@ -7,7 +7,7 @@ using Altinn.Broker.Helpers;
 namespace Altinn.Broker.Models;
 
 /// <summary>
-/// API input model for file initialization.
+/// A model containing the metadata for a file transfer.
 /// </summary>
 public class FileTransferInitalizeExt
 {
@@ -50,7 +50,7 @@ public class FileTransferInitalizeExt
     [Required]
     [MinLength(1, ErrorMessage = "One or more recipients are required")]
     public List<string> Recipients { get; set; } = new List<string>();
-  
+
     /// <summary>
     /// User-defined properties related to the file
     /// </summary>
@@ -106,7 +106,7 @@ internal class PropertyListAttribute : ValidationAttribute
 
     protected override ValidationResult IsValid(object value, ValidationContext validationContext)
     {
-        if(value == null) 
+        if (value == null)
         {
             return ValidationResult.Success;
         }
