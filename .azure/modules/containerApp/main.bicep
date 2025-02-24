@@ -16,6 +16,8 @@ param keyVaultUrl string
 param userIdentityClientId string
 @secure()
 param containerAppEnvId string
+@secure()
+param apimIp string
 
 var probes = [
   {
@@ -59,6 +61,15 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
+var ipSecurityRestrictions = empty(apimIp)
+  ? []
+  : [
+      {
+        name: 'apim'
+        action: 'Allow'
+        ipAddressRange: apimIp!
+      }
+    ]
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
   location: location
@@ -74,6 +85,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 2525
         external: true
         transport: 'Auto'
+        ipSecurityRestrictions: ipSecurityRestrictions
       }
       secrets: [
         {
