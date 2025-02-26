@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -88,6 +89,7 @@ public class AzureResourceManagerService : IResourceManager
         storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
+        storageAccount.Value.Data.MinimumTlsVersion = "TLS1_2";
         if (virusScan) { 
             await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
         }
