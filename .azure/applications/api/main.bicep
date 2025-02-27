@@ -17,6 +17,9 @@ param sourceKeyVaultName string
 param keyVaultUrl string
 @secure()
 param namePrefix string
+@secure()
+@minLength(3)
+param apimIp string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
@@ -82,6 +85,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     image: image
     location: location
     environment: environment
+    apimIp: apimIp
     subscription_id: subscription().subscriptionId
     principal_id: appIdentity.outputs.id
     platform_base_url: platform_base_url
