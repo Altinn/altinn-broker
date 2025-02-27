@@ -11,6 +11,10 @@ using Azure;
 using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.AppContainers;
+using Azure.ResourceManager.AppContainers.Models;
+using Azure.ResourceManager.Network;
+using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Storage;
 using Azure.ResourceManager.Storage.Models;
@@ -255,5 +259,29 @@ public class AzureResourceManagerService : IResourceManager
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
         _logger.LogInformation("SAS Token created");
         return sasToken;
+    }
+
+    public async Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps)
+    {
+        var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
+        var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync();
+
+        var currentIpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
+
+        currentIpRestrictions.Clear();
+
+        foreach (var ip in newIps)
+        {
+            currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip));
+        }
+
+        await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: CancellationToken.None);
+
+        return;
+    }
+
+    public async Task<ServiceTagsListResult> RetrieveServiceTags(CancellationToken cancellationToken)
+    {
+        return await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
     }
 }
