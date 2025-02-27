@@ -14,6 +14,6 @@ public class IpSecurityRestrictionUpdater
     public async Task UpdateIpRestrictions()
     {
         var newIps = await _azureResourceManagerService.RetrieveCurrentIpRanges(CancellationToken.None);
-        await _azureResourceManagerService.UpdateContainerAppIpRestrictionsAsync(newIps);
+        await _azureResourceManagerService.UpdateContainerAppIpRestrictionsAsync(newIps, CancellationToken.None);
     }
 }

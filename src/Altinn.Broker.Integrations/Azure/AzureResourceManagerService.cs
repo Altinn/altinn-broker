@@ -261,10 +261,10 @@ public class AzureResourceManagerService : IResourceManager
         return sasToken;
     }
 
-    public async Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps)
+    public async Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps, CancellationToken cancellationToken)
     {
         var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
-        var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync();
+        var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
 
         var currentIpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
 
@@ -275,7 +275,7 @@ public class AzureResourceManagerService : IResourceManager
             currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip));
         }
 
-        await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: CancellationToken.None);
+        await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: cancellationToken);
 
         return;
     }
