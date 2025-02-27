@@ -19,4 +19,5 @@ public interface IResourceManager
     Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity);
     Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps);
     Task<ServiceTagsListResult> RetrieveServiceTags(CancellationToken cancellationToken);
+    Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken);
 }

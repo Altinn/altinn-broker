@@ -284,4 +284,15 @@ public class AzureResourceManagerService : IResourceManager
     {
         return await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
     }
+
+    public async Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
+    {
+        var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
+        var retirevedAddresses = serviceTagsListResult.Values
+            .Where(v => v.Id == "AzureEventGrid.NorwayEast")
+            .SelectMany(v => v.Properties.AddressPrefixes)
+            .ToList();
+        retirevedAddresses.Add(_resourceManagerOptions.ApimIP);
+        return retirevedAddresses;
+    }
 }
