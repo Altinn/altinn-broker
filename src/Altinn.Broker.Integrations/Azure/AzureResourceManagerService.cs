@@ -277,7 +277,7 @@ public class AzureResourceManagerService : IResourceManager
 
         _logger.LogInformation("Updating IP restrictions for container app");
         var response = await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: cancellationToken);
-        
+
         if (response.GetRawResponse().Status != 200)
         {
             _logger.LogError("Failed to update IP restrictions for container app. Status code: {StatusCode}", response.GetRawResponse().Status);
@@ -300,9 +300,8 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
     {
         var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
-        _logger.LogInformation("Retrieved service tags, this is the count " + serviceTagsListResult?.Values.Count);
         var retrievedAddresses = serviceTagsListResult?.Values
-            .Where(v => string.Equals(v.Id, $"AzureEventGrid.{_resourceManagerOptions.Location}", StringComparison.OrdinalIgnoreCase))
+            .Where(v => string.Equals(v.Id, $"AzureEventGrid.NorwayEast", StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
             .ToList();
         if (retrievedAddresses == null || retrievedAddresses.Count == 0)
