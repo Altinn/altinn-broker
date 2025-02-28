@@ -20,6 +20,11 @@ public class IpSecurityRestrictionUpdater
     {
         _logger.LogInformation("Updating IP restrictions for container app");
         var newIps = await _azureResourceManagerService.RetrieveCurrentIpRanges(CancellationToken.None);
+        if (newIps.Count < 1)
+        {
+            _logger.LogError("Failed to retrieve current IP ranges, canceling update of IP restrictions");
+            return;
+        }
         await _azureResourceManagerService.UpdateContainerAppIpRestrictionsAsync(newIps, CancellationToken.None);
     }
 }

@@ -261,7 +261,7 @@ public class AzureResourceManagerService : IResourceManager
         return sasToken;
     }
 
-    public async Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps, CancellationToken cancellationToken)
+    public async Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken)
     {
         var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
         var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
@@ -272,7 +272,7 @@ public class AzureResourceManagerService : IResourceManager
 
         foreach (var ip in newIps)
         {
-            currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip));
+            currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
         }
 
         _logger.LogInformation("Updating IP restrictions for container app");
@@ -297,19 +297,20 @@ public class AzureResourceManagerService : IResourceManager
         return response.Value;
     }
 
-    public async Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
+    public async Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
     {
         var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
         var retrievedAddresses = serviceTagsListResult?.Values
-            .Where(v => string.Equals(v.Id, $"AzureEventGrid.NorwayEast", StringComparison.OrdinalIgnoreCase))
+            .Where(v => string.Equals(v.Id, $"AzureEventGrid", StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
             .ToList();
         if (retrievedAddresses == null || retrievedAddresses.Count == 0)
         {
-            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid.{_resourceManagerOptions.Location}' may not exist.");
-            return new List<string>();
+            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid' may not exist.");
+            return new Dictionary<string, string>();
         }
-        retrievedAddresses.Add(_resourceManagerOptions.ApimIP);
-        return retrievedAddresses;
+        Dictionary<string, string> adresses = retrievedAddresses.ToDictionary(ip => ip, ip => "EventGrid IP");
+        adresses.Add(_resourceManagerOptions.ApimIP, "Apim IP");
+        return adresses;
     }
 }

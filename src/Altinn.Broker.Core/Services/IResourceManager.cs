@@ -17,7 +17,7 @@ public interface IResourceManager
     void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
     Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity);
-    Task UpdateContainerAppIpRestrictionsAsync(List<string> newIps, CancellationToken cancellationToken);
+    Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken);
     Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken);
-    Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken);
+    Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken);
 }
