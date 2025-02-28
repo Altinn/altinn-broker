@@ -280,21 +280,28 @@ public class AzureResourceManagerService : IResourceManager
         return;
     }
 
-    public async Task<ServiceTagsListResult> RetrieveServiceTags(CancellationToken cancellationToken)
+    public async Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken)
     {
-        return await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
+        Response<ServiceTagsListResult> response = await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
+        if (response.GetRawResponse().Status != 200)
+        {
+            _logger.LogError("Failed to retrieve Azure service tags in Azure Resource Manager Service. Status code: {StatusCode}", response.GetRawResponse().Status);
+            return null;
+        }
+        return response.Value;
     }
 
     public async Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
     {
         var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
-        var retrievedAddresses = serviceTagsListResult.Values
+        var retrievedAddresses = serviceTagsListResult?.Values
             .Where(v => string.Equals(v.Id, $"AzureEventGrid.{_resourceManagerOptions.Location}", StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
             .ToList();
-        if (retrievedAddresses.Count == 0)
+        if (retrievedAddresses == null || retrievedAddresses.Count == 0)
         {
             _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid.{_resourceManagerOptions.Location}' may not exist.");
+            return new List<string>();
         }
         retrievedAddresses.Add(_resourceManagerOptions.ApimIP);
         return retrievedAddresses;
