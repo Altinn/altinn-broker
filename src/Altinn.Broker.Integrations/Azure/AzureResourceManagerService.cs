@@ -11,6 +11,10 @@ using Azure;
 using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.AppContainers;
+using Azure.ResourceManager.AppContainers.Models;
+using Azure.ResourceManager.Network;
+using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Storage;
 using Azure.ResourceManager.Storage.Models;
@@ -255,5 +259,59 @@ public class AzureResourceManagerService : IResourceManager
         string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
         _logger.LogInformation("SAS Token created");
         return sasToken;
+    }
+
+    public async Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken)
+    {
+        var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
+        var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
+
+        var currentIpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
+
+        currentIpRestrictions.Clear();
+
+        foreach (var ip in newIps)
+        {
+            currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
+        }
+
+        _logger.LogInformation("Updating IP restrictions for container app");
+        var response = await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: cancellationToken);
+
+        if (response.GetRawResponse().Status != 200)
+        {
+            _logger.LogError("Failed to update IP restrictions for container app. Status code: {StatusCode}", response.GetRawResponse().Status);
+        }
+
+        return;
+    }
+
+    public async Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken)
+    {
+        Response<ServiceTagsListResult> response = await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
+        if (response.GetRawResponse().Status != 200)
+        {
+            _logger.LogError("Failed to retrieve Azure service tags in Azure Resource Manager Service. Status code: {StatusCode}", response.GetRawResponse().Status);
+            return null;
+        }
+        return response.Value;
+    }
+
+    public async Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
+    {
+        var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
+        var retrievedAddresses = serviceTagsListResult?.Values
+            .Where(v => string.Equals(v.Id, $"AzureEventGrid", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(v => v.Properties.AddressPrefixes)
+            .Where(ip => !ip.Contains(':'))
+            .ToList();
+        if (retrievedAddresses == null || retrievedAddresses.Count == 0)
+        {
+            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid' may not exist.");
+            return new Dictionary<string, string>();
+        }
+        Dictionary<string, string> adresses = retrievedAddresses.ToDictionary(ip => ip, ip => "EventGrid IP");
+        adresses.Add(_resourceManagerOptions.ApimIP, "Apim IP");
+        return adresses;
     }
 }

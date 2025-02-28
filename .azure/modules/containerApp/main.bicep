@@ -16,6 +16,8 @@ param keyVaultUrl string
 param userIdentityClientId string
 @secure()
 param containerAppEnvId string
+@secure()
+param apimIp string
 
 var probes = [
   {
@@ -35,6 +37,8 @@ var containerAppEnvVars = [
   { name: 'AzureResourceManagerOptions__Location', value: 'norwayeast' }
   { name: 'AzureResourceManagerOptions__Environment', value: environment }
   { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
+  { name: 'AzureResourceManagerOptions__ContainerAppName', value: '${namePrefix}-app' }
+  { name: 'AzureResourceManagerOptions__ApimIP', value: apimIp }
   { name: 'AzureResourceManagerOptions__MalwareScanEventGridTopicName', value: eventgrid_topic.name }
   { name: 'AZURE_CLIENT_ID', value: userIdentityClientId }
   {

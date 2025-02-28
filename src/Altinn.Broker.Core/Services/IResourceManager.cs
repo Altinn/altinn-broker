@@ -1,5 +1,7 @@
 ﻿using Altinn.Broker.Core.Domain;
 
+using Azure.ResourceManager.Network.Models;
+
 namespace Altinn.Broker.Core.Services;
 public interface IResourceManager
 {
@@ -15,4 +17,7 @@ public interface IResourceManager
     void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
 
     Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity);
+    Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken);
+    Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken);
+    Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken);
 }
