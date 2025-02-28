@@ -303,6 +303,7 @@ public class AzureResourceManagerService : IResourceManager
         var retrievedAddresses = serviceTagsListResult?.Values
             .Where(v => string.Equals(v.Id, $"AzureEventGrid", StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
+            .Where(ip => !ip.Contains(':'))
             .ToList();
         if (retrievedAddresses == null || retrievedAddresses.Count == 0)
         {
