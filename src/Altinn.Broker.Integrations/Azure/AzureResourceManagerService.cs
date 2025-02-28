@@ -288,11 +288,15 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<List<string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
     {
         var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
-        var retirevedAddresses = serviceTagsListResult.Values
-            .Where(v => v.Id == "AzureEventGrid.NorwayEast")
+        var retrievedAddresses = serviceTagsListResult.Values
+            .Where(v => string.Equals(v.Id, $"AzureEventGrid.{_resourceManagerOptions.Location}", StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
             .ToList();
-        retirevedAddresses.Add(_resourceManagerOptions.ApimIP);
-        return retirevedAddresses;
+        if (retrievedAddresses.Count == 0)
+        {
+            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid.{_resourceManagerOptions.Location}' may not exist.");
+        }
+        retrievedAddresses.Add(_resourceManagerOptions.ApimIP);
+        return retrievedAddresses;
     }
 }
