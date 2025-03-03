@@ -64,20 +64,18 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
 
-resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'fetchAzureEventGridIpsScript'
   location: location
-  kind: 'AzurePowerShell'
+  kind: 'AzureCLI'
   properties: {
-    azPowerShellVersion: '13.0'
+    azCliVersion: '2.31.0'
     scriptContent: '''
-      # PowerShell script to fetch Azure EventGrid IP ranges
-      $serviceTags = Get-AzNetworkServiceTag -Location $using:location
-      $eventGridServiceTag = $serviceTags.Values | Where-Object { $_.Name -eq "AzureEventGrid" }
-      $eventGridIps = $eventGridServiceTag.Properties.AddressPrefixes
-      Write-Output $eventGridIps
+      # Fetch Azure EventGrid IP ranges using Azure CLI
+      eventGridIps=$(az network list-service-tags --location  $using:location --subscription $using:subscription_id | jq '.values[] | select(.name=="AzureEventGrid") | .properties.addressPrefixes | [.[] | select(test(":") | not)]')
+      echo "{\"eventGridIps\": $eventGridIps}"
     '''
-    arguments: '-location $location'
+    arguments: '-location $location -subscription_id $subscription_id'
     forceUpdateTag: '1'
     retentionInterval: 'PT2H'
   }
