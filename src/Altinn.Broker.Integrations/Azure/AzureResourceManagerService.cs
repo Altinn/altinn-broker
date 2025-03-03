@@ -263,38 +263,53 @@ public class AzureResourceManagerService : IResourceManager
 
     public async Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken)
     {
-        var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
-        var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
-
-        var currentIpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
-
-        currentIpRestrictions.Clear();
-
-        foreach (var ip in newIps)
+        try 
         {
-            currentIpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
+            var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
+            var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
+
+            var IpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
+
+            IpRestrictions.Clear();
+
+            foreach (var ip in newIps)
+            {
+                IpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
+            }
+
+            _logger.LogInformation("Updating IP restrictions for container app");
+            var response = await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: cancellationToken);
+
+            if (response.GetRawResponse().Status != 200)
+            {
+                _logger.LogError("Failed to update IP restrictions for container app. Status code: {StatusCode}", response.GetRawResponse().Status);
+            }
         }
-
-        _logger.LogInformation("Updating IP restrictions for container app");
-        var response = await containerApp.Value.UpdateAsync(waitUntil: WaitUntil.Started, data: containerApp.Value.Data, cancellationToken: cancellationToken);
-
-        if (response.GetRawResponse().Status != 200)
+        catch (Exception e)
         {
-            _logger.LogError("Failed to update IP restrictions for container app. Status code: {StatusCode}", response.GetRawResponse().Status);
+            _logger.LogError(e, "Exception occurred while updating IP restrictions for container app");
         }
-
+        
         return;
     }
 
     public async Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken)
     {
-        Response<ServiceTagsListResult> response = await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
-        if (response.GetRawResponse().Status != 200)
+        try
         {
-            _logger.LogError("Failed to retrieve Azure service tags in Azure Resource Manager Service. Status code: {StatusCode}", response.GetRawResponse().Status);
+            Response<ServiceTagsListResult> response = await GetSubscription().GetServiceTagAsync(_resourceManagerOptions.Location, cancellationToken);
+            if (response.GetRawResponse().Status != 200)
+            {
+                _logger.LogError("Failed to retrieve Azure service tags in Azure Resource Manager Service. Status code: {StatusCode}", response.GetRawResponse().Status);
+                return null;
+            }
+            return response.Value;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Exception occurred while retrieving Azure service tags");
             return null;
         }
-        return response.Value;
     }
 
     public async Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
