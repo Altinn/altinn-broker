@@ -67,10 +67,11 @@ static void BuildAndRun(string[] args)
 
     app.UseHangfireDashboard();
 
-    app.Services.GetRequiredService<IBackgroundJobClient>().Enqueue<IpSecurityRestrictionUpdater>((handler) => handler.UpdateIpRestrictions());
+    //var ipSecurityRestrictionUpdater = app.Services.GetRequiredService<IpSecurityRestrictionUpdater>();
+    //ipSecurityRestrictionUpdater.UpdateIpRestrictions().Wait();
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     recurringJobManager.AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
-    recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
+    //recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     
     app.Run();
 }

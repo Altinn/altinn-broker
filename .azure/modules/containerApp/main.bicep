@@ -63,6 +63,49 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
+
+resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+  name: 'fetchAzureEventGridIpsScript'
+  location: location
+  kind: 'AzurePowerShell'
+  properties: {
+    azPowerShellVersion: '1.10.0'
+    scriptContent: '''
+      # PowerShell script to fetch Azure EventGrid IP ranges
+      $serviceTags = Get-AzNetworkServiceTag -Location $using:location
+      $eventGridServiceTag = $serviceTags.Values | Where-Object { $_.Name -eq "AzureEventGrid" }
+      $eventGridIps = $eventGridServiceTag.Properties.AddressPrefixes
+      Write-Output $eventGridIps
+    '''
+    arguments: '-location $location'
+    forceUpdateTag: '1'
+    retentionInterval: 'PT2H'
+  }
+}
+
+var eventGridIps = deploymentScript.properties.outputs.eventGridIps
+
+var apimIpRestrictions = empty(apimIp)
+  ? []
+  : [
+      {
+        name: 'apim'
+        action: 'Allow'
+        ipAddressRange: apimIp!
+      }
+    ]
+
+var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
+  name: 'AzureEventGrid'
+  action: 'Allow'
+  ipAddressRange: ipRange
+})
+
+var ipSecurityRestrictions = [
+  ...apimIpRestrictions
+  ...EventGridIpRestrictions
+]
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
   location: location
@@ -78,6 +121,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 2525
         external: true
         transport: 'Auto'
+        ipSecurityRestrictions: ipSecurityRestrictions
       }
       secrets: [
         {
