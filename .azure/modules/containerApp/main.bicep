@@ -69,7 +69,7 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   location: location
   kind: 'AzurePowerShell'
   properties: {
-    azPowerShellVersion: '1.10.0'
+    azPowerShellVersion: '13.0'
     scriptContent: '''
       # PowerShell script to fetch Azure EventGrid IP ranges
       $serviceTags = Get-AzNetworkServiceTag -Location $using:location
