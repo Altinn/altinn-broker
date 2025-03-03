@@ -85,6 +85,14 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
 
 var eventGridIps = deploymentScript.properties.outputs.eventGridIps
 
+var ipv4EventGridIps = filter(eventGridIps, ipRange => contains(ipRange, ':'))
+
+var EventGridIpRestrictions = map(ipv4EventGridIps, (ipRange, index) => {
+  name: 'AzureEventGrid'
+  action: 'Allow'
+  ipAddressRange: ipRange
+})
+
 var apimIpRestrictions = empty(apimIp)
   ? []
   : [
@@ -94,17 +102,7 @@ var apimIpRestrictions = empty(apimIp)
         ipAddressRange: apimIp!
       }
     ]
-
-var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
-  name: 'AzureEventGrid'
-  action: 'Allow'
-  ipAddressRange: ipRange
-})
-
-var ipSecurityRestrictions = [
-  ...apimIpRestrictions
-  ...EventGridIpRestrictions
-]
+var ipSecurityRestrictions = concat(apimIpRestrictions, EventGridIpRestrictions)
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
