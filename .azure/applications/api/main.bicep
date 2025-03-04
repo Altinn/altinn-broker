@@ -81,7 +81,7 @@ module fetchEventGridIpsScript './fetchEventGridIps.bicep' = {
   scope: resourceGroup
   params: {
     location: location
-    principal_id: appIdentity.outputs.principalId
+    principal_id: appIdentity.outputs.id
     subscription_id: subscription().subscriptionId
   }
 }
