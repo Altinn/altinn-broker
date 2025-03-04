@@ -16,6 +16,7 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   properties: {
     azPowerShellVersion: '13.0'
     scriptContent: '''
+      param([string] $location)
       $serviceTags = Get-AzNetworkServiceTag -Location $location
       $EventgridIps = $serviceTags.Values | Where-Object { $_.Name -eq "AzureEventGrid" }
       $output = $EventgridIps.Properties.AddressPrefixes | Where-Object { $_ -notmatch ":" }
