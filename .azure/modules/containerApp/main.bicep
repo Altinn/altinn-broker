@@ -75,9 +75,7 @@ module fetchEventGridIpsScript './fetchEventGridIps.bicep' = {
 
 var eventGridIps = fetchEventGridIpsScript.outputs.eventGridIps!
 
-var testEventGridIps = ['51.120.4.0/27','51.120.41.0/25']
-
-var ipv4EventGridIps = filter(testEventGridIps, ipRange => !contains(ipRange, ':'))
+var ipv4EventGridIps = filter(eventGridIps, ipRange => !contains(ipRange, ':'))
 
 var EventGridIpRestrictions = map(ipv4EventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
