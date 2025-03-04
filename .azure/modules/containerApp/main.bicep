@@ -72,8 +72,7 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
     azCliVersion: '2.31.0'
     scriptContent: '''
       # Fetch Azure EventGrid IP ranges using Azure CLI
-      eventGridIps=$(az network list-service-tags --location  $using:location --subscription $using:subscription_id | jq '.values[] | select(.name=="AzureEventGrid") | .properties.addressPrefixes | [.[] | select(test(":") | not)]')
-      echo "{\"eventGridIps\": $eventGridIps}"
+      az network list-service-tags --location $using:location --subscription $using:subscription_id | jq '{eventGridIps: [.values[] | select(.name=="AzureEventGrid") | .properties.addressPrefixes[] | select(test(":") | not)]}' > $AZ_SCRIPTS_OUTPUT_PATH
     '''
     arguments: '-location $location -subscription_id $subscription_id'
     forceUpdateTag: '1'
@@ -81,14 +80,14 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   }
 }
 
-var eventGridIps = deploymentScript.properties.outputs.eventGridIps
+var eventGridIps = deploymentScript.properties.outputs.eventGridIps!
 
-var ipv4EventGridIps = filter(eventGridIps, ipRange => contains(ipRange, ':'))
+var ipv4EventGridIps = filter(eventGridIps, ipRange => !contains(ipRange, ':'))
 
 var EventGridIpRestrictions = map(ipv4EventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
   action: 'Allow'
-  ipAddressRange: ipRange
+  ipAddressRange: ipRange!
 })
 
 var apimIpRestrictions = empty(apimIp)
