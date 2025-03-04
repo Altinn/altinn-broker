@@ -83,7 +83,6 @@ module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bic
   params: {
     location: location
     principal_id: appIdentity.outputs.id
-    subscription_id: subscription().subscriptionId
   }
 }
 
