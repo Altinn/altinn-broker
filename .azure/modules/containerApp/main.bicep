@@ -69,6 +69,7 @@ module fetchEventGridIpsScript './fetchEventGridIps.bicep' = {
   params: {
     location: location
     subscription_id: subscription_id
+    principal_id: principal_id
   }
 }
 

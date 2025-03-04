@@ -3,10 +3,19 @@ param location string
 @secure()
 param subscription_id string
 
+@secure()
+param principal_id string
+
 resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'fetchAzureEventGridIpsScript'
   location: location
   kind: 'AzureCLI'
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${principal_id}': {}
+    }
+  }
   properties: {
     azCliVersion: '2.31.0'
     scriptContent: '''
@@ -18,4 +27,6 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   }
 }
 
-output eventGridIps array = deploymentScript.properties.outputs.eventGridIps!
+
+output eventGridIps array = deploymentScript.properties.outputs.eventGridIps
+
