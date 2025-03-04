@@ -9,7 +9,7 @@ param principal_id string
 resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'fetchAzureEventGridIpsScript'
   location: location
-  kind: 'AzureCLI'
+  kind: 'AzurePowerShell'
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -17,9 +17,14 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
     }
   }
   properties: {
-    azCliVersion: '2.31.0'
+    azPowerShellVersion: '13.2.0'
     scriptContent: '''
-      az network list-service-tags --location $1 --subscription $2 | jq '{eventGridIps: [.values[] | select(.name=="AzureEventGrid") | .properties.addressPrefixes[] | select(test(":") | not)]}' > $AZ_SCRIPTS_OUTPUT_PATH
+      Set-AzContext -Subscription $2
+      $serviceTags = Get-AzNetworkServiceTag -Location $1
+      $EventgridIps = $serviceTags.Values | Where-Object { $_.Name -eq "AzureEventGrid" }
+      $output = $EventgridIps.Properties.AddressPrefixes | Where-Object { $_ -notmatch ":" }
+      $DeploymentScriptOutputs = @{}
+      $DeploymentScriptOutputs['eventGridIps'] = $output
     '''
     arguments: '${location} ${subscription_id}'
     forceUpdateTag: '1'
@@ -27,6 +32,4 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   }
 }
 
-
 output eventGridIps array = deploymentScript.properties.outputs.eventGridIps
-
