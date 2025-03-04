@@ -5,6 +5,7 @@ param image string
 param environment string
 param platform_base_url string
 param maskinporten_environment string
+param eventGridIps array
 
 @secure()
 param subscription_id string
@@ -64,20 +65,7 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
 
-module fetchEventGridIpsScript './fetchEventGridIps.bicep' = {
-  name: 'fetchAzureEventGridIpsScript'
-  params: {
-    location: location
-    subscription_id: subscription_id
-    principal_id: principal_id
-  }
-}
-
-var eventGridIps = fetchEventGridIpsScript.outputs.eventGridIps!
-
-var ipv4EventGridIps = filter(eventGridIps, ipRange => !contains(ipRange, ':'))
-
-var EventGridIpRestrictions = map(ipv4EventGridIps, (ipRange, index) => {
+var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
   action: 'Allow'
   ipAddressRange: ipRange!
