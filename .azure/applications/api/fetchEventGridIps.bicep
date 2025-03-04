@@ -17,7 +17,7 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
     }
   }
   properties: {
-    azPowerShellVersion: '13.2.0'
+    azPowerShellVersion: '13.0'
     scriptContent: '''
       Set-AzContext -Subscription $2
       $serviceTags = Get-AzNetworkServiceTag -Location $1
