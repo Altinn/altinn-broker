@@ -64,23 +64,15 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
 
-resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
+module fetchEventGridIpsScript './fetchEventGridIps.bicep' = {
   name: 'fetchAzureEventGridIpsScript'
-  location: location
-  kind: 'AzureCLI'
-  properties: {
-    azCliVersion: '2.31.0'
-    scriptContent: '''
-      # Fetch Azure EventGrid IP ranges using Azure CLI
-      az network list-service-tags --location $using:location --subscription $using:subscription_id | jq '{eventGridIps: [.values[] | select(.name=="AzureEventGrid") | .properties.addressPrefixes[] | select(test(":") | not)]}' > $AZ_SCRIPTS_OUTPUT_PATH
-    '''
-    arguments: '-location $location -subscription_id $subscription_id'
-    forceUpdateTag: '1'
-    retentionInterval: 'PT2H'
+  params: {
+    location: location
+    subscription_id: subscription_id
   }
 }
 
-var eventGridIps = deploymentScript.properties.outputs.eventGridIps!
+var eventGridIps = fetchEventGridIpsScript.outputs.eventGridIps!
 
 var ipv4EventGridIps = filter(eventGridIps, ipRange => !contains(ipRange, ':'))
 
