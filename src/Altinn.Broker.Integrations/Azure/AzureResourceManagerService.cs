@@ -287,7 +287,7 @@ public class AzureResourceManagerService : IResourceManager
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Exception occurred while updating IP restrictions for container app");
+            _logger.LogError(e, "Exception occurred while updating IP security restrictions for container app");
         }
         
         return;
@@ -314,18 +314,19 @@ public class AzureResourceManagerService : IResourceManager
 
     public async Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken)
     {
+        string serviceTagId = "AzureEventGrid";
         var serviceTagsListResult = await RetrieveServiceTags(cancellationToken);
         var retrievedAddresses = serviceTagsListResult?.Values
-            .Where(v => string.Equals(v.Id, $"AzureEventGrid", StringComparison.OrdinalIgnoreCase))
+            .Where(v => string.Equals(v.Id, serviceTagId, StringComparison.OrdinalIgnoreCase))
             .SelectMany(v => v.Properties.AddressPrefixes)
             .Where(ip => !ip.Contains(':'))
             .ToList();
         if (retrievedAddresses == null || retrievedAddresses.Count == 0)
         {
-            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag 'AzureEventGrid' may not exist.");
+            _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag '{serviceTagId}' may not exist.");
             return new Dictionary<string, string>();
         }
-        Dictionary<string, string> adresses = retrievedAddresses.ToDictionary(ip => ip, ip => "EventGrid IP");
+        Dictionary<string, string> adresses = retrievedAddresses.ToDictionary(ip => ip, ip => $"{serviceTagId} IP");
         adresses.Add(_resourceManagerOptions.ApimIP, "Apim IP");
         return adresses;
     }
