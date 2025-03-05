@@ -5,6 +5,7 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
@@ -65,8 +66,11 @@ static void BuildAndRun(string[] args)
     app.MapControllers();
 
     app.UseHangfireDashboard();
-    app.Services.GetService<IRecurringJobManager>().AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
 
+    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
+    recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
+    
     app.Run();
 }
 
