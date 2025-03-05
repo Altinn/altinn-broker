@@ -268,13 +268,13 @@ public class AzureResourceManagerService : IResourceManager
             var containerAppResourceId = new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}/resourceGroups/{_resourceManagerOptions.ApplicationResourceGroupName}/providers/Microsoft.App/containerapps/{_resourceManagerOptions.ContainerAppName}");
             var containerApp = await _armClient.GetContainerAppResource(containerAppResourceId).GetAsync(cancellationToken);
 
-            var IpRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
+            var ipRestrictions = containerApp.Value.Data.Configuration.Ingress.IPSecurityRestrictions;
 
-            IpRestrictions.Clear();
+            ipRestrictions.Clear();
 
             foreach (var ip in newIps)
             {
-                IpRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
+                ipRestrictions.Add(new ContainerAppIPSecurityRestrictionRule(name: $"IP whitelist {ip.Value}", action: ContainerAppIPRuleAction.Allow, ipAddressRange: ip.Key));
             }
 
             _logger.LogInformation("Updating IP restrictions for container app");
@@ -289,8 +289,6 @@ public class AzureResourceManagerService : IResourceManager
         {
             _logger.LogError(e, "Exception occurred while updating IP security restrictions for container app");
         }
-        
-        return;
     }
 
     public async Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken)
@@ -326,8 +324,8 @@ public class AzureResourceManagerService : IResourceManager
             _logger.LogError($"No EventGrid IP addresses were retrieved. Service tag '{serviceTagId}' may not exist.");
             return new Dictionary<string, string>();
         }
-        Dictionary<string, string> adresses = retrievedAddresses.ToDictionary(ip => ip, ip => $"{serviceTagId} IP");
-        adresses.Add(_resourceManagerOptions.ApimIP, "Apim IP");
-        return adresses;
+        Dictionary<string, string> addresses = retrievedAddresses.ToDictionary(ip => ip, ip => $"{serviceTagId} IP");
+        addresses.Add(_resourceManagerOptions.ApimIP, "Apim IP");
+        return addresses;
     }
 }
