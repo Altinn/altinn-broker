@@ -10,9 +10,9 @@ namespace Altinn.Broker.Helpers
             var useManifestFileShimProperty = validationContext.ObjectType.GetProperty("UseManifestFileShim");
             var externalServiceCodeLegacyProperty = validationContext.ObjectType.GetProperty("ExternalServiceCodeLegacy");
             var externalServiceEditionCodeLegacyProperty = validationContext.ObjectType.GetProperty("ExternalServiceEditionCodeLegacy");
-            var useManifestFileShimValue = (bool?)useManifestFileShimProperty.GetValue(validationContext.ObjectInstance, null);
-            var externalServiceCodeLegacyValue = externalServiceCodeLegacyProperty.GetValue(validationContext.ObjectInstance, null);
-            var externalServiceEditionCodeLegacyValue = externalServiceEditionCodeLegacyProperty.GetValue(validationContext.ObjectInstance, null);
+            var useManifestFileShimValue = (bool?)useManifestFileShimProperty?.GetValue(validationContext.ObjectInstance, null);
+            var externalServiceCodeLegacyValue = externalServiceCodeLegacyProperty?.GetValue(validationContext.ObjectInstance, null);
+            var externalServiceEditionCodeLegacyValue = externalServiceEditionCodeLegacyProperty?.GetValue(validationContext.ObjectInstance, null);
 
             if (useManifestFileShimValue == true)
             {
