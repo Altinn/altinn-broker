@@ -12,7 +12,9 @@
   ],
   "packageRules": [
     {
-      "matchFileNames": ["\\.bicep$"],
+      "matchPaths": [
+        "**/*.bicep"
+      ],
       "enabled": false
     }
   ]
