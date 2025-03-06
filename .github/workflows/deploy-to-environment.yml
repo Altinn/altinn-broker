@@ -97,4 +97,5 @@ jobs:
         PLATFORM_BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
         AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
 
