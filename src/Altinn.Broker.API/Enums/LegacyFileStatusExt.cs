@@ -8,6 +8,6 @@ public enum LegacyFileStatusExt
     Published,
     Cancelled,
     AllConfirmedDownloaded,
-    Deleted,
+    Purged,
     Failed
 }
