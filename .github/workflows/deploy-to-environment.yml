@@ -71,6 +71,7 @@ jobs:
         MASKINPORTEN_CLIENT_ID: ${{ secrets.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
         SLACK_URL: ${{ secrets.SLACK_URL }}
+        MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
 
     - name: Migrate database
       uses: ./.github/actions/migrate-database
