@@ -42,6 +42,9 @@ inputs:
   SLACK_URL:
     description: "URL for Slack channel to post to"
     required: true
+  MASKINPORTEN_ENVIRONMENT:
+    description: "Environment for maskinporten"
+    required: true
 
 
 runs:
@@ -87,6 +90,7 @@ runs:
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
         SLACK_URL: ${{ inputs.SLACK_URL }}
+        MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep
