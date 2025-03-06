@@ -40,8 +40,45 @@ internal static class LegacyFileStatusOverviewExtMapper
             FileTransferStatus.Published => LegacyFileStatusExt.Published,
             FileTransferStatus.Cancelled => LegacyFileStatusExt.Cancelled,
             FileTransferStatus.AllConfirmedDownloaded => LegacyFileStatusExt.AllConfirmedDownloaded,
-            FileTransferStatus.Purged => LegacyFileStatusExt.Deleted,
+            FileTransferStatus.Purged => LegacyFileStatusExt.Purged,
             FileTransferStatus.Failed => LegacyFileStatusExt.Failed,
+            _ => throw new InvalidEnumArgumentException()
+        };
+    }
+
+    internal static FileTransferStatus MapToDomainEnum(LegacyFileStatusExt? legacyEnum)
+    {
+        if (legacyEnum is null)
+        {
+            throw new ArgumentNullException(nameof(legacyEnum));
+        }
+
+        return legacyEnum switch
+        {
+            LegacyFileStatusExt.Initialized => FileTransferStatus.Initialized,
+            LegacyFileStatusExt.UploadStarted => FileTransferStatus.UploadStarted,
+            LegacyFileStatusExt.UploadProcessing => FileTransferStatus.UploadProcessing,
+            LegacyFileStatusExt.Published => FileTransferStatus.Published,
+            LegacyFileStatusExt.Cancelled => FileTransferStatus.Cancelled,
+            LegacyFileStatusExt.AllConfirmedDownloaded => FileTransferStatus.AllConfirmedDownloaded,
+            LegacyFileStatusExt.Purged => FileTransferStatus.Purged,
+            LegacyFileStatusExt.Failed => FileTransferStatus.Failed,
+            _ => throw new InvalidEnumArgumentException()
+        };
+    }
+
+    internal static ActorFileTransferStatus MapToDomainEnum(LegacyRecipientFileStatusExt? legacyEnum)
+    {
+        if (legacyEnum is null)
+        {
+            throw new ArgumentNullException(nameof(legacyEnum));
+        }
+
+        return legacyEnum switch
+        {
+            LegacyRecipientFileStatusExt.Initialized => ActorFileTransferStatus.Initialized,
+            LegacyRecipientFileStatusExt.DownloadStarted => ActorFileTransferStatus.DownloadStarted,
+            LegacyRecipientFileStatusExt.DownloadConfirmed => ActorFileTransferStatus.DownloadConfirmed,
             _ => throw new InvalidEnumArgumentException()
         };
     }
