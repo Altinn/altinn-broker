@@ -60,5 +60,6 @@ public static class DependencyInjection
         {
             services.AddSingleton<ISlackClient>(new SlackClient(generalSettings.SlackUrl));
         }
+        services.AddSingleton<SlackNotificationService>();
     }
 }

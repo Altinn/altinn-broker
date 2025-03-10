@@ -92,6 +92,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         EnableAdaptiveSampling = false
     });
     services.AddExceptionHandler<SlackExceptionNotification>();
+    services.AddSingleton<SlackSettings>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));

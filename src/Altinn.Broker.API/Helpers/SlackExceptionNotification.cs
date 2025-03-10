@@ -1,22 +1,29 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Slack.Webhooks;
+using Altinn.Broker.Core.Options;
+using Altinn.Broker.Integrations.Slack;
 
 namespace Altinn.Broker.Helpers;
+
 public class SlackExceptionNotification : IExceptionHandler
 {
     private readonly ILogger<SlackExceptionNotification> _logger;
-    private readonly ISlackClient _slackClient;
-    private const string TestChannel = "#test-varslinger";
+    private readonly SlackNotificationService _slackService;
+    private readonly SlackSettings _slackSettings;
     private readonly IHostEnvironment _hostEnvironment;
 
-    public SlackExceptionNotification(ILogger<SlackExceptionNotification> logger, ISlackClient slackClient, IHostEnvironment hostEnvironment)
+    public SlackExceptionNotification(
+        ILogger<SlackExceptionNotification> logger,
+        SlackNotificationService slackService,
+        SlackSettings slackSettings,
+        IHostEnvironment hostEnvironment)
     {
         _logger = logger;
-        _slackClient = slackClient;
+        _slackService = slackService;
+        _slackSettings = slackSettings;
         _hostEnvironment = hostEnvironment;
-
     }
-    public ValueTask<bool> TryHandleAsync(
+
+    public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
@@ -32,16 +39,16 @@ public class SlackExceptionNotification : IExceptionHandler
         
         try
         {
-            SendSlackNotificationWithMessage(exceptionMessage);
+            await SendSlackNotificationWithMessage(exceptionMessage);
+            return true;
         }
         catch (Exception slackEx)
         {
             _logger.LogError(
                 slackEx,
                 "Failed to send Slack notification");
+            return false;
         }
-
-        return ValueTask.FromResult(false);
     }
 
     private string FormatExceptionMessage(Exception exception, HttpContext context)
@@ -55,13 +62,9 @@ public class SlackExceptionNotification : IExceptionHandler
                $"*Time:* {DateTime.UtcNow:u}\n" +
                $"*Stacktrace:* \n{exception.StackTrace}";
     }
-    private void SendSlackNotificationWithMessage(string message)
+
+    private async Task SendSlackNotificationWithMessage(string message)
     {
-        var slackMessage = new SlackMessage
-        {
-            Text = message,
-            Channel = TestChannel,
-        };
-        _slackClient.Post(slackMessage);
+        await _slackService.SendSlackMessageAsync(message);
     }
 }
