@@ -57,7 +57,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
   sku: {
     name: environment == 'test'
     ? 'Standard_B1ms'
-    : 'Standard_D2ds_v5'
+    : 'Standard_D8ds_v5'
     tier: environment == 'test' ? 'Burstable' : 'GeneralPurpose'
   }
 }
