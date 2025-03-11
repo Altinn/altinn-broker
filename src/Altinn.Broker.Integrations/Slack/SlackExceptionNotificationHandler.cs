@@ -45,7 +45,7 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
             "Unhandled exception occurred. Type: {ExceptionType}, Message: {Message}, Path: {Path}",
             exception.GetType().Name,
             exception.Message,
-            httpContext.Request.Path);
+            httpContext.Request.Path.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
 
         try
         {
