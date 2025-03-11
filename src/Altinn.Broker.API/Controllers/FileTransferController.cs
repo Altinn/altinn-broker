@@ -8,7 +8,6 @@ using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
-using Altinn.Broker.Application.ExpireFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
@@ -24,7 +23,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OneOf;
-using Hangfire;
 
 namespace Altinn.Broker.Controllers;
 
@@ -333,37 +331,4 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
 
     private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
 
-    /// <summary>
-    /// Test endpoint that throws an exception to test Slack notifications
-    /// </summary>
-    [HttpGet]
-    [Route("test/exception")]
-    [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public IActionResult TestException()
-    {
-        throw new InvalidOperationException("This is a test exception that should be sent to Slack");
-    }
-
-    /// <summary>
-    /// Test endpoint that triggers a Hangfire job with an invalid expiration time
-    /// </summary>
-    [HttpGet]
-    [Route("test/hangfire-exception")]
-    [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult TestHangfireException([FromServices] IBackgroundJobClient backgroundJobClient)
-    {
-        var invalidExpirationTime = DateTime.UtcNow.AddYears(-1);
-        var fileTransferId = Guid.NewGuid();
-        
-        backgroundJobClient.Schedule<ExpireFileTransferHandler>(
-            (handler) => handler.Process(
-                new ExpireFileTransferRequest { FileTransferId = fileTransferId, Force = false }, 
-                null, 
-                CancellationToken.None), 
-            invalidExpirationTime);
-
-        return Ok($"Scheduled Hangfire job with invalid expiration time for file transfer {fileTransferId}");
-    }
 }
