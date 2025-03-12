@@ -1,0 +1,2 @@
+CREATE INDEX idx_actor_file_transfer_status_actor_file
+ON broker.actor_file_transfer_status(actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk);
