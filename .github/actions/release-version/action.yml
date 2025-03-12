@@ -65,7 +65,7 @@ runs:
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
-        APIM_IP: ${{ secrets.APIM_IP }}
+        APIM_IP: ${{ inputs.APIM_IP }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
