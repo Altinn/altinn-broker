@@ -112,8 +112,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     /// <returns></returns>
     [HttpGet]
     public async Task<ActionResult<List<Guid>>> GetFiles(
-        [FromQuery] FileTransferStatusExt? status,
-        [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
+        [FromQuery] LegacyFileStatusExt? status,
+        [FromQuery] LegacyRecipientFileStatusExt? recipientStatus,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
         [FromQuery] string? resourceId,
@@ -137,8 +137,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
         {
             ResourceId = resourceId ?? string.Empty,
-            RecipientFileTransferStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
-            FileTransferStatus = status is not null ? (FileTransferStatus)status : null,
+            RecipientFileTransferStatus = recipientStatus is not null ? LegacyFileStatusOverviewExtMapper.MapToDomainEnum(recipientStatus) : null,
+            FileTransferStatus = status is not null ? LegacyFileStatusOverviewExtMapper.MapToDomainEnum(status) : null,
             OnBehalfOfConsumer = onBehalfOfConsumer,
             From = from,
             To = to,

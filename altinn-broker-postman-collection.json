@@ -1,7 +1,7 @@
 {
 	"info": {
-		"_postman_id": "cff6671d-26f7-481b-badd-7f1185b5290d",
-		"name": "Altinn.Broker",
+		"_postman_id": "fc2016f7-83c8-461c-b861-de2c660da6b0",
+		"name": "Altinn.Broker Temp",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "7106668"
 	},
@@ -860,13 +860,50 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"ExternalServiceCodeLegacy\": \"\",\r\n    \"ExternalServiceEditionCodeLegacy\": \"\",\r\n    \"UseManifestFileShim\": false\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"ExternalServiceCodeLegacy\": \"4434\",\r\n    \"ExternalServiceEditionCodeLegacy\": \"2\",\r\n    \"UseManifestFileShim\": true\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
 								}
 							}
 						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/resource/{{resource_id}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"resource",
+								"{{resource_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Resource",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Ocp-Apim-Subscription-Key",
+								"value": "{{platform_subscription_key}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/broker/api/v1/resource/{{resource_id}}",
 							"host": [
@@ -1333,7 +1370,7 @@
 			}
 		}
 	],
-"variable": [
+	"variable": [
 		{
 			"key": "serviceowner_orgnumber",
 			"value": "Organization number of service owner / \"tjeneste-eier\". Nine digits, no prefix.",

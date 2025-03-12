@@ -5,6 +5,7 @@ param image string
 param environment string
 param platform_base_url string
 param maskinporten_environment string
+param eventGridIps array
 
 @secure()
 param subscription_id string
@@ -16,6 +17,8 @@ param keyVaultUrl string
 param userIdentityClientId string
 @secure()
 param containerAppEnvId string
+@secure()
+param apimIp string
 
 var probes = [
   {
@@ -35,6 +38,8 @@ var containerAppEnvVars = [
   { name: 'AzureResourceManagerOptions__Location', value: 'norwayeast' }
   { name: 'AzureResourceManagerOptions__Environment', value: environment }
   { name: 'AzureResourceManagerOptions__ApplicationResourceGroupName', value: '${namePrefix}-rg' }
+  { name: 'AzureResourceManagerOptions__ContainerAppName', value: '${namePrefix}-app' }
+  { name: 'AzureResourceManagerOptions__ApimIP', value: apimIp }
   { name: 'AzureResourceManagerOptions__MalwareScanEventGridTopicName', value: eventgrid_topic.name }
   { name: 'AZURE_CLIENT_ID', value: userIdentityClientId }
   {
@@ -59,6 +64,24 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
 ]
+
+var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
+  name: 'AzureEventGrid'
+  action: 'Allow'
+  ipAddressRange: ipRange!
+})
+
+var apimIpRestrictions = empty(apimIp)
+  ? []
+  : [
+      {
+        name: 'apim'
+        action: 'Allow'
+        ipAddressRange: apimIp!
+      }
+    ]
+var ipSecurityRestrictions = concat(apimIpRestrictions, EventGridIpRestrictions)
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
   location: location
@@ -74,6 +97,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 2525
         external: true
         transport: 'Auto'
+        ipSecurityRestrictions: ipSecurityRestrictions
       }
       secrets: [
         {
