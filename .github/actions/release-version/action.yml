@@ -30,6 +30,9 @@ inputs:
   PLATFORM_BASE_URL:
     description: "Base url for Altinn platform"
     required: true
+  APIM_IP:
+    description: "IP address for the APIM"
+    required: true
 
 runs:
   using: "composite"
@@ -58,6 +61,7 @@ runs:
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
+        APIM_IP: ${{ secrets.APIM_IP }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
