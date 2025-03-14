@@ -105,5 +105,6 @@ public class ConfirmDownloadHandler(
         {
             backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction to avoid issue with Hangfire distributed lock implementation
         }
+        return Task.CompletedTask;
     }
 }
