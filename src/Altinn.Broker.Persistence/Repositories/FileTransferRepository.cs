@@ -31,7 +31,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.file_location,
                     f.file_transfer_size,
                     f.expiration_time, 
-                    f.hangfire_job_id,
                     f.use_virus_scan,
                     sender.actor_external_id as senderActorExternalReference,
                     fs_latest.file_transfer_status_description_id_fk, 
@@ -77,7 +76,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     FileName = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
                     SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                    HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
                     FileTransferStatusEntity = new FileTransferStatusEntity()
                     {
                         FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
@@ -173,8 +171,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
         var fileTransferId = Guid.NewGuid();
         await using NpgsqlCommand command = dataSource.CreateCommand(
-            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
-            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan)");
+            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, use_virus_scan) " +
+            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @useVirusScan)");
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@resourceId", resource.Id);
@@ -185,7 +183,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
         command.Parameters.AddWithValue("@storageProviderId", storageProviderEntity.Id);
-        command.Parameters.AddWithValue("@hangfireJobId", DBNull.Value);
         command.Parameters.AddWithValue("@expirationTime", expirationTime);
         command.Parameters.AddWithValue("@useVirusScan", useVirusScan);
 
