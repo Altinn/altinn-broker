@@ -71,11 +71,8 @@ public class ConfirmDownloadHandler(
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }
         bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != caller).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
-        if (shouldConfirmAll) { 
-            backgroundJobClient.Delete(fileTransfer.HangfireJobId);
-        }
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
-        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+        await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid()));
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
@@ -104,5 +101,9 @@ public class ConfirmDownloadHandler(
             }
             return Task.CompletedTask;
         }, logger, cancellationToken);
+        if (shouldConfirmAll)
+        {
+            backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction to avoid issue with Hangfire distributed lock implementation
+        }
     }
 }
