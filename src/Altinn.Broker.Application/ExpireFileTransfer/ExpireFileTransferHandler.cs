@@ -34,9 +34,12 @@ public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepos
         {
             logger.LogInformation("FileTransfer has already been set to purged");
         }
+        if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.AllConfirmedDownloaded)
+        {
+            logger.LogError("FileTransfer has already been set to AllConfirmedDownloaded");
+        }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
-
             await brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
             if (!request.DoNotUpdateStatus)
             {

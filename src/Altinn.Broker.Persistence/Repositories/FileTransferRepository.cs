@@ -198,7 +198,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
-        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk");
+        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
         commandString.AppendLine("FROM broker.file_transfer f");
         commandString.AppendLine("INNER JOIN LATERAL ");
         commandString.AppendLine("(SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs ");
@@ -245,7 +245,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             commandString.AppendLine("AND filetransferstatus.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
-
+        commandString.AppendLine("ORDER BY f.created ASC");
         commandString.AppendLine(";");
 
         await using var command = dataSource.CreateCommand(
@@ -268,6 +268,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
         if (fileTransferSearch.FileTransferStatus.HasValue)
             command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
+
+
 
         var fileTransfers = new List<Guid>();
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -518,4 +520,3 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
     }
 }
-

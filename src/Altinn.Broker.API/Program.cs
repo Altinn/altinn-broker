@@ -87,10 +87,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
     });
-    services.AddApplicationInsightsTelemetry(new ApplicationInsightsServiceOptions()
-    {
-        EnableAdaptiveSampling = false
-    });
+    services.AddApplicationInsightsTelemetry();
     services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
