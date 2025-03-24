@@ -46,4 +46,44 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource) : IFileTr
         }
         return fileTransferStatuses;
     }
+
+    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus statusFilter, DateTime minStatusAge, CancellationToken cancellationToken)
+    {
+        var query = @"
+            SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, 
+                file_transfer_status_date, file_transfer_status_detailed_description
+            FROM broker.file_transfer_status fis
+            WHERE fis.file_transfer_status_description_id_fk = @statusFilter
+            AND fis.file_transfer_status_date < @minStatusDate
+            AND fis.file_transfer_status_date = (
+                SELECT MAX(file_transfer_status_date)
+                FROM broker.file_transfer_status
+                WHERE file_transfer_id_fk = fis.file_transfer_id_fk
+            )";
+
+        await using var command = dataSource.CreateCommand(query);
+
+        command.Parameters.AddWithValue("@statusFilter", (int)statusFilter);
+        command.Parameters.AddWithValue("@minStatusDate", DateTime.UtcNow.Subtract(minStatusAge));
+
+        var fileTransferStatuses = new List<FileTransferStatusEntity>();
+
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                fileTransferStatuses.Add(new FileTransferStatusEntity()
+                {
+                    FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
+                    Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
+                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) 
+                        ? null 
+                        : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
+                });
+            }
+        }
+
+        return fileTransferStatuses;
+    }
 }
