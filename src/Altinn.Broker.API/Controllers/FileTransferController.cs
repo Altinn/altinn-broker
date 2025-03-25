@@ -60,7 +60,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         logger.LogInformation("Initializing file transfer");
         var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt);
-
+        
         var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileTransferId => Ok(new FileTransferInitializeResponseExt()
