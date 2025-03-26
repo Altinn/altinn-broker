@@ -55,13 +55,16 @@ public class InitializeFileTransferHandler(
         {
             return Errors.NotApprovedForDisabledVirusScan;
         }
-        var storageProvider = serviceOwner.GetStorageProvider(!request.DisableVirusScan);
+        
+        // resource.ApprovedForDisabledVirusScan is a temporary fix for use with the transition solution
+        var useVirusScan = !request.DisableVirusScan || resource.ApprovedForDisabledVirusScan;
+        var storageProvider = serviceOwner.GetStorageProvider(useVirusScan);
         if (storageProvider is null)
         {
             return Errors.StorageProviderNotReady;
         }
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
-        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
+        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, useVirusScan, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
         try

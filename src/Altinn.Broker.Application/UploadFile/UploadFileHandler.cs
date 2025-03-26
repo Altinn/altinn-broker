@@ -61,7 +61,7 @@ public class UploadFileHandler(
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
-        };
+        };        
         var storageProvider = serviceOwner.GetStorageProvider(fileTransfer.UseVirusScan);
         if (storageProvider is null)
         {
