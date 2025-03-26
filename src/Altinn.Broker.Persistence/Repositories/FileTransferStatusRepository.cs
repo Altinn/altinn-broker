@@ -47,7 +47,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource) : IFileTr
         return fileTransferStatuses;
     }
 
-    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus statusFilter, DateTime minStatusAge, CancellationToken cancellationToken)
+    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus statusFilter, DateTime minStatusDate, CancellationToken cancellationToken)
     {
         var query = @"
             SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, 
@@ -64,7 +64,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource) : IFileTr
         await using var command = dataSource.CreateCommand(query);
 
         command.Parameters.AddWithValue("@statusFilter", (int)statusFilter);
-        command.Parameters.AddWithValue("@minStatusDate", DateTime.UtcNow.Subtract(minStatusAge));
+        command.Parameters.AddWithValue("@minStatusDate", minStatusDate);
 
         var fileTransferStatuses = new List<FileTransferStatusEntity>();
 

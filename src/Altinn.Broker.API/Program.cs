@@ -5,7 +5,7 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.FileTransferMonitorHandler;
+using Altinn.Broker.Application.FileTransferMonitor;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
