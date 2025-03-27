@@ -50,13 +50,18 @@ public class StuckFileTransferHandler(
             }
         }
 
+        HashSet<Guid> transferIdsToRemove = new HashSet<Guid>();
         foreach (Guid fileTransferId in _ongoingStuckFileTransferIds)
         {
             if (!fileTransfersStuckInUploadProcessing.Any(s => s.FileTransferId == fileTransferId))
             {
                 _logger.LogInformation("File transfer {fileTransferId} is no longer stuck in upload processing", fileTransferId);
-                _ongoingStuckFileTransferIds.Remove(fileTransferId);
-            }
+                transferIdsToRemove.Add(fileTransferId);
+             }
+        }
+        foreach (Guid idToRemove in transferIdsToRemove)
+        {
+            _ongoingStuckFileTransferIds.Remove(idToRemove);
         }
     }
 }
