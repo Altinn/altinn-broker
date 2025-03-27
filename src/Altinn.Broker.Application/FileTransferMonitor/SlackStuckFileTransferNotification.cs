@@ -20,13 +20,9 @@ public class SlackStuckFileTransferNotification
     }
     
     public bool NotifyFileStuckWithStatus(
-        FileTransferStatusEntity fileTransferStatus,
-        CancellationToken cancellationToken)
+        FileTransferStatusEntity fileTransferStatus)
     {
         var errorMessage = FormatNotificationMessage(fileTransferStatus);
-
-        _logger.LogWarning("File transfer {fileTransferId} has been stuck in status {status} for more than 15 minutes", fileTransferStatus.FileTransferId, fileTransferStatus.Status);
-        
         try
         {
             SendSlackNotificationWithMessage(errorMessage);

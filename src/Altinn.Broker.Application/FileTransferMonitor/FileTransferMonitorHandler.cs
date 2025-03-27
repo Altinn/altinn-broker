@@ -14,19 +14,23 @@ public class FileTransferMonitorHandler(
     private readonly ILogger<FileTransferMonitorHandler> _logger = logger;
     private readonly HashSet<Guid> _ongoingStuckFileTransferIds = new HashSet<Guid>();
     private readonly SlackStuckFileTransferNotification _slackNotifier = slackNotifier;
+    private readonly int _stuckThresholdMinutes = 15;
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Checking for file transfers stuck in upload processing");
-        List<FileTransferStatusEntity> fileTransfersStuckInUploadProcessing = await _fileTransferStatusRepository.GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus.UploadProcessing, DateTime.UtcNow.AddMinutes(-15), cancellationToken);
+        List<FileTransferStatusEntity> fileTransfersStuckInUploadProcessing = await _fileTransferStatusRepository.GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(
+                FileTransferStatus.UploadProcessing, 
+                DateTime.UtcNow.AddMinutes(-_stuckThresholdMinutes), 
+                cancellationToken);
         
         foreach (FileTransferStatusEntity status in fileTransfersStuckInUploadProcessing)
         {
             if (!_ongoingStuckFileTransferIds.Contains(status.FileTransferId))
             {
-            _logger.LogWarning("File transfer {fileTransferId} has been stuck in upload processing for more than 15 minutes", status.FileTransferId);
+            _logger.LogWarning("File transfer {fileTransferId} has been stuck in upload processing for more than {thresholdMinutes} minutes", status.FileTransferId, _stuckThresholdMinutes);
             _ongoingStuckFileTransferIds.Add(status.FileTransferId);
-            _slackNotifier.NotifyFileStuckWithStatus(status, cancellationToken);
+            _slackNotifier.NotifyFileStuckWithStatus(status);
             }
         }
 
