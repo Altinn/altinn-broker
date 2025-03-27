@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 using Slack.Webhooks;
 
-namespace Altinn.Broker.Application.FileTransferMonitor;
+namespace Altinn.Broker.Application;
 public class SlackStuckFileTransferNotifier
 {
     private readonly ILogger<SlackStuckFileTransferNotifier> _logger;
@@ -44,6 +44,7 @@ public class SlackStuckFileTransferNotifier
                $"*File transfer id:* {fileTransferStatus.FileTransferId}\n" +
                $"*Status:* {fileTransferStatus.Status}\n" +
                $"*Status start date:* {fileTransferStatus.Date}\n" +
+               $"*Stuck duration:* {DateTime.UtcNow - fileTransferStatus.Date}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n";
     }
     private async Task<bool> SendSlackNotificationWithMessage(string message)

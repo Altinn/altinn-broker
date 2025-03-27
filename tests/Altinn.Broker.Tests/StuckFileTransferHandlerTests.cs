@@ -1,6 +1,4 @@
-using System.Threading.Tasks;
-
-using Altinn.Broker.Application.FileTransferMonitor;
+using Altinn.Broker.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 
