@@ -19,13 +19,13 @@ public class SlackStuckFileTransferNotifier
         _hostEnvironment = hostEnvironment;
     }
 
-    public bool NotifyFileStuckWithStatus(
+    public async Task<bool> NotifyFileStuckWithStatus(
         FileTransferStatusEntity fileTransferStatus)
     {
         var errorMessage = FormatNotificationMessage(fileTransferStatus);
         try
         {
-            SendSlackNotificationWithMessage(errorMessage);
+            return await SendSlackNotificationWithMessage(errorMessage);
         }
         catch (Exception slackEx)
         {
@@ -34,8 +34,6 @@ public class SlackStuckFileTransferNotifier
                 "Failed to send Slack notification");
             return false;
         }
-
-        return true;
     }
 
     private string FormatNotificationMessage(FileTransferStatusEntity fileTransferStatus)
@@ -48,13 +46,13 @@ public class SlackStuckFileTransferNotifier
                $"*Status start date:* {fileTransferStatus.Date}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n";
     }
-    private void SendSlackNotificationWithMessage(string message)
+    private async Task<bool> SendSlackNotificationWithMessage(string message)
     {
         var slackMessage = new SlackMessage
         {
             Text = message,
             Channel = TestChannel,
         };
-        _slackClient.Post(slackMessage);
+        return await _slackClient.PostAsync(slackMessage);
     }
 }
