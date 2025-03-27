@@ -5,20 +5,20 @@ using Microsoft.Extensions.Logging;
 using Slack.Webhooks;
 
 namespace Altinn.Broker.Application.FileTransferMonitor;
-public class SlackStuckFileTransferNotification
+public class SlackStuckFileTransferNotifier
 {
-    private readonly ILogger<SlackStuckFileTransferNotification> _logger;
+    private readonly ILogger<SlackStuckFileTransferNotifier> _logger;
     private readonly ISlackClient _slackClient;
     private const string TestChannel = "#test-varslinger";
     private readonly IHostEnvironment _hostEnvironment;
 
-    public SlackStuckFileTransferNotification(ILogger<SlackStuckFileTransferNotification> logger, ISlackClient slackClient, IHostEnvironment hostEnvironment)
+    public SlackStuckFileTransferNotifier(ILogger<SlackStuckFileTransferNotifier> logger, ISlackClient slackClient, IHostEnvironment hostEnvironment)
     {
         _logger = logger;
         _slackClient = slackClient;
         _hostEnvironment = hostEnvironment;
     }
-    
+
     public bool NotifyFileStuckWithStatus(
         FileTransferStatusEntity fileTransferStatus)
     {

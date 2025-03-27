@@ -5,15 +5,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Application.FileTransferMonitor;
 
-public class FileTransferMonitorHandler(
+public class StuckFileTransferHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
-    SlackStuckFileTransferNotification slackNotifier,
-    ILogger<FileTransferMonitorHandler> logger)
+    SlackStuckFileTransferNotifier slackNotifier,
+    ILogger<StuckFileTransferHandler> logger)
 {
     private readonly IFileTransferStatusRepository _fileTransferStatusRepository = fileTransferStatusRepository;
-    private readonly ILogger<FileTransferMonitorHandler> _logger = logger;
+    private readonly ILogger<StuckFileTransferHandler> _logger = logger;
     private readonly HashSet<Guid> _ongoingStuckFileTransferIds = new HashSet<Guid>();
-    private readonly SlackStuckFileTransferNotification _slackNotifier = slackNotifier;
+    private readonly SlackStuckFileTransferNotifier _slackNotifier = slackNotifier;
     private readonly int _stuckThresholdMinutes = 15;
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
