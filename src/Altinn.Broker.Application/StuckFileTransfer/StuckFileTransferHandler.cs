@@ -10,7 +10,7 @@ public class StuckFileTransferHandler
     private readonly IFileTransferStatusRepository _fileTransferStatusRepository;
     private readonly ILogger<StuckFileTransferHandler> _logger;
     private readonly SlackStuckFileTransferNotifier _slackNotifier;
-    private readonly int _stuckThresholdMinutes = 5;
+    private readonly int _stuckThresholdMinutes = 15;
 
     public StuckFileTransferHandler(
         IFileTransferStatusRepository fileTransferStatusRepository,
