@@ -29,5 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ConfigureResourceHandler>();
         services.AddScoped<EventBusMiddleware>();
         services.AddScoped<GetResourceHandler>();
+        services.AddScoped<StuckFileTransferHandler>();
+        services.AddScoped<SlackStuckFileTransferNotifier>();
     }
 }
