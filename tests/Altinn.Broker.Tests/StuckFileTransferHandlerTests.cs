@@ -81,5 +81,10 @@ public class StuckFileTransferHandlerTests
             It.Is<It.IsAnyType>((v, t) => v.ToString() == $"File transfer {fileTransferId} has been stuck in upload processing for more than 5 minutes"),
             It.IsAny<Exception>(),
             (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
+
+        slackClient.Verify(s => s.PostAsync(It.Is<SlackMessage>(m => 
+            m.Text.Contains(fileTransferId.ToString()) && 
+            m.Text.Contains("UploadProcessing"))), 
+            Times.Once);
     }
 }
