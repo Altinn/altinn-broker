@@ -30,18 +30,6 @@ public class StuckFileTransferHandler
             DateTime.UtcNow.AddMinutes(-_stuckThresholdMinutes), 
             cancellationToken);
 
-        if (fileTransfersStuckInUploadProcessing.Count == 0)
-        {
-            _logger.LogInformation("No file transfers are stuck in upload processing, creating a fictional filetransferEntity to test slack notification of stuck file transfer");
-            var fictionalFileTransferStatusEntity = new FileTransferStatusEntity
-            {
-                FileTransferId = Guid.NewGuid(),
-                Status = FileTransferStatus.UploadProcessing,
-                Date = DateTime.UtcNow.AddMinutes(-_stuckThresholdMinutes)
-            };
-            fileTransfersStuckInUploadProcessing.Add(fictionalFileTransferStatusEntity);
-        }
-
         foreach (FileTransferStatusEntity status in fileTransfersStuckInUploadProcessing)
         {
             _logger.LogWarning("File transfer {fileTransferId} has been stuck in upload processing for more than {thresholdMinutes} minutes", status.FileTransferId, _stuckThresholdMinutes);
