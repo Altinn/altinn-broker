@@ -36,23 +36,31 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Initialize a file transfer
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.write
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the id of the initialized File transfer</response>
+    /// <response code="400"><ul>
+    /// <li>Service owner needs to be configured to use the broker API</li>
+    /// <li>In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack</li>
+    /// </ul></response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
+    /// <response code="503">Storage provider is not ready yet. Please try again later</response>
     [HttpPost]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(FileTransferInitializeResponseExt), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         logger.LogInformation("Initializing file transfer");
         var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt);
-
+        
         var commandResult = await handler.Process(commandRequest, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileTransferId => Ok(new FileTransferInitializeResponseExt()
@@ -67,10 +75,20 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Upload to an initialized file using a binary stream.
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.write
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the id of the uploaded File transfer</response>
+    /// <response code="400"><ul>
+    /// <li>Service owner needs to be configured to use the broker API</li>
+    /// <li>File size exceeds maximum</li>
+    /// <li>The checksum of uploaded file did not match the checksum specified in initialize call</li>
+    /// </ul></response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
+    /// <response code="404">The requested file transfer was not found</response>
+    /// <response code="409">A file transfer has already been, or attempted to be, created. Create a new file transfer resource to try again</response>
+    /// <response code="503">Storage provider is not ready yet. Please try again later</response>
     [HttpPost]
     [Route("{fileTransferId}/upload")]
     [Consumes("application/octet-stream")]
@@ -78,6 +96,9 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     [ProducesResponseType(typeof(FileTransferUploadResponseExt), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> UploadStreamed(
@@ -111,17 +132,24 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Initialize a filetransfer and uploads the file in the same request using form-data
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.write
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the id of the uploaded File transfer</response>
+    /// <response code="400"><ul>
+    /// <li>Service owner needs to be configured to use the broker API</li>
+    /// <li>In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack</li>
+    /// </ul></response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
+    /// <response code="503">Storage provider is not ready yet. Please try again later</response>
     [HttpPost]
     [Consumes("multipart/form-data")]
     [Produces("application/json")]
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [Route("upload")]
     [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
@@ -159,11 +187,13 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Get information about the file transfer and its current status
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the file transfer overview</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="404">The requested file transfer was not found</response>
     [HttpGet]
     [Route("{fileTransferId}")]
     [Produces("application/json")]
@@ -191,11 +221,13 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Get more detailed information about the file transfer for auditing and troubleshooting purposes
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the file transfer overview</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="404">The requested file transfer was not found</response>
     [HttpGet]
     [Route("{fileTransferId}/details")]
     [Produces("application/json")]
@@ -224,17 +256,19 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Get files that can be accessed by the caller according to specified filters
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write <br/>
     /// Result is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 last created.
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the list of file transfers</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
+    /// 
     [HttpGet]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(List<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<List<Guid>>> GetFileTransfers(
@@ -265,10 +299,20 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Downloads the file
     /// </summary>
     /// <remarks>
-    /// Scopes: <br />
+    /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the file</response>
+    /// <response code="400"><ul>
+    /// <li>No file uploaded yet</li>
+    /// <li>Service owner needs to be configured to use the broker API</li>
+    /// </ul></response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403"><ul>
+    /// <li>The requested file transfer's file is not ready for download. See file transfer status</li>
+    /// <li>"The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</li>
+    /// </ul></response>
+    /// <response code="404">The requested file transfer was not found</response>
     [HttpGet]
     [Produces("application/octet-stream")]
     [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
@@ -298,10 +342,18 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
     /// Confirms that the file has been downloaded
     /// </summary>
     /// <remarks>
-    /// Scopes: <br/> 
+    /// One of the scopes: <br/> 
     /// - altinn:broker.read <br/>
     /// </remarks>
-    /// <returns></returns>
+    /// <response code="200">Returns the file</response>
+    /// <response code="400"><ul>
+    /// <li>Cannot confirm before the files have been downloaded</li>
+    /// <li>No file uploaded yet</li>
+    /// <li>The requested file transfer's file is not ready for download. See file transfer status</li>
+    /// </ul></response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
+    /// <response code="404">The requested file transfer was not found</response>
     [HttpPost]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]

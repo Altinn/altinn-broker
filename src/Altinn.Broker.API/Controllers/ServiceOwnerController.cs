@@ -22,9 +22,11 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// Initializes the service owner for the calling organization within the brokerservice.
     /// </summary>
     /// <remarks>
-    /// Scopes: <br/>
+    /// One of the scopes: <br/>
     /// - altinn:serviceowner <br/>
     /// </remarks>
+    /// <response code="200">Service owner initialized successfully</response>
+    /// <response code="409">Service owner already exists</response>
     [HttpPost]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -47,9 +49,11 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// Gets the service owner for the calling organization within the brokerservice.
     /// </summary>
     /// <remarks>
-    /// Scopes: <br/>
+    /// One of the scopes: <br/>
     /// - altinn:serviceowner <br/>
     /// </remarks>
+    /// <response code="200">Service owner retrieved successfully</response>
+    /// <response code="404">Service owner not found</response>
     [HttpGet]
     [Produces("application/json")]
     [ProducesResponseType(typeof(ServiceOwnerOverviewExt), StatusCodes.Status200OK)]
