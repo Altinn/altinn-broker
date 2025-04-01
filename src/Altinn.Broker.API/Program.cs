@@ -17,7 +17,6 @@ using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
-using Microsoft.ApplicationInsights.AspNetCore.Extensions;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -87,7 +86,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
     });
-    services.AddApplicationInsightsTelemetry();
+    services.AddApplicationInsightsTelemetry(config => config.EnableAdaptiveSampling = false);
     services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
