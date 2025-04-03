@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,11 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
     public async Task<OneOf<GetFileTransferOverviewResponse, Error>> Process(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Retrieving file overview for file transfer {fileTransferId}. Legacy: {legacy}", request.FileTransferId, request.IsLegacy);
-        var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+
+        var fileTransfer = await TransactionWithRetriesPolicy.Execute(
+            async (cancellationToken) => await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken),
+            logger,
+            cancellationToken);
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
