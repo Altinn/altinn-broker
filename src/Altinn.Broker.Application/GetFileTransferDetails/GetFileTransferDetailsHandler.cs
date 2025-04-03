@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,10 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
     public async Task<OneOf<GetFileTransferDetailsResponse, Error>> Process(GetFileTransferDetailsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting file transfer details for {fileTransferId}.", request.FileTransferId);
-        var fileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken);
+        var fileTransfer = await TransactionWithRetriesPolicy.Execute(
+            async (cancellationToken) => await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken),
+            logger,
+            cancellationToken); 
         if (fileTransfer is null)
         {
             return Errors.FileTransferNotFound;
@@ -24,13 +28,20 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         {
             return Errors.NoAccessToResource;
         };
-        var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
-        var actorEvents = await actorFileTransferStatusRepository.GetActorEvents(request.FileTransferId, cancellationToken);
-        return new GetFileTransferDetailsResponse()
-        {
-            FileTransfer = fileTransfer,
-            FileTransferEvents = fileTransferEvents,
-            ActorEvents = actorEvents
-        };
+
+        return await TransactionWithRetriesPolicy.Execute(
+            async (cancellationToken) =>
+            {
+                var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
+                var actorEvents = await actorFileTransferStatusRepository.GetActorEvents(request.FileTransferId, cancellationToken);
+                return new GetFileTransferDetailsResponse()
+                {
+                    FileTransfer = fileTransfer,
+                    FileTransferEvents = fileTransferEvents,
+                    ActorEvents = actorEvents
+                };
+            },
+            logger,
+            cancellationToken);
     }
 }
