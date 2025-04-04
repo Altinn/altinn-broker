@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
+using Serilog.Formatting.Json;
 
 BuildAndRun(args);
 
@@ -38,7 +39,7 @@ static void BuildAndRun(string[] args)
         .Enrich.FromLogContext()
         .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
         .Enrich.WithClientIp()
-        .WriteTo.Console()
+        .WriteTo.Console(new JsonFormatter(renderMessage: true))
         .WriteTo.ApplicationInsights(
             services.GetRequiredService<TelemetryConfiguration>(),
             TelemetryConverter.Traces));
@@ -86,7 +87,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
     });
-    services.AddApplicationInsightsTelemetry(config => config.EnableAdaptiveSampling = false);
+    services.AddApplicationInsightsTelemetry();
     services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
