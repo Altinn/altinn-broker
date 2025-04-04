@@ -23,16 +23,14 @@ public class PropertyPropagationEnricher : ILogEventEnricher
             {
                 if (logEvent.Properties.TryGetValue(propertyToken.PropertyName, out var value))
                 {
-                    logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(propertyToken.PropertyName, value));
                     LogContext.PushProperty(propertyToken.PropertyName, value);
+                    if (propertyToken.PropertyName == "fileTransferId") // For queries that work across multiple API's.
+                    {
+                        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("instanceId", value));
+                        LogContext.PushProperty("instanceId", value);
+                    }
                 }
             }
-        }
-
-        if (logEvent.Properties.TryGetValue("fileTransferId", out var fileTransferIdValue))
-        {
-            logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("instanceId", fileTransferIdValue));
-            LogContext.PushProperty("instanceId", fileTransferIdValue);
         }
     }
 }
