@@ -24,12 +24,13 @@ public class PropertyPropagationEnricher : ILogEventEnricher
                 if (logEvent.Properties.TryGetValue(propertyToken.PropertyName, out var value))
                 {
                     LogContext.PushProperty(propertyToken.PropertyName, value);
-                    if (propertyToken.PropertyName == "fileTransferId") // For queries that work across multiple API's.
-                    {
-                        LogContext.PushProperty("instanceId", value);
-                    }
                 }
             }
+        }
+
+        if (logEvent.Properties.TryGetValue("fileTransferId", out var fileTransferIdValue))
+        {
+            LogContext.PushProperty("instanceId", fileTransferIdValue);
         }
     }
 }
