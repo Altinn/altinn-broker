@@ -23,6 +23,7 @@ public class PropertyPropagationEnricher : ILogEventEnricher
             {
                 if (logEvent.Properties.TryGetValue(propertyToken.PropertyName, out var value))
                 {
+                    logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(propertyToken.PropertyName, value));
                     LogContext.PushProperty(propertyToken.PropertyName, value);
                 }
             }
@@ -30,6 +31,7 @@ public class PropertyPropagationEnricher : ILogEventEnricher
 
         if (logEvent.Properties.TryGetValue("fileTransferId", out var fileTransferIdValue))
         {
+            logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("instanceId", fileTransferIdValue));
             LogContext.PushProperty("instanceId", fileTransferIdValue);
         }
     }
