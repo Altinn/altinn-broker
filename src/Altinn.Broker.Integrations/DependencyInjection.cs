@@ -24,7 +24,7 @@ public static class DependencyInjection
         services.AddSingleton<IBrokerStorageService, AzureStorageService>();
         services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IResourceRepository, ResourceRepository>();
-        services.AddScoped<IIdempotencyEventRepository, IdempotencyEventRepository>();
+        services.AddSingleton<IIdempotencyEventRepository, IdempotencyEventRepository>();
 
         var maskinportenSettings = new MaskinportenSettings();
         configuration.GetSection(nameof(MaskinportenSettings)).Bind(maskinportenSettings);

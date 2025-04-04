@@ -1,5 +1,4 @@
-﻿using Altinn.Broker.Core.Options;
-using Altinn.Broker.Core.Repositories;
+﻿using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
@@ -22,7 +21,6 @@ public static class DependencyInjection
         services.AddSingleton<IFileTransferStatusRepository, FileTransferStatusRepository>();
         services.AddSingleton<IActorFileTransferStatusRepository, ActorFileTransferStatusRepository>();
         services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
-        services.AddSingleton<IIdempotencyEventRepository, IdempotencyEventRepository>();
         services.AddSingleton<IPartyRepository, PartyRepository>();
     }
     private static NpgsqlDataSource BuildAzureNpgsqlDataSource(IConfiguration config)
