@@ -11,6 +11,7 @@ param administratorLoginPassword string
 @secure()
 param tenantId string
 
+var prodLikeEnvironment = !(environment != 'test')
 var databaseName = 'brokerdb'
 var databaseUser = 'adminuser'
 var poolSize = environment == 'test' ? 25 : 50
@@ -81,10 +82,50 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   }
 }
 
+resource maxConnectionsConfiguration 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'max_connections'
+  parent: postgres
+  dependsOn: [database, configurations]
+  properties: {
+    value: prodLikeEnvironment ? '3000' : '50'
+    source: 'user-override'
+  }
+}
+
+resource workMemConfiguration 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'work_mem'
+  parent: postgres
+  dependsOn: [database, maxConnectionsConfiguration]
+  properties: {
+    value: prodLikeEnvironment ? '1097151' : '4096'
+    source: 'user-override'
+  }
+}
+
+resource maintenanceWorkMemConfiguration 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'maintenance_work_mem'
+  parent: postgres
+  dependsOn: [database, workMemConfiguration]
+  properties: {
+    value: prodLikeEnvironment ? '2097151' : '99328'
+    source: 'user-override'
+  }
+}
+
+resource maxPreparedTransactions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'max_prepared_transactions'
+  parent: postgres
+  dependsOn: [database, maintenanceWorkMemConfiguration]
+  properties: {
+    value: prodLikeEnvironment ? '3000' : '50'
+    source: 'user-override'
+  }
+}
+
 resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
   name: 'azure-access'
   parent: postgres
-  dependsOn: [configurations] // Needs to depend on database to avoid updating at the same time
+  dependsOn: [maxPreparedTransactions] // Needs to depend on database to avoid updating at the same time
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
