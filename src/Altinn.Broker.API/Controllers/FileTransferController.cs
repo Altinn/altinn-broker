@@ -29,7 +29,7 @@ namespace Altinn.Broker.Controllers;
 [ApiController]
 [Route("broker/api/v1/filetransfer")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-public class FileTransferController(ILogger<FileTransferController> logger, IIdempotencyEventRepository idempotencyEventRepository) : Controller
+public class FileTransferController(ILogger<FileTransferController> logger) : Controller
 {
 
     /// <summary>
@@ -373,9 +373,7 @@ public class FileTransferController(ILogger<FileTransferController> logger, IIde
         {
             FileTransferId = fileTransferId
         };
-        var proccessingFunction = new Func<Task<OneOf<Task, Error>>>(() => handler.Process(requestData, HttpContext.User, cancellationToken));
-        var uniqueString = $"confirmDownload_{fileTransferId}_{HttpContext.User.GetCallerOrganizationId()}";
-        var commandResult = await IdempotencyEventHelper.ProcessEvent(uniqueString, proccessingFunction, idempotencyEventRepository, cancellationToken);
+        var commandResult = await handler.Process(requestData, HttpContext.User, cancellationToken);
         return commandResult.Match(
             (_) => Ok(null),
             Problem

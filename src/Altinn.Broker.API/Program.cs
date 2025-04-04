@@ -68,7 +68,6 @@ static void BuildAndRun(string[] args)
     app.UseHangfireDashboard();
 
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-    recurringJobManager.AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
     recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
     
@@ -88,7 +87,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
     });
-    services.AddApplicationInsightsTelemetry();
+    services.AddApplicationInsightsTelemetry(config => config.EnableAdaptiveSampling = false);
     services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
