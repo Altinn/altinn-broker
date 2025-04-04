@@ -17,7 +17,6 @@ using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
-using Microsoft.ApplicationInsights.AspNetCore.Extensions;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -26,6 +25,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
+using Serilog.Formatting.Json;
 
 BuildAndRun(args);
 
@@ -39,7 +39,7 @@ static void BuildAndRun(string[] args)
         .Enrich.FromLogContext()
         .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
         .Enrich.WithClientIp()
-        .WriteTo.Console()
+        .WriteTo.Console(new JsonFormatter(renderMessage: true))
         .WriteTo.ApplicationInsights(
             services.GetRequiredService<TelemetryConfiguration>(),
             TelemetryConverter.Traces));
