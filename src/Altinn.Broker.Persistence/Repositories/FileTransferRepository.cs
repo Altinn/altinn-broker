@@ -216,7 +216,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
-                commandString.AppendLine("AND NOT EXISTS (SELECT * FROM broker.actor_file_transfer_status s WHERE s.file_transfer_id_fk = afs.file_transfer_id_fk AND actor_file_transfer_status_description_id_fk = 2)");
+                commandString.AppendLine($"AND NOT EXISTS (SELECT * FROM broker.actor_file_transfer_status s WHERE s.file_transfer_id_fk = afs.file_transfer_id_fk AND actor_file_transfer_status_description_id_fk = {ActorFileTransferStatus.DownloadConfirmed})");
             }
             else
             {
@@ -225,7 +225,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
         commandString.AppendLine("INNER JOIN broker.file_transfer_status fs");
         commandString.Append("ON fs.file_transfer_id_fk = f.file_transfer_id_pk and file_transfer_status_description_id_fk = ");
-        commandString.AppendLine(fileTransferSearch.FileTransferStatus.HasValue ? "@fileTransferStatus" : "3");
+        commandString.AppendLine(fileTransferSearch.FileTransferStatus.HasValue ? "@fileTransferStatus" : FileTransferStatus.Published.ToString());
         commandString.AppendLine("WHERE 1 = 1");
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
