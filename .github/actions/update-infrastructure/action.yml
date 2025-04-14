@@ -64,9 +64,11 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Install Bicep CLI
+    - name: Fix Bicep setup
       shell: bash
       run: |
+        az bicep uninstall
+        az config set bicep.use_binary_from_path=false
         az bicep install
 
     - name: Generate postgresql password
