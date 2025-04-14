@@ -64,6 +64,11 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Install Bicep CLI
+      shell: bash
+      run: |
+        az bicep install
+
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh
