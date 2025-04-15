@@ -51,7 +51,6 @@ public class AltinnEventBus : IEventBus
         if (subjectOrganizationNumber != null)
         {
             var party = await _partyRepository.GetParty(subjectOrganizationNumber, cancellationToken);
-            party = null;
             if (party == null)
             {
                 _logger.LogInformation("looking up party in Altinn Register");
