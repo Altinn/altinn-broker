@@ -64,6 +64,17 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Downgrade Azure CLI to 2.70.0
+      shell: bash
+      run: |
+        # Obtain the currently installed distribution
+        AZ_DIST=$(lsb_release -cs)
+        # Store an Azure CLI version of choice
+        AZ_VER=2.70.0
+        # Install a specific version
+        sudo apt-get update
+        sudo apt-get install -y --allow-downgrades azure-cli=${AZ_VER}-1~${AZ_DIST}
+
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh
