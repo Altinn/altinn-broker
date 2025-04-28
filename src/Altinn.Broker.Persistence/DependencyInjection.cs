@@ -31,7 +31,7 @@ public static class DependencyInjection
         
         var connectionStringBuilder = new NpgsqlConnectionStringBuilder(databaseOptions.ConnectionString)
         {
-            KeepAlive = 6
+            KeepAlive = 30
         };
         
         dataSourceBuilder.ConnectionStringBuilder.ConnectionString = connectionStringBuilder.ConnectionString;
