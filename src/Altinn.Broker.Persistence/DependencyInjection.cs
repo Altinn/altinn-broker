@@ -28,7 +28,14 @@ public static class DependencyInjection
         var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
         config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
         var dataSourceBuilder = new NpgsqlDataSourceBuilder();
-        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = databaseOptions.ConnectionString;
+        
+        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(databaseOptions.ConnectionString)
+        {
+            KeepAlive = 6
+        };
+        
+        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = connectionStringBuilder.ConnectionString;
+        
         if (!string.IsNullOrWhiteSpace(dataSourceBuilder.ConnectionStringBuilder.Password))
         {
             return dataSourceBuilder.Build();
