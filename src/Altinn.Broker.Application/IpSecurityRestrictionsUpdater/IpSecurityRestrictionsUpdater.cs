@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 
-[DisableConcurrentExecution(timeoutInSeconds: 600)]
+
 public class IpSecurityRestrictionUpdater
 {
     private readonly IResourceManager _azureResourceManagerService;
@@ -19,6 +19,7 @@ public class IpSecurityRestrictionUpdater
         _logger = logger;
     }
 
+    [DisableConcurrentExecution(timeoutInSeconds: 600)]
     public async Task UpdateIpRestrictions()
     {
         try
