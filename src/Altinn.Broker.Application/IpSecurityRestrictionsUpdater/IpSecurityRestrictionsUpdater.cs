@@ -30,9 +30,8 @@ public class IpSecurityRestrictionUpdater
             
             // Get the IPs from Event Grid and APIM
             var newIps = await _azureResourceManagerService.RetrieveCurrentIpRanges(cts.Token);
-            _logger.LogInformation("Retrieved {Count} IP ranges", newIps.Count);
             
-            if (newIps.Count < 1)
+            if (newIps == null || newIps.Count < 1)
             {
                 _logger.LogError("Failed to retrieve current IP ranges, canceling update of IP restrictions");
                 return;
