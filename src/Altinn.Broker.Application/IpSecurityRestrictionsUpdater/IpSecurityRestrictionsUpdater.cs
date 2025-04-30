@@ -1,8 +1,11 @@
 using Altinn.Broker.Core.Services;
 
+using Hangfire;
+
 using Microsoft.Extensions.Logging;
 
 namespace Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
+
 
 public class IpSecurityRestrictionUpdater
 {
@@ -16,15 +19,36 @@ public class IpSecurityRestrictionUpdater
         _logger = logger;
     }
 
+    [DisableConcurrentExecution(timeoutInSeconds: 600)]
     public async Task UpdateIpRestrictions()
     {
-        _logger.LogInformation("Updating IP restrictions for container app");
-        var newIps = await _azureResourceManagerService.RetrieveCurrentIpRanges(CancellationToken.None);
-        if (newIps.Count < 1)
+        try
         {
-            _logger.LogError("Failed to retrieve current IP ranges, canceling update of IP restrictions");
-            return;
+            _logger.LogInformation("Started updating IP restrictions for container app");
+            
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            
+            // Get the IPs from Event Grid and APIM
+            var newIps = await _azureResourceManagerService.RetrieveCurrentIpRanges(cts.Token);
+            
+            if (newIps == null || newIps.Count < 1)
+            {
+                _logger.LogError("Failed to retrieve current IP ranges, canceling update of IP restrictions");
+                return;
+            }
+            
+            // Update the Container App with the new IPs
+            await _azureResourceManagerService.UpdateContainerAppIpRestrictionsAsync(newIps, cts.Token);
+            _logger.LogInformation("Successfully updated IP restrictions for container app");
         }
-        await _azureResourceManagerService.UpdateContainerAppIpRestrictionsAsync(newIps, CancellationToken.None);
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("IP restrictions update operation timed out");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception occurred while updating IP restrictions: {Message}", ex.Message);
+            throw;
+        }
     }
 }
