@@ -38,6 +38,7 @@ public static class TransactionWithRetriesPolicy
         .Or<PostgresException>()
         .Or<BackgroundJobClientException>()
         .Or<PostgreSqlDistributedLockException>()
+        .Or<NpgsqlException>(ex => ex.IsTransient)
         .WaitAndRetryAsync(
             8,
             retryAttempt => TimeSpan.FromMilliseconds(Math.Min(5 * Math.Pow(2, retryAttempt), 640)),
