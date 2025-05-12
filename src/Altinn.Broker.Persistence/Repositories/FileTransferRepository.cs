@@ -454,7 +454,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileTransferId, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT property_name, property_value FROM broker.file_transfer_property WHERE file_transfer_id_fk = @filetransferId");
+        await using var command = dataSource.CreateCommand("SELECT key, value FROM broker.file_transfer_property WHERE file_transfer_id_fk = @filetransferId");
         command.Parameters.AddWithValue("@filetransferId", fileTransferId);
         
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
@@ -464,7 +464,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 
             while (await reader.ReadAsync(ct))
             {
-                metadata.Add(reader.GetString(reader.GetOrdinal("property_name")), reader.GetString(reader.GetOrdinal("property_value")));
+                metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
             }
             return metadata;
         }, cancellationToken);
