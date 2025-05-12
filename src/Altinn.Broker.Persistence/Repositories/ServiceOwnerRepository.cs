@@ -1,10 +1,11 @@
 ﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Helpers;
 
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwnerRepository
+public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IServiceOwnerRepository
 {
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
@@ -17,47 +18,50 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
             "ORDER BY created desc");
         command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
 
-        using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
-        ServiceOwnerEntity? serviceOwner = null;
-        var storageProviders = new List<StorageProviderEntity>();
-
-        while (reader.Read())
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
-            if (serviceOwner == null)
-            {
-                serviceOwner = new ServiceOwnerEntity
-                {
-                    Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
-                    Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
-                    StorageProviders = new List<StorageProviderEntity>()
-                };
-            }
+            ServiceOwnerEntity? serviceOwner = null;
+            var storageProviders = new List<StorageProviderEntity>();
 
-            if (!reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")))
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (reader.Read())
             {
-                var storageProvider = new StorageProviderEntity
+                if (serviceOwner == null)
                 {
-                    ServiceOwnerId = serviceOwnerId,
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                    Id = reader.GetInt64(reader.GetOrdinal("storage_provider_id_pk")),
-                    ResourceName = reader.GetString(reader.GetOrdinal("resource_name")),
-                    Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type"))),
-                    Active = reader.GetBoolean(reader.GetOrdinal("active"))
-                };
+                    serviceOwner = new ServiceOwnerEntity
+                    {
+                        Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
+                        Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
+                        StorageProviders = new List<StorageProviderEntity>()
+                    };
+                }
 
-                if (storageProvider.Active && !storageProviders.Any(sp => sp.Id == storageProvider.Id))
+                if (!reader.IsDBNull(reader.GetOrdinal("storage_provider_id_pk")))
                 {
-                    storageProviders.Add(storageProvider);
+                    var storageProvider = new StorageProviderEntity
+                    {
+                        ServiceOwnerId = serviceOwnerId,
+                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                        Id = reader.GetInt64(reader.GetOrdinal("storage_provider_id_pk")),
+                        ResourceName = reader.GetString(reader.GetOrdinal("resource_name")),
+                        Type = Enum.Parse<StorageProviderType>(reader.GetString(reader.GetOrdinal("storage_provider_type"))),
+                        Active = reader.GetBoolean(reader.GetOrdinal("active"))
+                    };
+
+                    if (storageProvider.Active && !storageProviders.Any(sp => sp.Id == storageProvider.Id))
+                    {
+                        storageProviders.Add(storageProvider);
+                    }
                 }
             }
-        }
 
-        if (serviceOwner != null)
-        {
-            serviceOwner.StorageProviders = storageProviders;
-        }
+            if (serviceOwner != null)
+            {
+                serviceOwner.StorageProviders = storageProviders;
+            }
 
-        return serviceOwner;
+            return serviceOwner;
+        });
     }
 
     public async Task InitializeServiceOwner(string sub, string name)
@@ -67,8 +71,8 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
             "VALUES (@sub, @name)");
         command.Parameters.AddWithValue("@sub", sub);
         command.Parameters.AddWithValue("@name", name);
-        var commandText = command.CommandText;
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
     }
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
@@ -79,7 +83,8 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource) : IServiceOwner
         command.Parameters.AddWithValue("@resourceName", resourceName);
         command.Parameters.AddWithValue("@storageType", storageType.ToString());
         command.Parameters.AddWithValue("@serviceOwnerId", sub);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
     }
 }
 
