@@ -48,7 +48,7 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBComman
                         Active = reader.GetBoolean(reader.GetOrdinal("active"))
                     };
 
-                    if (storageProvider.Active && !storageProviders.Any(sp => sp.Id == storageProvider.Id))
+                    if (!storageProviders.Any(sp => sp.Id == storageProvider.Id))
                     {
                         storageProviders.Add(storageProvider);
                     }
