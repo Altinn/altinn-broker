@@ -1,11 +1,12 @@
 ﻿using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Helpers;
 
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-internal class ActorFileTransferStatusRepository(IActorRepository actorRepository, NpgsqlDataSource dataSource) : IActorFileTransferStatusRepository
+internal class ActorFileTransferStatusRepository(IActorRepository actorRepository, NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IActorFileTransferStatusRepository
 {
     public async Task<List<ActorFileTransferStatusEntity>> GetActorEvents(Guid fileTransferId, CancellationToken cancellationToken)
     {
@@ -15,10 +16,12 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
            "INNER JOIN broker.actor a on a.actor_id_pk = afs.actor_id_fk " +
            "WHERE afs.file_transfer_id_fk = @fileTransferId");
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
-        using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
-            while (await reader.ReadAsync(cancellationToken))
+            var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
             {
                 fileTransferStatuses.Add(new Core.Domain.ActorFileTransferStatusEntity()
                 {
@@ -32,8 +35,8 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                     }
                 });
             }
-        }
-        return fileTransferStatuses;
+            return fileTransferStatuses;
+        }, cancellationToken);
     }
 
     public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, CancellationToken cancellationToken)
@@ -51,12 +54,14 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         {
             actorId = actor.ActorId;
         }
+        
         await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date) " +
             "VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())");
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@actorFileTransferStatusId", (int)status);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 }
