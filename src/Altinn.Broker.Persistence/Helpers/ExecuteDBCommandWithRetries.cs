@@ -56,8 +56,7 @@ public class ExecuteDBCommandWithRetries(ILogger<ExecuteDBCommandWithRetries> lo
     private AsyncRetryPolicy CreateRetryPolicy()
     {
         return Policy
-            .Handle<NpgsqlException>(ex => ex.IsTransient)
-            .Or<PostgresException>()
+            .Handle<NpgsqlException>(ex => ex.IsTransient && ex is not PostgresException)
             .WaitAndRetryAsync(
                 3,
                 retryAttempt => TimeSpan.FromMilliseconds(100),
