@@ -57,6 +57,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
+        throw new NotImplementedException("This endpoint is not implemented yet");
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
         logger.LogInformation("Initializing file transfer");
         var commandRequest = InitializeFileTransferMapper.MapToRequest(initializeExt);
