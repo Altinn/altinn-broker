@@ -206,6 +206,7 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
     {
         return $":warning: *Unhandled Exception in Background Job*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
+               $"*System:* Broker\n" +
                $"*Job ID:* {jobId}\n" +
                $"*Job Name:* {jobName}\n" +
                $"*Type:* {exception.GetType().Name}\n" +
