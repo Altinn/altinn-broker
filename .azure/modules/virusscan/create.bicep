@@ -9,11 +9,11 @@ resource StorageAccounts 'Microsoft.Security/pricings@2024-01-01' = {
     extensions: [
       {
         name: 'OnUploadMalwareScanning'
-        isEnabled: 'True'
+        isEnabled: 'False'
       }
       {
         name: 'SensitiveDataDiscovery'
-        isEnabled: 'True'
+        isEnabled: 'False'
       }
     ]
   }

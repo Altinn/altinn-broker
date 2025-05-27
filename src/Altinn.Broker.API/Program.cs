@@ -17,7 +17,6 @@ using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
-using Microsoft.ApplicationInsights.AspNetCore.Extensions;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -26,6 +25,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
 using Serilog;
+using Serilog.Formatting.Json;
 
 BuildAndRun(args);
 
@@ -39,7 +39,7 @@ static void BuildAndRun(string[] args)
         .Enrich.FromLogContext()
         .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
         .Enrich.WithClientIp()
-        .WriteTo.Console()
+        .WriteTo.Console(new JsonFormatter(renderMessage: true))
         .WriteTo.ApplicationInsights(
             services.GetRequiredService<TelemetryConfiguration>(),
             TelemetryConverter.Traces));
@@ -68,7 +68,6 @@ static void BuildAndRun(string[] args)
     app.UseHangfireDashboard();
 
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-    recurringJobManager.AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
     recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
     
@@ -89,7 +88,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.IncludeXmlComments(xmlPath);
     });
     services.AddApplicationInsightsTelemetry();
-    services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));

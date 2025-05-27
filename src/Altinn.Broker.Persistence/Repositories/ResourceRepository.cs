@@ -1,10 +1,11 @@
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Helpers;
 
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository) : IResourceRepository
+public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, ExecuteDBCommandWithRetries commandExecutor) : IResourceRepository
 {
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
@@ -15,25 +16,29 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "ORDER BY created desc");
         command.Parameters.AddWithValue("@resourceId", resourceId);
 
-        using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         ResourceEntity? resource = null;
-        while (reader.Read())
+        
+        await using (var reader = await commandExecutor.ExecuteWithRetry(command.ExecuteReaderAsync, cancellationToken))
         {
-            resource = new ResourceEntity
+            while (await reader.ReadAsync(cancellationToken))
             {
-                Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
-                OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
-                MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
-                FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
-                Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
-                PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
-                PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
-                UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
-                ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
-                ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy"))
-            };
+                resource = new ResourceEntity
+                {
+                    Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
+                    OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
+                    MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
+                    FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
+                    PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
+                    PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
+                    UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
+                    ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
+                    ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy"))
+                };
+            }
         }
+
         if (resource is null)
         {
             resource = await altinnResourceRepository.GetResource(resourceId, cancellationToken);
@@ -48,6 +53,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         }
         return resource;
     }
+    
     public async Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
@@ -58,8 +64,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         command.Parameters.AddWithValue("@maxFileTransferSize", resource.MaxFileTransferSize == null ? DBNull.Value : resource.MaxFileTransferSize);
         command.Parameters.AddWithValue("@fileTransferTimeToLive", resource.FileTransferTimeToLive is null ? DBNull.Value : resource.FileTransferTimeToLive.Value);
         command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+    
     public async Task UpdateMaxFileTransferSize(string resource, long maxSize, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
@@ -68,7 +76,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resource);
         command.Parameters.AddWithValue("@maxFileTransferSize", maxSize);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
     public async Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default)
@@ -79,8 +88,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@fileTransferTimeToLive", fileTransferTimeToLive);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+    
     public async Task UpdatePurgeFileTransferAfterAllRecipientsConfirmed(string resourceId, bool PurgeFileTransferAfterAllRecipientsConfirmed, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
@@ -89,8 +100,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@PurgeFileTransferAfterAllRecipientsConfirmed", PurgeFileTransferAfterAllRecipientsConfirmed);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+
     public async Task UpdatePurgeFileTransferGracePeriod(string resourceId, TimeSpan PurgeFileTransferGracePeriod, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
@@ -99,7 +112,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@PurgeFileTransferGracePeriod", PurgeFileTransferGracePeriod);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
     public async Task UpdateUseManifestFileShim(string resourceId, bool useManifestFileShim, CancellationToken cancellationToken = default)
@@ -110,8 +124,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@UseManifestFileShim", useManifestFileShim);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+    
     public async Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
@@ -120,8 +136,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@externalServiceCodeLegacy", externalServiceCodeLegacy);
-        command.ExecuteNonQuery();
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+    
     public async Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
@@ -129,7 +147,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             "SET external_service_edition_code_legacy = @externalServiceEditionCodeLegacy " +
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
-                command.Parameters.AddWithValue("@externalServiceEditionCodeLegacy", (object?)externalServiceEditionCodeLegacy ?? DBNull.Value); 
-        command.ExecuteNonQuery();
+        command.Parameters.AddWithValue("@externalServiceEditionCodeLegacy", (object?)externalServiceEditionCodeLegacy ?? DBNull.Value);
+        
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 }
