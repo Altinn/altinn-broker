@@ -88,7 +88,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.IncludeXmlComments(xmlPath);
     });
     services.AddApplicationInsightsTelemetry();
-    services.AddExceptionHandler<SlackExceptionNotification>();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));

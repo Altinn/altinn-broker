@@ -1,10 +1,11 @@
 ﻿using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Helpers;
 
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class IdempotencyEventRepository(NpgsqlDataSource dataSource) : IIdempotencyEventRepository
+public class IdempotencyEventRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IIdempotencyEventRepository
 {
     public async Task AddIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
     {
@@ -14,6 +15,6 @@ public class IdempotencyEventRepository(NpgsqlDataSource dataSource) : IIdempote
         command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 }

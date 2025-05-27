@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Persistence.Helpers;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Broker.Persistence.Repositories;
 
@@ -16,6 +17,7 @@ public static class DependencyInjection
     public static void AddPersistence(this IServiceCollection services, IConfiguration config)
     {
         services.AddSingleton(BuildAzureNpgsqlDataSource(config));
+        services.AddSingleton<ExecuteDBCommandWithRetries>();
         services.AddSingleton<IActorRepository, ActorRepository>();
         services.AddSingleton<IFileTransferRepository, FileTransferRepository>();
         services.AddSingleton<IFileTransferStatusRepository, FileTransferStatusRepository>();
@@ -28,7 +30,14 @@ public static class DependencyInjection
         var databaseOptions = new DatabaseOptions() { ConnectionString = "" };
         config.GetSection(nameof(DatabaseOptions)).Bind(databaseOptions);
         var dataSourceBuilder = new NpgsqlDataSourceBuilder();
-        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = databaseOptions.ConnectionString;
+        
+        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(databaseOptions.ConnectionString)
+        {
+            KeepAlive = 30
+        };
+        
+        dataSourceBuilder.ConnectionStringBuilder.ConnectionString = connectionStringBuilder.ConnectionString;
+        
         if (!string.IsNullOrWhiteSpace(dataSourceBuilder.ConnectionStringBuilder.Password))
         {
             return dataSourceBuilder.Build();
