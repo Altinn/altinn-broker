@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.Helpers;
+using Altinn.Broker.Integrations.Altinn.Authorization;
+using Altinn.Broker.Common.Constants;
 
 namespace Altinn.Broker.Models;
 
@@ -37,7 +39,7 @@ public class LegacyFileInitalizeExt
     /// The sender organization of the file
     /// </summary>
     [JsonPropertyName("sender")]
-    [RegularExpressionAttribute(@"^\d{4}:\d{9}$", ErrorMessage = "Organization numbers should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+    [RegularExpressionAttribute(@"^(?:0192:|" + UrnConstants.OrganizationNumberAttribute + @":)\d{9}$", ErrorMessage = $"Organization numbers should be on the format '{UrnConstants.OrganizationNumberAttribute}:organizationnumber' or the format countrycode:organizationnumber, for instance 0192:910753614")]
     [Required]
     public string Sender { get; set; } = string.Empty;
 
@@ -45,7 +47,7 @@ public class LegacyFileInitalizeExt
     /// The recipient organizations of the broker file.
     /// </summary>
     [JsonPropertyName("recipients")]
-    [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^\d{4}:\d{9}$", ErrorMessage = "Each recipient should be on the form countrycode:organizationnumber, for instance 0192:910753614")]
+    [ValidateElementsInList(typeof(RegularExpressionAttribute), @"^(?:0192:|" + UrnConstants.OrganizationNumberAttribute + @":)\d{9}$", ErrorMessage = $"Each recipient should be on the format '{UrnConstants.OrganizationNumberAttribute}:organizationnumber' or the format countrycode:organizationnumber, for instance 0192:910753614")]
     [Required]
     [MinLength(1, ErrorMessage = "One or more recipients are required")]
     public List<string> Recipients { get; set; } = new List<string>();

@@ -6,6 +6,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
+using Altinn.Broker.Common.Constants;
 
 using static Altinn.Authorization.ABAC.Constants.XacmlConstants;
 

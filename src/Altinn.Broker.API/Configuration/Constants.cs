@@ -1,6 +1,8 @@
-﻿namespace Altinn.Broker.API.Configuration;
+﻿using Altinn.Broker.Common.Constants;
+
+namespace Altinn.Broker.API.Configuration;
 
 public static class Constants
 {
-    public const string OrgNumberPattern = @"^\d{4}:\d{9}$";
+    public const string OrgNumberPattern = @"^(?:0192:|" + UrnConstants.OrganizationNumberAttribute + @":)\d{9}$";
 }

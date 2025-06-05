@@ -1,4 +1,5 @@
-﻿namespace Altinn.Broker.Integrations.Altinn.Authorization;
+namespace Altinn.Broker.Common.Constants;
+
 public static class UrnConstants
 {
     /// <summary>
@@ -33,4 +34,4 @@ public static class UrnConstants
     /// xacml string that represents session id
     /// </summary>
     public const string SessionId = "urn:altinn:sessionid";
-}
+} 

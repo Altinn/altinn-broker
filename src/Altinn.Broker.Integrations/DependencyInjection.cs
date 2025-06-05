@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
+using Altinn.Broker.Common.Constants;
 
 namespace Altinn.Broker.Integrations;
 public static class DependencyInjection
