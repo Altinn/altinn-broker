@@ -34,6 +34,30 @@ public class InitializeFileTransferHandler(
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Initializing file transfer on {resourceId}", request.ResourceId.SanitizeForLogs());
+        
+        // Log sender format
+        if (request.SenderExternalId.StartsWith("urn:altinn:organization:identifier-no:"))
+        {
+            logger.LogInformation("Sender using new URN format: {sender}", request.SenderExternalId);
+        }
+        else if (request.SenderExternalId.StartsWith("0192:"))
+        {
+            logger.LogInformation("Sender using legacy format: {sender}", request.SenderExternalId);
+        }
+
+        // Log recipients format
+        foreach (var recipient in request.RecipientExternalIds)
+        {
+            if (recipient.StartsWith("urn:altinn:organization:identifier-no:"))
+            {
+                logger.LogInformation("Recipient using new URN format: {recipient}", recipient);
+            }
+            else if (recipient.StartsWith("0192:"))
+            {
+                logger.LogInformation("Recipient using legacy format: {recipient}", recipient);
+            }
+        }
+
         var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, request.IsLegacy, cancellationToken);
         if (!hasAccess)
         {
