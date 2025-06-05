@@ -38,11 +38,11 @@ public class InitializeFileTransferHandler(
         // Log sender format
         if (request.SenderExternalId.StartsWith("urn:altinn:organization:identifier-no:"))
         {
-            logger.LogInformation("Sender using new URN format: {sender}", request.SenderExternalId);
+            logger.LogInformation("Sender using new URN format: {sender}", request.SenderExternalId.SanitizeForLogs());
         }
         else if (request.SenderExternalId.StartsWith("0192:"))
         {
-            logger.LogInformation("Sender using legacy format: {sender}", request.SenderExternalId);
+            logger.LogInformation("Sender using legacy format: {sender}", request.SenderExternalId.SanitizeForLogs());
         }
 
         // Log recipients format
@@ -50,11 +50,11 @@ public class InitializeFileTransferHandler(
         {
             if (recipient.StartsWith("urn:altinn:organization:identifier-no:"))
             {
-                logger.LogInformation("Recipient using new URN format: {recipient}", recipient);
+                logger.LogInformation("Recipient using new URN format: {recipient}", recipient.SanitizeForLogs());
             }
             else if (recipient.StartsWith("0192:"))
             {
-                logger.LogInformation("Recipient using legacy format: {recipient}", recipient);
+                logger.LogInformation("Recipient using legacy format: {recipient}", recipient.SanitizeForLogs());
             }
         }
 
