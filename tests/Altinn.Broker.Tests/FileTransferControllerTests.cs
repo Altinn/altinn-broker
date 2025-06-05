@@ -195,7 +195,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
