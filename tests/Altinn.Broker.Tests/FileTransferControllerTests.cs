@@ -195,7 +195,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
@@ -504,6 +504,62 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         await Test_Graceful_purge_changes_purge_time("PT12H");
         await Test_Graceful_purge_changes_purge_time("PT1H");
         await Test_Graceful_purge_changes_purge_time("PT1M");
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithNewUrnFormat_Success()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.Sender = "urn:altinn:organization:identifier-no:991825827";
+        initializeRequestBody.Recipients = new List<string> { "urn:altinn:organization:identifier-no:986252932" };
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithMixedUrnFormats_Success()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.Sender = "urn:altinn:organization:identifier-no:991825827";
+        initializeRequestBody.Recipients = new List<string> 
+        { 
+            "urn:altinn:organization:identifier-no:986252932",
+            "0192:910351192" 
+        };
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithInvalidUrnFormat_Fails()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.Sender = "invalid:format:991825827";
+        initializeRequestBody.Recipients = new List<string> { "invalid:format:986252932" };
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Contains("Organization numbers should be on the form", parsedError.Detail);
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
