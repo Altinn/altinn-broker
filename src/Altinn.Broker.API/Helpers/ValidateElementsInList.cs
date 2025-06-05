@@ -10,6 +10,7 @@ public class ValidateElementsInList(Type attributeType, params object[] attribut
         if (list != null)
         {
             var attributeInstance = (ValidationAttribute)Activator.CreateInstance(attributeType, attributeArgs)!;
+            attributeInstance.ErrorMessage = this.ErrorMessage;
             foreach (var item in list)
             {
                 if (!attributeInstance.IsValid(item))
