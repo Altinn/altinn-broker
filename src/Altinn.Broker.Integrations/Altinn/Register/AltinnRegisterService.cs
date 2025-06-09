@@ -38,6 +38,7 @@ public class AltinnRegisterService : IAltinnRegisterService
             _logger.LogError("Error when looking up organization in Altinn Register.Statuscode was: {statusCode}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
             return null;
         }
+        _logger.LogInformation("Party lookup successful");
         var party = await response.Content.ReadFromJsonAsync<Party>();
         if (party is null)
         {
