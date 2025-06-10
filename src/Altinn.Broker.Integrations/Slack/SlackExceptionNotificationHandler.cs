@@ -1,14 +1,15 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Diagnostics;
-using Slack.Webhooks;
-using Microsoft.AspNetCore.Http;
 using System.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using System.Net;
+
 using Altinn.Broker.Core.Options;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.DataContracts;
+
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+using Slack.Webhooks;
 
 namespace Altinn.Broker.Integrations.Slack;
 
@@ -19,7 +20,6 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
     private readonly IProblemDetailsService _problemDetailsService;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly SlackSettings _slackSettings;
-    private readonly TelemetryClient _telemetryClient;
     private string Channel => _slackSettings.NotificationChannel;
 
     public SlackExceptionNotificationHandler(
@@ -27,15 +27,13 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         ISlackClient slackClient,
         IProblemDetailsService problemDetailsService,
         IHostEnvironment hostEnvironment,
-        SlackSettings slackSettings,
-        TelemetryClient telemetryClient)
+        SlackSettings slackSettings)
     {
         _logger = logger;
         _slackClient = slackClient;
         _problemDetailsService = problemDetailsService;
         _hostEnvironment = hostEnvironment;
         _slackSettings = slackSettings;
-        _telemetryClient = telemetryClient;
     }
 
     public async ValueTask<bool> TryHandleAsync(
@@ -47,10 +45,7 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
 
         _logger.LogError(
             exception,
-            "Unhandled exception occurred. Type: {ExceptionType}, Message: {Message}, Path: {Path}",
-            exception.GetType().Name,
-            exception.Message,
-            httpContext.Request.Path.ToString().Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            null);
 
         try
         {
@@ -73,52 +68,13 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
                 ProblemDetails = problemDetails
             });
 
-            // Track successful Slack notification
-            var properties = new Dictionary<string, string>
-            {
-                { "ExceptionType", exception.GetType().Name },
-                { "Path", httpContext.Request.Path },
-                { "Environment", _hostEnvironment.EnvironmentName },
-                { "System", "Broker" },
-                { "StackTrace", exception.StackTrace ?? "No stack trace available" },
-                { "InnerExceptionStackTrace", exception.InnerException?.StackTrace ?? "No inner exception stack trace" },
-                { "ExceptionSource", "HTTP" },
-                { "ExceptionIdentifier", $"{exception.GetType().Name}:{httpContext.Request.Path}" },
-                { "ExceptionMessage", exception.Message },
-                { "InnerExceptionType", exception.InnerException?.GetType().Name ?? "None" },
-                { "InnerExceptionMessage", exception.InnerException?.Message ?? "None" },
-                { "SentToSlack", "true" },
-                { "SlackMessage", exceptionMessage }
-            };
-
-            _telemetryClient.TrackException(exception, properties);
-
             return true;
         }
         catch (Exception slackEx)
         {
             _logger.LogError(
                 slackEx,
-                "Failed to send Slack notification");
-
-            // Track Slack notification failure
-            var properties = new Dictionary<string, string>
-            {
-                { "OriginalExceptionType", exception.GetType().Name },
-                { "SlackExceptionType", slackEx.GetType().Name },
-                { "Environment", _hostEnvironment.EnvironmentName },
-                { "System", "Broker" },
-                { "StackTrace", slackEx.StackTrace ?? "No stack trace available" },
-                { "InnerExceptionStackTrace", slackEx.InnerException?.StackTrace ?? "No inner exception stack trace" },
-                { "ExceptionSource", "SlackNotification" },
-                { "ExceptionIdentifier", $"SlackNotification:{exception.GetType().Name}:{httpContext.Request.Path}" },
-                { "ExceptionMessage", slackEx.Message },
-                { "InnerExceptionType", slackEx.InnerException?.GetType().Name ?? "None" },
-                { "InnerExceptionMessage", slackEx.InnerException?.Message ?? "None" }
-            };
-
-            _telemetryClient.TrackException(slackEx, properties);
-
+                null);
             return true;
         }
     }
@@ -129,63 +85,19 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
 
         _logger.LogError(
             exception,
-            "Unhandled exception occurred in background job. Job ID: {JobId}, Job Name: {JobName}, Type: {ExceptionType}, Message: {Message}",
-            jobId,
-            jobName,
-            exception.GetType().Name,
-            exception.Message);
+            null);
 
         try
         {
             await SendSlackNotificationWithMessage(exceptionMessage);
 
-            // Track successful Slack notification for background job
-            var properties = new Dictionary<string, string>
-            {
-                { "ExceptionType", exception.GetType().Name },
-                { "JobId", jobId },
-                { "JobName", jobName },
-                { "Environment", _hostEnvironment.EnvironmentName },
-                { "System", "Broker" },
-                { "StackTrace", exception.StackTrace ?? "No stack trace available" },
-                { "InnerExceptionStackTrace", exception.InnerException?.StackTrace ?? "No inner exception stack trace" },
-                { "ExceptionSource", "BackgroundJob" },
-                { "ExceptionIdentifier", $"BackgroundJob:{exception.GetType().Name}:{jobName}" },
-                { "ExceptionMessage", exception.Message },
-                { "InnerExceptionType", exception.InnerException?.GetType().Name ?? "None" },
-                { "InnerExceptionMessage", exception.InnerException?.Message ?? "None" },
-                { "SentToSlack", "true" },
-                { "SlackMessage", exceptionMessage }
-            };
-
-            _telemetryClient.TrackException(exception, properties);
-
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send Slack notification");
-
-            // Track Slack notification failure for background job
-            var properties = new Dictionary<string, string>
-            {
-                { "OriginalExceptionType", exception.GetType().Name },
-                { "SlackExceptionType", ex.GetType().Name },
-                { "JobId", jobId },
-                { "JobName", jobName },
-                { "Environment", _hostEnvironment.EnvironmentName },
-                { "System", "Broker" },
-                { "StackTrace", ex.StackTrace ?? "No stack trace available" },
-                { "InnerExceptionStackTrace", ex.InnerException?.StackTrace ?? "No inner exception stack trace" },
-                { "ExceptionSource", "BackgroundJobSlackNotification" },
-                { "ExceptionIdentifier", $"BackgroundJobSlackNotification:{exception.GetType().Name}:{jobName}" },
-                { "ExceptionMessage", ex.Message },
-                { "InnerExceptionType", ex.InnerException?.GetType().Name ?? "None" },
-                { "InnerExceptionMessage", ex.InnerException?.Message ?? "None" }
-            };
-
-            _telemetryClient.TrackException(ex, properties);
-
+            _logger.LogError(
+                ex,
+                null);
             return false;
         }
     }
