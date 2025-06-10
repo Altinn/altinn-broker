@@ -11,7 +11,7 @@ param administratorLoginPassword string
 @secure()
 param tenantId string
 
-var prodLikeEnvironment = !(environment != 'test')
+var prodLikeEnvironment = environment != 'test'
 var databaseName = 'brokerdb'
 var databaseUser = 'adminuser'
 var poolSize = environment == 'test' ? 25 : 50
