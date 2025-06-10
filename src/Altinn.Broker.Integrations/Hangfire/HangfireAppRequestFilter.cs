@@ -7,7 +7,7 @@ namespace Altinn.Broker.Integrations.Hangfire;
 public class HangfireAppRequestFilter() : IServerFilter
 {
     private static readonly AsyncLocal<Activity> _hangfireActivity = new();
-    private static readonly ActivitySource _activitySource = new("Altinn.Correspondence.Integrations.Hangfire");
+    private static readonly ActivitySource _activitySource = new("Altinn.Broker.Integrations.Hangfire");
 
     public void OnPerformed(PerformedContext context)
     {

@@ -30,7 +30,7 @@ static ILogger<Program> CreateBootstrapLogger()
     return LoggerFactory.Create(builder =>
     {
         builder
-            .AddFilter("Altinn.Correspondence.API.Program", LogLevel.Debug)
+            .AddFilter("Altinn.Broker.API.Program", LogLevel.Debug)
             .AddConsole();
     }).CreateLogger<Program>();
 }
