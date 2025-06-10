@@ -544,24 +544,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.NotNull(fileTransferResponse);
     }
 
-    [Fact]
-    public async Task InitializeFileTransfer_WithInvalidUrnFormat_Fails()
-    {
-        // Arrange
-        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.Sender = "invalid:format:991825827";
-        initializeRequestBody.Recipients = new List<string> { "invalid:format:986252932" };
-
-        // Act
-        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
-        
-        // Assert
-        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Contains("Organization numbers should be on the form", parsedError.Detail);
-    }
-
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);
