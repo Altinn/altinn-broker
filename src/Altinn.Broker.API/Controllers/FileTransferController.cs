@@ -280,10 +280,6 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         [FromServices] GetFileTransfersHandler handler,
         CancellationToken cancellationToken)
     {
-        if (resourceId == "123")
-        {
-            throw new NotImplementedException();
-        }
         logger.LogInformation("Getting fileTransfers with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
         var queryResult = await handler.Process(new GetFileTransfersRequest()
         {
