@@ -18,7 +18,7 @@ public static class OpenTelemetryConfiguration
     {
         var attributes = new List<KeyValuePair<string, object>>
         {
-            KeyValuePair.Create("service.name", (object)"altinn-correspondence"),
+            KeyValuePair.Create("service.name", (object)"altinn-broker"),
         };
 
         services.AddOpenTelemetry()
@@ -35,7 +35,7 @@ public static class OpenTelemetryConfiguration
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddSource("Altinn.Correspondence.Integrations.Hangfire")
+                    .AddSource("Altinn.Broker.Integrations.Hangfire")
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         options.Filter = httpContext =>
