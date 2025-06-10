@@ -1,23 +1,22 @@
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Options;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using Slack.Webhooks;
 
 namespace Altinn.Broker.Application;
-public class SlackStuckFileTransferNotifier
+public class SlackStuckFileTransferNotifier(
+    ILogger<SlackStuckFileTransferNotifier> logger, 
+    ISlackClient slackClient,
+    IHostEnvironment hostEnvironment,
+    SlackSettings slackSettings)
 {
-    private readonly ILogger<SlackStuckFileTransferNotifier> _logger;
-    private readonly ISlackClient _slackClient;
-    private const string TestChannel = "#test-varslinger";
-    private readonly IHostEnvironment _hostEnvironment;
-
-    public SlackStuckFileTransferNotifier(ILogger<SlackStuckFileTransferNotifier> logger, ISlackClient slackClient, IHostEnvironment hostEnvironment)
-    {
-        _logger = logger;
-        _slackClient = slackClient;
-        _hostEnvironment = hostEnvironment;
-    }
+    private readonly ILogger<SlackStuckFileTransferNotifier> _logger = logger;
+    private readonly ISlackClient _slackClient = slackClient;
+    private readonly IHostEnvironment _hostEnvironment = hostEnvironment;
+    private string Channel => slackSettings.NotificationChannel;
 
     public async Task<bool> NotifyFileStuckWithStatus(
         FileTransferStatusEntity fileTransferStatus)
@@ -52,7 +51,7 @@ public class SlackStuckFileTransferNotifier
         var slackMessage = new SlackMessage
         {
             Text = message,
-            Channel = TestChannel,
+            Channel = Channel,
         };
         return await _slackClient.PostAsync(slackMessage);
     }
