@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -113,6 +114,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             {
                 services.UseMemoryStorage();
             });
+            services.RemoveAll<IRecurringJobManager>();
+            services.AddSingleton(new Mock<IRecurringJobManager>().Object);
             if (result.Outcome == OutcomeType.Failure)
             {
                 throw new InvalidOperationException("Hangfire could not be installed");
