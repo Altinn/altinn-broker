@@ -24,7 +24,7 @@ public static class HttpClientBuilderExtensions
     }
 
     /// <summary>
-    /// A standard retry policy for HTTP operations; 3 retry attempts with exponential backoff (50ms, 100ms, 200ms)
+    /// A standard retry policy for HTTP operations; 3 retry attempts with exponential backoff (100ms, 200ms, 400ms)
     /// </summary>
     public static IAsyncPolicy<HttpResponseMessage> GetStandardRetryPolicy(ILogger logger)
     {
