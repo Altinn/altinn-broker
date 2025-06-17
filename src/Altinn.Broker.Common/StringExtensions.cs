@@ -18,15 +18,15 @@ public static class StringExtensions
     /// <summary>
     /// Extracts the identifier from a colon-separated string that may contain a prefix.
     /// </summary>
-    /// <param name="orgNumber">The organization number to format</param>
+    /// <param name="identifierWithPrefix">An identifier with a prefix to format. f.eks an organization number or social security number</param>
     /// <returns>Returns the last sequence succeeding a colon.</returns>
-    public static string WithoutPrefix(this string orgNumber)
+    public static string WithoutPrefix(this string identifierWithPrefix)
     {
-        if (string.IsNullOrWhiteSpace(orgNumber))
+        if (string.IsNullOrWhiteSpace(identifierWithPrefix))
         {
             return string.Empty;
         }
-        return orgNumber.Split(":").Last();
+        return identifierWithPrefix.Split(":").Last();
     }
 
     public static string WithPrefix(this string orgNumber)
