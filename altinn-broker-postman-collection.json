@@ -867,18 +867,6 @@
 							"name": "Create sender systemuser request",
 							"event": [
 								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											"var responseData = JSON.parse(responseBody);\r",
-											"pm.globals.set(\"system_id\", responseData);\r",
-											""
-										],
-										"type": "text/javascript",
-										"packages": {}
-									}
-								},
-								{
 									"listen": "prerequest",
 									"script": {
 										"exec": [
@@ -935,18 +923,6 @@
 						{
 							"name": "Create recipient systemuser request",
 							"event": [
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											"var responseData = JSON.parse(responseBody);\r",
-											"pm.globals.set(\"system_id\", responseData);\r",
-											""
-										],
-										"type": "text/javascript",
-										"packages": {}
-									}
-								},
 								{
 									"listen": "prerequest",
 									"script": {
@@ -1519,7 +1495,7 @@
 		},
 		{
 			"key": "client_id",
-			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.samarbeid.digdir.no/integrations)",
+			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.test.samarbeid.digdir.no/login)",
 			"type": "string"
 		},
 		{
@@ -1530,11 +1506,6 @@
 		{
 			"key": "client_jwk",
 			"value": "\nInput your Maskinporten JWK here. Should be on the form: \n{\n        \"p\": \"....\",\n        \"kty\": \"RSA\",\n        \"q\": \"....\",\n        \"d\": \"...\",\n        \"e\": \"AQAB\",\n        \"use\": \"sig\",\n        \"kid\": \"client_kid\",\n        \"qi\": \"....\",\n        \"dp\": \"...\",\n        \"alg\": \"RS256\",\n        \"dq\": \"....\",\n        \"n\": \"....\"\n    }",
-			"type": "string"
-		},
-		{
-			"key": "platform_subscription_key",
-			"value": "Contact us to get a subscription key for use with Altinn APIs",
 			"type": "string"
 		},
 		{
