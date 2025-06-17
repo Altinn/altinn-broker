@@ -506,6 +506,26 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         await Test_Graceful_purge_changes_purge_time("PT1M");
     }
 
+    [Fact]
+    public async Task Initialize_WithUrnResourceId_Success()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.ResourceId = $"urn:altinn:resource:{TestConstants.RESOURCE_FOR_TEST}";
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+
+        // Assert
+        Assert.NotNull(fileTransferResponse);
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterInitialize);
+        Assert.True(fileTransferAfterInitialize.FileTransferStatus == FileTransferStatusExt.Initialized);
+    }
+
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);
