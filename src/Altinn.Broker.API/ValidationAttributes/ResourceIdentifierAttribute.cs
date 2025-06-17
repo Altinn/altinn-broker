@@ -20,6 +20,6 @@ public class ResourceIdentifierAttribute : ValidationAttribute
 
     public static bool IsValidResourceFormat(string value)
     {
-        return !string.IsNullOrEmpty(value) && Regex.IsMatch(value);
+        return string.IsNullOrEmpty(value) || Regex.IsMatch(value);
     }
 }
