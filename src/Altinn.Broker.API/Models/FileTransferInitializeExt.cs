@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Models;
 
 namespace Altinn.Broker.Models;
 
@@ -25,6 +26,7 @@ public class FileTransferInitalizeExt
     [JsonPropertyName("resourceId")]
     [StringLength(255, MinimumLength = 1)]
     [Required]
+    [ResourceIdentifier]
     public string ResourceId { get; set; } = string.Empty;
 
     /// <summary>
@@ -71,7 +73,6 @@ public class FileTransferInitalizeExt
     [JsonPropertyName("disableVirusScan")]
     public bool? DisableVirusScan { get; set; } = false;
 }
-
 internal class MD5ChecksumAttribute : ValidationAttribute
 {
     public MD5ChecksumAttribute()
@@ -133,3 +134,4 @@ internal class PropertyListAttribute : ValidationAttribute
         return ValidationResult.Success;
     }
 }
+
