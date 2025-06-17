@@ -1077,7 +1077,7 @@
 									"    }, \r",
 									"    exp = 120, \r",
 									"    alg = 'RS256');\r",
-									"pm.variables.set('sender_jwt', jwt);\r",
+									"pm.variables.set('jwt', jwt);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -1110,7 +1110,7 @@
 								},
 								{
 									"key": "assertion",
-									"value": "{{sender_jwt}}",
+									"value": "{{jwt}}",
 									"type": "text"
 								}
 							]
@@ -1215,7 +1215,7 @@
 									"    },\r",
 									"    exp = 120,\r",
 									"    alg = 'RS256');\r",
-									"pm.variables.set('sender_jwt', jwt);\r",
+									"pm.variables.set('jwt', jwt);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -1248,7 +1248,7 @@
 								},
 								{
 									"key": "assertion",
-									"value": "{{sender_jwt}}",
+									"value": "{{jwt}}",
 									"type": "text"
 								}
 							]
@@ -1356,7 +1356,7 @@
 									"    },\r",
 									"    exp = 120,\r",
 									"    alg = 'RS256');\r",
-									"pm.variables.set('sender_jwt', jwt);\r",
+									"pm.variables.set('jwt', jwt);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -1389,7 +1389,7 @@
 								},
 								{
 									"key": "assertion",
-									"value": "{{sender_jwt}}",
+									"value": "{{jwt}}",
 									"type": "text"
 								}
 							]
