@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.Application.InitializeFileTransfer;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Models;
 
@@ -10,7 +11,7 @@ internal static class InitializeFileTransferMapper
     {
         return new InitializeFileTransferRequest()
         {
-            ResourceId = fileTransferInitializeExt.ResourceId,
+            ResourceId = fileTransferInitializeExt.ResourceId.WithoutPrefix(),
             FileName = fileTransferInitializeExt.FileName,
             SenderExternalId = fileTransferInitializeExt.Sender,
             SendersFileTransferReference = fileTransferInitializeExt.SendersFileTransferReference,

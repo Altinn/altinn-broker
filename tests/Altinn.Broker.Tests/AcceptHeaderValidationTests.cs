@@ -11,13 +11,13 @@ using Xunit.Abstractions;
 
 namespace Altinn.Broker.Tests.TestingFeature;
 
-public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFactory>
+public class AcceptHeaderValidationTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
-    public FileTransferControllerTests(CustomWebApplicationFactory factory, ITestOutputHelper output)
+    public AcceptHeaderValidationTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);

@@ -1,4 +1,4 @@
-﻿namespace Altinn.Broker.Integrations.Altinn.Authorization;
+﻿namespace Altinn.Broker.Common.Constants;
 public static class UrnConstants
 {
     /// <summary>
