@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-using Altinn.Broker.API.Models;
+using Altinn.Broker.API.ValidationAttributes;
 using Altinn.Broker.Helpers;
 
 namespace Altinn.Broker.Models;

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using Altinn.Broker.Common.Constants;
 
-namespace Altinn.Broker.API.Models;
+namespace Altinn.Broker.API.ValidationAttributes;
 
 public class ResourceIdentifierAttribute : ValidationAttribute
 {

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Helpers;
-using Altinn.Broker.API.Models;
+using Altinn.Broker.API.ValidationAttributes;
 
 namespace Altinn.Broker.Models;
 

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Altinn.Broker.API.Models
+namespace Altinn.Broker.API.ValidationAttributes
 {
     [AttributeUsage(AttributeTargets.Property)]
     internal class PropertyListAttribute : ValidationAttribute

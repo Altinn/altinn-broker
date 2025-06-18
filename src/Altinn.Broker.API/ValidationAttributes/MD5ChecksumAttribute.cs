@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Altinn.Broker.API.Models
+namespace Altinn.Broker.API.ValidationAttributes
 {
     internal class MD5ChecksumAttribute : ValidationAttribute
     {
