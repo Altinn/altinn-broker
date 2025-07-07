@@ -1,6 +1,6 @@
 name: Create release in github
 
-description: Create a release to git if the version has been bumped in the version.txt file
+description: Create a release to git (version checking is handled by the calling workflow)
 
 inputs:
   GITHUB_TOKEN:
@@ -17,21 +17,11 @@ runs:
       id: get-version
       uses: ./.github/actions/get-current-version
 
-    - name: fetch tags
-      shell: bash
-      run: git fetch --tags
-
-    - name: set latest tag
-      shell: bash
-      id: set-latest-tag
-      run: |
-        echo "latestTag=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_OUTPUT
-
     - name: Create release
       shell: bash
-      if: ${{ !(steps.set-latest-tag.outputs.latestTag == steps.get-version.outputs.version) }}
       env:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         TAG: ${{ steps.get-version.outputs.version }}
       run: |
-        gh release create "$TAG" --title="v${{steps.get-version.outputs.version}}" --generate-notes
+        echo "Creating release for version $TAG"
+        gh release create "$TAG" --title="v$TAG" --generate-notes
