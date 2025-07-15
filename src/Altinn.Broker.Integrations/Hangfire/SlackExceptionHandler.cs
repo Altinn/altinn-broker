@@ -22,7 +22,8 @@ namespace Altinn.Broker.Integrations.Hangfire
             // Log the start of the job execution
             var jobId = filterContext.BackgroundJob.Id;
             var jobName = filterContext.BackgroundJob.Job.Type.Name;
-            _logger.LogInformation("Starting job {JobId} of type {JobName}", jobId, jobName);
+            var retryCount = filterContext.GetJobParameter<int>("RetryCount");
+            _logger.LogInformation("Starting job {JobId} of type {JobName} with retry count {RetryCount}", jobId, jobName, retryCount);
         }
 
         public async void OnPerformed(PerformedContext filterContext)
@@ -47,7 +48,7 @@ namespace Altinn.Broker.Integrations.Hangfire
                 var exception = failedState.Exception;
                 var jobId = context.BackgroundJob.Id;
                 var jobName = context.BackgroundJob.Job.Type.Name;
-                var retryCount = GetRetryCount(context);
+                var retryCount = context.GetJobParameter<int>("RetryCount");
 
                 _logger.LogError(exception, "Job {JobId} of type {JobName} failed on retry {RetryCount}", jobId, jobName, retryCount);
                 
@@ -60,25 +61,18 @@ namespace Altinn.Broker.Integrations.Hangfire
         {
             try
             {
-                // Try to get retry count from Hangfire's job state
-                // For failed jobs, we can check the retry count from the job state
                 var jobId = filterContext.BackgroundJob.Id;
                 
-                // In Hangfire, retry count is typically available in the job state
-                // We'll use a simple approach to estimate retry count based on job execution history
-                // This is a simplified implementation - in production you might want to query the Hangfire database directly
+                // Get retry count from Hangfire's job parameters
+                var retryCount = filterContext.GetJobParameter<int>("RetryCount");
+                _logger.LogDebug("Getting retry count for job {JobId}: {RetryCount}", jobId, retryCount);
                 
-                // For now, we'll return 0 as default and let the notification handler decide
-                // The actual retry count would need to be tracked by Hangfire's retry mechanism
-                // or by querying the job state from the database
-                
-                _logger.LogDebug("Retry count not available for job {JobId}, using default value", jobId);
-                return 0;
+                return retryCount;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to get retry count for job {JobId}", filterContext.BackgroundJob.Id);
-                return 0;
+                return 0; // Default to 0 if we can't get the retry count
             }
         }
 
@@ -86,25 +80,18 @@ namespace Altinn.Broker.Integrations.Hangfire
         {
             try
             {
-                // Try to get retry count from Hangfire's job state
-                // For failed jobs, we can check the retry count from the job state
                 var jobId = filterContext.BackgroundJob.Id;
                 
-                // In Hangfire, retry count is typically available in the job state
-                // We'll use a simple approach to estimate retry count based on job execution history
-                // This is a simplified implementation - in production you might want to query the Hangfire database directly
+                // Get retry count from Hangfire's job parameters
+                var retryCount = filterContext.GetJobParameter<int>("RetryCount");
+                _logger.LogDebug("Getting retry count for job {JobId}: {RetryCount}", jobId, retryCount);
                 
-                // For now, we'll return 0 as default and let the notification handler decide
-                // The actual retry count would need to be tracked by Hangfire's retry mechanism
-                // or by querying the job state from the database
-                
-                _logger.LogDebug("Retry count not available for job {JobId}, using default value", jobId);
-                return 0;
+                return retryCount;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to get retry count for job {JobId}", filterContext.BackgroundJob.Id);
-                return 0;
+                return 0; // Default to 0 if we can't get the retry count
             }
         }
     }

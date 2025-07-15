@@ -81,8 +81,8 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
 
     public async Task<bool> TryHandleBackgroundJobAsync(string jobId, string jobName, Exception exception, int retryCount = 0)
     {
-        // Skip notifications for the first 6 retries
-        if (retryCount < 6)
+        // Only send Slack notifications on retry 3, 6 and 10 (final retry)
+        if (retryCount != 3 && retryCount != 6 && retryCount != 10)
         {
             _logger.LogDebug("Skipping Slack notification for job {JobId} on retry {RetryCount}", jobId, retryCount);
             return true;
@@ -123,8 +123,8 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
 
     private string FormatBackgroundJobExceptionMessage(string jobId, string jobName, Exception exception, int retryCount)
     {
-        var severity = retryCount >= 10 ? ":rotating_light:" : ":warning:";
-        var retryInfo = retryCount >= 10 ? " (CRITICAL - Final retry)" : $" (Retry {retryCount})";
+        var severity = retryCount == 10 ? ":rotating_light:" : ":warning:";
+        var retryInfo = retryCount == 10 ? " (CRITICAL - Final retry)" : $" (Retry {retryCount})";
         
         return $"{severity} *Unhandled Exception in Background Job*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
@@ -133,7 +133,7 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
                $"*Job Name:* {jobName}\n" +
                $"*Type:* {exception.GetType().Name}\n" +
                $"*Message:* {exception.Message}\n" +
-               $"*Retry Count:* {retryCount}{retryInfo}\n" +
+               $"*Retry Count:* {retryCount}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n" +
                $"*Stacktrace:* \n{exception.StackTrace}";
     }
