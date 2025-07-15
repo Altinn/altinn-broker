@@ -124,7 +124,6 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
     private string FormatBackgroundJobExceptionMessage(string jobId, string jobName, Exception exception, int retryCount)
     {
         var severity = retryCount == 10 ? ":rotating_light:" : ":warning:";
-        var retryInfo = retryCount == 10 ? " (CRITICAL - Final retry)" : $" (Retry {retryCount})";
         
         return $"{severity} *Unhandled Exception in Background Job*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
