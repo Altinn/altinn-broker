@@ -7,7 +7,6 @@ using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
-using Altinn.Broker.Application.TestRetry;
 using Altinn.Broker.Application.UploadFile;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +31,5 @@ public static class DependencyInjection
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
-        services.AddScoped<TestRetryHandler>();
     }
 }
