@@ -125,10 +125,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
-        .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+        .AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options => // For both pure Maskinporten tokens and legacy
         {
-            var altinnOptions = new AltinnOptions();
-            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
             if (hostEnvironment.IsProduction())
             {
@@ -152,11 +150,11 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.Legacy));
-        options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
     });
 
     services.Configure<KestrelServerOptions>(options =>

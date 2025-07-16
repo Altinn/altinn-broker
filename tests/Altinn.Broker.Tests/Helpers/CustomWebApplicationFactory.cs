@@ -56,7 +56,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                             return jwt;
                         }
                     };
-                }).AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+                }).AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options => // To support "overgangslosningen"
                 {
                     options.RequireHttpsMetadata = false;
                     options.SaveToken = true;
