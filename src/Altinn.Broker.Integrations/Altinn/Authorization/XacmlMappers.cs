@@ -112,25 +112,6 @@ public static class XacmlMappers
     {
         XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
         List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-        // Handle Maskinporten tokens with authorization_details (system user)
-        // var systemUserClaim = claims.FirstOrDefault(c => c.Type == "authorization_details");
-        // if (systemUserClaim is not null)
-        // {
-        //     try
-        //     {
-        //         var systemUserAuthorizationDetails = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
-        //         if (systemUserAuthorizationDetails?.SystemUserOrg?.ID is not null)
-        //         {
-        //             var orgNumber = systemUserAuthorizationDetails.SystemUserOrg.ID.WithoutPrefix();
-        //             list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", systemUserClaim.Issuer));
-        //             list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", systemUserClaim.Issuer));
-        //         }
-        //     }
-        //     catch (JsonException)
-        //     {
-        //         // If we can't parse the authorization_details, continue with other claims
-        //     }
-        // }
         foreach (Claim claim in claims)
         {
             if (IsScopeClaim(claim.Type))

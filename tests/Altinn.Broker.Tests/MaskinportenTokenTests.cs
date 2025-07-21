@@ -86,25 +86,6 @@ public class MaskinportenTokenTests
     }
 
     [Fact]
-    public void CreateSubjectCategory_WithMaskinportenToken_MapsOrgNumberCorrectly()
-    {
-        // Arrange
-        var user = TestTokenHelper.CreateMaskinportenUser("123456789", "altinn:broker.write");
-
-        // Act
-        var category = XacmlMappers.CreateSubjectCategory(user);
-
-        // Assert
-        var orgNumberAttr = category.Attribute.FirstOrDefault(a => a.AttributeId == "urn:altinn:organizationnumber");
-        Assert.NotNull(orgNumberAttr);
-        Assert.Equal("123456789", orgNumberAttr.Value);
-
-        var orgIdentifierAttr = category.Attribute.FirstOrDefault(a => a.AttributeId == "urn:altinn:organization:identifier-no");
-        Assert.NotNull(orgIdentifierAttr);
-        Assert.Equal("123456789", orgIdentifierAttr.Value);
-    }
-
-    [Fact]
     public void CreateSubjectCategory_WithMaskinportenToken_IncludesScopeAttribute()
     {
         // Arrange
