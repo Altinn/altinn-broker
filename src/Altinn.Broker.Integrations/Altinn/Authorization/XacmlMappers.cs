@@ -76,36 +76,6 @@ public static class XacmlMappers
 
     }
 
-    internal static XacmlJsonCategory CreateSubjectCategory(ClaimsPrincipal user)
-    {
-        XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
-        List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-
-        foreach (Claim claim in user.Claims)
-        {
-            if (IsCamelCaseOrgnumberClaim(claim.Type))
-            {
-                var orgNumber = claim.Value.WithoutPrefix();
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", claim.Issuer));
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", claim.Issuer));
-            }
-            else if (IsScopeClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:scope", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsJtiClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:sessionid", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsValidUrn(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute(claim.Type, claim.Value, "string", claim.Issuer));
-            }
-        }
-        xacmlJsonCategory.Attribute = list;
-        return xacmlJsonCategory;
-    }
-
     /// <param name="user">ClaimsPrincipal containing Maskinporten token claims</param>
     /// <returns>XacmlJsonCategory with appropriate subject attributes for Maskinporten tokens</returns>
     internal static XacmlJsonCategory CreateMaskinportenSubjectCategory(IEnumerable<Claim> claims)
@@ -154,11 +124,6 @@ public static class XacmlMappers
     {
         Regex regex = new Regex("^urn*");
         return regex.Match(value).Success;
-    }
-
-    private static bool IsCamelCaseOrgnumberClaim(string value)
-    {
-        return value.Equals("urn:altinn:orgNumber");
     }
 
     private static bool IsScopeClaim(string value)

@@ -92,7 +92,7 @@ public class MaskinportenTokenTests
         var user = TestTokenHelper.CreateMaskinportenUser("123456789", "altinn:broker.read");
 
         // Act
-        var category = XacmlMappers.CreateSubjectCategory(user);
+        var category = XacmlMappers.CreateMaskinportenSubjectCategory(user.Claims);
 
         // Assert
         var scopeAttr = category.Attribute.FirstOrDefault(a => a.AttributeId == "urn:scope");
@@ -120,17 +120,17 @@ public class MaskinportenTokenTests
         }
 
         [Fact]
-        public async Task FileTransfer_WithPureMaskinportenToken_SuccessfullyInitializes()
+        public async Task FileTransfer_WithValidMaskinportenToken_SuccessfullyInitializes()
         {
-            // Arrange - Create a pure Maskinporten token (no exchange to Altinn token)
+            // Arrange - Create a valid Maskinporten token (not expired)
             var maskinportenToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.write");
             var client = _factory.CreateClientWithAuthorization(maskinportenToken);
 
-            // Act - Try to initialize a file transfer using the pure Maskinporten token
+            // Act - Try to initialize a file transfer using the valid Maskinporten token
             var initializeRequest = FileTransferInitializeExtTestFactory.BasicFileTransfer();
             var response = await client.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequest);
 
-            // Assert - The request should succeed, proving Maskinporten tokens are accepted without exchange
+            // Assert - The request should succeed, proving valid Maskinporten tokens are accepted
             Assert.True(response.IsSuccessStatusCode, $"Expected success but got {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
 
             var fileTransferResponse = await response.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
@@ -149,7 +149,7 @@ public class MaskinportenTokenTests
             var initResponse = await writeClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequest);
             var initResult = await initResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
 
-            // Act - Now try to read details with a read scope Maskinporten token
+            // Act - Now try to read details with a valid read scope Maskinporten token
             var readToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.read");
             var readClient = _factory.CreateClientWithAuthorization(readToken);
 
@@ -160,7 +160,7 @@ public class MaskinportenTokenTests
         }
 
         [Fact]
-        public async Task FileTransfer_WithPureMaskinportenTokenDifferentOrg_CanAuthenticate()
+        public async Task FileTransfer_WithValidMaskinportenTokenDifferentOrg_CanAuthenticate()
         {
             // Arrange - Create a file transfer with one organization
             var orgToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.write");
@@ -170,26 +170,26 @@ public class MaskinportenTokenTests
             var response = await orgClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequest);
             var result = await response.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
 
-            // Act - Try to access with a different organization's Maskinporten token
+            // Act - Try to access with a different organization's valid Maskinporten token
             var differentOrgToken = TestTokenHelper.CreateMaskinportenToken("123456789", "altinn:broker.read");
             var differentOrgClient = _factory.CreateClientWithAuthorization(differentOrgToken);
 
             var accessResponse = await differentOrgClient.GetAsync($"broker/api/v1/filetransfer/{result.FileTransferId}");
 
             // Assert - Should authenticate successfully (authorization is mocked in test environment)
-            // The key test is that the Maskinporten token is accepted for authentication
+            // The key test is that the valid Maskinporten token is accepted for authentication
             Assert.True(accessResponse.IsSuccessStatusCode || accessResponse.StatusCode == System.Net.HttpStatusCode.Forbidden,
                 $"Expected authentication to succeed but got {accessResponse.StatusCode}: {await accessResponse.Content.ReadAsStringAsync()}");
         }
 
         [Fact]
-        public async Task LegacyApi_WithPureMaskinportenToken_SuccessfullyInitializes()
+        public async Task LegacyApi_WithValidMaskinportenToken_SuccessfullyInitializes()
         {
-            // Arrange - Test that Maskinporten tokens work with legacy API endpoints too
+            // Arrange - Test that valid Maskinporten tokens work with legacy API endpoints too
             var maskinportenToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.legacy");
             var client = _factory.CreateClientWithAuthorization(maskinportenToken);
 
-            // Act - Try to initialize using legacy API with pure Maskinporten token
+            // Act - Try to initialize using legacy API with valid Maskinporten token
             var initializeRequest = FileTransferInitializeExtTestFactory.BasicFileTransfer();
             var response = await client.PostAsJsonAsync("broker/api/v1/legacy/file", initializeRequest);
 
