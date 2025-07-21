@@ -58,6 +58,8 @@ public static class XacmlMappers
         return actionAttributes;
     }
 
+    /// <summary>
+    /// Creates XACML resource category for authorization requests.
     /// If id is required this should be included by the caller. 
     /// Attribute eventId is tagged with `includeInResponse`</remarks>
     internal static XacmlJsonCategory CreateResourceCategory(string resourceId, string party, string? instanceId)
@@ -78,26 +80,6 @@ public static class XacmlMappers
     {
         XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
         List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-
-        // Handle Maskinporten tokens with authorization_details (system user)
-        var systemUserClaim = user.Claims.FirstOrDefault(c => c.Type == "authorization_details");
-        if (systemUserClaim is not null)
-        {
-            try
-            {
-                var systemUserAuthorizationDetails = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
-                if (systemUserAuthorizationDetails?.SystemUserOrg?.ID is not null)
-                {
-                    var orgNumber = systemUserAuthorizationDetails.SystemUserOrg.ID.WithoutPrefix();
-                    list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", systemUserClaim.Issuer));
-                    list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", systemUserClaim.Issuer));
-                }
-            }
-            catch (JsonException)
-            {
-                // If we can't parse the authorization_details, continue with other claims
-            }
-        }
 
         foreach (Claim claim in user.Claims)
         {
@@ -123,6 +105,70 @@ public static class XacmlMappers
         xacmlJsonCategory.Attribute = list;
         return xacmlJsonCategory;
     }
+
+    /// <param name="user">ClaimsPrincipal containing Maskinporten token claims</param>
+    /// <returns>XacmlJsonCategory with appropriate subject attributes for Maskinporten tokens</returns>
+    internal static XacmlJsonCategory CreateMaskinportenSubjectCategory(IEnumerable<Claim> claims)
+    {
+        XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
+        List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
+        // Handle Maskinporten tokens with authorization_details (system user)
+        // var systemUserClaim = claims.FirstOrDefault(c => c.Type == "authorization_details");
+        // if (systemUserClaim is not null)
+        // {
+        //     try
+        //     {
+        //         var systemUserAuthorizationDetails = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
+        //         if (systemUserAuthorizationDetails?.SystemUserOrg?.ID is not null)
+        //         {
+        //             var orgNumber = systemUserAuthorizationDetails.SystemUserOrg.ID.WithoutPrefix();
+        //             list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", systemUserClaim.Issuer));
+        //             list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", systemUserClaim.Issuer));
+        //         }
+        //     }
+        //     catch (JsonException)
+        //     {
+        //         // If we can't parse the authorization_details, continue with other claims
+        //     }
+        // }
+        foreach (Claim claim in claims)
+        {
+            if (IsScopeClaim(claim.Type))
+            {
+                list.Add(CreateXacmlJsonAttribute("urn:scope", claim.Value, "string", claim.Issuer));
+            }
+            else if (IsJtiClaim(claim.Type))
+            {
+                list.Add(CreateXacmlJsonAttribute("urn:altinn:sessionid", claim.Value, "string", claim.Issuer));
+            }
+            else if (claim.Type == "consumer")
+            {
+                // Handle Maskinporten consumer claim - extract organization number
+                try
+                {
+                    var consumerObject = JsonSerializer.Deserialize<TokenConsumer>(claim.Value);
+                    if (consumerObject?.ID is not null)
+                    {
+                        var orgNumber = consumerObject.ID.WithoutPrefix();
+                        list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", claim.Issuer));
+                        list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", claim.Issuer));
+                    }
+                }
+                catch (JsonException)
+                {
+                    // If we can't parse the consumer claim, skip it
+                }
+            }
+            else if (IsValidUrn(claim.Type))
+            {
+                list.Add(CreateXacmlJsonAttribute(claim.Type, claim.Value, "string", claim.Issuer));
+            }
+        }
+        
+        xacmlJsonCategory.Attribute = list;
+        return xacmlJsonCategory;
+    }
+
     private static bool IsValidUrn(string value)
     {
         Regex regex = new Regex("^urn*");
