@@ -8,7 +8,6 @@ using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;

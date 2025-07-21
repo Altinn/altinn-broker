@@ -8,11 +8,8 @@ using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
-using Altinn.Broker.Common;
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
-using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
@@ -21,8 +18,6 @@ using Altinn.Broker.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-using OneOf;
 
 namespace Altinn.Broker.Controllers;
 

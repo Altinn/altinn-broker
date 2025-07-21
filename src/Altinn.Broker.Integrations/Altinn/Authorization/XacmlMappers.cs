@@ -103,8 +103,9 @@ public static class XacmlMappers
         {
             if (IsCamelCaseOrgnumberClaim(claim.Type))
             {
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", claim.Value, "string", claim.Issuer));
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", claim.Value, "string", claim.Issuer));
+                var orgNumber = claim.Value.WithoutPrefix();
+                list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", claim.Issuer));
+                list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", claim.Issuer));
             }
             else if (IsScopeClaim(claim.Type))
             {

@@ -14,8 +14,16 @@ public static class ClaimsPrincipalExtensions
         var systemUserClaim = user.Claims.FirstOrDefault(c => c.Type == "authorization_details");
         if (systemUserClaim is not null)
         {
-            var systemUserAuthorizationDetails = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
-            return systemUserAuthorizationDetails?.SystemUserOrg.ID.WithoutPrefix();
+            try
+            {
+                var systemUserAuthorizationDetails = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
+                return systemUserAuthorizationDetails?.SystemUserOrg.ID.WithoutPrefix();
+            }
+            catch (JsonException)
+            {
+                // Invalid JSON in authorization_details claim
+                return null;
+            }
         }
         
         // Enterprise token (from Altinn)
