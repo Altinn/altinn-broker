@@ -30,4 +30,10 @@ public class HealthController(NpgsqlDataSource databaseConnectionProvider) : Con
 
         return Ok("Environment properly configured");
     }
+
+    [HttpGet("throw")]
+    public IActionResult ThrowTestException()
+    {
+        throw new Exception("Dette er en test-exception fra /health/throw-endepunktet for å teste logging og Slack-varsling.");
+    }
 }
