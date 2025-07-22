@@ -380,5 +380,12 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         );
     }
 
+    [HttpGet("throw")]
+    [AllowAnonymous]
+    public IActionResult ThrowTestException()
+    {
+        throw new Exception("Dette er en test-exception fra /filetransfer/throw-endepunktet for å teste logging og Slack-varsling.");
+    }
+
     private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
 }
