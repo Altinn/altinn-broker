@@ -5,7 +5,7 @@ ON broker.actor_file_transfer_status (
     actor_file_transfer_status_description_id_fk DESC
 );
 
-CREATE INDEX file_transfer_status_file_transfer_id_fk_idx 
+CREATE INDEX file_transfer_status_file_transfer_id_fk_status_pk_idx 
 ON broker.file_transfer_status (
     file_transfer_id_fk,
     file_transfer_status_id_pk DESC
