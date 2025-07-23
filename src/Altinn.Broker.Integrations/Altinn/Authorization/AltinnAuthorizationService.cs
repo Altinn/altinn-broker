@@ -76,7 +76,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             return bypass.Value;
         }
-        bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten"));
+        bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
         XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.WithoutPrefix(), fileTransferId, rights, resource.Id, isMaskinportenToken);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -116,7 +116,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         };
         // Use appropriate subject category creation based on token type
         var subjectCategory = isMaskinportenToken 
-            ? XacmlMappers.CreateMaskinportenSubjectCategory(user.Claims)     // Handle Maskinporten consumer claims
+            ? XacmlMappers.CreateMaskinportenSubjectCategory(user)     // Handle Maskinporten consumer claims
             : DecisionHelper.CreateSubjectCategory(user.Claims);               // Use standard Altinn token handling
         request.AccessSubject.Add(subjectCategory);
         foreach (var actionType in actionTypes)

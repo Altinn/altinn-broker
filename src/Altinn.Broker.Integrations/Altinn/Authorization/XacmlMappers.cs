@@ -78,11 +78,20 @@ public static class XacmlMappers
 
     /// <param name="user">ClaimsPrincipal containing Maskinporten token claims</param>
     /// <returns>XacmlJsonCategory with appropriate subject attributes for Maskinporten tokens</returns>
-    internal static XacmlJsonCategory CreateMaskinportenSubjectCategory(IEnumerable<Claim> claims)
+    internal static XacmlJsonCategory CreateMaskinportenSubjectCategory(ClaimsPrincipal user)
     {
         XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
         List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-        foreach (Claim claim in claims)
+        
+        // Add organization number attributes using centralized extraction logic
+        var organizationNumber = user.GetCallerOrganizationId();
+        if (!string.IsNullOrEmpty(organizationNumber))
+        {
+            list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", organizationNumber, "string", "altinn"));
+            list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", organizationNumber, "string", "altinn"));
+        }
+        
+        foreach (Claim claim in user.Claims)
         {
             if (IsScopeClaim(claim.Type))
             {
@@ -91,24 +100,6 @@ public static class XacmlMappers
             else if (IsJtiClaim(claim.Type))
             {
                 list.Add(CreateXacmlJsonAttribute("urn:altinn:sessionid", claim.Value, "string", claim.Issuer));
-            }
-            else if (claim.Type == "consumer")
-            {
-                // Handle Maskinporten consumer claim - extract organization number
-                try
-                {
-                    var consumerObject = JsonSerializer.Deserialize<TokenConsumer>(claim.Value);
-                    if (consumerObject?.ID is not null)
-                    {
-                        var orgNumber = consumerObject.ID.WithoutPrefix();
-                        list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", orgNumber, "string", claim.Issuer));
-                        list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", orgNumber, "string", claim.Issuer));
-                    }
-                }
-                catch (JsonException)
-                {
-                    // If we can't parse the consumer claim, skip it
-                }
             }
             else if (IsValidUrn(claim.Type))
             {

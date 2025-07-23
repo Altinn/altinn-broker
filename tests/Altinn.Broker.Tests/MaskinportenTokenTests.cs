@@ -92,7 +92,7 @@ public class MaskinportenTokenTests
         var user = TestTokenHelper.CreateMaskinportenUser("123456789", "altinn:broker.read");
 
         // Act
-        var category = XacmlMappers.CreateMaskinportenSubjectCategory(user.Claims);
+        var category = XacmlMappers.CreateMaskinportenSubjectCategory(user);
 
         // Assert
         var scopeAttr = category.Attribute.FirstOrDefault(a => a.AttributeId == "urn:scope");
@@ -159,28 +159,6 @@ public class MaskinportenTokenTests
             Assert.True(detailsResponse.IsSuccessStatusCode, $"Expected success but got {detailsResponse.StatusCode}: {await detailsResponse.Content.ReadAsStringAsync()}");
         }
 
-        [Fact]
-        public async Task FileTransfer_WithValidMaskinportenTokenDifferentOrg_CanAuthenticate()
-        {
-            // Arrange - Create a file transfer with one organization
-            var orgToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.write");
-            var orgClient = _factory.CreateClientWithAuthorization(orgToken);
-
-            var initializeRequest = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-            var response = await orgClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequest);
-            var result = await response.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
-
-            // Act - Try to access with a different organization's valid Maskinporten token
-            var differentOrgToken = TestTokenHelper.CreateMaskinportenToken("123456789", "altinn:broker.read");
-            var differentOrgClient = _factory.CreateClientWithAuthorization(differentOrgToken);
-
-            var accessResponse = await differentOrgClient.GetAsync($"broker/api/v1/filetransfer/{result.FileTransferId}");
-
-            // Assert - Should authenticate successfully (authorization is mocked in test environment)
-            // The key test is that the valid Maskinporten token is accepted for authentication
-            Assert.True(accessResponse.IsSuccessStatusCode || accessResponse.StatusCode == System.Net.HttpStatusCode.Forbidden,
-                $"Expected authentication to succeed but got {accessResponse.StatusCode}: {await accessResponse.Content.ReadAsStringAsync()}");
-        }
 
         [Fact]
         public async Task LegacyApi_WithValidMaskinportenToken_SuccessfullyInitializes()

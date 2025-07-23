@@ -38,7 +38,7 @@ public static class ClaimsPrincipalExtensions
         if (consumerClaim is not null)
         {
             var consumerObject = JsonSerializer.Deserialize<TokenConsumer>(consumerClaim.Value);
-            return consumerObject.ID.WithoutPrefix();
+            return consumerObject?.ID?.WithoutPrefix();
         }
         
         return null;
