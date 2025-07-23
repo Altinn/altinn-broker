@@ -40,14 +40,15 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        var exceptionMessage = FormatExceptionMessage(exception, httpContext);
+        var sanitizedPath = httpContext.Request.Path.ToString().Replace("\r", "").Replace("\n", "");
+        var exceptionMessage = FormatExceptionMessage(exception, sanitizedPath);
 
         _logger.LogError(
             exception,
             "Unhandled exception occurred. Type: {ExceptionType}, Message: {Message}, Path: {Path}, Environment: {Environment}, System: {System}, StackTrace: {StackTrace}, ExceptionSource: {ExceptionSource}, ExceptionMessage: {ExceptionMessage}, SentToSlack: {SentToSlack}, SlackMessage: {SlackMessage}",
             exception.GetType().Name,
             exception.Message,
-            httpContext.Request.Path,
+            sanitizedPath,
             _hostEnvironment.EnvironmentName,
             "Broker",
             exception.StackTrace ?? "No stack trace available",
@@ -154,14 +155,14 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         }
     }
 
-    private string FormatExceptionMessage(Exception exception, HttpContext context)
+    private string FormatExceptionMessage(Exception exception, string sanitizedPath)
     {
         return $":warning: *Unhandled Exception*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
                $"*System:* Broker\n" +
                $"*Type:* {exception.GetType().Name}\n" +
                $"*Message:* {exception.Message}\n" +
-               $"*Path:* {context.Request.Path}\n" +
+               $"*Path:* {sanitizedPath}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n" +
                $"*Stacktrace:* \n{exception.StackTrace}";
     }

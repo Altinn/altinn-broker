@@ -17,6 +17,7 @@ using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
+using Hangfire;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -385,6 +386,20 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     public IActionResult ThrowTestException()
     {
         throw new Exception("Dette er en test-exception fra /filetransfer/throw-endepunktet for å teste logging og Slack-varsling.");
+    }
+
+    [HttpGet("test-hangfire-fail")]
+    [AllowAnonymous]
+    public IActionResult TriggerFailingHangfireJob([FromServices] IBackgroundJobClient backgroundJobClient)
+    {
+        backgroundJobClient.Enqueue(() => FileTransferController.FailJob());
+        return Accepted("Hangfire test-jobb som feiler er trigget.");
+    }
+
+    [NonAction]
+    public static void FailJob()
+    {
+        throw new Exception("Dette er en test-exception fra en Hangfire-jobb for å teste logging og Slack-varsling.");
     }
 
     private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
