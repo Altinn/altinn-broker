@@ -17,7 +17,6 @@ using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
-using Hangfire;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -379,13 +378,6 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
             (_) => Ok(null),
             Problem
         );
-    }
-
-    [HttpGet("throw")]
-    [AllowAnonymous]
-    public IActionResult ThrowTestException()
-    {
-        throw new Exception("Dette er en test-exception fra /filetransfer/throw-endepunktet for å teste logging og Slack-varsling.");
     }
 
     [HttpGet("test-hangfire-fail")]
