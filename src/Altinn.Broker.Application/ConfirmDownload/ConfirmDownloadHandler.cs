@@ -83,14 +83,6 @@ public class ConfirmDownloadHandler(
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
-                    backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
-                    {
-                        FileTransferId = request.FileTransferId,
-                        Force = true
-                    }, null, cancellationToken));
-                }
-                else
-                {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);
                     backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
                     {

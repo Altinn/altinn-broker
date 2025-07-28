@@ -526,6 +526,47 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.True(fileTransferAfterInitialize.FileTransferStatus == FileTransferStatusExt.Initialized);
     }
 
+
+
+    [Fact]
+    public async Task DownloadFileTransfer_ResourceWithPurgeGraceTime_SchedulesDeletionInGracePeriod()
+    {
+        // Arrange
+        var resource = new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P48H",
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
+            PurgeFileTransferGracePeriod = "PT24H"
+        };
+        var createResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_GRACEFUL_PURGE}", resource);
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        fileTransfer.ResourceId = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE;
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse?.FileTransferId.ToString();
+        Assert.NotNull(fileTransferId);
+        await UploadTextFileTransfer(fileTransferId, "123");
+        var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
+        
+        // Act
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        Assert.True(confirmResponse.IsSuccessStatusCode, await confirmResponse.Content.ReadAsStringAsync());
+
+        // Assert that the deletion is scheduled in the grace period
+        var jobStorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
+        var gracePeriod = XmlConvert.ToTimeSpan("PT24H");
+        
+        Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => 
+            j.Value.Job.Method.Name == "Process" && 
+            ((ExpireFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && 
+            ((ExpireFileTransferRequest)j.Value.Job.Args[0]).Force == true &&
+            j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && 
+            j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
+    }
+
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);
