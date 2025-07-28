@@ -609,9 +609,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
-            PurgeFileTransferAfterAllRecipientsConfirmed = false,
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = time
-
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
 
