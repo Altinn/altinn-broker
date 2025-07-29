@@ -18,6 +18,7 @@ using Altinn.Broker.Tests.Helpers;
 using Hangfire;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 using Xunit;
 using Xunit.Abstractions;
@@ -547,7 +548,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
         var fileTransferId = fileTransferResponse?.FileTransferId.ToString();
         Assert.NotNull(fileTransferId);
-        await UploadTextFileTransfer(fileTransferId, "123");
+        await UploadDummyFileTransferAsync(fileTransferId);
         var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
         
@@ -565,6 +566,56 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
             j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && 
             j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
+    }
+
+    [Fact]
+    public async Task ConfirmDownload_ResourceWithPurgeGraceTime_ExpiresAfterAllConfirmedDownloadedButBeforePurge()
+    {
+        // Arrange
+        var resource = new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P48H",
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
+            PurgeFileTransferGracePeriod = "PT24H"
+        };
+        var createResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_GRACEFUL_PURGE}", resource);
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        fileTransfer.ResourceId = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE;
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse?.FileTransferId.ToString();
+        Assert.NotNull(fileTransferId);
+        await UploadDummyFileTransferAsync(fileTransferId);
+        var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        Assert.True(confirmResponse.IsSuccessStatusCode, await confirmResponse.Content.ReadAsStringAsync());
+
+        // Act
+        using var requestScope = _factory.Services.CreateScope();
+        var purgeFileTransferHandler = requestScope.ServiceProvider.GetRequiredService<PurgeFileTransferHandler>();
+        var fileExpiryPurgeResult = await purgeFileTransferHandler.Process(new PurgeFileTransferRequest
+        {
+            FileTransferId = Guid.Parse(fileTransferId),
+            PurgeTrigger = PurgeTrigger.FileTransferExpiry
+        }, null, CancellationToken.None);
+        Assert.Equal(Task.CompletedTask, fileExpiryPurgeResult);
+        var fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+        Assert.Equal(FileTransferStatusExt.AllConfirmedDownloaded, fileTransferDetails.FileTransferStatus);
+        var allConfirmedDownloadedPurgeResult = await purgeFileTransferHandler.Process(new PurgeFileTransferRequest
+        {
+            FileTransferId = Guid.Parse(fileTransferId),
+            PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
+        }, null, CancellationToken.None);
+        fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+
+        // Assert
+        Assert.Equal(FileTransferStatusExt.Purged, fileTransferDetails.FileTransferStatus);
+
     }
 
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
