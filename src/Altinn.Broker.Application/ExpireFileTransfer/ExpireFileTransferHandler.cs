@@ -1,23 +1,17 @@
 ﻿using System.Security.Claims;
-using System.Transactions;
 
 using Altinn.Broker.Application.Middlewares;
-using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using OneOf;
-
-using Polly;
 
 namespace Altinn.Broker.Application.ExpireFileTransfer;
 public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository, IServiceOwnerRepository serviceOwnerRepository, IBrokerStorageService brokerStorageService, IResourceRepository resourceRepository, EventBusMiddleware eventBus, IBackgroundJobClient backgroundJobClient, ILogger<ExpireFileTransferHandler> logger) : IHandler<ExpireFileTransferRequest, Task>
@@ -33,10 +27,6 @@ public class ExpireFileTransferHandler(IFileTransferRepository fileTransferRepos
         if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
             logger.LogInformation("FileTransfer has already been set to purged");
-        }
-        if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.AllConfirmedDownloaded)
-        {
-            logger.LogError("FileTransfer has already been set to AllConfirmedDownloaded");
         }
         if (request.Force || fileTransfer.ExpirationTime < DateTime.UtcNow)
         {
