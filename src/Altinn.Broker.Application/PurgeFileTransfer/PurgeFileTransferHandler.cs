@@ -19,7 +19,7 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
     [AutomaticRetry(Attempts = 0)]
     public async Task<OneOf<Task, Error>> Process(PurgeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Deleting file transfer with id {fileTransferId}", request.FileTransferId.ToString());
+        logger.LogInformation("Deleting file transfer with id {fileTransferId} because {purgeTrigger}", request.FileTransferId.ToString(), request.PurgeTrigger.ToString());
         var fileTransfer = await GetFileTransferAsync(request.FileTransferId, cancellationToken);
         var resource = await GetResource(fileTransfer.ResourceId, cancellationToken);
         var serviceOwner = await GetServiceOwnerAsync(resource.ServiceOwnerId);
