@@ -15,7 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.6" />
     <PackageReference Include="Npgsql" Version="9.0.3" />
-    <PackageReference Include="Polly" Version="8.6.0" />
+    <PackageReference Include="Polly" Version="8.6.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Altinn.Broker.Common\Altinn.Broker.Common.csproj" />
