@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
@@ -73,10 +73,10 @@ public class InitializeFileTransferHandler(
             logger.LogError("Failed when adding recipient initialized events: {message}\n{stackTrace}", ex.Message, ex.StackTrace);
             throw;
         }
-        var jobId = backgroundJobClient.Schedule<ExpireFileTransferHandler>((ExpireFileTransferHandler) => ExpireFileTransferHandler.Process(new ExpireFileTransferRequest
+        var jobId = backgroundJobClient.Schedule<PurgeFileTransferHandler>((ExpireFileTransferHandler) => ExpireFileTransferHandler.Process(new PurgeFileTransferRequest
         {
             FileTransferId = fileTransferId,
-            Force = false
+            PurgeTrigger = PurgeTrigger.FileTransferExpiry
         }, null, cancellationToken), fileExpirationTime);
         await fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>

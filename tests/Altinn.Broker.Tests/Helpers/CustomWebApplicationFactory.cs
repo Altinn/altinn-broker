@@ -93,6 +93,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = "",
                     OrganizationNumber = "",
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
