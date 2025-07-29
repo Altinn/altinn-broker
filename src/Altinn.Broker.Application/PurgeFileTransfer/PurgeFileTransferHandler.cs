@@ -28,6 +28,14 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
         {
             logger.LogInformation("FileTransfer has already been set to purged");
         }
+        if (
+            fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.AllConfirmedDownloaded 
+            && request.PurgeTrigger == PurgeTrigger.FileTransferExpiry
+            && resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
+        {
+            logger.LogInformation("File transfer will be purged as part of the PurgeFileTransferAfterAllRecipientsConfirmed process.");
+            return Task.CompletedTask;
+        }
         await brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken); // This must be idempotent - i.e not fail on file not existing
         if (request.PurgeTrigger != PurgeTrigger.MalwareScanFailed)
         {
