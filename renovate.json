@@ -12,8 +12,12 @@
   ],
   "packageRules": [
     {
-      "matchFileNames": ["\\.bicep$"],
+      "matchPaths": [ "**/*.bicep" ],
       "enabled": false
+    },
+    {
+      "groupName": "All dependencies",
+      "matchUpdateTypes": [ "major", "minor", "patch" ]
     }
   ]
 }

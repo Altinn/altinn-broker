@@ -3,7 +3,7 @@ using System.Xml;
 
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
-using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
@@ -70,37 +70,33 @@ public class ConfirmDownloadHandler(
         {
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }
-        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+        bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != caller).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
+        var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+        await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid()));
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
             await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, cancellationToken);
-            bool shouldConfirmAll = fileTransfer.RecipientCurrentStatuses.Where(recipientStatus => recipientStatus.Actor.ActorExternalId != caller).All(status => status.Status >= ActorFileTransferStatus.DownloadConfirmed);
             if (shouldConfirmAll)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
-                var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
-                backgroundJobClient.Delete(fileTransfer.HangfireJobId);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
-                    backgroundJobClient.Enqueue<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
-                    {
-                        FileTransferId = request.FileTransferId,
-                        Force = true
-                    }, null, cancellationToken));
-                }
-                else
-                {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);
-                    backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
+                    backgroundJobClient.Schedule<PurgeFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new PurgeFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
-                        Force = true
+                        PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
                     }, null, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
                 }
             }
             return Task.CompletedTask;
         }, logger, cancellationToken);
+        if (shouldConfirmAll)
+        {
+            backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction to avoid issue with Hangfire distributed lock implementation
+        }
+        return Task.CompletedTask;
     }
 }

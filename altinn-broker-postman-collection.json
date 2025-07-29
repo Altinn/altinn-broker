@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "cff6671d-26f7-481b-badd-7f1185b5290d",
+		"_postman_id": "60226fe4-00b7-4893-9f69-d3a91ea6e8a8",
 		"name": "Altinn.Broker",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "7106668"
@@ -26,13 +26,7 @@
 									]
 								},
 								"method": "GET",
-								"header": [
-									{
-										"key": "Ocp-Apim-Subscription-Key",
-										"value": "{{platform_subscription_key}}",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}",
 									"host": [
@@ -55,7 +49,7 @@
 										"header": [
 											{
 												"key": "Accept",
-												"value": "text/plain"
+												"value": "application/json"
 											}
 										],
 										"url": {
@@ -109,11 +103,6 @@
 									{
 										"key": "Content-Type",
 										"value": "application/octet-stream",
-										"type": "text"
-									},
-									{
-										"key": "Ocp-Apim-Subscription-Key",
-										"value": "{{platform_subscription_key}}",
 										"type": "text"
 									}
 								],
@@ -187,13 +176,7 @@
 									]
 								},
 								"method": "GET",
-								"header": [
-									{
-										"key": "Ocp-Apim-Subscription-Key",
-										"value": "{{platform_subscription_key}}",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/details",
 									"host": [
@@ -217,7 +200,7 @@
 										"header": [
 											{
 												"key": "Accept",
-												"value": "text/plain"
+												"value": "application/json"
 											}
 										],
 										"url": {
@@ -268,13 +251,7 @@
 									]
 								},
 								"method": "GET",
-								"header": [
-									{
-										"key": "Ocp-Apim-Subscription-Key",
-										"value": "{{platform_subscription_key}}",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download",
 									"host": [
@@ -387,13 +364,7 @@
 									]
 								},
 								"method": "POST",
-								"header": [
-									{
-										"key": "Ocp-Apim-Subscription-Key",
-										"value": "{{platform_subscription_key}}",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/confirmdownload",
 									"host": [
@@ -477,20 +448,11 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "text/plain"
-							},
-							{
-								"key": "Ocp-Apim-Subscription-Key",
-								"value": "{{platform_subscription_key}}",
-								"type": "text"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"FileName\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileTransferReference\": \"archiveno-20425\",\n  \"sender\": \"0192:{{serviceowner_orgnumber}}\",\n  \"recipients\": [\n    \"0192:{{recipient_orgnumber}}\"\n  ],\n  \"propertyList\": {\n    \"veniam_1d\": \"d1_mainev\",\n    \"veniam_2d\": \"d1_mainev\",\n    \"veniam_3d\": \"d1_mainev\",\n    \"veniam_4d\": \"d1_mainev\"\n  }\n}",
+							"raw": "{\n  \"FileName\": \"system.ini\",\n  \"resourceId\": \"{{resource_id}}\",\n  \"sendersFileTransferReference\": \"archiveno-20425\",\n  \"sender\": \"0192:{{sender_orgnumber}}\",\n  \"recipients\": [\n    \"0192:{{recipient_orgnumber}}\"\n  ],\n  \"propertyList\": {\n    \"caseNumber\": \"123\",\n    \"etc\": \"can-use-for-anything\"\n  }\n}",
 							"options": {
 								"raw": {
 									"headerFamily": "json",
@@ -523,7 +485,7 @@
 									},
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"body": {
@@ -571,23 +533,13 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{sender_token}}",
+									"value": "{{recipient_token}}",
 									"type": "string"
 								}
 							]
 						},
 						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "text/plain"
-							},
-							{
-								"key": "Ocp-Apim-Subscription-Key",
-								"value": "{{platform_subscription_key}}",
-								"type": "text"
-							}
-						],
+						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/broker/api/v1/filetransfer?resourceId={{resource_id}}",
 							"host": [
@@ -603,11 +555,6 @@
 								{
 									"key": "resourceId",
 									"value": "{{resource_id}}"
-								},
-								{
-									"key": "Ocp-Apim-Subscription-Key",
-									"value": "{{platform_subscription_key}}",
-									"disabled": true
 								}
 							]
 						}
@@ -620,7 +567,7 @@
 								"header": [
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"url": {
@@ -653,188 +600,6 @@
 			]
 		},
 		{
-			"name": "Resource Registry",
-			"item": [
-				{
-					"name": "Configure resource",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{serviceowner_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"identifier\": \"{{resource_id}}\",\r\n    \"title\": {\r\n        \"en\": \"Altinn Broker - Test\",\r\n        \"nb\": \"Altinn Broker - Test\",\r\n        \"nn\": \"Altinn Broker - Test\"\r\n    },\r\n    \"description\": {\r\n        \"en\": \"Altinn Broker test resource\",\r\n        \"nb\": \"Altinn Broker testressurs\",\r\n        \"nn\": \"Altinn Broker testressurs\"\r\n    },\r\n    \"rightDescription\": {\r\n        \"en\": \"Access to Altinn Broker test resource\",\r\n        \"nb\": \"Tilgang til Altinn Broker testressurs\",\r\n        \"nn\": \"Tilgang til Altinn Broker testressurs\"\r\n    },\r\n    \"homepage\": \"https://www.digdir.no/\",\r\n    \"status\": \"Active\",\r\n    \"contactPoints\": [],\r\n    \"isPartOf\": \"Altinn\",\r\n    \"resourceReferences\": [],\r\n    \"delegable\": false,\r\n    \"visible\": false,\r\n    \"hasCompetentAuthority\": {\r\n        \"organization\": \"991825827\",\r\n        \"orgcode\": \"TTD\",\r\n        \"name\": {\r\n            \"en\": \"Testdepartementet\",\r\n            \"nb\": \"Testdepartementet\",\r\n            \"nn\": \"Testdepartementet\"\r\n        }\r\n    },\r\n    \"keywords\": [],\r\n    \"limitedByRRR\": false,\r\n    \"selfIdentifiedUserEnabled\": false,\r\n    \"enterpriseUserEnabled\": false,\r\n    \"resourceType\": \"GenericAccessResource\"\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource",
-							"protocol": "https",
-							"host": [
-								"platform",
-								"tt02",
-								"altinn",
-								"no"
-							],
-							"path": [
-								"resourceregistry",
-								"api",
-								"v1",
-								"resource"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Resource",
-					"request": {
-						"auth": {
-							"type": "noauth"
-						},
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}",
-							"protocol": "https",
-							"host": [
-								"platform",
-								"tt02",
-								"altinn",
-								"no"
-							],
-							"path": [
-								"resourceregistry",
-								"api",
-								"v1",
-								"resource",
-								"{{resource_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create Resource Policy",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{serviceowner_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "policyFile",
-									"type": "file",
-									"src": "./tests/Altinn.Broker.Tests/Data/BasePolicy.xml"
-								}
-							]
-						},
-						"url": {
-							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}/policy",
-							"protocol": "https",
-							"host": [
-								"platform",
-								"tt02",
-								"altinn",
-								"no"
-							],
-							"path": [
-								"resourceregistry",
-								"api",
-								"v1",
-								"resource",
-								"{{resource_id}}",
-								"policy"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Resource Policy",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{serviceowner_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "policyFile",
-									"type": "file",
-									"src": "/C:/Workspace/altinn-broker/tests/Altinn.Broker.Tests/Data/BasePolicy.xml"
-								}
-							]
-						},
-						"url": {
-							"raw": "https://platform.tt02.altinn.no/resourceregistry/api/v1/resource/{{resource_id}}/policy",
-							"protocol": "https",
-							"host": [
-								"platform",
-								"tt02",
-								"altinn",
-								"no"
-							],
-							"path": [
-								"resourceregistry",
-								"api",
-								"v1",
-								"resource",
-								"{{resource_id}}",
-								"policy"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
 			"name": "Resource",
 			"item": [
 				{
@@ -851,22 +616,47 @@
 							]
 						},
 						"method": "PUT",
-						"header": [
-							{
-								"key": "Ocp-Apim-Subscription-Key",
-								"value": "{{platform_subscription_key}}",
-								"type": "text"
-							}
-						],
+						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"ExternalServiceCodeLegacy\": \"\",\r\n    \"ExternalServiceEditionCodeLegacy\": \"\",\r\n    \"UseManifestFileShim\": false\r\n}",
+							"raw": "{\r\n    \"resourceId\": \"{{resourceId}}\",\r\n    \"maxFileTransferSize\": \"1112391230\",\r\n    \"fileTransferTimeToLive\": \"PT2H\",\r\n    \"PurgeFileTransferAfterAllRecipientsConfirmed\" : false,\r\n    \"purgeFileTransferGracePeriod\": \"PT14H\",\r\n    \"ExternalServiceCodeLegacy\": \"4434\",\r\n    \"ExternalServiceEditionCodeLegacy\": \"2\",\r\n    \"UseManifestFileShim\": true\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
 								}
 							}
 						},
+						"url": {
+							"raw": "{{baseUrl}}/broker/api/v1/resource/{{resource_id}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"broker",
+								"api",
+								"v1",
+								"resource",
+								"{{resource_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Resource",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{serviceowner_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/broker/api/v1/resource/{{resource_id}}",
 							"host": [
@@ -967,7 +757,7 @@
 									},
 									{
 										"key": "Accept",
-										"value": "text/plain"
+										"value": "application/json"
 									}
 								],
 								"url": {
@@ -1002,6 +792,194 @@
 		{
 			"name": "Authenticator",
 			"item": [
+				{
+					"name": "System Register",
+					"item": [
+						{
+							"name": "Register system",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var responseData = JSON.parse(responseBody);\r",
+											"pm.globals.set(\"system_id\", responseData);\r",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{systemprovider_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Id\": \"{{serviceowner_orgnumber}}_brokersystem\",\r\n  \"systemVendorOrgNumber\": \"{{serviceowner_orgnumber}}\",\r\n  \"vendor\": {\r\n    \"authority\" : \"iso6523-actorid-upis\",\r\n    \"ID\": \"0192:{{serviceowner_orgnumber}}\"\r\n  },\r\n  \"name\": {\r\n    \"en\": \"BrokerTestSystem-{{serviceowner_orgnumber}}\",\r\n    \"nb\": \"BrokerTestSystem-{{serviceowner_orgnumber}}\",\r\n    \"nn\": \"BrokerTestSystem-{{serviceowner_orgnumber}}\"\r\n  },\r\n  \"description\": {\r\n    \"en\": \"From Postman-collection\",\r\n    \"nb\": \"Fra Postman-collection\",\r\n    \"nn\": \"Fra Postman-collection\"\r\n  },\r\n  \"rights\": [\r\n    {\r\n      \"resource\": [\r\n        {\r\n          \"value\": \"{{resource_id}}\",\r\n          \"id\": \"urn:altinn:resource\"\r\n        }\r\n      ]\r\n    }\r\n  ],\r\n  \"allowedRedirectUrls\": [ \"https://smartcloudaltinn.azurewebsites.net/receipt\" ],\r\n  \"clientId\": [ \"{{client_id}}\" ]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://platform.tt02.altinn.no/authentication/api/v1/systemregister/vendor",
+									"protocol": "https",
+									"host": [
+										"platform",
+										"tt02",
+										"altinn",
+										"no"
+									],
+									"path": [
+										"authentication",
+										"api",
+										"v1",
+										"systemregister",
+										"vendor"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create sender systemuser request",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{systemprovider_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"externalReference\": \"dev-test-create_01\",\r\n  \"systemId\": \"{{serviceowner_orgnumber}}_brokersystem\",\r\n  \"partyOrgNo\": \"{{serviceowner_orgnumber}}\",\r\n  \"rights\": [\r\n    {\r\n      \"Resource\": [\r\n        {\r\n          \"id\": \"urn:altinn:resource\",\r\n          \"value\": \"{{resource_id}}\"\r\n        }\r\n      ]\r\n    }\r\n  ],\r\n  \"redirectUrl\": \"\"\r\n} \r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://platform.tt02.altinn.no/authentication/api/v1/systemuser/request/vendor",
+									"protocol": "https",
+									"host": [
+										"platform",
+										"tt02",
+										"altinn",
+										"no"
+									],
+									"path": [
+										"authentication",
+										"api",
+										"v1",
+										"systemuser",
+										"request",
+										"vendor"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create recipient systemuser request",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{systemprovider_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"externalReference\": \"dev-test-create_01\",\r\n  \"systemId\": \"{{serviceowner_orgnumber}}_brokersystem\",\r\n  \"partyOrgNo\": \"{{recipient_orgnumber}}\",\r\n  \"rights\": [\r\n    {\r\n      \"Resource\": [\r\n        {\r\n          \"id\": \"urn:altinn:resource\",\r\n          \"value\": \"{{resource_id}}\"\r\n        }\r\n      ]\r\n    }\r\n  ],\r\n  \"redirectUrl\": \"\"\r\n} \r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://platform.tt02.altinn.no/authentication/api/v1/systemuser/request/vendor",
+									"protocol": "https",
+									"host": [
+										"platform",
+										"tt02",
+										"altinn",
+										"no"
+									],
+									"path": [
+										"authentication",
+										"api",
+										"v1",
+										"systemuser",
+										"request",
+										"vendor"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Registering a system is a one-time thing. After you have created the system you can create systemuser requests. Use the confirmUrl in the response from these and log in using Tenor in the organization that will approve the system user with a user with right privileges (often \"Daglig Leder\" in test)."
+				},
 				{
 					"name": "Install Postman Utility (Initialize)",
 					"event": [
@@ -1056,7 +1034,7 @@
 					"response": []
 				},
 				{
-					"name": "Login to Maskinporten (Initialize)",
+					"name": "Get Systemprovider Maskinporten Token",
 					"event": [
 						{
 							"listen": "prerequest",
@@ -1067,7 +1045,7 @@
 									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")), \r",
 									"    payload = {\r",
 									"        \"aud\": \"https://test.maskinporten.no/\",\r",
-									"        \"scope\": \"altinn:testtools/tokengenerator/enterprise\",\r",
+									"        \"scope\": \"altinn:authentication/systemregister.write altinn:serviceowner altinn:authentication/systemuser.request.write altinn:authentication/systemuser.request.read\",\r",
 									"        \"iss\": pm.variables.get(\"client_id\")\r",
 									"    }, \r",
 									"    header = {\r",
@@ -1075,7 +1053,7 @@
 									"    }, \r",
 									"    exp = 120, \r",
 									"    alg = 'RS256');\r",
-									"pm.variables.set('sender_jwt', jwt);\r",
+									"pm.variables.set('jwt', jwt);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -1087,7 +1065,7 @@
 							"script": {
 								"exec": [
 									"var responseData = JSON.parse(responseBody);\r",
-									"pm.globals.set(\"test_token\", responseData.access_token);\r",
+									"pm.globals.set(\"systemprovider_maskinporten_token\", responseData.access_token);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -1108,7 +1086,7 @@
 								},
 								{
 									"key": "assertion",
-									"value": "{{sender_jwt}}",
+									"value": "{{jwt}}",
 									"type": "text"
 								}
 							]
@@ -1129,15 +1107,23 @@
 					"response": []
 				},
 				{
-					"name": "Authenticate as sender",
+					"name": "Exchange Systemprovider token",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.globals.set(\"sender_token\", responseBody);\r",
+									"pm.globals.set(\"systemprovider_token\", responseBody);\r",
 									""
 								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"packages": {},
 								"type": "text/javascript"
 							}
 						}
@@ -1148,7 +1134,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{test_token}}",
+									"value": "{{systemprovider_maskinporten_token}}",
 									"type": "string"
 								}
 							]
@@ -1156,47 +1142,127 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.write&org=ttd&orgNo={{serviceowner_orgnumber}}",
+							"raw": "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten",
 							"protocol": "https",
 							"host": [
-								"altinn-testtools-token-generator",
-								"azurewebsites",
-								"net"
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
 							],
 							"path": [
+								"authentication",
 								"api",
-								"GetEnterpriseToken"
-							],
-							"query": [
-								{
-									"key": "env",
-									"value": "tt02"
-								},
-								{
-									"key": "scopes",
-									"value": "altinn:broker.write"
-								},
-								{
-									"key": "org",
-									"value": "ttd"
-								},
-								{
-									"key": "orgNo",
-									"value": "{{serviceowner_orgnumber}}"
-								}
+								"v1",
+								"exchange",
+								"maskinporten"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "Authenticate as recipient",
+					"name": "Create sender system user Maskinporten token",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"eval(pm.variables.get(\"pmlib_code\"));\r",
+									"    const jwt = pmlib.jwtSign(\r",
+									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")),\r",
+									"    payload = {\r",
+									"        \"aud\": \"https://test.maskinporten.no/\",\r",
+									"        \"scope\": \"altinn:broker.write\",\r",
+									"        \"iss\": pm.variables.get(\"client_id\"),\r",
+									"        \"authorization_details\": [\r",
+									"            {\r",
+									"                \"type\": \"urn:altinn:systemuser\",\r",
+									"                \"systemuser_org\":\r",
+									"                    {\r",
+									"                        \"authority\" : \"iso6523-actorid-upis\",\r",
+									"                        \"ID\": pm.variables.get(\"sender_orgnumber\")\r",
+									"                    }\r",
+									"            }\r",
+									"        ],\r",
+									"    },\r",
+									"    header = {\r",
+									"        \"kid\": pm.variables.get(\"client_kid\")\r",
+									"    },\r",
+									"    exp = 120,\r",
+									"    alg = 'RS256');\r",
+									"pm.variables.set('jwt', jwt);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var responseData = JSON.parse(responseBody);\r",
+									"pm.globals.set(\"sender_maskinporten_token\", responseData.access_token);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+									"type": "text"
+								},
+								{
+									"key": "assertion",
+									"value": "{{jwt}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://test.maskinporten.no/token",
+							"protocol": "https",
+							"host": [
+								"test",
+								"maskinporten",
+								"no"
+							],
+							"path": [
+								"token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Exchange sender token",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.globals.set(\"recipient_token\", responseBody);"
+									"pm.globals.set(\"sender_token\", responseBody);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1209,7 +1275,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{test_token}}",
+									"value": "{{sender_maskinporten_token}}",
 									"type": "string"
 								}
 							]
@@ -1217,49 +1283,130 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:broker.read&org=ttd&orgNo={{recipient_orgnumber}}",
+							"raw": "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten",
 							"protocol": "https",
 							"host": [
-								"altinn-testtools-token-generator",
-								"azurewebsites",
-								"net"
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
 							],
 							"path": [
+								"authentication",
 								"api",
-								"GetEnterpriseToken"
-							],
-							"query": [
-								{
-									"key": "env",
-									"value": "tt02"
-								},
-								{
-									"key": "scopes",
-									"value": "altinn:broker.read"
-								},
-								{
-									"key": "org",
-									"value": "ttd"
-								},
-								{
-									"key": "orgNo",
-									"value": "{{recipient_orgnumber}}"
-								}
+								"v1",
+								"exchange",
+								"maskinporten"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "Authenticate as service owner (tjeneste-eier)",
+					"name": "Create recipient system user maskinporten token",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"eval(pm.variables.get(\"pmlib_code\"));\r",
+									"    const jwt = pmlib.jwtSign(\r",
+									"    jwk = JSON.parse(pm.variables.get(\"client_jwk\")),\r",
+									"    payload = {\r",
+									"        \"aud\": \"https://test.maskinporten.no/\",\r",
+									"        \"scope\": \"altinn:broker.read\",\r",
+									"        \"iss\": pm.variables.get(\"client_id\"),\r",
+									"        \"authorization_details\": [\r",
+									"            {\r",
+									"                \"type\": \"urn:altinn:systemuser\",\r",
+									"                \"systemuser_org\":\r",
+									"                    {\r",
+									"                        \"authority\" : \"iso6523-actorid-upis\",\r",
+									"                        \"ID\": pm.variables.get(\"recipient_orgnumber\")\r",
+									"                    }\r",
+									"            }\r",
+									"        ],\r",
+									"    },\r",
+									"    header = {\r",
+									"        \"kid\": pm.variables.get(\"client_kid\")\r",
+									"    },\r",
+									"    exp = 120,\r",
+									"    alg = 'RS256');\r",
+									"pm.variables.set('jwt', jwt);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var responseData = JSON.parse(responseBody);\r",
+									"pm.globals.set(\"recipient_maskinporten_token\", responseData.access_token);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+									"type": "text"
+								},
+								{
+									"key": "assertion",
+									"value": "{{jwt}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://test.maskinporten.no/token",
+							"protocol": "https",
+							"host": [
+								"test",
+								"maskinporten",
+								"no"
+							],
+							"path": [
+								"token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Exchange recipient token",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.globals.set(\"serviceowner_token\", responseBody);"
+									"pm.globals.set(\"recipient_token\", responseBody);\r",
+									""
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -1269,7 +1416,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{test_token}}",
+									"value": "{{recipient_maskinporten_token}}",
 									"type": "string"
 								}
 							]
@@ -1277,40 +1424,27 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://altinn-testtools-token-generator.azurewebsites.net/api/GetEnterpriseToken?env=tt02&scopes=altinn:resourceregistry/resource.write&org=ttd&orgNo={{serviceowner_orgnumber}}",
+							"raw": "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten",
 							"protocol": "https",
 							"host": [
-								"altinn-testtools-token-generator",
-								"azurewebsites",
-								"net"
+								"platform",
+								"tt02",
+								"altinn",
+								"no"
 							],
 							"path": [
+								"authentication",
 								"api",
-								"GetEnterpriseToken"
-							],
-							"query": [
-								{
-									"key": "env",
-									"value": "tt02"
-								},
-								{
-									"key": "scopes",
-									"value": "altinn:resourceregistry/resource.write"
-								},
-								{
-									"key": "org",
-									"value": "ttd"
-								},
-								{
-									"key": "orgNo",
-									"value": "{{serviceowner_orgnumber}}"
-								}
+								"v1",
+								"exchange",
+								"maskinporten"
 							]
 						}
 					},
 					"response": []
 				}
-			]
+			],
+			"description": "Create Maskinporten integrations at:\n\n[https://sjolvbetjening.test.samarbeid.digdir.no/](https://sjolvbetjening.test.samarbeid.digdir.no/)\n\nFollow this guide:  \n[https://docs.altinn.studio/correspondence/getting-started/developer-guides/maskinporten/](https://docs.altinn.studio/correspondence/getting-started/developer-guides/maskinporten/)\n\nYou should make a Maskinporten integration for the system owner. This should have the following scopes:\n\nauthentication/systemregister.write altinn:serviceowner altinn:authentication/systemuser.request.write altinn:authentication/systemuser.request.read altinn:broker.write altinn:broker.read\n\nUpdate the postman variables:\n\nclient_id\n\nclient_kid\n\nclient_jwk"
 		}
 	],
 	"event": [
@@ -1333,10 +1467,25 @@
 			}
 		}
 	],
-"variable": [
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://platform.tt02.altinn.no",
+			"type": "string"
+		},
+		{
+			"key": "resource_id",
+			"value": "altinn-broker-test-service-resource",
+			"type": "string"
+		},
 		{
 			"key": "serviceowner_orgnumber",
 			"value": "Organization number of service owner / \"tjeneste-eier\". Nine digits, no prefix.",
+			"type": "string"
+		},
+		{
+			"key": "sender_orgnumber",
+			"value": "",
 			"type": "string"
 		},
 		{
@@ -1346,7 +1495,7 @@
 		},
 		{
 			"key": "client_id",
-			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.samarbeid.digdir.no/integrations)",
+			"value": "Your Maskinporten \"Integrasjons-ID\" (from https://sjolvbetjening.test.samarbeid.digdir.no/login)",
 			"type": "string"
 		},
 		{
@@ -1360,21 +1509,6 @@
 			"type": "string"
 		},
 		{
-			"key": "resource_id",
-			"value": "Set resource id here",
-			"type": "string"
-		},
-		{
-			"key": "baseUrl",
-			"value": "https://platform.tt02.altinn.no",
-			"type": "string"
-		},
-		{
-			"key": "platform_subscription_key",
-			"value": "Contact us to get a subscription key for use with Altinn APIs",
-			"type": "string"
-		},
-		{
 			"key": "local_testing",
 			"value": "http://localhost:5096",
 			"type": "string",
@@ -1382,6 +1516,16 @@
 		},
 		{
 			"key": "fileTransferId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "system_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "sender_dagl_ssn",
 			"value": "",
 			"type": "string"
 		}

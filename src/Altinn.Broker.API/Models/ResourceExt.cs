@@ -5,7 +5,7 @@ using Altinn.Broker.Helpers;
 namespace Altinn.Broker.Models;
 
 /// <summary>
-/// API input model for file initialization.
+/// A model representing the extended resource properties unique for the broker service.
 /// </summary>
 [ValidateUseManifestFileShim]
 
@@ -42,9 +42,15 @@ public class ResourceExt
     [JsonPropertyName("useManifestFileShim")]
     public bool? UseManifestFileShim { get; set; }
 
+    /// <summary>
+    /// The external service code used in Altinn 2 for the broker service
+    /// </summary>
     [JsonPropertyName("externalServiceCodeLegacy")]
     public string? ExternalServiceCodeLegacy { get; set; }
 
+    /// <summary>
+    /// The external service edition code used in Altinn 2 for the broker service
+    /// </summary>
     [JsonPropertyName("externalServiceEditionCodeLegacy")]
     public int? ExternalServiceEditionCodeLegacy { get; set; }
 }

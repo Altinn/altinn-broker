@@ -27,6 +27,7 @@ namespace Altinn.Broker.Controllers;
 [Route("broker/api/v1/legacy/file")]
 [Authorize(AuthenticationSchemes = AuthorizationConstants.Legacy)]
 [Authorize(Policy = AuthorizationConstants.Legacy)]
+[ApiExplorerSettings(IgnoreApi = true)]
 public class LegacyFileController(ILogger<LegacyFileController> logger) : Controller
 {
 
@@ -61,7 +62,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         CancellationToken cancellationToken
     )
     {
-        logger.LogInformation("Legacy - Uploading file for file transfer {fileId}", fileTransferId.ToString());
+        logger.LogInformation("Legacy - Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
         if (Request.ContentLength is null)
         {
             return Problem("Content-length header is required");
@@ -85,17 +86,17 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     /// </summary>
     /// <returns></returns>
     [HttpGet]
-    [Route("{fileId}")]
+    [Route("{fileTransferId}")]
     public async Task<ActionResult<LegacyFileOverviewExt>> GetFileOverview(
-        Guid fileId,
+        Guid fileTransferId,
         [FromQuery] string onBehalfOfConsumer,
         [FromServices] GetFileTransferOverviewHandler handler,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Legacy - Getting file overview for {fileId}", fileId.ToString());
+        logger.LogInformation("Legacy - Getting file overview for {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new GetFileTransferOverviewRequest()
         {
-            FileTransferId = fileId,
+            FileTransferId = fileTransferId,
             IsLegacy = true,
             OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
@@ -111,8 +112,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     /// <returns></returns>
     [HttpGet]
     public async Task<ActionResult<List<Guid>>> GetFiles(
-        [FromQuery] FileTransferStatusExt? status,
-        [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
+        [FromQuery] LegacyFileStatusExt? status,
+        [FromQuery] LegacyRecipientFileStatusExt? recipientStatus,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
         [FromQuery] string? resourceId,
@@ -136,8 +137,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
         {
             ResourceId = resourceId ?? string.Empty,
-            RecipientFileTransferStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
-            FileTransferStatus = status is not null ? (FileTransferStatus)status : null,
+            RecipientFileTransferStatus = recipientStatus is not null ? LegacyFileStatusOverviewExtMapper.MapToDomainEnum(recipientStatus) : null,
+            FileTransferStatus = status is not null ? LegacyFileStatusOverviewExtMapper.MapToDomainEnum(status) : null,
             OnBehalfOfConsumer = onBehalfOfConsumer,
             From = from,
             To = to,
@@ -154,17 +155,17 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     /// </summary>
     /// <returns></returns>
     [HttpGet]
-    [Route("{fileId}/download")]
+    [Route("{fileTransferId}/download")]
     public async Task<ActionResult> DownloadFile(
-         Guid fileId,
+         Guid fileTransferId,
         [FromQuery] string onBehalfOfConsumer,
         [FromServices] DownloadFileHandler handler,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Downloading file {fileId}", fileId.ToString());
+        logger.LogInformation("Downloading file {fileTransferId}", fileTransferId.ToString());
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
-            FileTransferId = fileId,
+            FileTransferId = fileTransferId,
             IsLegacy = true,
             OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
@@ -179,17 +180,17 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     /// </summary>
     /// <returns></returns>
     [HttpPost]
-    [Route("{fileId}/confirmdownload")]
+    [Route("{fileTransferId}/confirmdownload")]
     public async Task<ActionResult> ConfirmDownload(
-        Guid fileId,
+        Guid fileTransferId,
         [FromQuery] string onBehalfOfConsumer,
         [FromServices] ConfirmDownloadHandler handler,
          CancellationToken cancellationToken)
     {
-        logger.LogInformation("Confirming download for file {fileId}", fileId.ToString());
+        logger.LogInformation("Confirming download for file {fileTransferId}", fileTransferId.ToString());
         var commandResult = await handler.Process(new ConfirmDownloadRequest()
         {
-            FileTransferId = fileId,
+            FileTransferId = fileTransferId,
             IsLegacy = true,
             OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);

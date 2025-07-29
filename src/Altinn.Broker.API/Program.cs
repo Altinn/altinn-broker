@@ -1,77 +1,58 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
-using Altinn.Broker.Middlewares;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
-using Serilog;
+BuildAndRun(args);
 
-// Using two-stage initialization to catch startup errors.
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Warning()
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.ApplicationInsights(
-        TelemetryConfiguration.CreateDefault(),
-        TelemetryConverter.Traces)
-    .CreateLogger();
-
-try
+static ILogger<Program> CreateBootstrapLogger()
 {
-    BuildAndRun(args);
-}
-catch (Exception ex) when (ex is not OperationCanceledException)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
+    return LoggerFactory.Create(builder =>
+    {
+        builder
+            .AddFilter("Altinn.Broker.API.Program", LogLevel.Debug)
+            .AddConsole();
+    }).CreateLogger<Program>();
 }
 
 static void BuildAndRun(string[] args)
 {
+    var bootstrapLogger = CreateBootstrapLogger();
+    bootstrapLogger.LogInformation("Starting Altinn.Broker.API...");
     var builder = WebApplication.CreateBuilder(args);
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .MinimumLevel.Information()
-        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Fatal)
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .WriteTo.Console()
-        .WriteTo.ApplicationInsights(
-            services.GetRequiredService<TelemetryConfiguration>(),
-            TelemetryConverter.Traces));
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
         .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
         .AddJsonFile("appsettings.local.json", true, true);
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
+    var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
+    bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
+    builder.Services.ConfigureOpenTelemetry(generalSettings.ApplicationInsightsConnectionString);
 
     var app = builder.Build();
-    app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
-    app.UseSerilogRequestLogging();
+    app.UseMiddleware<AcceptHeaderValidationMiddleware>();
     app.UseExceptionHandler();
 
     if (app.Environment.IsDevelopment())
@@ -84,21 +65,28 @@ static void BuildAndRun(string[] args)
     app.MapControllers();
 
     app.UseHangfireDashboard();
-    app.Services.GetService<IRecurringJobManager>().AddOrUpdate<IdempotencyService>("Delete old impotency events", handler => handler.DeleteOldIdempotencyEvents(), Cron.Weekly());
 
+    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
+    recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
+    
     app.Run();
 }
 
 static void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
 {
+    services.AddHttpContextAccessor();
     services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
     services.AddEndpointsApiExplorer();
-    services.AddSwaggerGen();
-    services.AddApplicationInsightsTelemetry();
-    services.AddExceptionHandler<SlackExceptionNotification>();
+    services.AddSwaggerGen(options =>
+    {
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        options.IncludeXmlComments(xmlPath);
+    });
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));

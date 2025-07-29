@@ -30,6 +30,12 @@ inputs:
   PLATFORM_BASE_URL:
     description: "Base url for Altinn platform"
     required: true
+  MASKINPORTEN_ENVIRONMENT:
+    description: "Environment for maskinporten"
+    required: true
+  APIM_IP:
+    description: "IP for APIM"
+    required: true
 
 runs:
   using: "composite"
@@ -58,6 +64,8 @@ runs:
         KEY_VAULT_URL: https://${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}.vault.azure.net
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
+        MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
+        APIM_IP: ${{ inputs.APIM_IP }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
@@ -74,7 +82,7 @@ runs:
       id: verify-deployment
       with:
         timeout-minutes: 3
-        azcliversion: 2.56.0
+        azcliversion: 2.72.0
         inlineScript: |
           chmod +x ./.github/tools/revisionVerifier.sh
           ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ inputs.AZURE_NAME_PREFIX }}-rg

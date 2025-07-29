@@ -1,4 +1,4 @@
-﻿using System.IO;
+﻿using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -343,6 +343,40 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task GetFileOverview_3Published_GetInOrder_Success()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        string fileId1 = await InitializeFile();
+        await UploadFile(fileId1);
+        string fileId2 = await InitializeFile();
+        await UploadFile(fileId2);
+        string fileId3 = await InitializeFile();
+        await UploadFile(fileId3);
+
+        // Act
+        var getResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file"
+        + $"?status=Published"
+        + $"&recipientStatus=Initialized"
+        + $"&resourceId={file.ResourceId}"
+        + $"&onBehalfOfConsumer={file.Recipients[0]}");
+        string s = await getResponse.Content.ReadAsStringAsync();
+        var fileData = await getResponse.Content.ReadFromJsonAsync<List<Guid>>(_responseSerializerOptions);
+
+        // Assert        
+        int fileIndex1, fileIndex2, fileIndex3 = -1;
+        Assert.Equal(System.Net.HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(fileData);
+        fileIndex1 = fileData.FindIndex(g => g == Guid.Parse(fileId1));
+        fileIndex2 = fileData.FindIndex(g => g == Guid.Parse(fileId2));
+        fileIndex3 = fileData.FindIndex(g => g == Guid.Parse(fileId3));
+        Assert.NotEqual(-1, fileIndex1);
+        Assert.NotEqual(-1, fileIndex2);
+        Assert.NotEqual(-1, fileIndex3);
+        Assert.True(fileIndex1 < fileIndex2 && fileIndex2 < fileIndex3);
+    }
+
+    [Fact]
     public async Task GetFileOverview_FileDoesNotExist_FileNotFound()
     {
         // Arrange
@@ -533,13 +567,31 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     private async Task<long> UploadZipFile(string fileTransferId) {
-        var fileBuffer = File.ReadAllBytes("Data/ManifestFileTests/Payload.zip");
-        using (var content = new ByteArrayContent(fileBuffer))
+        var payloadFile = await GenerateDummyFile(10240);
+        using var zipStream = new MemoryStream();
+        using (var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+        {
+            var zippedFile = zipArchive.CreateEntry("payload.txt");
+            using (var zippedFileStream = zippedFile.Open())
+            {
+                await zippedFileStream.WriteAsync(payloadFile);
+            }
+        }
+        zipStream.Position = 0;
+        var zipBytes = zipStream.ToArray();
+        using (var content = new ByteArrayContent(zipStream.ToArray()))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        return fileBuffer.Length;
+        return zipStream.Length;
+    }
+
+    private async Task<byte[]> GenerateDummyFile(long bytes)
+    {
+        var fileBuffer = new byte[bytes];
+        new Random().NextBytes(fileBuffer);
+        return fileBuffer;
     }
 }

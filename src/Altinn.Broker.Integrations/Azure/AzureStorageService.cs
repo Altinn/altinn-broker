@@ -52,7 +52,6 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         BlockBlobClient blockBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
         try
         {
-
             using var accumulationBuffer = new MemoryStream();
             var networkReadBuffer = new byte[1024 * 1024];
             var blockList = new List<string>();
@@ -104,7 +103,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
                     {
                         await Task.WhenAll(uploadTasks);
 
-                        // Commit the blocks we have so far
+                        // Commit the blocks we have so far without MD5 hash
                         var blocksToCommit = blockList.ToList();
                         var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
                         await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
@@ -115,13 +114,13 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             }
             await Task.WhenAll(uploadTasks);
 
-            // Final commit with MD5 hash
+            // Calculate final MD5
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
             {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
             }
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit, blobMd5.Hash, cancellationToken);
+            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit, null, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
@@ -193,6 +192,40 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             throw;
         }
     }
+    public async Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(fileTransferEntity.Checksum))
+        {
+            logger.LogError("Did not set checksum content hash because checksum was not found on file transfer");
+        }
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
+        var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
+        BlobHttpHeaders headers = new BlobHttpHeaders
+        {
+            ContentType = "application/octet-stream", // Set appropriate content type
+            ContentHash = HexStringToByteArray(fileTransferEntity.Checksum)
+        };
+        await blobClient.SetHttpHeadersAsync(headers);
+    }
+
+    private static byte[] HexStringToByteArray(string hex)
+    {
+        if (string.IsNullOrEmpty(hex))
+            throw new ArgumentException("Hex string cannot be null or empty");
+
+        hex = hex.Replace("-", "").Replace(" ", "");
+        if (hex.Length % 2 != 0)
+            throw new ArgumentException("Hex string must have an even length");
+
+        byte[] bytes = new byte[hex.Length / 2];
+        for (int i = 0; i < hex.Length; i += 2)
+        {
+            bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+        }
+
+        return bytes;
+    }
+
 }
 
 internal static class BlobRetryPolicy

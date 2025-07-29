@@ -18,7 +18,19 @@ namespace Altinn.Broker.Controllers;
 [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
 public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, IResourceManager resourceManager) : Controller
 {
+    /// <summary>
+    /// Initializes the service owner for the calling organization within the brokerservice.
+    /// </summary>
+    /// <remarks>
+    /// One of the scopes: <br/>
+    /// - altinn:serviceowner <br/>
+    /// </remarks>
+    /// <response code="200">Service owner initialized successfully</response>
+    /// <response code="409">Service owner already exists</response>
     [HttpPost]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
         var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
@@ -33,7 +45,19 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
         return Ok();
     }
 
+    /// <summary>
+    /// Gets the service owner for the calling organization within the brokerservice.
+    /// </summary>
+    /// <remarks>
+    /// One of the scopes: <br/>
+    /// - altinn:serviceowner <br/>
+    /// </remarks>
+    /// <response code="200">Service owner retrieved successfully</response>
+    /// <response code="404">Service owner not found</response>
     [HttpGet]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ServiceOwnerOverviewExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
@@ -48,7 +72,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             var deploymentStatus = await resourceManager.GetDeploymentStatus(storageProvider, cancellationToken);
             deploymentStatuses.Add(storageProvider, deploymentStatus);
         }
-        
+
         return new ServiceOwnerOverviewExt()
         {
             Name = serviceOwner.Name,

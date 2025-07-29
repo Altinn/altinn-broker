@@ -1,11 +1,8 @@
-using System.Data.Common;
 using System.Net.Http.Headers;
 using System.Security.Claims;
-using System.Threading;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
@@ -19,12 +16,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using Moq;
-
-using Npgsql;
 
 using Polly;
 
@@ -97,6 +93,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = "",
                     OrganizationNumber = "",
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
@@ -113,6 +117,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var _backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
             var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
             var result = policy.ExecuteAndCapture(() => _backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
+
+            services.AddHangfire(services =>
+            {
+                services.UseMemoryStorage();
+            });
+            services.RemoveAll<IRecurringJobManager>();
+            services.AddSingleton(new Mock<IRecurringJobManager>().Object);
             if (result.Outcome == OutcomeType.Failure)
             {
                 throw new InvalidOperationException("Hangfire could not be installed");
@@ -124,6 +135,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Accept.Clear();
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         return client;
     }
 }
