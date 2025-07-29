@@ -3,7 +3,7 @@ using System.Xml;
 
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfirmDownload;
-using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
@@ -84,10 +84,10 @@ public class ConfirmDownloadHandler(
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);
-                    backgroundJobClient.Schedule<ExpireFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new ExpireFileTransferRequest
+                    backgroundJobClient.Schedule<PurgeFileTransferHandler>((expireFileTransferHandler) => expireFileTransferHandler.Process(new PurgeFileTransferRequest
                     {
                         FileTransferId = request.FileTransferId,
-                        Force = true
+                        PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
                     }, null, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
                 }
             }
