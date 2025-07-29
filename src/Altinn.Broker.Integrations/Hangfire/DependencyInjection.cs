@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Altinn.Broker.Integrations.Slack;
+using Hangfire.AspNetCore;
 
 namespace Altinn.Broker.Integrations.Hangfire;
 public static class DependencyInjection
@@ -18,8 +19,8 @@ public static class DependencyInjection
             config.UsePostgreSqlStorage(
                 c => c.UseConnectionFactory(provider.GetRequiredService<IConnectionFactory>())
             );
-            config.UseSerilogLogProvider();
-            config.UseFilter(new HangfireAppRequestFilter(provider.GetRequiredService<TelemetryClient>()));
+            config.UseLogProvider(new AspNetCoreLogProvider(provider.GetRequiredService<ILoggerFactory>()));
+            config.UseFilter(new HangfireAppRequestFilter());
             config.UseSerializerSettings(new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore });
             config.UseFilter(
                 new SlackExceptionHandler(

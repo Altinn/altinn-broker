@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
+using Altinn.Broker.Core.Helpers;
 
 namespace Altinn.Broker.Integrations;
 public static class DependencyInjection
@@ -40,15 +41,18 @@ public static class DependencyInjection
         {
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IEventBus).FullName, maskinportenSettings);
             services.AddHttpClient<IEventBus, AltinnEventBus>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
-                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>();
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IEventBus>()
+                .AddStandardRetryPolicy();
 
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnRegisterService).FullName, maskinportenSettings);
             services.AddHttpClient<IAltinnRegisterService, AltinnRegisterService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
-                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnRegisterService>();
+                .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnRegisterService>()
+                .AddStandardRetryPolicy();
 
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAuthorizationService).FullName, maskinportenSettings);
             services.AddHttpClient<IAuthorizationService, AltinnAuthorizationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
-                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>();
+                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>()
+                    .AddStandardRetryPolicy();
         }
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
@@ -58,7 +62,14 @@ public static class DependencyInjection
         } 
         else
         {
-            services.AddSingleton<ISlackClient>(new SlackClient(generalSettings.SlackUrl));
+            services.AddHttpClient(nameof(SlackClient))
+                .AddStandardRetryPolicy();
+            services.AddSingleton<ISlackClient>(serviceProvider =>
+            {
+                var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+                var httpClient = httpClientFactory.CreateClient(nameof(SlackClient));
+                return new SlackClient(generalSettings.SlackUrl, httpClient: httpClient);
+            });
         }
 
         services.AddSingleton<SlackSettings>();

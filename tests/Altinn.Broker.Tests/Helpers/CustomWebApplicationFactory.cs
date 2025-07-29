@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -92,6 +93,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = "",
                     OrganizationNumber = "",
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
@@ -113,6 +122,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             {
                 services.UseMemoryStorage();
             });
+            services.RemoveAll<IRecurringJobManager>();
+            services.AddSingleton(new Mock<IRecurringJobManager>().Object);
             if (result.Outcome == OutcomeType.Failure)
             {
                 throw new InvalidOperationException("Hangfire could not be installed");
