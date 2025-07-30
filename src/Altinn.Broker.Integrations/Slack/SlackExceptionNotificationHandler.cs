@@ -20,7 +20,6 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
     private readonly IProblemDetailsService _problemDetailsService;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly SlackSettings _slackSettings;
-    private string Channel => _slackSettings.NotificationChannel;
 
     public SlackExceptionNotificationHandler(
         ILogger<SlackExceptionNotificationHandler> logger,
@@ -41,15 +40,28 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        var exceptionMessage = FormatExceptionMessage(exception, httpContext);
+        var sanitizedPath = httpContext.Request.Path.ToString().Replace("\r", "").Replace("\n", "");
+        var exceptionMessage = FormatExceptionMessage(exception, sanitizedPath);
 
         _logger.LogError(
             exception,
-            null);
+            "Unhandled exception occurred. Type: {ExceptionType}, Message: {Message}, Path: {Path}, Environment: {Environment}, System: {System}, StackTrace: {StackTrace}, ExceptionSource: {ExceptionSource}, ExceptionMessage: {ExceptionMessage}, SentToSlack: {SentToSlack}, SlackMessage: {SlackMessage}",
+            exception.GetType().Name,
+            exception.Message,
+            sanitizedPath,
+            _hostEnvironment.EnvironmentName,
+            "Broker",
+            exception.StackTrace ?? "No stack trace available",
+            "HTTP",
+            exception.Message,
+            true, // Slack notification attempted
+            exceptionMessage
+        );
 
         try
         {
             await SendSlackNotificationWithMessage(exceptionMessage);
+
             var statusCode = HttpStatusCode.InternalServerError;
             var problemDetails = new ProblemDetails
             {
@@ -74,55 +86,99 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         {
             _logger.LogError(
                 slackEx,
-                null);
+                "Failed to send Slack notification. OriginalExceptionType: {OriginalExceptionType}, SlackExceptionType: {SlackExceptionType}, Environment: {Environment}, System: {System}, StackTrace: {StackTrace}, ExceptionSource: {ExceptionSource}, ExceptionMessage: {ExceptionMessage}, SentToSlack: {SentToSlack}, SlackMessage: {SlackMessage}",
+                exception.GetType().Name,
+                slackEx.GetType().Name,
+                _hostEnvironment.EnvironmentName,
+                "Broker",
+                slackEx.StackTrace ?? "No stack trace available",
+                "SlackNotification",
+                slackEx.Message,
+                false, // Slack notification failed
+                exceptionMessage
+            );
             return true;
         }
     }
 
-    public async Task<bool> TryHandleBackgroundJobAsync(string jobId, string jobName, Exception exception)
+    public async Task<bool> TryHandleBackgroundJobAsync(string jobId, string jobName, Exception exception, int retryCount = 0)
     {
-        var exceptionMessage = FormatBackgroundJobExceptionMessage(jobId, jobName, exception);
+        // Only send Slack notifications on retry 3, 6 and 10 (final retry)
+        if (retryCount != 3 && retryCount != 6 && retryCount != 10)
+        {
+            _logger.LogDebug("Skipping Slack notification for job {JobId} on retry {RetryCount}", jobId, retryCount);
+            return true;
+        }
+
+        var exceptionMessage = FormatBackgroundJobExceptionMessage(jobId, jobName, exception, retryCount);
 
         _logger.LogError(
             exception,
-            null);
+            "Background job failed. JobId: {JobId}, JobName: {JobName}, RetryCount: {RetryCount}, ExceptionType: {ExceptionType}, Environment: {Environment}, System: {System}, StackTrace: {StackTrace}, ExceptionSource: {ExceptionSource}, ExceptionMessage: {ExceptionMessage}, SentToSlack: {SentToSlack}, SlackMessage: {SlackMessage}",
+            jobId,
+            jobName,
+            retryCount,
+            exception.GetType().Name,
+            _hostEnvironment.EnvironmentName,
+            "Broker",
+            exception.StackTrace ?? "No stack trace available",
+            "BackgroundJob",
+            exception.Message,
+            true, // Slack notification attempted
+            exceptionMessage
+        );
 
         try
         {
             await SendSlackNotificationWithMessage(exceptionMessage);
-
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                null);
+                "Failed to send Slack notification for background job. OriginalExceptionType: {OriginalExceptionType}, SlackExceptionType: {SlackExceptionType}, JobId: {JobId}, JobName: {JobName}, RetryCount: {RetryCount}, Environment: {Environment}, System: {System}, StackTrace: {StackTrace}, ExceptionSource: {ExceptionSource}, ExceptionMessage: {ExceptionMessage}, SentToSlack: {SentToSlack}, SlackMessage: {SlackMessage}",
+                exception.GetType().Name,
+                ex.GetType().Name,
+                jobId,
+                jobName,
+                retryCount,
+                _hostEnvironment.EnvironmentName,
+                "Broker",
+                ex.StackTrace ?? "No stack trace available",
+                "SlackNotification",
+                ex.Message,
+                false, // Slack notification failed
+                exceptionMessage
+            );
             return false;
         }
     }
 
-    private string FormatExceptionMessage(Exception exception, HttpContext context)
+    private string FormatExceptionMessage(Exception exception, string sanitizedPath)
     {
         return $":warning: *Unhandled Exception*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
                $"*System:* Broker\n" +
                $"*Type:* {exception.GetType().Name}\n" +
                $"*Message:* {exception.Message}\n" +
-               $"*Path:* {context.Request.Path}\n" +
+               $"*Path:* {sanitizedPath}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n" +
                $"*Stacktrace:* \n{exception.StackTrace}";
     }
 
-    private string FormatBackgroundJobExceptionMessage(string jobId, string jobName, Exception exception)
+    private string FormatBackgroundJobExceptionMessage(string jobId, string jobName, Exception exception, int retryCount)
     {
-        return $":warning: *Unhandled Exception in Background Job*\n" +
+        var severity = retryCount == 10 ? ":rotating_light:" : ":warning:";
+        
+        return $"{severity} *Unhandled Exception in Background Job*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
                $"*System:* Broker\n" +
                $"*Job ID:* {jobId}\n" +
                $"*Job Name:* {jobName}\n" +
                $"*Type:* {exception.GetType().Name}\n" +
                $"*Message:* {exception.Message}\n" +
+               $"*Retry Count:* {retryCount}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n" +
                $"*Stacktrace:* \n{exception.StackTrace}";
     }
@@ -132,7 +188,7 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
         var slackMessage = new SlackMessage
         {
             Text = message,
-            Channel = Channel
+            Channel = _slackSettings.NotificationChannel
         };
         await _slackClient.PostAsync(slackMessage);
     }

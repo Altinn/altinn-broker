@@ -8,7 +8,7 @@ using System.Xml;
 
 using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.ExpireFileTransfer;
+using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -18,6 +18,7 @@ using Altinn.Broker.Tests.Helpers;
 using Hangfire;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 using Xunit;
 using Xunit.Abstractions;
@@ -526,6 +527,97 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.True(fileTransferAfterInitialize.FileTransferStatus == FileTransferStatusExt.Initialized);
     }
 
+
+
+    [Fact]
+    public async Task DownloadFileTransfer_ResourceWithPurgeGraceTime_SchedulesDeletionInGracePeriod()
+    {
+        // Arrange
+        var resource = new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P48H",
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
+            PurgeFileTransferGracePeriod = "PT24H"
+        };
+        var createResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_GRACEFUL_PURGE}", resource);
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        fileTransfer.ResourceId = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE;
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse?.FileTransferId.ToString();
+        Assert.NotNull(fileTransferId);
+        await UploadDummyFileTransferAsync(fileTransferId);
+        var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
+        
+        // Act
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        Assert.True(confirmResponse.IsSuccessStatusCode, await confirmResponse.Content.ReadAsStringAsync());
+
+        // Assert that the deletion is scheduled in the grace period
+        var jobStorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
+        var gracePeriod = XmlConvert.ToTimeSpan("PT24H");
+        
+        Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => 
+            j.Value.Job.Method.Name == "Process" && 
+            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && 
+            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
+            j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && 
+            j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
+    }
+
+    [Fact]
+    public async Task ConfirmDownload_ResourceWithPurgeGraceTime_ExpiresAfterAllConfirmedDownloadedButBeforePurge()
+    {
+        // Arrange
+        var resource = new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P48H",
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
+            PurgeFileTransferGracePeriod = "PT24H"
+        };
+        var createResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_GRACEFUL_PURGE}", resource);
+        var fileTransfer = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        fileTransfer.ResourceId = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE;
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse?.FileTransferId.ToString();
+        Assert.NotNull(fileTransferId);
+        await UploadDummyFileTransferAsync(fileTransferId);
+        var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+        Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
+        var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        Assert.True(confirmResponse.IsSuccessStatusCode, await confirmResponse.Content.ReadAsStringAsync());
+
+        // Act
+        using var requestScope = _factory.Services.CreateScope();
+        var purgeFileTransferHandler = requestScope.ServiceProvider.GetRequiredService<PurgeFileTransferHandler>();
+        var fileExpiryPurgeResult = await purgeFileTransferHandler.Process(new PurgeFileTransferRequest
+        {
+            FileTransferId = Guid.Parse(fileTransferId),
+            PurgeTrigger = PurgeTrigger.FileTransferExpiry
+        }, null, CancellationToken.None);
+        Assert.Equal(Task.CompletedTask, fileExpiryPurgeResult);
+        var fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+        Assert.Equal(FileTransferStatusExt.AllConfirmedDownloaded, fileTransferDetails.FileTransferStatus);
+        var allConfirmedDownloadedPurgeResult = await purgeFileTransferHandler.Process(new PurgeFileTransferRequest
+        {
+            FileTransferId = Guid.Parse(fileTransferId),
+            PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
+        }, null, CancellationToken.None);
+        fileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(fileTransferDetails);
+
+        // Assert
+        Assert.Equal(FileTransferStatusExt.Purged, fileTransferDetails.FileTransferStatus);
+
+    }
+
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);
@@ -568,9 +660,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
-            PurgeFileTransferAfterAllRecipientsConfirmed = false,
+            PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = time
-
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
 
@@ -590,7 +681,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
 
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).Force == false).Value);
+        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
         var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
         var confirmedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
 
@@ -598,8 +689,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.Null(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).Force == false).Value);
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((ExpireFileTransferRequest)j.Value.Job.Args[0]).Force == true &&
+        Assert.Null(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
+        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
         j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 
     }
