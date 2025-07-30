@@ -10,14 +10,8 @@ public class AltinnTokenEventsHelper
 {
     public static Task OnAuthenticationFailed(AuthenticationFailedContext context)
     {
-        if (context.Exception is SecurityTokenInvalidIssuerException)
-        {
-            var issuer = ((SecurityTokenInvalidIssuerException)context.Exception).InvalidIssuer;
-            if (issuer?.ToString().Contains("maskinporten.no") ?? false)
-            {
-                context.Exception = new MaskinportenSecurityTokenException();
-            }
-        }
+        // Allow authentication failures to be handled by the default mechanism
+        // This removes the blocking of Maskinporten tokens to support pure Maskinporten tokens
         return Task.CompletedTask;
     }
 
