@@ -508,6 +508,44 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task InitializeFileTransfer_WithNewUrnFormat_Success()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.Sender = "urn:altinn:organization:identifier-no:991825827";
+        initializeRequestBody.Recipients = new List<string> { "urn:altinn:organization:identifier-no:986252932" };
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithMixedUrnFormats_Success()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.Sender = "urn:altinn:organization:identifier-no:991825827";
+        initializeRequestBody.Recipients = new List<string> 
+        { 
+            "urn:altinn:organization:identifier-no:986252932",
+            "0192:910351192" 
+        };
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
+    }
+
+    [Fact]
     public async Task Initialize_WithUrnResourceId_Success()
     {
         // Arrange
