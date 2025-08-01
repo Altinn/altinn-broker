@@ -543,7 +543,9 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
         Assert.NotNull(fileTransferResponse);
-        
+    }
+
+    [Fact]
     public async Task Initialize_WithUrnResourceId_Success()
     {
         // Arrange
