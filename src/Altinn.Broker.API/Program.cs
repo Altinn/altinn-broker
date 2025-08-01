@@ -17,43 +17,42 @@ using Altinn.Common.PEP.Authorization;
 
 using Hangfire;
 
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
 
-using Serilog;
-using Serilog.Formatting.Json;
-
 BuildAndRun(args);
+
+static ILogger<Program> CreateBootstrapLogger()
+{
+    return LoggerFactory.Create(builder =>
+    {
+        builder
+            .AddFilter("Altinn.Broker.API.Program", LogLevel.Debug)
+            .AddConsole();
+    }).CreateLogger<Program>();
+}
 
 static void BuildAndRun(string[] args)
 {
+    var bootstrapLogger = CreateBootstrapLogger();
+    bootstrapLogger.LogInformation("Starting Altinn.Broker.API...");
     var builder = WebApplication.CreateBuilder(args);
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .MinimumLevel.Information()
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.With(new PropertyPropagationEnricher("fileTransferId", "instanceId", "resourceId", "partyId"))
-        .Enrich.WithClientIp()
-        .WriteTo.Console(new JsonFormatter(renderMessage: true))
-        .WriteTo.ApplicationInsights(
-            services.GetRequiredService<TelemetryConfiguration>(),
-            TelemetryConverter.Traces));
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
         .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
         .AddJsonFile("appsettings.local.json", true, true);
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
+    var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
+    bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
+    builder.Services.ConfigureOpenTelemetry(generalSettings.ApplicationInsightsConnectionString);
 
     var app = builder.Build();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
-    app.UseSerilogRequestLogging();
     app.UseExceptionHandler();
 
     if (app.Environment.IsDevelopment())
@@ -76,6 +75,7 @@ static void BuildAndRun(string[] args)
 
 static void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
 {
+    services.AddHttpContextAccessor();
     services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -87,7 +87,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
     });
-    services.AddApplicationInsightsTelemetry();
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
@@ -126,10 +125,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
-        .AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+        .AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options => // For both pure Maskinporten tokens and legacy
         {
-            var altinnOptions = new AltinnOptions();
-            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
             if (hostEnvironment.IsProduction())
             {
@@ -153,11 +150,11 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
-        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.Legacy));
-        options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
     });
 
     services.Configure<KestrelServerOptions>(options =>

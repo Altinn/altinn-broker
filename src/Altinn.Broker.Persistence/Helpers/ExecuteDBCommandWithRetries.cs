@@ -34,29 +34,10 @@ public class ExecuteDBCommandWithRetries(ILogger<ExecuteDBCommandWithRetries> lo
         return result.Result;
     }
 
-    /// <summary>
-    /// Executes a database command that returns no result with retry logic for transient failures
-    /// </summary>
-    /// <param name="operation">The operation to execute</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    public async Task ExecuteWithRetry(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
-    {
-        var policy = CreateRetryPolicy();
-        var result = await policy.ExecuteAndCaptureAsync(operation, cancellationToken);
-        
-        if (result.Outcome == OutcomeType.Failure)
-        {
-            _logger.LogError("Exception during database command retries: {message}\n{stackTrace}", 
-                result.FinalException.Message, 
-                result.FinalException.StackTrace);
-            throw result.FinalException;
-        }
-    }
-
     private AsyncRetryPolicy CreateRetryPolicy()
     {
         return Policy
-            .Handle<NpgsqlException>(ex => ex.IsTransient && ex is not PostgresException)
+            .Handle<NpgsqlException>(ex => ex.IsTransient)
             .WaitAndRetryAsync(
                 3,
                 retryAttempt => TimeSpan.FromMilliseconds(100),

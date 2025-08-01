@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Security.Claims;
 
+using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
@@ -75,7 +76,8 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             return bypass.Value;
         }
-        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.WithoutPrefix(), fileTransferId, rights, resource.Id);
+        bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.WithoutPrefix(), fileTransferId, rights, resource.Id, isMaskinportenToken);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -87,7 +89,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             _logger.LogError("Unexpected null or invalid json response from Authorization.");
             return false;
         }
-        var validationResult = ValidateResult(responseContent, user);
+        var validationResult = ValidateResult(responseContent, user, isMaskinportenToken);
         return validationResult;
     }
     private async Task<bool?> EvaluateBypassConditions(bool isLegacyUser, ResourceEntity resource, CancellationToken cancellationToken)
@@ -104,7 +106,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         return null;
     }
 
-    private XacmlJsonRequestRoot CreateDecisionRequest(ClaimsPrincipal user, string party, string? fileTransferId, List<ResourceAccessLevel> actionTypes, string resourceId)
+    private XacmlJsonRequestRoot CreateDecisionRequest(ClaimsPrincipal user, string party, string? fileTransferId, List<ResourceAccessLevel> actionTypes, string resourceId, bool isMaskinportenToken)
     {
         XacmlJsonRequest request = new()
         {
@@ -112,7 +114,10 @@ public class AltinnAuthorizationService : IAuthorizationService
             Action = new List<XacmlJsonCategory>(),
             Resource = new List<XacmlJsonCategory>()
         };
-        var subjectCategory = DecisionHelper.CreateSubjectCategory(user.Claims);
+        // Use appropriate subject category creation based on token type
+        var subjectCategory = isMaskinportenToken 
+            ? XacmlMappers.CreateMaskinportenSubjectCategory(user)     // Handle Maskinporten consumer claims
+            : DecisionHelper.CreateSubjectCategory(user.Claims);               // Use standard Altinn token handling
         request.AccessSubject.Add(subjectCategory);
         foreach (var actionType in actionTypes)
         {
@@ -124,11 +129,24 @@ public class AltinnAuthorizationService : IAuthorizationService
         return jsonRequest;
     }
 
-    private static bool ValidateResult(XacmlJsonResponse response, ClaimsPrincipal user)
+    private static bool ValidateResult(XacmlJsonResponse response, ClaimsPrincipal user, bool isMaskinportenToken)
     {
+        
         foreach (var decision in response.Response)
         {
-            var result = DecisionHelper.ValidateDecisionResult(decision, user);
+            bool result;
+            
+            if (isMaskinportenToken)
+            {
+                // For Maskinporten tokens: just check permit/deny, skip obligations
+                result = decision.Decision.Equals(XacmlContextDecision.Permit.ToString());
+            }
+            else
+            {
+                // For Altinn tokens: use full validation with obligations
+                result = DecisionHelper.ValidateDecisionResult(decision, user);
+            }
+            
             if (result == false)
             {
                 return false;

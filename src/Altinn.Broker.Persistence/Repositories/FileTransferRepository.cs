@@ -256,29 +256,29 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         commandString.AppendLine("ORDER BY f.created ASC");
         commandString.AppendLine(";");
 
-        await using var command = dataSource.CreateCommand(
-            commandString.ToString());
-        if (!(fileTransferSearch.Actor is null))
-        {
-            command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
-        }
-
-        if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
-        {
-            command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
-        }
-
-        if (fileTransferSearch.From.HasValue)
-            command.Parameters.AddWithValue("@From", fileTransferSearch.From);
-        if (fileTransferSearch.To.HasValue)
-            command.Parameters.AddWithValue("@To", fileTransferSearch.To);
-        if (fileTransferSearch.RecipientFileTransferStatus.HasValue && fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
-            command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
-        if (fileTransferSearch.FileTransferStatus.HasValue)
-            command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
-
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
+            await using var command = dataSource.CreateCommand(
+            commandString.ToString());
+            if (!(fileTransferSearch.Actor is null))
+            {
+                command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
+            {
+                command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
+            }
+
+            if (fileTransferSearch.From.HasValue)
+                command.Parameters.AddWithValue("@From", fileTransferSearch.From);
+            if (fileTransferSearch.To.HasValue)
+                command.Parameters.AddWithValue("@To", fileTransferSearch.To);
+            if (fileTransferSearch.RecipientFileTransferStatus.HasValue && fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
+                command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
+            if (fileTransferSearch.FileTransferStatus.HasValue)
+                command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
+
             var fileTransfers = new List<Guid>();
             
             await using var reader = await command.ExecuteReaderAsync(ct);
@@ -287,7 +287,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 var fileTransferId = reader.GetGuid(0);
                 fileTransfers.Add(fileTransferId);
             }
-            
             return fileTransfers;
         }, cancellationToken);
     }
