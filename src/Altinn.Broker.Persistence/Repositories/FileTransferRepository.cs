@@ -208,23 +208,36 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         StringBuilder commandString = new StringBuilder();
         commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
         commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN LATERAL ");
-        commandString.AppendLine("(SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs ");
-        commandString.AppendLine("WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk ");
+        commandString.AppendLine("INNER JOIN");
+        commandString.AppendLine("broker.actor_file_transfer_status afs");
+        commandString.AppendLine("ON afs.file_transfer_id_fk = f.file_transfer_id_pk");
         if (fileTransferSearch.Actors?.Count > 0)
         {
             commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
         }
         else if (!(fileTransferSearch.Actor is null))
         {
-            commandString.AppendLine("AND afs.actor_id_fk = @actorId");
+            commandString.AppendLine("AND afs.actor_id_fk = @actorId ");
         }
-        commandString.AppendLine("ORDER BY afs.actor_file_transfer_status_description_id_fk desc LIMIT 1) AS recipientfiletransferstatus ON true");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true");
+
+        if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
+        {
+            if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
+            {
+                commandString.AppendLine($"AND NOT EXISTS (SELECT * FROM broker.actor_file_transfer_status s WHERE s.file_transfer_id_fk = afs.file_transfer_id_fk AND actor_file_transfer_status_description_id_fk = {((int)ActorFileTransferStatus.DownloadConfirmed)})");
+            }
+            else
+            {
+                commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+            }
+        }
+        commandString.AppendLine("INNER JOIN broker.file_transfer_status fs");
+        commandString.Append("ON fs.file_transfer_id_fk = f.file_transfer_id_pk and file_transfer_status_description_id_fk = ");
+        commandString.AppendLine(fileTransferSearch.FileTransferStatus.HasValue ? "@fileTransferStatus" : ((int)FileTransferStatus.Published).ToString());
         commandString.AppendLine("WHERE 1 = 1");
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created between @from AND @to");
+            commandString.AppendLine("AND f.created BETWEEN @from AND @to");
         }
         else if (fileTransferSearch.From.HasValue)
         {
@@ -238,23 +251,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             commandString.AppendLine("AND resource_id = @resourceId");
         }
-        if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
-        {
-            if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
-            {
-                commandString.AppendLine($"AND actor_file_transfer_status_description_id_fk in (0,1)");
-            }
-            else
-            {
-                commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
-            }
-        }
-        if (fileTransferSearch.FileTransferStatus.HasValue)
-        {
-            commandString.AppendLine("AND filetransferstatus.file_transfer_status_description_id_fk = @fileTransferStatus");
-        }
-        commandString.AppendLine("ORDER BY f.created ASC");
-        commandString.AppendLine(";");
+
+        commandString.AppendLine("ORDER BY f.created ASC;");
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
