@@ -23,7 +23,6 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/filetransfer")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class FileTransferController(ILogger<FileTransferController> logger) : Controller
 {
 

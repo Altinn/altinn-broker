@@ -4,7 +4,6 @@ using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +11,6 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/resource")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
 public class ResourceController : Controller
 {
