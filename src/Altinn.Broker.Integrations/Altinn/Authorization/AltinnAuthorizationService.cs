@@ -4,10 +4,12 @@ using System.Security.Claims;
 using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Broker.Common;
+using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 
 using Microsoft.AspNetCore.Http;
@@ -20,6 +22,8 @@ public class AltinnAuthorizationService : IAuthorizationService
     private readonly HttpClient _httpClient;
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
+    private const string PolicyObligationMinAuthnLevel = "urn:altinn:minimum-authenticationlevel";
+    private const string PolicyObligationMinAuthnLevelOrg = "urn:altinn:minimum-authenticationlevel-org";
 
     public AltinnAuthorizationService(HttpClient httpClient, IOptions<AltinnOptions> altinnOptions, IResourceRepository resourceRepository, ILogger<AltinnAuthorizationService> logger)
     {
@@ -114,10 +118,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             Action = new List<XacmlJsonCategory>(),
             Resource = new List<XacmlJsonCategory>()
         };
-        // Use appropriate subject category creation based on token type
-        var subjectCategory = isMaskinportenToken 
-            ? XacmlMappers.CreateMaskinportenSubjectCategory(user)     // Handle Maskinporten consumer claims
-            : DecisionHelper.CreateSubjectCategory(user.Claims);               // Use standard Altinn token handling
+        var subjectCategory = CreateSubjectCategory(user);
         request.AccessSubject.Add(subjectCategory);
         foreach (var actionType in actionTypes)
         {
@@ -129,23 +130,29 @@ public class AltinnAuthorizationService : IAuthorizationService
         return jsonRequest;
     }
 
+    private static XacmlJsonCategory CreateSubjectCategory(ClaimsPrincipal user)
+    {
+        var subjectCategory = DecisionHelper.CreateSubjectCategory(user.Claims);
+        var isSystemUserSubject = subjectCategory.Attribute.Any(attribute => attribute.AttributeId == AltinnXacmlUrns.SystemUserUuid);
+        if (!isSystemUserSubject)
+        {
+            var pidClaim = user.Claims.FirstOrDefault(claim => claim.Type == "pid");
+            if (pidClaim is not null)
+            {
+                subjectCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(UrnConstants.PersonIdAttribute, pidClaim.Value, "string", pidClaim.Issuer));
+            }
+        }
+        return subjectCategory;
+    }
+
     private static bool ValidateResult(XacmlJsonResponse response, ClaimsPrincipal user, bool isMaskinportenToken)
     {
-        
         foreach (var decision in response.Response)
         {
             bool result;
-            
-            if (isMaskinportenToken)
-            {
-                // For Maskinporten tokens: just check permit/deny, skip obligations
-                result = decision.Decision.Equals(XacmlContextDecision.Permit.ToString());
-            }
-            else
-            {
-                // For Altinn tokens: use full validation with obligations
-                result = DecisionHelper.ValidateDecisionResult(decision, user);
-            }
+
+            // For Altinn tokens: use full validation with obligations
+            result = ValidateDecisionResult(decision, user, isMaskinportenToken);
             
             if (result == false)
             {
@@ -153,6 +160,68 @@ public class AltinnAuthorizationService : IAuthorizationService
             }
         }
         return true;
+    }
+
+    private static bool ValidateDecisionResult(XacmlJsonResult result, ClaimsPrincipal user, bool isMaskinportenToken)
+    {
+
+        // Checks that the result is nothing else than "permit"
+        if (!result.Decision.Equals(XacmlContextDecision.Permit.ToString()))
+        {
+            return false;
+        }
+
+        // Checks if the result contains obligation
+        if (result.Obligations != null)
+        {
+            List<XacmlJsonObligationOrAdvice> obligationList = result.Obligations;
+            XacmlJsonAttributeAssignment attributeMinLvAuth = GetObligation(PolicyObligationMinAuthnLevel, obligationList);
+
+            // Checks if the obligation contains a minimum authentication level attribute
+            if (attributeMinLvAuth != null)
+            {
+                string minAuthenticationLevel = attributeMinLvAuth.Value;
+                string usersAuthenticationLevel = user.Claims.FirstOrDefault(c => c.Type.Equals("urn:altinn:authlevel"))?.Value;
+                if (usersAuthenticationLevel is null && isMaskinportenToken)
+                {
+                    usersAuthenticationLevel = "3";
+                }
+
+                // Checks that the user meets the minimum authentication level
+                if (Convert.ToInt32(usersAuthenticationLevel) < Convert.ToInt32(minAuthenticationLevel))
+                {
+                    if (user.Claims.FirstOrDefault(c => c.Type.Equals("urn:altinn:org")) != null)
+                    {
+                        XacmlJsonAttributeAssignment attributeMinLvAuthOrg = GetObligation(PolicyObligationMinAuthnLevelOrg, obligationList);
+                        if (attributeMinLvAuthOrg != null)
+                        {
+                            if (Convert.ToInt32(usersAuthenticationLevel) >= Convert.ToInt32(attributeMinLvAuthOrg.Value))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static XacmlJsonAttributeAssignment GetObligation(string category, List<XacmlJsonObligationOrAdvice> obligations)
+    {
+        foreach (XacmlJsonObligationOrAdvice obligation in obligations)
+        {
+            XacmlJsonAttributeAssignment assignment = obligation.AttributeAssignment.FirstOrDefault(a => a.Category.Equals(category));
+            if (assignment != null)
+            {
+                return assignment;
+            }
+        }
+
+        return null;
     }
 
     private string GetActionId(ResourceAccessLevel right)
