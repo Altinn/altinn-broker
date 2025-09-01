@@ -1,1 +1,2 @@
-/.github/CODEOWNERS                         @altinn/team-messaging
+* @altinn/team-messaging
+/.github/CODEOWNERS @altinn/team-messaging
