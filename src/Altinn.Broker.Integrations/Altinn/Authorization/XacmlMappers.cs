@@ -1,10 +1,13 @@
 ﻿using System.Security.Claims;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
+using Altinn.Broker.Common;
 using Altinn.Broker.Common.Constants;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
+using Altinn.Broker.Common.Helpers.Models;
 
 using static Altinn.Authorization.ABAC.Constants.XacmlConstants;
 
@@ -55,6 +58,8 @@ public static class XacmlMappers
         return actionAttributes;
     }
 
+    /// <summary>
+    /// Creates XACML resource category for authorization requests.
     /// If id is required this should be included by the caller. 
     /// Attribute eventId is tagged with `includeInResponse`</remarks>
     internal static XacmlJsonCategory CreateResourceCategory(string resourceId, string party, string? instanceId)
@@ -71,19 +76,24 @@ public static class XacmlMappers
 
     }
 
-    internal static XacmlJsonCategory CreateSubjectCategory(ClaimsPrincipal user)
+    /// <param name="user">ClaimsPrincipal containing Maskinporten token claims</param>
+    /// <returns>XacmlJsonCategory with appropriate subject attributes for Maskinporten tokens</returns>
+    internal static XacmlJsonCategory CreateMaskinportenSubjectCategory(ClaimsPrincipal user)
     {
         XacmlJsonCategory xacmlJsonCategory = new XacmlJsonCategory();
         List<XacmlJsonAttribute> list = new List<XacmlJsonAttribute>();
-
+        
+        // Add organization number attributes using centralized extraction logic
+        var organizationNumber = user.GetCallerOrganizationId();
+        if (!string.IsNullOrEmpty(organizationNumber))
+        {
+            list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", organizationNumber, "string", "altinn"));
+            list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", organizationNumber, "string", "altinn"));
+        }
+        
         foreach (Claim claim in user.Claims)
         {
-            if (IsCamelCaseOrgnumberClaim(claim.Type))
-            {
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organizationnumber", claim.Value, "string", claim.Issuer));
-                list.Add(CreateXacmlJsonAttribute("urn:altinn:organization:identifier-no", claim.Value, "string", claim.Issuer));
-            }
-            else if (IsScopeClaim(claim.Type))
+            if (IsScopeClaim(claim.Type))
             {
                 list.Add(CreateXacmlJsonAttribute("urn:scope", claim.Value, "string", claim.Issuer));
             }
@@ -96,18 +106,15 @@ public static class XacmlMappers
                 list.Add(CreateXacmlJsonAttribute(claim.Type, claim.Value, "string", claim.Issuer));
             }
         }
+        
         xacmlJsonCategory.Attribute = list;
         return xacmlJsonCategory;
     }
+
     private static bool IsValidUrn(string value)
     {
         Regex regex = new Regex("^urn*");
         return regex.Match(value).Success;
-    }
-
-    private static bool IsCamelCaseOrgnumberClaim(string value)
-    {
-        return value.Equals("urn:altinn:orgNumber");
     }
 
     private static bool IsScopeClaim(string value)

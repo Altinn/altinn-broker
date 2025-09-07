@@ -56,7 +56,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                             return jwt;
                         }
                     };
-                }).AddJwtBearer(AuthorizationConstants.Legacy, options => // To support "overgangslosningen"
+                }).AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options => // To support "overgangslosningen"
                 {
                     options.RequireHttpsMetadata = false;
                     options.SaveToken = true;
@@ -100,6 +100,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     Created = DateTime.UtcNow,
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
+                    MaxFileTransferSize = 1000000,
+                    FileTransferTimeToLive = TimeSpan.FromHours(48),
+                    PurgeFileTransferAfterAllRecipientsConfirmed = true,
+                    PurgeFileTransferGracePeriod = TimeSpan.FromHours(24)
                 });
             services.AddSingleton(altinnResourceRepository.Object);
 

@@ -17,4 +17,16 @@ public class IdempotencyEventRepository(NpgsqlDataSource dataSource, ExecuteDBCo
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+
+    public async Task<bool> TryAddIdempotencyEventAsync(string IdempotencyEventId, CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = dataSource.CreateCommand(
+                    "INSERT INTO broker.idempotency_event (idempotency_event_id_pk, created) " +
+                    "VALUES (@idempotency_event_id_pk, @created) ON CONFLICT (idempotency_event_id_pk) DO NOTHING");
+        command.Parameters.AddWithValue("@idempotency_event_id_pk", IdempotencyEventId);
+        command.Parameters.AddWithValue("@created", DateTime.UtcNow);
+
+        var affected = await commandExecutor.ExecuteWithRetry(async (ct) => await command.ExecuteNonQueryAsync(ct), cancellationToken);
+        return affected > 0;
+    }
 }
