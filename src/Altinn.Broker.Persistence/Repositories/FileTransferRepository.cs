@@ -207,48 +207,58 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     {
         StringBuilder commandString = new StringBuilder();
 
-        // CTE with window function to get latest status per file transfer and actor
-        commandString.AppendLine("WITH latest_actor_statuses AS (");
-        commandString.AppendLine("    SELECT ");
-        commandString.AppendLine("        afs.file_transfer_id_fk,");
-        commandString.AppendLine("        afs.actor_id_fk,");
-        commandString.AppendLine("        afs.actor_file_transfer_status_description_id_fk,");
-        commandString.AppendLine("        ROW_NUMBER() OVER (");
-        commandString.AppendLine("            PARTITION BY afs.file_transfer_id_fk, afs.actor_id_fk");
-        commandString.AppendLine("            ORDER BY afs.actor_file_transfer_status_id_pk DESC");
-        commandString.AppendLine("        ) as rn");
-        commandString.AppendLine("    FROM broker.actor_file_transfer_status afs");
+        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
+        commandString.AppendLine("FROM broker.file_transfer f");
+        commandString.AppendLine("WHERE EXISTS (");
+        commandString.AppendLine("    SELECT 1 FROM broker.actor_file_transfer_status afs");
+        commandString.AppendLine("    WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk");
 
-        // Add actor filtering in the CTE for better performance
+        // Actor filtering in EXISTS clause
         if (fileTransferSearch.Actors?.Count > 0)
         {
-            commandString.AppendLine($"    WHERE afs.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
+            commandString.AppendLine($"    AND afs.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
         }
         else if (!(fileTransferSearch.Actor is null))
         {
-            commandString.AppendLine("    WHERE afs.actor_id_fk = @actorId");
+            commandString.AppendLine("    AND afs.actor_id_fk = @actorId");
         }
 
-        commandString.AppendLine("),");
+        // Recipient status filtering
+        if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
+        {
+            if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
+            {
+                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk IN (0,1)");
+            }
+            else
+            {
+                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+            }
+        }
 
-        // CTE for latest file transfer status (if needed)
-        commandString.AppendLine("latest_file_statuses AS (");
-        commandString.AppendLine("    SELECT ");
-        commandString.AppendLine("        fs.file_transfer_id_fk,");
-        commandString.AppendLine("        fs.file_transfer_status_description_id_fk,");
-        commandString.AppendLine("        ROW_NUMBER() OVER (");
-        commandString.AppendLine("            PARTITION BY fs.file_transfer_id_fk");
-        commandString.AppendLine("            ORDER BY fs.file_transfer_status_id_pk DESC");
-        commandString.AppendLine("        ) as rn");
-        commandString.AppendLine("    FROM broker.file_transfer_status fs");
+        // Ensure this is the latest status for this actor
+        commandString.AppendLine("    AND NOT EXISTS (");
+        commandString.AppendLine("        SELECT 1 FROM broker.actor_file_transfer_status afs2");
+        commandString.AppendLine("        WHERE afs2.file_transfer_id_fk = afs.file_transfer_id_fk");
+        commandString.AppendLine("        AND afs2.actor_id_fk = afs.actor_id_fk");
+        commandString.AppendLine("        AND afs2.actor_file_transfer_status_id_pk > afs.actor_file_transfer_status_id_pk");
+        commandString.AppendLine("    )");
         commandString.AppendLine(")");
 
-        // Main query
-        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
-        commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN latest_actor_statuses las ON las.file_transfer_id_fk = f.file_transfer_id_pk AND las.rn = 1");
-        commandString.AppendLine("INNER JOIN latest_file_statuses lfs ON lfs.file_transfer_id_fk = f.file_transfer_id_pk AND lfs.rn = 1");
-        commandString.AppendLine("WHERE 1 = 1");
+        // File transfer status check
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            commandString.AppendLine("AND EXISTS (");
+            commandString.AppendLine("    SELECT 1 FROM broker.file_transfer_status fs");
+            commandString.AppendLine("    WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk");
+            commandString.AppendLine("    AND fs.file_transfer_status_description_id_fk = @fileTransferStatus");
+            commandString.AppendLine("    AND NOT EXISTS (");
+            commandString.AppendLine("        SELECT 1 FROM broker.file_transfer_status fs2");
+            commandString.AppendLine("        WHERE fs2.file_transfer_id_fk = fs.file_transfer_id_fk");
+            commandString.AppendLine("        AND fs2.file_transfer_status_id_pk > fs.file_transfer_status_id_pk");
+            commandString.AppendLine("    )");
+            commandString.AppendLine(")");
+        }
 
         // Date range filtering
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
@@ -268,25 +278,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
         {
             commandString.AppendLine("AND f.resource_id = @resourceId");
-        }
-
-        // Recipient file transfer status filtering
-        if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
-        {
-            if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
-            {
-                commandString.AppendLine("AND las.actor_file_transfer_status_description_id_fk IN (0,1)");
-            }
-            else
-            {
-                commandString.AppendLine("AND las.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
-            }
-        }
-
-        // File transfer status filtering
-        if (fileTransferSearch.FileTransferStatus.HasValue)
-        {
-            commandString.AppendLine("AND lfs.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
 
         commandString.AppendLine("ORDER BY f.created ASC;");
