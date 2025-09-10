@@ -1,8 +1,8 @@
-﻿-- For actor file transfer status CTE
+﻿-- For actor file transfer status
 CREATE index CONCURRENTLY idx_actor_file_transfer_status_window 
 ON broker.actor_file_transfer_status (file_transfer_id_fk, actor_id_fk, actor_file_transfer_status_id_pk DESC);
 
--- For file transfer status CTE  
+-- For file transfer status
 CREATE INDEX concurrently idx_file_transfer_status_window
 ON broker.file_transfer_status (file_transfer_id_fk, file_transfer_status_id_pk DESC);
 
