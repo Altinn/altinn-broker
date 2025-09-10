@@ -206,25 +206,54 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
-        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
-        commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN LATERAL ");
-        commandString.AppendLine("(SELECT afs.actor_file_transfer_status_description_id_fk FROM broker.actor_file_transfer_status afs ");
-        commandString.AppendLine("WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk ");
+
+        // CTE with window function to get latest status per file transfer and actor
+        commandString.AppendLine("WITH latest_actor_statuses AS (");
+        commandString.AppendLine("    SELECT ");
+        commandString.AppendLine("        afs.file_transfer_id_fk,");
+        commandString.AppendLine("        afs.actor_id_fk,");
+        commandString.AppendLine("        afs.actor_file_transfer_status_description_id_fk,");
+        commandString.AppendLine("        ROW_NUMBER() OVER (");
+        commandString.AppendLine("            PARTITION BY afs.file_transfer_id_fk, afs.actor_id_fk");
+        commandString.AppendLine("            ORDER BY afs.actor_file_transfer_status_id_pk DESC");
+        commandString.AppendLine("        ) as rn");
+        commandString.AppendLine("    FROM broker.actor_file_transfer_status afs");
+
+        // Add actor filtering in the CTE for better performance
         if (fileTransferSearch.Actors?.Count > 0)
         {
-            commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
+            commandString.AppendLine($"    WHERE afs.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
         }
         else if (!(fileTransferSearch.Actor is null))
         {
-            commandString.AppendLine("AND afs.actor_id_fk = @actorId");
+            commandString.AppendLine("    WHERE afs.actor_id_fk = @actorId");
         }
-        commandString.AppendLine("ORDER BY afs.actor_file_transfer_status_description_id_fk desc LIMIT 1) AS recipientfiletransferstatus ON true");
-        commandString.AppendLine("INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true");
+
+        commandString.AppendLine("),");
+
+        // CTE for latest file transfer status (if needed)
+        commandString.AppendLine("latest_file_statuses AS (");
+        commandString.AppendLine("    SELECT ");
+        commandString.AppendLine("        fs.file_transfer_id_fk,");
+        commandString.AppendLine("        fs.file_transfer_status_description_id_fk,");
+        commandString.AppendLine("        ROW_NUMBER() OVER (");
+        commandString.AppendLine("            PARTITION BY fs.file_transfer_id_fk");
+        commandString.AppendLine("            ORDER BY fs.file_transfer_status_id_pk DESC");
+        commandString.AppendLine("        ) as rn");
+        commandString.AppendLine("    FROM broker.file_transfer_status fs");
+        commandString.AppendLine(")");
+
+        // Main query
+        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
+        commandString.AppendLine("FROM broker.file_transfer f");
+        commandString.AppendLine("INNER JOIN latest_actor_statuses las ON las.file_transfer_id_fk = f.file_transfer_id_pk AND las.rn = 1");
+        commandString.AppendLine("INNER JOIN latest_file_statuses lfs ON lfs.file_transfer_id_fk = f.file_transfer_id_pk AND lfs.rn = 1");
         commandString.AppendLine("WHERE 1 = 1");
+
+        // Date range filtering
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created between @from AND @to");
+            commandString.AppendLine("AND f.created BETWEEN @from AND @to");
         }
         else if (fileTransferSearch.From.HasValue)
         {
@@ -234,32 +263,39 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             commandString.AppendLine("AND f.created < @to");
         }
+
+        // Resource ID filtering
         if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
         {
-            commandString.AppendLine("AND resource_id = @resourceId");
+            commandString.AppendLine("AND f.resource_id = @resourceId");
         }
+
+        // Recipient file transfer status filtering
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
             if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
-                commandString.AppendLine($"AND actor_file_transfer_status_description_id_fk in (0,1)");
+                commandString.AppendLine("AND las.actor_file_transfer_status_description_id_fk IN (0,1)");
             }
             else
             {
-                commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+                commandString.AppendLine("AND las.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
             }
         }
+
+        // File transfer status filtering
         if (fileTransferSearch.FileTransferStatus.HasValue)
         {
-            commandString.AppendLine("AND filetransferstatus.file_transfer_status_description_id_fk = @fileTransferStatus");
+            commandString.AppendLine("AND lfs.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
-        commandString.AppendLine("ORDER BY f.created ASC");
-        commandString.AppendLine(";");
+
+        commandString.AppendLine("ORDER BY f.created ASC;");
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
-            await using var command = dataSource.CreateCommand(
-            commandString.ToString());
+            await using var command = dataSource.CreateCommand(commandString.ToString());
+
+            // Add parameters
             if (!(fileTransferSearch.Actor is null))
             {
                 command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
@@ -271,16 +307,16 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             }
 
             if (fileTransferSearch.From.HasValue)
-                command.Parameters.AddWithValue("@From", fileTransferSearch.From);
+                command.Parameters.AddWithValue("@from", fileTransferSearch.From);
             if (fileTransferSearch.To.HasValue)
-                command.Parameters.AddWithValue("@To", fileTransferSearch.To);
+                command.Parameters.AddWithValue("@to", fileTransferSearch.To);
             if (fileTransferSearch.RecipientFileTransferStatus.HasValue && fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
                 command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
             if (fileTransferSearch.FileTransferStatus.HasValue)
                 command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
 
             var fileTransfers = new List<Guid>();
-            
+
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
