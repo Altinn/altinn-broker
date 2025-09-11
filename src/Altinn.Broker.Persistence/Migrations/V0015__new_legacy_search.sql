@@ -1,6 +1,4 @@
-﻿executeInTransaction=false
-
--- For actor file transfer status
+﻿-- For actor file transfer status
 CREATE index CONCURRENTLY idx_actor_file_transfer_status_window 
 ON broker.actor_file_transfer_status (file_transfer_id_fk, actor_id_fk, actor_file_transfer_status_id_pk DESC);
 
