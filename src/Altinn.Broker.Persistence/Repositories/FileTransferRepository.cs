@@ -206,35 +206,61 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
+
         commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
         commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("INNER JOIN");
-        commandString.AppendLine("broker.actor_file_transfer_status afs");
-        commandString.AppendLine("ON afs.file_transfer_id_fk = f.file_transfer_id_pk");
+        commandString.AppendLine("WHERE EXISTS (");
+        commandString.AppendLine("    SELECT 1 FROM broker.actor_file_transfer_status afs");
+        commandString.AppendLine("    WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk");
+
+        // Actor filtering in EXISTS clause
         if (fileTransferSearch.Actors?.Count > 0)
         {
-            commandString.AppendLine($"AND afs.actor_id_fk in ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
+            commandString.AppendLine($"    AND afs.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
         }
         else if (!(fileTransferSearch.Actor is null))
         {
-            commandString.AppendLine("AND afs.actor_id_fk = @actorId ");
+            commandString.AppendLine("    AND afs.actor_id_fk = @actorId");
         }
 
+        // Recipient status filtering
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
             if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
-                commandString.AppendLine($"AND NOT EXISTS (SELECT * FROM broker.actor_file_transfer_status s WHERE s.file_transfer_id_fk = afs.file_transfer_id_fk AND actor_file_transfer_status_description_id_fk = {((int)ActorFileTransferStatus.DownloadConfirmed)})");
+                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk IN (0,1)");
             }
             else
             {
-                commandString.AppendLine("AND actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
             }
         }
-        commandString.AppendLine("INNER JOIN broker.file_transfer_status fs");
-        commandString.Append("ON fs.file_transfer_id_fk = f.file_transfer_id_pk and file_transfer_status_description_id_fk = ");
-        commandString.AppendLine(fileTransferSearch.FileTransferStatus.HasValue ? "@fileTransferStatus" : ((int)FileTransferStatus.Published).ToString());
-        commandString.AppendLine("WHERE 1 = 1");
+
+        // Ensure this is the latest status for this actor
+        commandString.AppendLine("    AND NOT EXISTS (");
+        commandString.AppendLine("        SELECT 1 FROM broker.actor_file_transfer_status afs2");
+        commandString.AppendLine("        WHERE afs2.file_transfer_id_fk = afs.file_transfer_id_fk");
+        commandString.AppendLine("        AND afs2.actor_id_fk = afs.actor_id_fk");
+        commandString.AppendLine("        AND afs2.actor_file_transfer_status_id_pk > afs.actor_file_transfer_status_id_pk");
+        commandString.AppendLine("    )");
+        commandString.AppendLine(")");
+
+        // File transfer status check
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            commandString.AppendLine("AND EXISTS (");
+            commandString.AppendLine("    SELECT 1 FROM broker.file_transfer_status fs");
+            commandString.AppendLine("    WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk");
+            commandString.AppendLine("    AND fs.file_transfer_status_description_id_fk = @fileTransferStatus");
+            commandString.AppendLine("    AND NOT EXISTS (");
+            commandString.AppendLine("        SELECT 1 FROM broker.file_transfer_status fs2");
+            commandString.AppendLine("        WHERE fs2.file_transfer_id_fk = fs.file_transfer_id_fk");
+            commandString.AppendLine("        AND fs2.file_transfer_status_id_pk > fs.file_transfer_status_id_pk");
+            commandString.AppendLine("    )");
+            commandString.AppendLine(")");
+        }
+
+        // Date range filtering
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
             commandString.AppendLine("AND f.created BETWEEN @from AND @to");
@@ -247,17 +273,20 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             commandString.AppendLine("AND f.created < @to");
         }
+
+        // Resource ID filtering
         if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
         {
-            commandString.AppendLine("AND resource_id = @resourceId");
+            commandString.AppendLine("AND f.resource_id = @resourceId");
         }
 
         commandString.AppendLine("ORDER BY f.created ASC;");
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
-            await using var command = dataSource.CreateCommand(
-            commandString.ToString());
+            await using var command = dataSource.CreateCommand(commandString.ToString());
+
+            // Add parameters
             if (!(fileTransferSearch.Actor is null))
             {
                 command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
@@ -269,16 +298,16 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             }
 
             if (fileTransferSearch.From.HasValue)
-                command.Parameters.AddWithValue("@From", fileTransferSearch.From);
+                command.Parameters.AddWithValue("@from", fileTransferSearch.From);
             if (fileTransferSearch.To.HasValue)
-                command.Parameters.AddWithValue("@To", fileTransferSearch.To);
+                command.Parameters.AddWithValue("@to", fileTransferSearch.To);
             if (fileTransferSearch.RecipientFileTransferStatus.HasValue && fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
                 command.Parameters.AddWithValue("@recipientFileTransferStatus", (int)fileTransferSearch.RecipientFileTransferStatus);
             if (fileTransferSearch.FileTransferStatus.HasValue)
                 command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.FileTransferStatus);
 
             var fileTransfers = new List<Guid>();
-            
+
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
