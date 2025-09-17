@@ -77,7 +77,7 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   parent: postgres
   dependsOn: [database]
   properties: {
-    value: 'UUID-OSSP'
+    value: 'UUID-OSSP,PG_CRON'
     source: 'user-override'
   }
 }
@@ -129,6 +129,16 @@ resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRul
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
+  }
+}
+
+resource cronDatabaseName 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'cron.database_name'
+  parent: postgres
+  dependsOn: [database, allowAzureAccess]
+  properties: {
+    value: 'brokerdb'
+    source: 'user-override'
   }
 }
 
