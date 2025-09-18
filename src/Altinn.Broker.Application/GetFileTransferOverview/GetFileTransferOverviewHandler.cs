@@ -39,4 +39,35 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
             FileTransfer = fileTransfer
         };
     }
+
+    public async Task<OneOf<GetFileTransferOverviewsResponse, Error>> ProcessMultiple(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Retrieving file overview for {transfers} file transfers. Legacy: {legacy}", request.FileTransferIds?.Count ?? 0, request.IsLegacy);
+        var fileTransfers = await TransactionWithRetriesPolicy.Execute(
+            async (cancellationToken) => await fileTransferRepository.GetFileTransfers(request.FileTransferIds, cancellationToken),
+            logger,
+            cancellationToken);
+        if (fileTransfers is null)
+        {
+            return Errors.FileTransferNotFound;
+        }
+        foreach (var fileTransfer in fileTransfers)
+        {
+            var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+
+            if (!hasAccess)
+            {
+                return Errors.NoAccessToResource;
+            }
+        }
+        if (request.IsLegacy && request.OnBehalfOfConsumer is not null 
+        && fileTransfers.Any(ft => !ft.IsSenderOrRecipient(request.OnBehalfOfConsumer)))
+        {
+            return Errors.NoAccessToResource;
+        }
+        return new GetFileTransferOverviewsResponse()
+        {
+            FileTransfers = fileTransfers
+        };
+    }
 }

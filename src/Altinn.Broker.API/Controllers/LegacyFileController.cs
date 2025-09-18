@@ -79,6 +79,28 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         );
     }
 
+    [HttpPost]
+    [Route("overviews")]
+    public async Task<ActionResult<List<LegacyFileOverviewExt>>> GetFileOverviews(
+        List<Guid> fileTransferIds,
+        [FromQuery] string onBehalfOfConsumer,
+        [FromServices] GetFileTransferOverviewHandler handler,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Legacy - Getting file overviews for {count}, starting with {firstId}", fileTransferIds.Count.ToString(), fileTransferIds.First().ToString());
+        var queryResult = await handler.ProcessMultiple(new GetFileTransferOverviewRequest()
+        {
+            FileTransferIds = fileTransferIds,
+            IsLegacy = true,
+            OnBehalfOfConsumer = onBehalfOfConsumer
+        }, HttpContext.User, cancellationToken);
+        return queryResult.Match(
+            result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModels(result.FileTransfers)),
+            Problem
+        );
+    }
+    
+
     /// <summary>
     /// Get information about the file and its current status
     /// </summary>
