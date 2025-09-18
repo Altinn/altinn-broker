@@ -42,26 +42,24 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
 
     public async Task<OneOf<GetFileTransferOverviewsResponse, Error>> ProcessMultiple(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Retrieving file overview for {transfers} file transfers. Legacy: {legacy}", request.FileTransferIds?.Count ?? 0, request.IsLegacy);
+        var ids = request.FileTransferIds ?? [];
+        logger.LogInformation("Retrieving file overview for {Transfers} file transfers. Legacy: {Legacy}", ids.Count, request.IsLegacy);
         var fileTransfers = await TransactionWithRetriesPolicy.Execute(
-            async (cancellationToken) => await fileTransferRepository.GetFileTransfers(request.FileTransferIds, cancellationToken),
-            logger,
-            cancellationToken);
+        async (cancellationToken) => await fileTransferRepository.GetFileTransfers(ids, cancellationToken),
+             logger,
+             cancellationToken);
         if (fileTransfers is null)
         {
             return Errors.FileTransferNotFound;
         }
-        foreach (var fileTransfer in fileTransfers)
+        var accessChecks = await Task.WhenAll(
+        fileTransfers.Select(ft => authorizationService.CheckAccessAsSenderOrRecipient(user, ft, request.IsLegacy, cancellationToken)));
+        if (accessChecks.Any(allowed => !allowed))
         {
-            var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
-
-            if (!hasAccess)
-            {
-                return Errors.NoAccessToResource;
-            }
+            return Errors.NoAccessToResource;
         }
-        if (request.IsLegacy && request.OnBehalfOfConsumer is not null 
-        && fileTransfers.Any(ft => !ft.IsSenderOrRecipient(request.OnBehalfOfConsumer)))
+        if (request.IsLegacy && !string.IsNullOrWhiteSpace(request.OnBehalfOfConsumer)
+            && fileTransfers.Any(ft => !ft.IsSenderOrRecipient(request.OnBehalfOfConsumer!)))
         {
             return Errors.NoAccessToResource;
         }

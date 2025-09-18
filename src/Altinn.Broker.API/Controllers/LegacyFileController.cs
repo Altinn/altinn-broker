@@ -82,12 +82,21 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     [HttpPost]
     [Route("overviews")]
     public async Task<ActionResult<List<LegacyFileOverviewExt>>> GetFileOverviews(
-        List<Guid> fileTransferIds,
+        [FromBody] List<Guid> fileTransferIds,
         [FromQuery] string onBehalfOfConsumer,
         [FromServices] GetFileTransferOverviewHandler handler,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Legacy - Getting file overviews for {count}, starting with {firstId}", fileTransferIds.Count.ToString(), fileTransferIds.First().ToString());
+        if (fileTransferIds is null || fileTransferIds.Count == 0)
+        {
+            return Problem("At least one fileTransferId must be provided.", statusCode: 400);
+        }
+        if (string.IsNullOrWhiteSpace(onBehalfOfConsumer))
+        {
+            return Problem("Query parameter 'onBehalfOfConsumer' is required.", statusCode: 400);
+        }
+
+        logger.LogInformation("Legacy - Getting file overviews for {Count}, starting with {FirstId}", fileTransferIds.Count, fileTransferIds[0]);
         var queryResult = await handler.ProcessMultiple(new GetFileTransferOverviewRequest()
         {
             FileTransferIds = fileTransferIds,

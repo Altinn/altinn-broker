@@ -4,5 +4,5 @@ namespace Altinn.Broker.Application.GetFileTransferOverview;
 
 public class GetFileTransferOverviewsResponse
 {
-    public required List<FileTransferEntity> FileTransfers { get; set; }
+    public required IReadOnlyList<FileTransferEntity> FileTransfers { get; set; }
 }

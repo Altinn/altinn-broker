@@ -109,8 +109,13 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 WHERE 
                     f.file_transfer_id_pk = @fileTransferId;";
     #endregion
-    public async Task<List<FileTransferEntity>> GetFileTransfers(List<Guid> fileTransferIds, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FileTransferEntity>> GetFileTransfers(IReadOnlyCollection<Guid> fileTransferIds, CancellationToken cancellationToken)
     {
+        if (fileTransferIds is null || fileTransferIds.Count == 0)
+        {
+            return new List<FileTransferEntity>(0);
+        }
+        
         await using var command = dataSource.CreateCommand(overviewCommandMultiple);
 
         var parameter = new NpgsqlParameter("@fileTransferIds", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
