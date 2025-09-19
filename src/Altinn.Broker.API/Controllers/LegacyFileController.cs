@@ -65,6 +65,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             return Problem("Content-length header is required");
         }
+        
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
@@ -96,10 +97,11 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             return Problem("Query parameter 'onBehalfOfConsumer' is required.", statusCode: 400);
         }
 
-        logger.LogInformation("Legacy - Getting file overviews for {Count}, starting with {FirstId}", fileTransferIds.Count, fileTransferIds[0]);
+        var distinctIds = fileTransferIds.Distinct().ToList();
+        logger.LogInformation("Legacy - Getting file overviews for {Count}, starting with {FirstId}", distinctIds.Count, distinctIds[0]);
         var queryResult = await handler.ProcessMultiple(new GetFileTransferOverviewRequest()
         {
-            FileTransferIds = fileTransferIds,
+            FileTransferIds = distinctIds,
             IsLegacy = true,
             OnBehalfOfConsumer = onBehalfOfConsumer
         }, HttpContext.User, cancellationToken);
