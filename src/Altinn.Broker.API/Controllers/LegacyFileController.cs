@@ -65,6 +65,7 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         {
             return Problem("Content-length header is required");
         }
+        
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
@@ -78,6 +79,38 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
             Problem
         );
     }
+
+    [HttpPost]
+    [Route("overviews")]
+    public async Task<ActionResult<List<LegacyFileOverviewExt>>> GetFileOverviews(
+        [FromBody] List<Guid> fileTransferIds,
+        [FromQuery] string onBehalfOfConsumer,
+        [FromServices] GetFileTransferOverviewHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (fileTransferIds is null || fileTransferIds.Count == 0)
+        {
+            return Problem("At least one fileTransferId must be provided.", statusCode: 400);
+        }
+        if (string.IsNullOrWhiteSpace(onBehalfOfConsumer))
+        {
+            return Problem("Query parameter 'onBehalfOfConsumer' is required.", statusCode: 400);
+        }
+
+        var distinctIds = fileTransferIds.Distinct().ToList();
+        logger.LogInformation("Legacy - Getting file overviews for {Count}, starting with {FirstId}", distinctIds.Count, distinctIds[0]);
+        var queryResult = await handler.ProcessMultiple(new GetFileTransferOverviewRequest()
+        {
+            FileTransferIds = distinctIds,
+            IsLegacy = true,
+            OnBehalfOfConsumer = onBehalfOfConsumer
+        }, HttpContext.User, cancellationToken);
+        return queryResult.Match(
+            result => Ok(LegacyFileStatusOverviewExtMapper.MapToExternalModels(result.FileTransfers)),
+            Problem
+        );
+    }
+    
 
     /// <summary>
     /// Get information about the file and its current status
