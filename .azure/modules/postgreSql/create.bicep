@@ -54,6 +54,11 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
       passwordAuth: 'Enabled'
       tenantId: tenantId
     }
+    availabilityZone: environment == 'production' ? '3' : null
+    highAvailability: environment == 'production' ? {
+      mode: 'ZoneRedundant'
+      standbyAvailabilityZone: '1'
+    } : null
   }
   sku: {
     name: environment == 'test'
