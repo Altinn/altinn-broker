@@ -4,7 +4,7 @@ param principalObjectId string
 
 var secretsOfficerRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
 
-resource kv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
+resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
 }
 
