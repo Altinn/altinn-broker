@@ -29,6 +29,17 @@ param keyVaultSku KeyVaultSku
 
 var resourceGroupName = '${namePrefix}-rg'
 
+module grantTestClientSecretsOfficerRole '../modules/keyvault/addSecretsOfficerRole.bicep' = if (environment == 'test') {
+  scope: resourceGroup
+  name: 'kv-secrets-officer-test-client'
+  dependsOn: [ environmentKeyVault ]
+  params: {
+    keyvaultName: sourceKeyVaultName
+    principalObjectId: test_client_id
+    principalType: 'Group'
+  }
+}
+
 var secrets = [
   {
     name: 'maskinporten-client-id'
