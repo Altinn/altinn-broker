@@ -316,6 +316,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
+        long[]? actorIds = null;
         commandString.AppendLine(@"
 SELECT DISTINCT f.file_transfer_id_pk, f.Created
 FROM broker.file_transfer f
@@ -324,14 +325,11 @@ INNER JOIN LATERAL
 	SELECT * FROM broker.actor_file_transfer_status afts
 	WHERE afts.file_transfer_id_fk = f.file_transfer_id_pk
 ");
+
         // Actor filtering in inner join lateral clause
-        if (fileTransferSearch.Actors?.Count > 0)
+        if (fileTransferSearch.TryGetActorIds(out actorIds))
         {
-            commandString.AppendLine($" AND afts.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
-        }
-        else if (!(fileTransferSearch.Actor is null))
-        {
-            commandString.AppendLine("  AND afts.actor_id_fk = @actorId");
+            commandString.AppendLine("  AND afts.actor_id_fk = ANY(@actorIds)");
         }
 
         commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_description_id_fk DESC
@@ -395,11 +393,14 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             await using var command = dataSource.CreateCommand(commandString.ToString());
 
             // Add parameters
-            if (!(fileTransferSearch.Actor is null))
+            if (actorIds?.Length > 0)
             {
-                command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
+                command.Parameters.Add(new NpgsqlParameter("@actorIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+                    {
+                        Value = actorIds
+                    });
             }
-
+            
             if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
             {
                 command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
