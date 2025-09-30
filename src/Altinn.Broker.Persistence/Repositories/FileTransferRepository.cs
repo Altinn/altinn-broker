@@ -370,18 +370,18 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
 
         // Date range filtering
-            if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
-            {
-                commandString.AppendLine("AND f.created BETWEEN @from AND @to");
-            }
-            else if (fileTransferSearch.From.HasValue)
-            {
-                commandString.AppendLine("AND f.created > @from");
-            }
-            else if (fileTransferSearch.To.HasValue)
-            {
-                commandString.AppendLine("AND f.created < @to");
-            }
+        if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created BETWEEN @from AND @to");
+        }
+        else if (fileTransferSearch.From.HasValue)
+        {
+            commandString.AppendLine("AND f.created > @from");
+        }
+        else if (fileTransferSearch.To.HasValue)
+        {
+            commandString.AppendLine("AND f.created < @to");
+        }
 
         // Resource ID filtering
         if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
