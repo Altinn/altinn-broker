@@ -334,20 +334,20 @@ INNER JOIN LATERAL
             commandString.AppendLine("  AND afts.actor_id_fk = @actorId");
         }
 
-        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_description_id_fk desc
-	limit 1
+        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_description_id_fk DESC
+	LIMIT 1
 ) as afts on true
         ");
 
         if (fileTransferSearch.FileTransferStatus.HasValue)
         {
             // File transfer status check
-            commandString.AppendLine(@"inner join lateral
+            commandString.AppendLine(@"INNER JOIN LATERAL
 (
 	SELECT * FROM broker.file_transfer_status fs
 	WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
-	order by fs.file_transfer_status_description_id_fk desc
-	limit 1
+	ORDER BY fs.file_transfer_status_description_id_fk DESC
+	LIMIT 1
 ) as fs on true
 WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
