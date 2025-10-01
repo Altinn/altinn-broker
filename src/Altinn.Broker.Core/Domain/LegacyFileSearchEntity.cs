@@ -11,4 +11,20 @@ public class LegacyFileSearchEntity
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
     public string? ResourceId { get; set; }
+
+    public long[] GetActorIds()
+    {
+        List<long> actorIds = new();
+        if (Actor is not null)
+        {
+            actorIds.Add(Actor.ActorId);
+        }
+
+        if (Actors is not null)
+        {
+            actorIds.AddRange(Actors.Select(a => a.ActorId));
+        }
+
+        return [.. actorIds];
+    }
 }

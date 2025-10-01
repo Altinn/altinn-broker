@@ -316,21 +316,46 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
+        long[] actorIds = fileTransferSearch.GetActorIds();
+        commandString.AppendLine(@"
+SELECT DISTINCT f.file_transfer_id_pk, f.Created
+FROM broker.file_transfer f
+INNER JOIN LATERAL
+(
+	SELECT * FROM broker.actor_file_transfer_status afts
+	WHERE afts.file_transfer_id_fk = f.file_transfer_id_pk
+");
 
-        commandString.AppendLine("SELECT DISTINCT f.file_transfer_id_pk, f.Created");
-        commandString.AppendLine("FROM broker.file_transfer f");
-        commandString.AppendLine("WHERE EXISTS (");
-        commandString.AppendLine("    SELECT 1 FROM broker.actor_file_transfer_status afs");
-        commandString.AppendLine("    WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk");
-
-        // Actor filtering in EXISTS clause
-        if (fileTransferSearch.Actors?.Count > 0)
+        // Actor filtering in inner join lateral clause
+        if (actorIds.Length > 1)
         {
-            commandString.AppendLine($"    AND afs.actor_id_fk IN ({string.Join(',', fileTransferSearch.Actors.Select(a => a.ActorId))})");
+            commandString.AppendLine("  AND afts.actor_id_fk = ANY(@actorIds)");
         }
-        else if (!(fileTransferSearch.Actor is null))
+        else if (actorIds.Length == 1)
         {
-            commandString.AppendLine("    AND afs.actor_id_fk = @actorId");
+            commandString.AppendLine($"  AND afts.actor_id_fk = @actorId");
+        }
+
+        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_id_pk DESC
+	LIMIT 1
+) as afts on true
+        ");
+
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            // File transfer status check
+            commandString.AppendLine(@"INNER JOIN LATERAL
+(
+	SELECT * FROM broker.file_transfer_status fs
+	WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
+	ORDER BY fs.file_transfer_status_id_pk DESC
+	LIMIT 1
+) as fs on true
+WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
+        }
+        else
+        {
+            commandString.AppendLine("WHERE 1=1");
         }
 
         // Recipient status filtering
@@ -338,36 +363,12 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
-                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk IN (0,1)");
+                commandString.AppendLine("    AND afts.actor_file_transfer_status_description_id_fk IN (0,1)");
             }
             else
             {
-                commandString.AppendLine("    AND afs.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+                commandString.AppendLine("    AND afts.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
             }
-        }
-
-        // Ensure this is the latest status for this actor
-        commandString.AppendLine("    AND NOT EXISTS (");
-        commandString.AppendLine("        SELECT 1 FROM broker.actor_file_transfer_status afs2");
-        commandString.AppendLine("        WHERE afs2.file_transfer_id_fk = afs.file_transfer_id_fk");
-        commandString.AppendLine("        AND afs2.actor_id_fk = afs.actor_id_fk");
-        commandString.AppendLine("        AND afs2.actor_file_transfer_status_id_pk > afs.actor_file_transfer_status_id_pk");
-        commandString.AppendLine("    )");
-        commandString.AppendLine(")");
-
-        // File transfer status check
-        if (fileTransferSearch.FileTransferStatus.HasValue)
-        {
-            commandString.AppendLine("AND EXISTS (");
-            commandString.AppendLine("    SELECT 1 FROM broker.file_transfer_status fs");
-            commandString.AppendLine("    WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk");
-            commandString.AppendLine("    AND fs.file_transfer_status_description_id_fk = @fileTransferStatus");
-            commandString.AppendLine("    AND NOT EXISTS (");
-            commandString.AppendLine("        SELECT 1 FROM broker.file_transfer_status fs2");
-            commandString.AppendLine("        WHERE fs2.file_transfer_id_fk = fs.file_transfer_id_fk");
-            commandString.AppendLine("        AND fs2.file_transfer_status_id_pk > fs.file_transfer_status_id_pk");
-            commandString.AppendLine("    )");
-            commandString.AppendLine(")");
         }
 
         // Date range filtering
@@ -391,17 +392,23 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
 
         commandString.AppendLine("ORDER BY f.created ASC;");
-
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             await using var command = dataSource.CreateCommand(commandString.ToString());
 
             // Add parameters
-            if (!(fileTransferSearch.Actor is null))
+            if (actorIds.Length > 1)
             {
-                command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
+                command.Parameters.Add(new NpgsqlParameter("@actorIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+                {
+                    Value = actorIds
+                });
             }
-
+            else if (actorIds.Length == 1)
+            {
+                command.Parameters.AddWithValue("@actorId", actorIds[0]);
+            }
+            
             if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
             {
                 command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
