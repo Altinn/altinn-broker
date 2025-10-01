@@ -316,7 +316,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     public async Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         StringBuilder commandString = new StringBuilder();
-        long[]? actorIds = null;
+        long[] actorIds = fileTransferSearch.GetActorIds();
         commandString.AppendLine(@"
 SELECT DISTINCT f.file_transfer_id_pk, f.Created
 FROM broker.file_transfer f
@@ -327,12 +327,16 @@ INNER JOIN LATERAL
 ");
 
         // Actor filtering in inner join lateral clause
-        if (fileTransferSearch.TryGetActorIds(out actorIds))
+        if (actorIds.Length > 1)
         {
             commandString.AppendLine("  AND afts.actor_id_fk = ANY(@actorIds)");
         }
+        else if (actorIds.Length == 1)
+        {
+            commandString.AppendLine($"  AND afts.actor_id_fk = @actorId");
+        }
 
-        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_description_id_fk DESC
+        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_id_pk DESC
 	LIMIT 1
 ) as afts on true
         ");
@@ -344,7 +348,7 @@ INNER JOIN LATERAL
 (
 	SELECT * FROM broker.file_transfer_status fs
 	WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
-	ORDER BY fs.file_transfer_status_description_id_fk DESC
+	ORDER BY fs.file_transfer_status_id_pk DESC
 	LIMIT 1
 ) as fs on true
 WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
@@ -393,12 +397,16 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             await using var command = dataSource.CreateCommand(commandString.ToString());
 
             // Add parameters
-            if (actorIds?.Length > 0)
+            if (actorIds.Length > 1)
             {
                 command.Parameters.Add(new NpgsqlParameter("@actorIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
-                    {
-                        Value = actorIds
-                    });
+                {
+                    Value = actorIds
+                });
+            }
+            else if (actorIds.Length == 1)
+            {
+                command.Parameters.AddWithValue("@actorId", actorIds[0]);
             }
             
             if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
