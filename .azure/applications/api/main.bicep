@@ -46,13 +46,11 @@ module appDeployToAzureAccess '../../modules/identity/addDeploymentRoles.bicep' 
   }
 }
 
-
 module keyvaultAddReaderRolesAppIdentity '../../modules/keyvault/addReaderRoles.bicep' = {
   name: 'kvreader-${namePrefix}-app'
   scope: resourceGroup
   params: {
     keyvaultName: sourceKeyVaultName
-    tenantId: appIdentity.outputs.tenantId
     principals: [{objectId: appIdentity.outputs.principalId, principalType: 'ServicePrincipal'}]
   }
 }
