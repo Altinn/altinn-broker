@@ -9,6 +9,11 @@ namespace Altinn.Broker.Mappers;
 
 internal static class LegacyFileStatusOverviewExtMapper
 {
+    internal static List<LegacyFileOverviewExt> MapToExternalModels(IReadOnlyList<FileTransferEntity> fileTransfers)
+    {
+        return [.. fileTransfers.Select(MapToExternalModel)];
+    }
+
     internal static LegacyFileOverviewExt MapToExternalModel(FileTransferEntity fileTransfer)
     {
         return new LegacyFileOverviewExt()

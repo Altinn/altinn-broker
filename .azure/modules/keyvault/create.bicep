@@ -19,6 +19,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enabledForTemplateDeployment: true
     enabledForDiskEncryption: true
     enabledForDeployment: true
+    enableSoftDelete: true
+    enablePurgeProtection: true
     sku: sku
     tenantId: tenant_id
     accessPolicies: environment == 'test'

@@ -318,6 +318,70 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task GetFileOverview_MultipleSentByA3Sender_Success()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var initializeFileResponse2 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeFileResponse2.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var initializeFileResponse3 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeFileResponse3.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var initializeFileResponse4 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeFileResponse4.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferResponse2 = await initializeFileResponse2.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferResponse3 = await initializeFileResponse3.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferResponse4 = await initializeFileResponse4.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();        
+        Assert.NotNull(fileTransferResponse);
+        Assert.NotNull(fileTransferResponse2);
+        Assert.NotNull(fileTransferResponse3);
+        Assert.NotNull(fileTransferResponse4);
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        var fileTransferId2 = fileTransferResponse2.FileTransferId.ToString();
+        var fileTransferId3 = fileTransferResponse3.FileTransferId.ToString();
+        var fileTransferId4 = fileTransferResponse4.FileTransferId.ToString();
+        var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(initializedFile);
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        using (var content2 = new ByteArrayContent(uploadedFileBytes))
+        using (var content3 = new ByteArrayContent(uploadedFileBytes))
+        using (var content4 = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            content2.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            content3.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            content4.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
+            var uploadResponse2 = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId2}/upload", content2);
+            var uploadResponse3 = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId3}/upload", content3);
+            var uploadResponse4 = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId4}/upload", content4);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+            Assert.True(uploadResponse2.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+            Assert.True(uploadResponse3.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+            Assert.True(uploadResponse4.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        List<Guid> ids = [fileTransferResponse.FileTransferId, fileTransferResponse2.FileTransferId, fileTransferResponse3.FileTransferId, fileTransferResponse4.FileTransferId];
+
+        // Act
+        var getResponse = await _legacyClient.PostAsJsonAsync($"broker/api/v1/legacy/file/overviews?onBehalfOfConsumer={file.Recipients[0]}", ids);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var fileData = await getResponse.Content.ReadFromJsonAsync<List<LegacyFileOverviewExt>>(_responseSerializerOptions);
+
+        // Assert        
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(fileData);
+        var resultIds = fileData.Select(fd => fd.FileId.ToString());
+        Assert.Contains(fileTransferId, resultIds);
+        Assert.Contains(fileTransferId2, resultIds);
+        Assert.Contains(fileTransferId3, resultIds);
+        Assert.Contains(fileTransferId4, resultIds);
+    }
+
+    [Fact]
     public async Task GetFileOverview_2FilesInitiated_1Published_StandardRequestRetrievesOnlyPublished_Success()
     {
         // Arrange
