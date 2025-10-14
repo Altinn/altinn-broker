@@ -77,7 +77,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddHangfire(c => c.UseMemoryStorage());
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetResourceEntity(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
                     Id = TestConstants.RESOURCE_FOR_TEST,
@@ -85,7 +85,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetResourceEntity(It.Is(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
                     Id = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER,
@@ -93,7 +93,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = "",
                     OrganizationNumber = "",
                 });
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetResourceEntity(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
                     Id = TestConstants.RESOURCE_WITH_GRACEFUL_PURGE,
