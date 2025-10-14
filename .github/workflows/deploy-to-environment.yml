@@ -72,6 +72,7 @@ jobs:
         PLATFORM_SUBSCRIPTION_KEY: ${{ secrets.PLATFORM_SUBSCRIPTION_KEY }}
         SLACK_URL: ${{ secrets.SLACK_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
+        REPORT_API_KEY: ${{ secrets.REPORT_API_KEY }}
 
     - name: Migrate database
       uses: ./.github/actions/migrate-database

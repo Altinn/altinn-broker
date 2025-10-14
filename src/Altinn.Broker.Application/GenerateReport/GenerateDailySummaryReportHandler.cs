@@ -1,7 +1,6 @@
-using System.Security.Claims;
-
 using Altinn.Broker.Core.Repositories;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
@@ -13,24 +12,25 @@ namespace Altinn.Broker.Application.GenerateReport;
 public class GenerateDailySummaryReportHandler(
     IFileTransferRepository fileTransferRepository,
     IAltinnResourceRepository altinnResourceRepository,
+    IHttpContextAccessor httpContextAccessor,
     ILogger<GenerateDailySummaryReportHandler> logger)
 {
     /// <summary>
-    /// Generates a daily summary report and returns the parquet file stream
+    /// Generates a daily summary report and returns the parquet file stream.
+    /// Metadata is stored in HttpContext.Items for the controller to add as response headers.
     /// </summary>
     public async Task<OneOf<Stream, Error>> Process(
-        ClaimsPrincipal? user,
         CancellationToken cancellationToken)
     {
         try
         {
             logger.LogInformation("Generating daily summary report for direct download");
 
-            var parquetStream = await GenerateParquetFile(cancellationToken);
+            var stream = await GenerateParquetFile(cancellationToken);
 
             logger.LogInformation("Successfully generated report for download");
 
-            return parquetStream;
+            return stream;
         }
         catch (Exception ex)
         {
@@ -77,7 +77,25 @@ public class GenerateDailySummaryReportHandler(
         
         memoryStream.Position = 0;
 
-        logger.LogInformation("Generated parquet file with {RecordCount} records", parquetData.Count);
+        // Calculate metadata
+        var totalFileTransfers = parquetData.Sum(d => (long)d.FileTransferCount);
+        var uniqueServiceOwners = parquetData.Select(d => d.ServiceOwnerId).Distinct().Count();
+
+        logger.LogInformation("Generated parquet file with {RecordCount} records, {TotalFileTransfers} file transfers, {UniqueServiceOwners} service owners",
+            parquetData.Count, totalFileTransfers, uniqueServiceOwners);
+
+        // Store metadata in HttpContext.Items for controller to add as response headers
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            httpContext.Items["ReportMetadata"] = new ReportMetadata
+            {
+                TotalRecords = parquetData.Count,
+                TotalFileTransfers = totalFileTransfers,
+                TotalServiceOwners = uniqueServiceOwners,
+                GeneratedAt = DateTime.UtcNow
+            };
+        }
 
         return memoryStream;
     }

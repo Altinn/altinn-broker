@@ -45,6 +45,9 @@ inputs:
   MASKINPORTEN_ENVIRONMENT:
     description: "Environment for maskinporten"
     required: true
+  REPORT_API_KEY:
+    description: "API key for report generation endpoints"
+    required: true
 
 
 runs:
@@ -91,6 +94,7 @@ runs:
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
         SLACK_URL: ${{ inputs.SLACK_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
+        REPORT_API_KEY: ${{ inputs.REPORT_API_KEY }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep
