@@ -24,7 +24,7 @@ param platformSubscriptionKey string
 @secure()
 param slackUrl string
 @secure()
-param reportApiKey string
+param statisticsApiKey string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -60,8 +60,8 @@ var secrets = [
     value: slackUrl
   }
   {
-    name: 'report-api-key'
-    value: reportApiKey
+    name: 'statistics-api-key'
+    value: statisticsApiKey
   }
 ]
 

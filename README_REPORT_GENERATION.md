@@ -73,7 +73,7 @@ X-RateLimit-Reset: 1697293980
 
 The endpoint requires API key authentication:
 - **Header**: `X-API-Key: your-api-key-here`
-- The API key is configured via Azure Key Vault secret `report-api-key`
+- The API key is configured via Azure Key Vault secret `statistics-api-key`
 - In development, the API key is set in `appsettings.Development.json`
 
 #### Rate Limiting
@@ -127,10 +127,10 @@ To prevent abuse, rate limiting is enforced per IP address:
   ```
 
 ### API Layer
-- **`ReportController`**: Single GET endpoint for generate-and-download
+- **`StatisticsController`**: Single GET endpoint for generate-and-download
   - Handles filename generation with environment name
   - Returns file with metadata in HTTP headers
-  - Protected by API key authentication via `ReportApiKeyFilter`
+  - Protected by API key authentication via `StatisticsApiKeyFilter`
   - Rate limiting enforced per IP address (10 requests per minute)
 
 ## Configuration
@@ -140,17 +140,17 @@ To prevent abuse, rate limiting is enforced per IP address:
 The report endpoint requires API key authentication configured via:
 
 1. **Azure Key Vault** (Production/Staging/Test):
-   - Secret name: `report-api-key`
-   - Configured via GitHub secret `REPORT_API_KEY`
+   - Secret name: `statistics-api-key`
+   - Configured via GitHub secret `STATISTICS_API_KEY`
    - Deployed through bicep infrastructure files
 
 2. **Local Development**:
-   - Configured in `appsettings.Development.json` under `ReportApiKey.ApiKey`
-   - Default development key: `dev-report-api-key-12345`
+   - Configured in `appsettings.Development.json` under `StatisticsApiKey.ApiKey`
+   - Default development key: `dev-statistics-api-key-12345`
 
 ### Rate Limiting Configuration
 
-Rate limiting is hard-coded in `ReportApiKeyFilter`:
+Rate limiting is hard-coded in `StatisticsApiKeyFilter`:
 - Maximum requests: 10 per minute
 - Scope: Per IP address
 - Can be modified by updating constants in the filter class
@@ -196,7 +196,7 @@ X-RateLimit-Reset: 1697293980
 **Local Development:**
 ```bash
 curl -X GET "http://localhost:5096/broker/api/v1/report/generate-and-download-daily-summary" \
-  -H "X-API-Key: dev-report-api-key-12345" \
+  -H "X-API-Key: dev-statistics-api-key-12345" \
   -i \
   --output daily_summary_report.parquet
 ```
@@ -288,19 +288,19 @@ The generated parquet file contains the following columns (lowercase names):
 - `DailySummaryData.cs` - Internal domain model
 
 ### API Layer
-- `src/Altinn.Broker.API/Controllers/ReportController.cs` - Single GET endpoint with API key authentication
-- `src/Altinn.Broker.API/Filters/ReportApiKeyFilter.cs` - API key authentication filter with rate limiting
+- `src/Altinn.Broker.API/Controllers/StatisticsController.cs` - Single GET endpoint with API key authentication
+- `src/Altinn.Broker.API/Filters/StatisticsApiKeyFilter.cs` - API key authentication filter with rate limiting
 - `src/Altinn.Broker.API/Program.cs` - Updated to register filter and configuration
 
 ### Configuration
-- `appsettings.json` - Added `ReportApiKey` configuration section
+- `appsettings.json` - Added `StatisticsApiKey` configuration section
 - `appsettings.Development.json` - Added development API key
 
 ### Infrastructure
-- `.azure/infrastructure/main.bicep` - Added `report-api-key` secret parameter
-- `.azure/infrastructure/params.bicepparam` - Added `REPORT_API_KEY` environment variable
-- `.github/actions/update-infrastructure/action.yml` - Added `REPORT_API_KEY` input
-- `.github/workflows/deploy-to-environment.yml` - Added `REPORT_API_KEY` secret
+- `.azure/infrastructure/main.bicep` - Added `statistics-api-key` secret parameter
+- `.azure/infrastructure/params.bicepparam` - Added `STATISTICS_API_KEY` environment variable
+- `.github/actions/update-infrastructure/action.yml` - Added `STATISTICS_API_KEY` input
+- `.github/workflows/deploy-to-environment.yml` - Added `STATISTICS_API_KEY` secret
 
 ### Persistence Layer
 - Extended `IFileTransferRepository` with `GetDailySummaryData()` method
@@ -325,12 +325,12 @@ This implementation follows the pattern established in the Altinn Correspondence
 ### API Key Management
 
 1. **Production/Staging/Test**:
-   - API key is stored as a GitHub secret per environment: `REPORT_API_KEY`
-   - GitHub Actions deploys the secret to Azure Key Vault as `report-api-key`
+   - API key is stored as a GitHub secret per environment: `STATISTICS_API_KEY`
+   - GitHub Actions deploys the secret to Azure Key Vault as `statistics-api-key`
    - Container App reads the key from Key Vault and injects it into the configuration
 
 2. **Key Rotation**:
-   - Update the GitHub secret `REPORT_API_KEY` for the respective environment
+   - Update the GitHub secret `STATISTICS_API_KEY` for the respective environment
    - Redeploy the application to pick up the new key
 
 3. **Rate Limiting**:
@@ -346,13 +346,13 @@ To deploy with the new API key authentication:
 
 1. **Add GitHub Secret** (per environment: test, staging, production):
    ```
-   Name: REPORT_API_KEY
+   Name: STATISTICS_API_KEY
    Value: <strong-random-api-key>
    ```
 
 2. **Deploy Infrastructure**:
    - The workflow will automatically deploy the secret to Azure Key Vault
-   - The secret will be available as `report-api-key` in Key Vault
+   - The secret will be available as `statistics-api-key` in Key Vault
 
 3. **Verify Deployment**:
    ```bash

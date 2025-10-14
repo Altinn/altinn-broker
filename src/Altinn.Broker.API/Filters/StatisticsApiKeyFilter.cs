@@ -8,21 +8,21 @@ using Microsoft.Extensions.Options;
 namespace Altinn.Broker.API.Filters;
 
 /// <summary>
-/// Authorization filter that validates API key for report generation endpoints
+/// Authorization filter that validates API key for statistics endpoints
 /// Implements rate limiting per IP address to prevent abuse
 /// </summary>
-public class ReportApiKeyFilter : IAuthorizationFilter
+public class StatisticsApiKeyFilter : IAuthorizationFilter
 {
-    private readonly ILogger<ReportApiKeyFilter> _logger;
+    private readonly ILogger<StatisticsApiKeyFilter> _logger;
     private readonly string _validApiKey;
     private static readonly ConcurrentDictionary<string, Queue<DateTime>> _requestLog = new();
     private const int RateLimitMaxRequests = 10; // Maximum 10 requests
     private const int RateLimitWindowMinutes = 1; // Within 1 minute
 
-    public ReportApiKeyFilter(ILogger<ReportApiKeyFilter> logger, IOptions<ReportApiKeyOptions> options)
+    public StatisticsApiKeyFilter(ILogger<StatisticsApiKeyFilter> logger, IOptions<StatisticsApiKeyOptions> options)
     {
         _logger = logger;
-        _validApiKey = options.Value.ApiKey ?? throw new InvalidOperationException("Report API key is not configured");
+        _validApiKey = options.Value.ApiKey ?? throw new InvalidOperationException("Statistics API key is not configured");
     }
 
     public void OnAuthorization(AuthorizationFilterContext context)
@@ -140,14 +140,14 @@ public class ReportApiKeyFilter : IAuthorizationFilter
 }
 
 /// <summary>
-/// Configuration options for Report API key authentication
+/// Configuration options for Statistics API key authentication
 /// </summary>
-public class ReportApiKeyOptions
+public class StatisticsApiKeyOptions
 {
-    public const string SectionName = "ReportApiKey";
+    public const string SectionName = "StatisticsApiKey";
     
     /// <summary>
-    /// The API key used for authenticating report generation requests
+    /// The API key used for authenticating statistics requests
     /// </summary>
     public string? ApiKey { get; set; }
 }

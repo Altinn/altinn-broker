@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace Altinn.Broker.Controllers;
 
 /// <summary>
-/// Controller for generating statistical reports on file transfers
+/// Controller for generating statistics on file transfers
 /// </summary>
 [ApiController]
 [Route("broker/api/v1/report")]
-public class ReportController(IHostEnvironment hostEnvironment) : Controller
+public class StatisticsController(IHostEnvironment hostEnvironment) : Controller
 {
     /// <summary>
     /// Generates and downloads a daily summary report as a Parquet file
@@ -43,7 +43,7 @@ public class ReportController(IHostEnvironment hostEnvironment) : Controller
     /// <response code="429">Too Many Requests - Rate limit exceeded</response>
     /// <response code="500">Failed to generate report</response>
     [HttpGet("generate-and-download-daily-summary")]
-    [ServiceFilter(typeof(ReportApiKeyFilter))]
+    [ServiceFilter(typeof(StatisticsApiKeyFilter))]
     [Produces("application/octet-stream")]
     [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

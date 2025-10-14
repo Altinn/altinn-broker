@@ -94,7 +94,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
-    services.Configure<ReportApiKeyOptions>(config.GetSection(ReportApiKeyOptions.SectionName));
+    services.Configure<StatisticsApiKeyOptions>(config.GetSection(StatisticsApiKeyOptions.SectionName));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
@@ -103,8 +103,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddHttpClient();
     services.AddProblemDetails();
 
-    // Register report API key filter
-    services.AddScoped<ReportApiKeyFilter>();
+    // Register statistics API key filter
+    services.AddScoped<StatisticsApiKeyFilter>();
 
     services.ConfigureHangfire();
 
