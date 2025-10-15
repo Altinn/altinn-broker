@@ -100,4 +100,5 @@ jobs:
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
         APIM_IP: ${{ secrets.APIM_IP }}
+        STATISTICS_API_KEY: ${{ secrets.STATISTICS_API_KEY }}
 
