@@ -30,4 +30,10 @@ public interface IFileTransferRepository
         CancellationToken cancellationToken
     );
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
+    Task<List<DailySummaryData>> GetDailySummaryData(
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? resourceId,
+        CancellationToken cancellationToken
+    );
 }

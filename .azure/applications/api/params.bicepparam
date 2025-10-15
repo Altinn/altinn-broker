@@ -11,3 +11,4 @@ param apimIp = readEnvironmentVariable('APIM_IP')
 // secrets
 param sourceKeyVaultName = readEnvironmentVariable('KEY_VAULT_NAME')
 param keyVaultUrl = readEnvironmentVariable('KEY_VAULT_URL')
+param statisticsApiKey = readEnvironmentVariable('STATISTICS_API_KEY')
