@@ -23,8 +23,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         _logger = logger;
     }
 
-    public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
-    {
+    private async Task<GetResourceResponse?> GetResource(string resourceId, CancellationToken cancellationToken) {
         var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
         {
@@ -37,6 +36,11 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
             throw new BadHttpRequestException("Failed to get resource from Altinn Resource Registry");
         }
         var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: cancellationToken);
+        return altinnResourceResponse;
+    }
+    public async Task<ResourceEntity?> GetResourceEntity(string resourceId, CancellationToken cancellationToken)
+    {
+        var altinnResourceResponse = await GetResource(resourceId, cancellationToken);
         if (altinnResourceResponse is null)
         {
             _logger.LogError("Failed to deserialize response from Altinn Resource Registry");
@@ -48,5 +52,30 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
             ServiceOwnerId = altinnResourceResponse.HasCompetentAuthority.Organization.WithPrefix(),
             OrganizationNumber = altinnResourceResponse.HasCompetentAuthority.Organization,
         };
+    }
+
+    public async Task<string?> GetServiceOwnerNameOfResource(string resourceId, CancellationToken cancellationToken)
+    {
+        var altinnResourceResponse = await GetResource(resourceId, cancellationToken);
+        if (altinnResourceResponse is null)
+        {
+            return null;
+        }
+        return GetNameOfResourceResponse(altinnResourceResponse);
+    }
+
+    private string GetNameOfResourceResponse(GetResourceResponse resourceResponse)
+    {
+        var nameAttributes = new List<string> { "nb", "nn", "en" };
+        string? name = null;
+        foreach (var nameAttribute in nameAttributes)
+        {
+            if (resourceResponse.HasCompetentAuthority?.Name?.ContainsKey(nameAttribute) == true)
+            {
+                name = resourceResponse.HasCompetentAuthority.Name[nameAttribute];
+                break;
+            }
+        }
+        return name ?? string.Empty;
     }
 }

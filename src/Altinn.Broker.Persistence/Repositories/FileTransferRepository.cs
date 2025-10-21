@@ -674,4 +674,85 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
         }
     }
+
+    public async Task<List<DailySummaryData>> GetDailySummaryData(
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? resourceId,
+        CancellationToken cancellationToken)
+    {
+        var commandString = new StringBuilder(@"
+            SELECT 
+                DATE(f.created) as date,
+                so.service_owner_id_pk,
+                so.service_owner_name,
+                f.resource_id,
+                COUNT(*) as count
+            FROM broker.file_transfer f
+            INNER JOIN broker.storage_provider sp ON sp.storage_provider_id_pk = f.storage_provider_id_fk
+            INNER JOIN broker.service_owner so ON so.service_owner_id_pk = sp.service_owner_id_fk
+            WHERE 1=1");
+
+        if (fromDate.HasValue)
+        {
+            commandString.AppendLine(" AND f.created >= @fromDate");
+        }
+
+        if (toDate.HasValue)
+        {
+            commandString.AppendLine(" AND f.created <= @toDate");
+        }
+
+        if (!string.IsNullOrWhiteSpace(resourceId))
+        {
+            commandString.AppendLine(" AND f.resource_id = @resourceId");
+        }
+
+        commandString.AppendLine(@"
+            GROUP BY DATE(f.created), so.service_owner_id_pk, so.service_owner_name, f.resource_id
+            ORDER BY date DESC, so.service_owner_id_pk, f.resource_id");
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            await using var command = dataSource.CreateCommand(commandString.ToString());
+
+            if (fromDate.HasValue)
+            {
+                command.Parameters.AddWithValue("@fromDate", fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                command.Parameters.AddWithValue("@toDate", toDate.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(resourceId))
+            {
+                command.Parameters.AddWithValue("@resourceId", resourceId);
+            }
+
+            var results = new List<DailySummaryData>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var date = reader.GetDateTime(reader.GetOrdinal("date"));
+                var serviceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_pk"));
+                var serviceOwnerName = reader.GetString(reader.GetOrdinal("service_owner_name"));
+                var resourceId = reader.GetString(reader.GetOrdinal("resource_id"));
+                var count = reader.GetInt32(reader.GetOrdinal("count"));
+
+                results.Add(new DailySummaryData
+                {
+                    Date = new DateTimeOffset(date, TimeSpan.Zero),
+                    ServiceOwnerId = serviceOwnerId,
+                    ServiceOwnerName = serviceOwnerName,
+                    ResourceId = resourceId,
+                    FileTransferCount = count
+                });
+            }
+
+            return results;
+        }, cancellationToken);
+    }
 }

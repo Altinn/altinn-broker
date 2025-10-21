@@ -20,6 +20,8 @@ param namePrefix string
 @secure()
 @minLength(3)
 param apimIp string
+@secure()
+param statisticsApiKey string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
@@ -104,6 +106,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     maskinporten_environment: maskinporten_environment
     userIdentityClientId: appIdentity.outputs.clientId
     containerAppEnvId: keyvault.getSecret('container-app-env-id')
+    statisticsApiKey: statisticsApiKey
   }
 }
 
