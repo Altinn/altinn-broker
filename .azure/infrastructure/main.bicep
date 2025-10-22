@@ -73,8 +73,6 @@ module environmentKeyVault '../modules/keyvault/create.bicep' = {
     location: location
     sku: keyVaultSku
     tenant_id: tenantId
-    environment: environment
-    test_client_id: test_client_id
   }
 }
 
