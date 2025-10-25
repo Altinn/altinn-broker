@@ -16,11 +16,11 @@ auth:bearer {
 
 body:json {
   {
-    "MaxFileTransferSize": null,
-    "FileTransferTimeToLive": null,
-    "PurgeFileTransferAfterAllRecipientsConfirmed": null,
-    "PurgeFileTransferGracePeriod": null,
-    "UseManifestFileShim": null,
+    "MaxFileTransferSize": 2147483648,
+    "FileTransferTimeToLive": "P30D",
+    "PurgeFileTransferAfterAllRecipientsConfirmed": true,
+    "PurgeFileTransferGracePeriod": "PT2H",
+    "UseManifestFileShim": false,
     "ExternalServiceCodeLegacy": null,
     "ExternalServiceEditionCodeLegacy": null
   }
