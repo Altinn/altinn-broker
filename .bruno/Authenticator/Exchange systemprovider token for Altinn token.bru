@@ -1,0 +1,19 @@
+meta {
+  name: Exchange systemprovider token for Altinn token
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{platform_base_url}}/authentication/api/v1/exchange/maskinporten
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_maskinporten_token}}
+}
+
+script:post-response {
+  bru.setVar("systemprovider_token", res.body);
+}
