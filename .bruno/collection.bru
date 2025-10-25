@@ -1,3 +1,15 @@
+vars:pre-request {
+  client_id: your-maskinporten-integration-id
+  client_kid: your-maskinporten-integration-key-id
+  client_pem: your-maskinporten-integration-key
+  resource_id: created-in-altinn-studio
+  serviceowner_orgnumber: https://github.com/Altinn/altinn-cdn/blob/master/orgs/altinn-orgs.json
+  sender_orgnumber: find-in-tenor
+  recipient_orgnumber: find-in-tenor
+  correspondence_base_url: https://platform.tt02.altinn.no
+  platform_base_url: https://platform.tt02.altinn.no
+}
+
 docs {
   Altinn-Broker is a managed file transfer API that is used to transfer binary data between organizations in Norway.
   
@@ -10,15 +22,15 @@ docs {
   File → Open Collection → Select the `.bruno` folder in the Altinn Broker repository
   
   ### 3. Configure Environment
-  Navigate to Environments → Default and set:
+  Select environment in upper right and set:
   
-  - `client_id`: Your Maskinporten Integration ID
-  - `client_kid`: Your key identifier
-  - `client_pem`: Your complete PEM private key (including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`)
-  - `serviceowner_orgnumber`: Service owner org number (9 digits, no prefix)
-  - `sender_orgnumber`: Sender org number
-  - `recipient_orgnumber`: Recipient org number
-  - `resource_id`: Your resource ID 
+  - `client_id`: Your Maskinporten Integration ID (see step 4)
+  - `client_kid`: Your Maskinporten key identifier
+  - `client_pem`: Your Maskinporten private key (including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`)
+  - `serviceowner_orgnumber`: Service owner org number (9 digits, no prefix) see https://github.com/Altinn/altinn-cdn/blob/master/orgs/altinn-orgs.json
+  - `sender_orgnumber`: Sender org number (from Tenor)
+  - `recipient_orgnumber`: Recipient org number (from Tenor)
+  - `resource_id`: Your resource ID (see step 5)
   
   ### 4. Create Maskinporten Integration
   1. Go to https://sjolvbetjening.test.samarbeid.digdir.no/
@@ -41,17 +53,19 @@ docs {
   ## Usage Workflow
   
   ### One-time Setup:
-  1. **Register system** → `Authenticator/System Register/Register system`
+  1. **Register system** → `SystemRegister/Register system`
   2. Create system user requests (sender & recipient)
   3. Approve via Tenor login with appropriate privileges
   4. **Initialize Service Owner** → `Service Owner/Initialize Service Owner`
   5. **Configure Resource** → `Resource/Configure Resource`
+  6. **Configure Events** → `Events/Create Subscription`
   
   ### Regular Workflow:
   1. **Get tokens**:
      - `Get Systemprovider Maskinporten Token` → `Exchange Systemprovider token`
      - `Create sender system user Maskinporten token` → `Exchange sender token`
      - `Create recipient system user maskinporten token` → `Exchange recipient token`
+     -  **Or just Right-Click the authenticator folder and click "Run" to be authenticated for all calls for an hour**
   
   2. **File transfer**:
      - `Initialize` → Creates file transfer, sets `fileTransferId`
