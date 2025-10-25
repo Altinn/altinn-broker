@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/broker/api/v1/filetransfer?resourceId={{resource_id}}
+  url: {{correspondence_base_url}}/broker/api/v1/filetransfer?resourceId={{resource_id}}
   body: none
   auth: bearer
+}
+
+params:query {
+  resourceId: {{resource_id}}
 }
 
 auth:bearer {

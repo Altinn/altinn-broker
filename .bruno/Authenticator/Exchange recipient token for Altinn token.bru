@@ -1,11 +1,11 @@
 meta {
   name: Exchange recipient token for Altinn token
   type: http
-  seq: 7
+  seq: 6
 }
 
 get {
-  url: https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten
+  url: {{platform_base_url}}/authentication/api/v1/exchange/maskinporten
   body: none
   auth: bearer
 }
