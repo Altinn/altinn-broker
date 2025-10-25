@@ -1,0 +1,56 @@
+meta {
+  name: Get Systemprovider Maskinporten Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://test.maskinporten.no/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  grant_type: urn:ietf:params:oauth:grant-type:jwt-bearer
+  assertion: {{jwt}}
+}
+
+script:pre-request {
+  const crypto = require('crypto');
+  
+  const header = {
+      "alg": "RS256",
+      "kid": bru.getEnvVar("client_kid")
+  };
+  
+  const payload = {
+      "aud": "https://test.maskinporten.no/",
+      "scope": "altinn:authentication/systemregister.write altinn:serviceowner altinn:authentication/systemuser.request.write altinn:authentication/systemuser.request.read",
+      "iss": bru.getEnvVar("client_id"),
+      "iat": Math.floor(Date.now() / 1000),
+      "exp": Math.floor(Date.now() / 1000) + 120
+  };
+  
+  function base64url(input) {
+      return Buffer.from(input).toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '');
+  }
+  
+  const encodedHeader = base64url(JSON.stringify(header));
+  const encodedPayload = base64url(JSON.stringify(payload));
+  const signatureInput = `${encodedHeader}.${encodedPayload}`;
+  
+  const privateKey = bru.getEnvVar("client_pem");
+  const signature = crypto.sign("RSA-SHA256", Buffer.from(signatureInput), privateKey);
+  const encodedSignature = base64url(signature);
+  
+  const jwt = `${signatureInput}.${encodedSignature}`;
+  bru.setVar("jwt", jwt);
+}
+
+script:post-response {
+  const responseData = res.body;
+  bru.setVar("systemprovider_maskinporten_token", responseData.access_token);
+}

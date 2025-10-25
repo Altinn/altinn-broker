@@ -1,0 +1,15 @@
+meta {
+  name: Overview
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Get Service Owner Info
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/serviceowner
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response contains service owner information", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('Name');
+    expect(body).to.have.property('StorageProviders');
+    expect(body.StorageProviders).to.be.an('array');
+  });
+  
+  test("Storage providers have required fields", function() {
+    const body = res.getBody();
+    if (body.StorageProviders && body.StorageProviders.length > 0) {
+      const provider = body.StorageProviders[0];
+      expect(provider).to.have.property('Type');
+      expect(provider).to.have.property('DeploymentStatus');
+      expect(provider).to.have.property('DeploymentEnvironment');
+    }
+  });
+}

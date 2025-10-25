@@ -1,0 +1,96 @@
+docs {
+  Altinn-Broker is a managed file transfer API that is used to transfer binary data between organizations in Norway.
+  
+  ## Setup
+  
+  ### 1. Install Bruno
+  Download from [usebruno.com](https://www.usebruno.com/)
+  
+  ### 2. Open Collection
+  File → Open Collection → Select the `.bruno` folder in the Altinn Broker repository
+  
+  ### 3. Configure Environment
+  Navigate to Environments → Default and set:
+  
+  - `client_id`: Your Maskinporten Integration ID
+  - `client_kid`: Your key identifier
+  - `client_pem`: Your complete PEM private key (including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`)
+  - `serviceowner_orgnumber`: Service owner org number (9 digits, no prefix)
+  - `sender_orgnumber`: Sender org number
+  - `recipient_orgnumber`: Recipient org number
+  - `resource_id`: Your resource ID 
+  
+  ### 4. Create Maskinporten Integration
+  1. Go to https://sjolvbetjening.test.samarbeid.digdir.no/
+  2. Create integration with scopes:
+     - `altinn:authentication/systemregister.write`
+     - `altinn:serviceowner`
+     - `altinn:authentication/systemuser.request.write`
+     - `altinn:authentication/systemuser.request.read`
+     - `altinn:broker.write`
+     - `altinn:broker.read`
+  3. Generate/upload your certificate and download the private key as PEM format
+  
+  ### 5. Create resource
+  1. Go to https://altinn.studio
+  2. Login, click profile in upper right and select your service owner.
+  3. Scroll down and go to "Resource Dashboard"
+  4. Create new resource
+  5. Type "Fomidlingstjeneste". Tilgangsregler should give read/write/subscribe to whoever will approve the systemuser request (like "daglig leder"). 
+  
+  ## Usage Workflow
+  
+  ### One-time Setup:
+  1. **Register system** → `Authenticator/System Register/Register system`
+  2. Create system user requests (sender & recipient)
+  3. Approve via Tenor login with appropriate privileges
+  4. **Initialize Service Owner** → `Service Owner/Initialize Service Owner`
+  5. **Configure Resource** → `Resource/Configure Resource`
+  
+  ### Regular Workflow:
+  1. **Get tokens**:
+     - `Get Systemprovider Maskinporten Token` → `Exchange Systemprovider token`
+     - `Create sender system user Maskinporten token` → `Exchange sender token`
+     - `Create recipient system user maskinporten token` → `Exchange recipient token`
+  
+  2. **File transfer**:
+     - `Initialize` → Creates file transfer, sets `fileTransferId`
+     - `Upload` → Upload file
+     - `Search` → Recipient searches for files
+     - `Download` → Recipient downloads file
+     - `Confirm Download` → Recipient confirms download
+  
+  ## Available Endpoints
+  
+  ### FileTransfer
+  - **Initialize**: Create a new file transfer
+  - **Initialize and Upload**: Create and upload file in one request
+  - **Search**: Search for available file transfers
+  - **Overview**: Get file transfer overview
+  - **Details**: Get detailed file transfer information with status history
+  - **Upload**: Upload file to initialized transfer
+  - **Download**: Download file
+  - **Confirm Download**: Confirm file has been downloaded
+  
+  ### Resource
+  - **Configure Resource**: Set resource configuration (file size limits, TTL, etc.)
+  - **Get Resource Info**: Retrieve current resource configuration
+  
+  ### Service Owner
+  - **Initialize Service Owner**: Initialize service owner for broker service
+  - **Get Service Owner Info**: Get service owner information and storage providers
+  
+  ## Notes
+  
+  - JWT tokens expire after 120 seconds
+  - All tokens use RS256 algorithm
+  - PEM keys must include header/footer lines
+  - System registration is one-time only
+  - File transfers have configurable TTL and size limits
+  - Virus scanning can be disabled with special permissions
+  
+  ## Documentation
+  
+  - [Altinn Broker Docs](https://docs.altinn.studio/broker/)
+  - [Maskinporten Guide](https://docs.altinn.studio/correspondence/getting-started/developer-guides/maskinporten/)
+}

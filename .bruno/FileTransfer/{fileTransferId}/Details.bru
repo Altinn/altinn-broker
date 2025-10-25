@@ -1,0 +1,34 @@
+meta {
+  name: Details
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/details
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response contains file transfer details", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('fileTransferId');
+    expect(body).to.have.property('fileTransferStatus');
+    expect(body).to.have.property('fileTransferStatusHistory');
+    expect(body).to.have.property('recipientFileTransferStatusHistory');
+  });
+  
+  test("File transfer ID matches request", function() {
+    const body = res.getBody();
+    expect(body.fileTransferId).to.equal(req.getEnvironmentVar('fileTransferId'));
+  });
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Initialize and Upload
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/broker/api/v1/filetransfer/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_altinn_token}}
+}
+
+body:multipartForm {
+  Metadata.FileName: {{filename}}
+  Metadata.ResourceId: {{resource_id}}
+  Metadata.Sender: {{sender_orgnumber}}
+  Metadata.Recipients: {{recipient_orgnumber}}
+  Metadata.SendersFileTransferReference: {{file_reference}}
+  Metadata.PropertyList: {{property_list}}
+  Metadata.Checksum: {{checksum}}
+  Metadata.DisableVirusScan: {{disable_virus_scan}}
+  FileTransfer: @file({{file_path}})
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response contains file transfer ID", function() {
+    expect(res.getBody()).to.be.a('string');
+    expect(res.getBody()).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+}

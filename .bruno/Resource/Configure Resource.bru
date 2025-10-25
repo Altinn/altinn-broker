@@ -1,0 +1,37 @@
+meta {
+  name: Configure Resource
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/broker/api/v1/resource/{{resource_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+body:json {
+  {
+    "MaxFileTransferSize": null,
+    "FileTransferTimeToLive": null,
+    "PurgeFileTransferAfterAllRecipientsConfirmed": null,
+    "PurgeFileTransferGracePeriod": null,
+    "UseManifestFileShim": null,
+    "ExternalServiceCodeLegacy": null,
+    "ExternalServiceEditionCodeLegacy": null
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is empty", function() {
+    expect(res.getBody()).to.equal('');
+  });
+}

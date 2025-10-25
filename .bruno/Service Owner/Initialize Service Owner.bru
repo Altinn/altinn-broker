@@ -1,0 +1,31 @@
+meta {
+  name: Initialize Service Owner
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/broker/api/v1/serviceowner
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+body:json {
+  {
+    "Name": "{{serviceowner_orgnumber}}"
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is empty", function() {
+    expect(res.getBody()).to.equal('');
+  });
+}

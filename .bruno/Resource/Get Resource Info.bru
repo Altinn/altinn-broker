@@ -1,0 +1,30 @@
+meta {
+  name: Get Resource Info
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/resource/{{resource_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response contains resource configuration", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('MaxFileTransferSize');
+    expect(body).to.have.property('FileTransferTimeToLive');
+    expect(body).to.have.property('PurgeFileTransferAfterAllRecipientsConfirmed');
+    expect(body).to.have.property('PurgeFileTransferGracePeriod');
+    expect(body).to.have.property('UseManifestFileShim');
+  });
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Search
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/filetransfer?resourceId={{resource_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{recipient_token}}
+}

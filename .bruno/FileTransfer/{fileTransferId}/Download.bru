@@ -1,0 +1,15 @@
+meta {
+  name: Download
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/broker/api/v1/filetransfer/{{fileTransferId}}/download
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{recipient_token}}
+}
