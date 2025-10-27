@@ -6,7 +6,7 @@ vars:pre-request {
   serviceowner_orgnumber: https://github.com/Altinn/altinn-cdn/blob/master/orgs/altinn-orgs.json
   sender_orgnumber: find-in-tenor
   recipient_orgnumber: find-in-tenor
-  correspondence_base_url: https://platform.tt02.altinn.no
+  broker_base_url: https://platform.tt02.altinn.no
   platform_base_url: https://platform.tt02.altinn.no
 }
 
@@ -22,7 +22,7 @@ docs {
   File → Open Collection → Select the `.bruno` folder in the Altinn Broker repository
   
   ### 3. Configure Environment
-  Select environment in upper right and set:
+  Select environment in upper right (Configure > Create) and set:
   
   - `client_id`: Your Maskinporten Integration ID (see step 4)
   - `client_kid`: Your Maskinporten key identifier
