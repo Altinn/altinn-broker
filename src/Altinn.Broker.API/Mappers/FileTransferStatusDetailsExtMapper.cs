@@ -23,6 +23,7 @@ internal static class FileTransferStatusDetailsExtMapper
             PropertyList = fileTransferOverview.PropertyList,
             Recipients = fileTransferOverview.Recipients,
             SendersFileTransferReference = fileTransferOverview.SendersFileTransferReference,
+            Created = fileTransfer.Created,
             ExpirationTime = fileTransferOverview.ExpirationTime,
             FileTransferStatusHistory = MapToFileTransferStatusHistoryExt(fileTransferEvents),
             RecipientFileTransferStatusHistory = MapToRecipientEvents(actorEvents)
