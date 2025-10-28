@@ -146,7 +146,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [Route("upload")]
-    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+    [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> InitializeAndUpload(
         [FromForm] FileTransferInitializeAndUploadExt form,

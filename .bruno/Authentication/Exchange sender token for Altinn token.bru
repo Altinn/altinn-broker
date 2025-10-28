@@ -1,0 +1,19 @@
+meta {
+  name: Exchange sender token for Altinn token
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{platform_base_url}}/authentication/api/v1/exchange/maskinporten
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_maskinporten_token}}
+}
+
+script:post-response {
+  bru.setVar("sender_token", res.body);
+}

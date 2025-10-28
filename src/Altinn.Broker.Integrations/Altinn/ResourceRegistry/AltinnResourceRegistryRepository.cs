@@ -16,6 +16,8 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
     private readonly HttpClient _client;
     private readonly ILogger<AltinnResourceRegistryRepository> _logger;
 
+    private const string TTD_ORGNUMBER = "991825827";
+
     public AltinnResourceRegistryRepository(HttpClient httpClient, IOptions<AltinnOptions> options, ILogger<AltinnResourceRegistryRepository> logger)
     {
         httpClient.BaseAddress = new Uri(options.Value.PlatformGatewayUrl);
@@ -41,6 +43,15 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         {
             _logger.LogError("Failed to deserialize response from Altinn Resource Registry");
             throw new BadHttpRequestException("Failed to process response from Altinn Resource Registry");
+        }
+        if (altinnResourceResponse.HasCompetentAuthority.Orgcode.ToLowerInvariant() == "ttd")
+        {
+            return new ResourceEntity()
+            {
+                Id = altinnResourceResponse.Identifier,
+                ServiceOwnerId = TTD_ORGNUMBER.WithPrefix(),
+                OrganizationNumber = TTD_ORGNUMBER,
+            };
         }
         return new ResourceEntity()
         {

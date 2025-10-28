@@ -1,0 +1,19 @@
+meta {
+  name: Search
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer?resourceId={{resource_id}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  resourceId: {{resource_id}}
+}
+
+auth:bearer {
+  token: {{recipient_token}}
+}
