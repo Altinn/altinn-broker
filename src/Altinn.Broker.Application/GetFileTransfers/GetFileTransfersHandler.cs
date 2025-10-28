@@ -43,7 +43,8 @@ public class GetFileTransfersHandler(IAuthorizationService authorizationService,
         {
             Actor = callingActor,
             ResourceId = request.ResourceId,
-            Status = request.Status
+            Status = request.Status,
+            Role = request.Role
         };
 
         if (request.From.HasValue)

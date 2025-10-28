@@ -48,6 +48,40 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task Search_WithRoleRecipient_ExcludesSenderOnly()
+    {
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(overview);
+        await UploadDummyFileTransferAsync(fileTransferId);
+
+        var asSender = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={overview.ResourceId}&status=Published&role=recipient");
+        var senderContent = await asSender.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(fileTransferId, senderContent); // sender querying recipient-only should not see own sent file
+
+        var asRecipient = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={overview.ResourceId}&status=Published&role=recipient");
+        var recipientContent = await asRecipient.Content.ReadAsStringAsync();
+        Assert.Contains(fileTransferId, recipientContent);
+    }
+
+    [Fact]
+    public async Task Search_WithRoleSender_ExcludesRecipientOnly()
+    {
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(overview);
+        await UploadDummyFileTransferAsync(fileTransferId);
+
+        var asSender = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={overview.ResourceId}&status=Published&role=sender");
+        var senderContent = await asSender.Content.ReadAsStringAsync();
+        Assert.Contains(fileTransferId, senderContent);
+
+        var asRecipient = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={overview.ResourceId}&status=Published&role=sender");
+        var recipientContent = await asRecipient.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(fileTransferId, recipientContent);
+    }
+
+    [Fact]
     public async Task NormalFlow_WhenAllIsOK_Success()
     {
         // Initialize
