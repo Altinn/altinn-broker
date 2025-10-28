@@ -3,6 +3,7 @@
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services.Enums;
@@ -42,7 +43,7 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
             await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, EventSubjectType.Sender, Guid.NewGuid()));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
         }
@@ -52,9 +53,9 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
             foreach (var recipient in recipientsWhoHaveNotDownloaded)
             {
                 logger.LogError("Recipient {recipientExternalReference} did not download the fileTransfer with id {fileTransferId}", recipient.Actor.ActorExternalId, recipient.FileTransferId.ToString());
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid()));
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), recipient.Actor.ActorExternalId, EventSubjectType.Recipient, Guid.NewGuid()));
             }
-            if (recipientsWhoHaveNotDownloaded.Count > 0) backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
+            if (recipientsWhoHaveNotDownloaded.Count > 0) backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileNeverConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, EventSubjectType.Sender, Guid.NewGuid()));
             return Task.CompletedTask;
     }, logger, cancellationToken);
     }
