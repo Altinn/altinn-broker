@@ -8,6 +8,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 using Altinn.Broker.Integrations.Altinn.Events.Helpers;
 
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -36,7 +37,7 @@ public class AltinnEventBus : IEventBus
 
     public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string subjectOrganizationNumber, EventSubjectType eventSubjectType, CancellationToken cancellationToken = default)
     {
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, subjectOrganizationNumber, eventId, time);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, subjectOrganizationNumber, eventSubjectType, eventId, time);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -50,7 +51,7 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string organizationNumber, Guid eventId, DateTime time)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string organizationNumber, EventSubjectType eventSubjectType, Guid eventId, DateTime time)
     {
         if (organizationNumber.Contains(":"))
         {
@@ -64,6 +65,10 @@ public class AltinnEventBus : IEventBus
             Resource = "urn:altinn:resource:" + resourceId,
             ResourceInstance = fileTransferId,
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
+            Data = new Dictionary<string, object>
+            {
+                { "role", eventSubjectType.ToString().ToLowerInvariant() }
+            },
             Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
             Subject = organizationNumber.WithPrefix()
         };
