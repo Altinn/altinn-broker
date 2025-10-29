@@ -456,7 +456,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             {0}
             {1}
 
-            ORDER BY created DESC
+            ORDER BY created {2}
             LIMIT 100;";
 
         string statusCondition = fileTransferSearch.Status.HasValue
@@ -477,7 +477,8 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             dateCondition = "AND f.created < @to";
         }
 
-        commandString = string.Format(commandString, statusCondition, dateCondition);
+        string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
@@ -527,7 +528,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId
             {0}
             {1}
-            ORDER BY created DESC
+            ORDER BY created {2}
             LIMIT 100;";
 
         string statusCondition = fileTransferSearch.Status.HasValue
@@ -548,12 +549,13 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             dateCondition = "AND f.created < @to";
         }
 
-        commandString = string.Format(commandString, statusCondition, dateCondition);
+        string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
         command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
-        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
+        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus!.Value);
 
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);
