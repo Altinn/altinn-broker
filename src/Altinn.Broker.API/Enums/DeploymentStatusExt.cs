@@ -1,5 +1,5 @@
 ﻿/// <summary>
-/// In the context of Azure deployment, "Prepared" corresponds to resource group deployed and "Ready" corresponds to all resources ready
+/// The status of deployment of Azure resources for storage providers
 /// </summary>
 public enum DeploymentStatusExt
 {
