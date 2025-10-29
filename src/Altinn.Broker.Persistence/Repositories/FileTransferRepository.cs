@@ -555,7 +555,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
         command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
-        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus!.Value);
+        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
 
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);
