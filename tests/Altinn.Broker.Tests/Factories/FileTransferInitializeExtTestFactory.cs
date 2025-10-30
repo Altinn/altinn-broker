@@ -14,6 +14,17 @@ internal static class FileTransferInitializeExtTestFactory
         Sender = "0192:991825827",
         SendersFileTransferReference = "test-data"
     };
+
+    internal static FileTransferInitalizeExt BasicFileTransfer2() => new FileTransferInitalizeExt()
+    {
+        ResourceId = TestConstants.RESOURCE_FOR_TEST,
+        Checksum = null,
+        FileName = "input2.txt",
+        PropertyList = [],
+        Recipients = new List<string> { "0192:991825827" },
+        Sender = "0192:991825827",
+        SendersFileTransferReference = "test-data-2"
+    };
     internal static FileTransferInitalizeExt BasicFileTransfer_MultipleRecipients() => new FileTransferInitalizeExt()
     {
         ResourceId = TestConstants.RESOURCE_FOR_TEST,

@@ -55,6 +55,13 @@ public class GetFileTransfersHandler(IAuthorizationService authorizationService,
         {
             fileTransferSearchEntity.To = new DateTimeOffset(request.To.Value.UtcDateTime, TimeSpan.Zero);
         }
+        if (request.OrderAscending.HasValue && request.OrderAscending.Value)
+        {
+            fileTransferSearchEntity.OrderAscending = "ASC";
+        } else
+        {
+            fileTransferSearchEntity.OrderAscending = "DESC";
+        }
 
         if (request.RecipientStatus.HasValue)
         {
