@@ -287,6 +287,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
             {
                 RoleExt.Sender => SearchRole.Sender,
                 RoleExt.Recipient => SearchRole.Recipient,
+                null => SearchRole.Both,
                 _ => SearchRole.Both
             }
         }, HttpContext.User, cancellationToken);
