@@ -19,7 +19,6 @@ module keyvaultAddReaderRolesMigrationIdentity '../../modules/keyvault/addReader
   name: 'kvreader-${namePrefix}-migration'
   params: {
     keyvaultName: keyVaultName
-    tenantId: userAssignedIdentity.properties.tenantId
     principals: [
       { objectId: userAssignedIdentity.properties.principalId, principalType: 'ServicePrincipal' }
     ]
