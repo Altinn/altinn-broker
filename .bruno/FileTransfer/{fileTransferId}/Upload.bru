@@ -1,0 +1,23 @@
+meta {
+  name: Upload
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer/{{fileTransferId}}/upload
+  body: file
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/octet-stream
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+body:file {
+  file: @file(collection.bru) @contentType(application/octet-stream)
+}

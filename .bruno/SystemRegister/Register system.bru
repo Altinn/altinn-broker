@@ -1,0 +1,57 @@
+meta {
+  name: Register system
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{platform_base_url}}/authentication/api/v1/systemregister/vendor
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+body:json {
+  {
+    "id": "{{serviceowner_orgnumber}}_{{resource_id}}_broker",
+    "systemVendorOrgNumber": "{{serviceowner_orgnumber}}",
+    "vendor": {
+      "authority": "iso6523-actorid-upis",
+      "ID": "0192:{{serviceowner_orgnumber}}"
+    },
+    "name": {
+      "en": "BrokerTestSystem-{{serviceowner_orgnumber}}_{{resource_id}}",
+      "nb": "BrokerTestSystem-{{serviceowner_orgnumber}}_{{resource_id}}",
+      "nn": "BrokerTestSystem-{{serviceowner_orgnumber}}_{{resource_id}}"
+    },
+    "description": {
+      "en": "From Bruno collection",
+      "nb": "Fra Bruno collection",
+      "nn": "Fra Bruno collection"
+    },
+    "rights": [
+      {
+        "resource": [
+          {
+            "value": "{{resource_id}}",
+            "id": "urn:altinn:resource"
+          }
+        ]
+      }
+    ],
+    "allowedRedirectUrls": [
+      "https://smartcloudaltinn.azurewebsites.net/receipt"
+    ],
+    "clientId": [
+      "{{client_id}}"
+    ]
+  }
+}
+
+script:post-response {
+  const responseData = res.body;
+  bru.setVar("system_id", responseData);
+}

@@ -41,7 +41,7 @@ public class StorageProviderExt
 }
 
 /// <summary>
-/// Represents the deployment status of a storage provider. 
+/// Represents the storage provider type. 
 /// </summary>
 public enum StorageProviderTypeExt
 {

@@ -1,0 +1,34 @@
+meta {
+  name: Create sender systemuser request
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{platform_base_url}}/authentication/api/v1/systemuser/request/vendor
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+body:json {
+  {
+    "externalReference": "dev-test-create_01",
+    "systemId": "{{serviceowner_orgnumber}}_{{resource_id}}_broker",
+    "partyOrgNo": "{{sender_orgnumber}}",
+    "rights": [
+      {
+        "Resource": [
+          {
+            "id": "urn:altinn:resource",
+            "value": "{{resource_id}}"
+          }
+        ]
+      }
+    ],
+    "redirectUrl": ""
+  }
+}
