@@ -36,6 +36,9 @@ inputs:
   APIM_IP:
     description: "IP for APIM"
     required: true
+  STATISTICS_API_KEY:
+    description: "API key for statistics endpoints"
+    required: true
 
 runs:
   using: "composite"
@@ -66,6 +69,7 @@ runs:
         PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         APIM_IP: ${{ inputs.APIM_IP }}
+        STATISTICS_API_KEY: ${{ inputs.STATISTICS_API_KEY }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}

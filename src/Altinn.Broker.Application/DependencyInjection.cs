@@ -1,5 +1,6 @@
 ﻿using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.DownloadFile;
+using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
@@ -31,5 +32,6 @@ public static class DependencyInjection
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
+        services.AddScoped<GenerateDailySummaryReportHandler>();
     }
 }
