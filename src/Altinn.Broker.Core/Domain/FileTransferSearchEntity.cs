@@ -10,5 +10,6 @@ public class FileTransferSearchEntity
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
     public required string ResourceId { get; set; }
+    public string? OrderAscending { get; set; }
     public SearchRole Role { get; set; } = SearchRole.Both;
 }

@@ -271,7 +271,9 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
+        [FromQuery] bool? orderAscending,
         [FromQuery] RoleExt? role,
+
         [FromServices] GetFileTransfersHandler handler,
         CancellationToken cancellationToken)
     {
@@ -283,6 +285,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
             RecipientStatus = recipientStatus is not null ? (ActorFileTransferStatus)recipientStatus : null,
             From = from,
             To = to,
+            OrderAscending = orderAscending,
             Role = role switch
             {
                 RoleExt.Sender => SearchRole.Sender,
@@ -290,6 +293,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
                 null => SearchRole.Both,
                 _ => SearchRole.Both
             }
+
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             Ok,

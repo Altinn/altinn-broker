@@ -458,6 +458,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
         bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
 
+
         string statusCondition = fileTransferSearch.Status.HasValue
             ? "AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus"
             : "";
@@ -476,16 +477,19 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             dateCondition = "AND f.created < @to";
         }
 
+        string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+
         var selects = new List<string>();
         if (includeRecipient) selects.Add(recipientSelect);
         if (includeSender) selects.Add(senderSelect);
 
         string commandString = string.Join("\nUNION\n\n", selects) + @"
 
-            ORDER BY created DESC
+            ORDER BY created {2}
             LIMIT 100;";
 
-        commandString = string.Format(commandString, statusCondition, dateCondition);
+        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
+
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
@@ -535,7 +539,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId
             {0}
             {1}
-            ORDER BY created DESC
+            ORDER BY created {2}
             LIMIT 100;";
 
         string statusCondition = fileTransferSearch.Status.HasValue
@@ -556,7 +560,8 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             dateCondition = "AND f.created < @to";
         }
 
-        commandString = string.Format(commandString, statusCondition, dateCondition);
+        string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);

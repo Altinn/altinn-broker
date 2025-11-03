@@ -10,5 +10,9 @@ public class GetFileTransfersRequest
     public ActorFileTransferStatus? RecipientStatus { get; set; }
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
+
+    public bool? OrderAscending { get; set; }
+
     public SearchRole Role { get; set; } = SearchRole.Both;
 }
+
