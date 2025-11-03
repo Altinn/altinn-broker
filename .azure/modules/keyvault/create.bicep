@@ -1,10 +1,7 @@
 param vaultName string
 param location string
-param environment string
 @secure()
 param tenant_id string
-@secure()
-param test_client_id string
 @export()
 type Sku = {
   name: 'standard'
@@ -23,23 +20,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enablePurgeProtection: true
     sku: sku
     tenantId: tenant_id
-    accessPolicies: environment == 'test'
-      ? [
-          {
-            applicationId: null
-            tenantId: tenant_id
-            objectId: test_client_id
-            permissions: {
-              keys: []
-              secrets: [
-                'Get'
-                'List'
-                'Set'
-              ]
-              certificates: []
-            }
-          }
-        ]: []
+    enableRbacAuthorization: true
+    accessPolicies: []
   }
 }
 
