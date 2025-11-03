@@ -271,7 +271,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         [FromQuery] RecipientFileTransferStatusExt? recipientStatus,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [FromQuery] bool orderAscending,
+        [FromQuery] bool? orderAscending,
         [FromQuery] RoleExt? role,
 
         [FromServices] GetFileTransfersHandler handler,
