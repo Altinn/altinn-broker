@@ -797,11 +797,15 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.True(response2.IsSuccessStatusCode, await response2.Content.ReadAsStringAsync());
         string contentstring2 = await response2.Content.ReadAsStringAsync();
         var fileTransferIds2 = JsonSerializer.Deserialize<List<string>>(contentstring2);
+        var index2InClient2 = fileTransferIds2.FindIndex(ft => ft == fileTransferId2);
+        Assert.NotNull(fileTransferIds2);
+        Assert.True(index2InClient2 >= 0, "FileTransfer2 should be visible to recipientClient2");
         // Assert
         var index1 = fileTransferIds.FindIndex(ft => ft == fileTransferId1);
         Assert.DoesNotContain(fileTransferId2, fileTransferIds);
         var index3 = fileTransferIds.FindIndex(ft => ft == fileTransferId3);
         Assert.True(index1 < index3, "File transfers are not in ascending order based on created value.");
+
     }
 
     [Fact]
@@ -862,7 +866,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId3}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
-        var fileTransferAfterUpload2 = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId2}", _responseSerializerOptions);
+        var fileTransferAfterUpload2 = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId3}", _responseSerializerOptions);
         Assert.NotNull(fileTransferAfterUpload2);
 
         var downloadedFile = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId1}/download");
