@@ -437,27 +437,27 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
 
     public async Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
-        string commandString = @"
-            SELECT DISTINCT afs.file_transfer_id_fk, 'Recipient', f.created
+        string recipientSelect = @"
+            SELECT DISTINCT afs.file_transfer_id_fk as file_transfer_id, f.created
             FROM broker.actor_file_transfer_status afs 
             INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afs.file_transfer_id_fk
             INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
             WHERE afs.actor_id_fk = @actorId AND f.resource_id = @resourceId
             {0}
-            {1}
+            {1}";
 
-            UNION
-
-            SELECT f.file_transfer_id_pk, 'Sender', f.created 
+        string senderSelect = @"
+            SELECT f.file_transfer_id_pk as file_transfer_id, f.created 
             FROM broker.file_transfer f 
             INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk 
             INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
             WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId
             {0}
-            {1}
+            {1}";
 
-            ORDER BY created {2}
-            LIMIT 100;";
+        bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
+        bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
+
 
         string statusCondition = fileTransferSearch.Status.HasValue
             ? "AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus"
@@ -478,7 +478,18 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+
+        var selects = new List<string>();
+        if (includeRecipient) selects.Add(recipientSelect);
+        if (includeSender) selects.Add(senderSelect);
+
+        string commandString = string.Join("\nUNION\n\n", selects) + @"
+
+            ORDER BY created {2}
+            LIMIT 100;";
+
         commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
+
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
