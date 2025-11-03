@@ -74,12 +74,12 @@ public class ConfirmDownloadHandler(
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid()));
-            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, cancellationToken);
             if (shouldConfirmAll)
             {
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid()));
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {

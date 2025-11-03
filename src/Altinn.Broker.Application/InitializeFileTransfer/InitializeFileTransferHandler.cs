@@ -106,7 +106,7 @@ public class InitializeFileTransferHandler(
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
-            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid()));
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             return fileTransferId;
         }, logger, cancellationToken);
     }
