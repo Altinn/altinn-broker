@@ -40,12 +40,12 @@ public class AltinnEventBus : IEventBus
         _altinnOptions = altinnOptions.Value;
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, Guid? guid = null, CancellationToken cancellationToken = default)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, Guid? guid = null, AltinnEventSubjectRole? subjectRole = null, CancellationToken cancellationToken = default)
     {
-        await Publish(type, resourceId, fileTransferId, guid ?? Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, cancellationToken);
+        await Publish(type, resourceId, fileTransferId, guid ?? Guid.NewGuid(), DateTime.UtcNow, subjectOrganizationNumber, subjectRole, cancellationToken);
     }
 
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string? subjectOrganizationNumber = null, CancellationToken cancellationToken = default)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, Guid eventId, DateTime time, string? subjectOrganizationNumber = null, AltinnEventSubjectRole? subjectRole = null, CancellationToken cancellationToken = default)
     {
         string? partyId = null;
         if (subjectOrganizationNumber != null)
@@ -57,7 +57,7 @@ public class AltinnEventBus : IEventBus
                 if (partyId != null) await _partyRepository.InitializeParty(subjectOrganizationNumber, partyId);
             }
         }
-        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber, eventId, time);
+        var cloudEvent = CreateCloudEvent(type, resourceId, fileTransferId, partyId, subjectOrganizationNumber, subjectRole, eventId, time);
         var serializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = new LowerCaseNamingPolicy()
@@ -71,12 +71,19 @@ public class AltinnEventBus : IEventBus
         }
     }
 
-    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? organizationNumber, Guid? eventId, DateTime time)
+    private CloudEvent CreateCloudEvent(AltinnEventType type, string resourceId, string fileTransferId, string? partyId, string? organizationNumber, AltinnEventSubjectRole? subjectRole, Guid? eventId, DateTime time)
     {
         if (organizationNumber is not null && organizationNumber.Contains(":"))
         {
             organizationNumber = organizationNumber.WithoutPrefix();
         }
+        Dictionary<string, object>? data = subjectRole.HasValue
+            ? new Dictionary<string, object>
+            {
+                ["Role"] = subjectRole.Value.ToString()
+            }
+            : null;
+
         CloudEvent cloudEvent = new CloudEvent()
         {
             Id = eventId ?? Guid.NewGuid(),
@@ -88,6 +95,7 @@ public class AltinnEventBus : IEventBus
             Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
             Subject = !string.IsNullOrWhiteSpace(organizationNumber) ? "/organisation/" + organizationNumber : null,
             AlternativeSubject = !string.IsNullOrWhiteSpace(partyId) ? "/party/" + partyId : null,
+            Data = data,
         };
 
         return cloudEvent;
