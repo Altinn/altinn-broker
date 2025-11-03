@@ -24,11 +24,13 @@ using Xunit;
 using Xunit.Abstractions;
 
 namespace Altinn.Broker.Tests;
+
 public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
+    private readonly HttpClient _recipientClient2;
     private readonly HttpClient _serviceOwnerClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
     private readonly ITestOutputHelper _output;
@@ -38,6 +40,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _recipientClient2 = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN_2);
         _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _output = output;
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
@@ -593,7 +596,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
-        
+
         // Assert
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
@@ -606,15 +609,15 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Arrange
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
         initializeRequestBody.Sender = "urn:altinn:organization:identifier-no:991825827";
-        initializeRequestBody.Recipients = new List<string> 
-        { 
+        initializeRequestBody.Recipients = new List<string>
+        {
             "urn:altinn:organization:identifier-no:986252932",
-            "0192:910351192" 
+            "0192:910351192"
         };
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
-        
+
         // Assert
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
@@ -664,7 +667,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         await UploadDummyFileTransferAsync(fileTransferId);
         var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
-        
+
         // Act
         var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
         Assert.True(confirmResponse.IsSuccessStatusCode, await confirmResponse.Content.ReadAsStringAsync());
@@ -672,12 +675,12 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Assert that the deletion is scheduled in the grace period
         var jobStorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
         var gracePeriod = XmlConvert.ToTimeSpan("PT24H");
-        
-        Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => 
-            j.Value.Job.Method.Name == "Process" && 
-            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && 
+
+        Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+            j.Value.Job.Method.Name == "Process" &&
+            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId &&
             ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
-            j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && 
+            j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) &&
             j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
     }
 
@@ -728,9 +731,166 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Assert
         Assert.Equal(FileTransferStatusExt.Purged, fileTransferDetails.FileTransferStatus);
+    }
+
+    [Fact]
+    public async Task OrderAscending_GetFileTransfers()
+    {
+        // Arrange
+        var fileTransfer1 = await InitializeAndAssertBasicFileTransfer();
+        var fileTransfer2 = await InitializeAndAssertBasicFileTransfer();
+        var fileTransfer3 = await InitializeAndAssertBasicFileTransfer();
+
+        // Act
+        var resourceId = TestConstants.RESOURCE_FOR_TEST;
+        var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true");
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        string contentstring = await response.Content.ReadAsStringAsync();
+        var fileTransferIds = JsonSerializer.Deserialize<List<string>>(contentstring);
+
+
+        // Assert
+        Assert.NotNull(fileTransferIds);
+        Assert.True(fileTransferIds.Count >= 3);
+        var index1 = fileTransferIds.FindIndex(ft => ft == fileTransfer1);
+        var index2 = fileTransferIds.FindIndex(ft => ft == fileTransfer2);
+        var index3 = fileTransferIds.FindIndex(ft => ft == fileTransfer3);
+        Assert.True(index1 < index2 && index2 < index3, "File transfers are not in ascending order based on created value.");
+    }
+
+    [Fact]
+    public async Task OrderAscending_GetFileTransfersAssociatedWithActor()
+    {
+     
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("SuperProperty01", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId1 = fileTransferResponse.FileTransferId.ToString();
+
+
+        var initializeRequestBody2 = FileTransferInitializeExtTestFactory.BasicFileTransfer2();
+        initializeRequestBody2.PropertyList.Add("SuperProperty02", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse2 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody2);
+        Assert.True(initializeFileTransferResponse2.IsSuccessStatusCode, await initializeFileTransferResponse2.Content.ReadAsStringAsync());
+        var fileTransferResponse2 = await initializeFileTransferResponse2.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId2 = fileTransferResponse2.FileTransferId.ToString();
+
+        var initializeRequestBody3 = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody3.PropertyList.Add("SuperProperty03", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse3 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody3);
+        Assert.True(initializeFileTransferResponse3.IsSuccessStatusCode, await initializeFileTransferResponse3.Content.ReadAsStringAsync());
+        var fileTransferResponse3 = await initializeFileTransferResponse3.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId3 = fileTransferResponse3.FileTransferId.ToString();
+
+        // Act
+        var resourceId = TestConstants.RESOURCE_FOR_TEST;
+        var recipientStatus = TestConstants.RECIPIENTSTATUS_INITIALIZED;
+        var response1 = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true");
+        Assert.True(response1.IsSuccessStatusCode, await response1.Content.ReadAsStringAsync());
+        string contentstring = await response1.Content.ReadAsStringAsync();
+        var fileTransferIds = JsonSerializer.Deserialize<List<string>>(contentstring);
+
+        var response2 = await _recipientClient2.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true");
+        Assert.True(response2.IsSuccessStatusCode, await response2.Content.ReadAsStringAsync());
+        string contentstring2 = await response2.Content.ReadAsStringAsync();
+        var fileTransferIds2 = JsonSerializer.Deserialize<List<string>>(contentstring2);
+        var index2InClient2 = fileTransferIds2.FindIndex(ft => ft == fileTransferId2);
+        Assert.NotNull(fileTransferIds2);
+        Assert.True(index2InClient2 >= 0, "FileTransfer2 should be visible to recipientClient2");
+        // Assert
+        var index1 = fileTransferIds.FindIndex(ft => ft == fileTransferId1);
+        Assert.DoesNotContain(fileTransferId2, fileTransferIds);
+        var index3 = fileTransferIds.FindIndex(ft => ft == fileTransferId3);
+        Assert.True(index1 < index3, "File transfers are not in ascending order based on created value.");
 
     }
 
+    [Fact]
+    public async Task OrderAscending_GetFileTransfersForRecipientWithRecipientStatus_Initialized_Then_DownloadStarted()
+    {
+        // Arrange
+        var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody.PropertyList.Add("SuperProperty01", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId1 = fileTransferResponse.FileTransferId.ToString();
+
+
+        var initializeRequestBody2 = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody2.PropertyList.Add("SuperProperty02", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse2 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody2);
+        Assert.True(initializeFileTransferResponse2.IsSuccessStatusCode, await initializeFileTransferResponse2.Content.ReadAsStringAsync());
+        var fileTransferResponse2 = await initializeFileTransferResponse2.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId2 = fileTransferResponse2.FileTransferId.ToString();
+
+        var initializeRequestBody3 = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        initializeRequestBody3.PropertyList.Add("SuperProperty03", "BLAHBLAHBLAH");
+        var initializeFileTransferResponse3 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody3);
+        Assert.True(initializeFileTransferResponse3.IsSuccessStatusCode, await initializeFileTransferResponse3.Content.ReadAsStringAsync());
+        var fileTransferResponse3 = await initializeFileTransferResponse3.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId3 = fileTransferResponse3.FileTransferId.ToString();
+
+        // Act
+        var resourceId = TestConstants.RESOURCE_FOR_TEST;
+        var recipientStatus = TestConstants.RECIPIENTSTATUS_INITIALIZED;
+        var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true&recipientStatus={recipientStatus}");
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        string contentstring = await response.Content.ReadAsStringAsync();
+        var fileTransferIds = JsonSerializer.Deserialize<List<string>>(contentstring);
+        // Assert
+        Assert.NotNull(fileTransferIds);
+        Assert.True(fileTransferIds.Count >= 3);
+        var index1 = fileTransferIds.FindIndex(ft => ft == fileTransferId1);
+        var index2 = fileTransferIds.FindIndex(ft => ft == fileTransferId2);
+        var index3 = fileTransferIds.FindIndex(ft => ft == fileTransferId3);
+        Assert.True(index1 < index2 && index2 < index3, "File transfers are not in ascending order based on created value.");
+
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the first uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId1}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+        var fileTransferAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId1}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterUpload);
+
+        var uploadedFileBytes2 = Encoding.UTF8.GetBytes("This is the contents of the second uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes2))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId3}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+        var fileTransferAfterUpload2 = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId3}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterUpload2);
+
+        var downloadedFile = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId1}/download");
+        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
+        Assert.Equal(uploadedFileBytes, downloadedFileBytes);
+        
+        var downloadedFile2 = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId3}/download");
+        var downloadedFileBytes2 = await downloadedFile2.Content.ReadAsByteArrayAsync();
+        Assert.Equal(uploadedFileBytes2, downloadedFileBytes2);
+
+        var newRecipientStatus = TestConstants.RECIPIENTSTATUS_DOWNLOADSTARTED;
+        var newResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true&recipientStatus={newRecipientStatus}");
+        Assert.True(newResponse.IsSuccessStatusCode, await newResponse.Content.ReadAsStringAsync());
+        string newContentString = await newResponse.Content.ReadAsStringAsync();
+        var downloadedFileTransferIds = JsonSerializer.Deserialize<List<string>>(newContentString);
+        Assert.NotNull(downloadedFileTransferIds);
+        Assert.True(downloadedFileTransferIds.Count >= 2);
+        var newIndex1 = downloadedFileTransferIds.FindIndex(ft => ft == fileTransferId1);
+        var newIndex3 = downloadedFileTransferIds.FindIndex(ft => ft == fileTransferId3);
+        Assert.DoesNotContain(fileTransferId2, downloadedFileTransferIds);
+        Assert.True(newIndex1 < newIndex3, "File transfers are not in ascending order based on created value.");
+
+    }
+    
     private async Task<HttpResponseMessage> UploadTextFileTransfer(string fileTransferId, string fileContent)
     {
         var fileContents = Encoding.UTF8.GetBytes(fileContent);
