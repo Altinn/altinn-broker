@@ -1,7 +1,6 @@
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
-using Hangfire;
 namespace Altinn.Broker.Application.Middlewares;
 public class EventBusMiddleware
 {
@@ -10,8 +9,8 @@ public class EventBusMiddleware
     {
         _eventBus = eventBus;
     }
-    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, Guid? guid = null)
+    public async Task Publish(AltinnEventType type, string resourceId, string fileTransferId, string? subjectOrganizationNumber = null, Guid? guid = null, AltinnEventSubjectRole? subjectRole = null)
     {
-        await _eventBus.Publish(type, resourceId, fileTransferId, subjectOrganizationNumber, guid);
+        await _eventBus.Publish(type, resourceId, fileTransferId, subjectOrganizationNumber, guid, subjectRole);
     }
 }
