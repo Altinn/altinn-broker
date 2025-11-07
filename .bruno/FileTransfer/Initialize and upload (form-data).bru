@@ -10,28 +10,8 @@ post {
   auth: bearer
 }
 
-headers {
-  : 
-}
-
 auth:bearer {
   token: {{sender_token}}
-}
-
-body:json {
-  {
-    "fileName": "collection.bru",
-    "resourceId": "{{resource_id}}",
-    "sendersFileTransferReference": "archiveno-20425",
-    "sender": "urn:altinn:organization:identifier-no:{{sender_orgnumber}}",
-    "recipients": [
-      "urn:altinn:organization:identifier-no:{{recipient_orgnumber}}"
-    ],
-    "propertyList": {
-      "caseNumber": "123",
-      "etc": "can-use-for-anything"
-    }
-  }
 }
 
 body:multipart-form {
@@ -46,5 +26,5 @@ body:multipart-form {
 
 script:post-response {
   const responseData = res.body;
-  bru.setVar("fileTransferId", responseData);
+  bru.setVar("fileTransferId", responseData.fileTransferId);
 }

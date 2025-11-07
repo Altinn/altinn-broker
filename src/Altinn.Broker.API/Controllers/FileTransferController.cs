@@ -165,11 +165,11 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         }
         var fileTransferId = initializeResult.AsT0;
 
-        Request.EnableBuffering();
         var uploadResult = await UploadFileHandler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
-            UploadStream = Request.Body
+            UploadStream = form.FileTransfer.OpenReadStream(),
+            ContentLength = form.FileTransfer.Length
         }, HttpContext.User, cancellationToken);
         return uploadResult.Match(
             uploadedFileTransferId => Ok(new FileTransferUploadResponseExt()
