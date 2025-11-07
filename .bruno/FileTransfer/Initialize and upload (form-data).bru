@@ -1,0 +1,30 @@
+meta {
+  name: Initialize and upload (form-data)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+body:multipart-form {
+  Metadata.FileName: collection.bru
+  Metadata.ResourceId: bruno-broker
+  Metadata.SendersFileTransferReference: CaseFiles-123
+  Metadata.Sender: 0192:{{sender_orgnumber}}
+  Metadata.Recipients: 0192:{{recipient_orgnumber}}
+  Metadata.DisableVirusScan: false
+  FileTransfer: @file(collection.bru)
+}
+
+script:post-response {
+  const responseData = res.body;
+  bru.setVar("fileTransferId", responseData.fileTransferId);
+}
