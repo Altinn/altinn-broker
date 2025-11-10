@@ -93,7 +93,6 @@ public class GenerateDailySummaryReportHandler(
             {
                 item.ft.Created.Date,
                 ServiceOwnerId = GetServiceOwnerId(item.ft),
-                MessageSender = item.ft.Sender.ActorExternalId ?? "unknown",
                 ResourceId = item.ft.ResourceId ?? "unknown",
                 RecipientId = item.recipientId,
                 RecipientType = GetRecipientType(item.recipientId),
@@ -107,7 +106,6 @@ public class GenerateDailySummaryReportHandler(
                 Day = g.Key.Date.Day,
                 ServiceOwnerId = g.Key.ServiceOwnerId,
                 ServiceOwnerName = GetServiceOwnerName(g.Key.ServiceOwnerId),
-                MessageSender = g.Key.MessageSender,
                 ResourceId = g.Key.ResourceId,
                 ResourceTitle = GetResourceTitle(g.Key.ResourceId),
                 RecipientType = g.Key.RecipientType,
@@ -118,7 +116,6 @@ public class GenerateDailySummaryReportHandler(
             })
             .OrderBy(d => d.Date)
             .ThenBy(d => d.ServiceOwnerId)
-            .ThenBy(d => d.MessageSender)
             .ThenBy(d => d.ResourceId)
             .ThenBy(d => d.RecipientType)
             .ThenBy(d => d.AltinnVersion)
@@ -194,14 +191,10 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            var resource = altinnResourceRepository.GetResource(resourceId, CancellationToken.None).GetAwaiter().GetResult();
-            if (resource != null)
-            {
-                // Try to get title from resource registry - would need to extend IAltinnResourceRepository
-                // For now, return resource ID
-                return resourceId;
-            }
-            return $"Unknown ({resourceId})";
+            // Get service owner name from Resource Registry (like correspondence does)
+            // This returns the name from HasCompetentAuthority.Name (e.g., "Digitaliseringsdirektoratet", "NAV", etc.)
+            var serviceOwnerName = altinnResourceRepository.GetServiceOwnerNameOfResource(resourceId, CancellationToken.None).GetAwaiter().GetResult();
+            return serviceOwnerName ?? $"Unknown ({resourceId})";
         }
         catch (Exception ex)
         {
@@ -287,7 +280,6 @@ public class GenerateDailySummaryReportHandler(
             Day = d.Day,
             ServiceOwnerId = d.ServiceOwnerId,
             ServiceOwnerName = d.ServiceOwnerName,
-            MessageSender = d.MessageSender,
             ResourceId = d.ResourceId,
             ResourceTitle = d.ResourceTitle,
             RecipientType = d.RecipientType.ToString(),

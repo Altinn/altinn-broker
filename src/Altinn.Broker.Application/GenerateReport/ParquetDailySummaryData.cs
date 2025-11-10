@@ -45,12 +45,6 @@ public class ParquetDailySummaryData
     public string ServiceOwnerName { get; set; } = string.Empty;
     
     /// <summary>
-    /// Message sender
-    /// </summary>
-    [JsonPropertyName("messagesender")]
-    public string MessageSender { get; set; } = string.Empty;
-    
-    /// <summary>
     /// Resource ID
     /// </summary>
     [JsonPropertyName("serviceresourceid")]

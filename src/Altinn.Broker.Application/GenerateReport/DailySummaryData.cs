@@ -39,11 +39,6 @@ public class DailySummaryData
     public string ServiceOwnerName { get; set; } = string.Empty;
     
     /// <summary>
-    /// Message sender (sender actor external ID)
-    /// </summary>
-    public string MessageSender { get; set; } = string.Empty;
-    
-    /// <summary>
     /// Resource ID
     /// </summary>
     public string ResourceId { get; set; } = string.Empty;
