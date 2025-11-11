@@ -15,6 +15,7 @@ namespace Altinn.Broker.Application.GenerateReport;
 public class GenerateDailySummaryReportHandler(
     IFileTransferRepository fileTransferRepository,
     IServiceOwnerRepository serviceOwnerRepository,
+    IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IBrokerStorageService storageService,
     ILogger<GenerateDailySummaryReportHandler> logger,
@@ -126,10 +127,11 @@ public class GenerateDailySummaryReportHandler(
 
     private string GetServiceOwnerId(FileTransferEntity fileTransfer)
     {
-        // Try to get service owner from resource
+        // Get service owner from database resource table (service_owner_id_fk -> service_owner.service_owner_id_pk)
+        // This matches the mapping: serviceownerorgnr -> service_owner.service_owner_id_pk
         try
         {
-            var resource = altinnResourceRepository.GetResource(fileTransfer.ResourceId, CancellationToken.None).GetAwaiter().GetResult();
+            var resource = resourceRepository.GetResource(fileTransfer.ResourceId, CancellationToken.None).GetAwaiter().GetResult();
             return resource?.ServiceOwnerId ?? "unknown";
         }
         catch
