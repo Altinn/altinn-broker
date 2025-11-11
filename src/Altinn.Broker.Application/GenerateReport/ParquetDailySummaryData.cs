@@ -71,7 +71,7 @@ public class ParquetDailySummaryData
     /// <summary>
     /// Number of file transfers for this service owner on this date
     /// </summary>
-    [JsonPropertyName("messagecount")]
+    [JsonPropertyName("filetransfercount")]
     public int MessageCount { get; set; }
     
     /// <summary>
@@ -83,7 +83,7 @@ public class ParquetDailySummaryData
     /// <summary>
     /// Total file storage used in bytes
     /// </summary>
-    [JsonPropertyName("attachmentstoragebytes")]
+    [JsonPropertyName("filestoragebytes")]
     public long AttachmentStorageBytes { get; set; }
 
 }
