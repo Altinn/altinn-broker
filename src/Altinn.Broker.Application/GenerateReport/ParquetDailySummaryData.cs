@@ -34,38 +34,42 @@ public class ParquetDailySummaryData
     
     /// <summary>
     /// Service Owner ID (organization number)
+    /// Source: service_owner.service_owner_id_pk
     /// </summary>
-    [JsonPropertyName("serviceownerorgnr")]
+    [JsonPropertyName("service_owner_id_pk")]
     public string ServiceOwnerId { get; set; } = string.Empty;
     
     /// <summary>
     /// Service Owner Name, e.g. digdir, brreg, kv, etc.
+    /// Source: service_owner.service_owner_name
     /// </summary>
-    [JsonPropertyName("serviceownercode")]
+    [JsonPropertyName("service_owner_name")]
     public string ServiceOwnerName { get; set; } = string.Empty;
     
     /// <summary>
     /// Resource ID
+    /// Source: file_transfer.resource_id
     /// </summary>
-    [JsonPropertyName("serviceresourceid")]
+    [JsonPropertyName("resource_id")]
     public string ResourceId { get; set; } = string.Empty;
     
     /// <summary>
-    /// Resource title in Norwegian (from Resource Registry)
+    /// Resource title (service owner name from Resource Registry)
+    /// Source: AltinnResourceService (Resource Registry API)
     /// </summary>
-    [JsonPropertyName("serviceresourcetitle")]
+    [JsonPropertyName("altinn_resource_service")]
     public string ResourceTitle { get; set; } = string.Empty;
     
     /// <summary>
-    /// Recipient type (Organization or Person)
+    /// Recipient type (Organization, Person, or Unknown)
     /// </summary>
-    [JsonPropertyName("recipienttype")]
+    [JsonPropertyName("organization")]
     public string RecipientType { get; set; } = string.Empty;
     
     /// <summary>
-    /// Altinn version (Altinn2, Altinn3)
+    /// Altinn version (always Altinn3 for Broker)
     /// </summary>
-    [JsonPropertyName("costcenter")]
+    [JsonPropertyName("altinn3")]
     public string AltinnVersion { get; set; } = string.Empty;
     
     /// <summary>
