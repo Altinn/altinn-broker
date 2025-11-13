@@ -63,13 +63,13 @@ public class ParquetDailySummaryData
     /// <summary>
     /// Recipient type (Organization, Person, or Unknown)
     /// </summary>
-    [JsonPropertyName("organization")]
+    [JsonPropertyName("recipient_type")]
     public string RecipientType { get; set; } = string.Empty;
     
     /// <summary>
     /// Altinn version (always Altinn3 for Broker)
     /// </summary>
-    [JsonPropertyName("altinn3")]
+    [JsonPropertyName("altinn_version")]
     public string AltinnVersion { get; set; } = string.Empty;
     
     /// <summary>
