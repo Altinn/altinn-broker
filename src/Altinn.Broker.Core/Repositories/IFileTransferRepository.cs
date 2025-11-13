@@ -30,6 +30,5 @@ public interface IFileTransferRepository
         CancellationToken cancellationToken
     );
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
-    Task<List<FileTransferEntity>> GetFileTransfersForReport(CancellationToken cancellationToken);
     Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken);
 }
