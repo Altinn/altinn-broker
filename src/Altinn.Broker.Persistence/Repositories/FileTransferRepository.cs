@@ -690,8 +690,9 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
 
     public async Task<List<FileTransferEntity>> GetFileTransfersForReport(CancellationToken cancellationToken)
     {
-        // Optimized query: Get all file transfers with sender and recipients in one query (no N+1 problem)
+        // Optimized query: Get all file transfers with sender, recipients, and service owner ID in one query (no N+1 problem)
         // Using DISTINCT to handle potential duplicates (same recipient can have multiple status changes)
+        // JOIN with altinn_resource to get service_owner_id_fk directly, avoiding extra lookups
         const string query = @"
             SELECT DISTINCT ON (f.file_transfer_id_pk, recipient.actor_id_pk)
                 f.file_transfer_id_pk,
@@ -710,9 +711,11 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
                 recipient.actor_id_pk as recipient_actor_id_pk,
                 recipient.actor_external_id as recipient_actor_external_id,
                 afs.actor_file_transfer_status_description_id_fk,
-                afs.actor_file_transfer_status_date
+                afs.actor_file_transfer_status_date,
+                r.service_owner_id_fk as service_owner_id
             FROM broker.file_transfer f
             INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+            LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
             LEFT JOIN broker.actor_file_transfer_status afs ON afs.file_transfer_id_fk = f.file_transfer_id_pk
             LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afs.actor_id_fk
             ORDER BY f.file_transfer_id_pk, recipient.actor_id_pk NULLS LAST, afs.actor_file_transfer_status_date DESC";
@@ -722,6 +725,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var fileTransfersDict = new Dictionary<Guid, FileTransferEntity>();
+            var serviceOwnerIdsDict = new Dictionary<Guid, string>(); // Store service owner IDs from query
             await using var reader = await command.ExecuteReaderAsync(ct);
             
             while (await reader.ReadAsync(ct))
@@ -733,6 +737,12 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
                 {
                     var senderActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk"));
                     var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    
+                    // Store service owner ID from query (if available)
+                    if (!reader.IsDBNull(reader.GetOrdinal("service_owner_id")))
+                    {
+                        serviceOwnerIdsDict[fileTransferId] = reader.GetString(reader.GetOrdinal("service_owner_id"));
+                    }
                     
                     fileTransfer = new FileTransferEntity
                     {
@@ -793,6 +803,124 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             }
             
             return fileTransfersDict.Values.ToList();
+        }, cancellationToken);
+    }
+
+    public async Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken)
+    {
+        // Optimized query: Get all file transfers with sender, recipients, and service owner ID in one query (no N+1 problem)
+        // Using DISTINCT to handle potential duplicates (same recipient can have multiple status changes)
+        // JOIN with altinn_resource to get service_owner_id_fk directly, avoiding extra lookups
+        const string query = @"
+            SELECT DISTINCT ON (f.file_transfer_id_pk, recipient.actor_id_pk)
+                f.file_transfer_id_pk,
+                f.resource_id,
+                f.filename,
+                f.checksum,
+                f.sender_actor_id_fk,
+                f.external_file_transfer_reference,
+                f.created,
+                f.file_location,
+                f.file_transfer_size,
+                f.expiration_time,
+                f.hangfire_job_id,
+                f.use_virus_scan,
+                sender.actor_external_id as sender_actor_external_id,
+                recipient.actor_id_pk as recipient_actor_id_pk,
+                recipient.actor_external_id as recipient_actor_external_id,
+                afs.actor_file_transfer_status_description_id_fk,
+                afs.actor_file_transfer_status_date,
+                r.service_owner_id_fk as service_owner_id
+            FROM broker.file_transfer f
+            INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+            LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
+            LEFT JOIN broker.actor_file_transfer_status afs ON afs.file_transfer_id_fk = f.file_transfer_id_pk
+            LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afs.actor_id_fk
+            ORDER BY f.file_transfer_id_pk, recipient.actor_id_pk NULLS LAST, afs.actor_file_transfer_status_date DESC";
+
+        await using var command = dataSource.CreateCommand(query);
+        
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransfersDict = new Dictionary<Guid, FileTransferEntity>();
+            var serviceOwnerIdsDict = new Dictionary<Guid, string>(); // Store service owner IDs from query
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                
+                // Get or create file transfer entity
+                if (!fileTransfersDict.TryGetValue(fileTransferId, out var fileTransfer))
+                {
+                    var senderActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk"));
+                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    
+                    // Store service owner ID from query (if available)
+                    if (!reader.IsDBNull(reader.GetOrdinal("service_owner_id")))
+                    {
+                        serviceOwnerIdsDict[fileTransferId] = reader.GetString(reader.GetOrdinal("service_owner_id"));
+                    }
+                    
+                    fileTransfer = new FileTransferEntity
+                    {
+                        FileTransferId = fileTransferId,
+                        ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                        FileName = reader.GetString(reader.GetOrdinal("filename")),
+                        Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                        Sender = new ActorEntity
+                        {
+                            ActorId = senderActorId,
+                            ActorExternalId = senderActorExternalId
+                        },
+                        SendersFileTransferReference = reader.IsDBNull(reader.GetOrdinal("external_file_transfer_reference")) ? null : reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                        ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                        FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                        HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                        FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                        UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
+                        RecipientCurrentStatuses = new List<ActorFileTransferStatusEntity>(),
+                        FileTransferStatusEntity = new FileTransferStatusEntity
+                        {
+                            FileTransferId = fileTransferId,
+                            Status = FileTransferStatus.UploadStarted, // Default, actual status not needed for report
+                            Date = reader.GetDateTime(reader.GetOrdinal("created"))
+                        },
+                        FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("created")),
+                        PropertyList = new Dictionary<string, string>()
+                    };
+                    
+                    fileTransfersDict[fileTransferId] = fileTransfer;
+                }
+                
+                // Add recipient if present (check for duplicates)
+                if (!reader.IsDBNull(reader.GetOrdinal("recipient_actor_id_pk")))
+                {
+                    var recipientActorId = reader.GetInt64(reader.GetOrdinal("recipient_actor_id_pk"));
+                    var recipientActorExternalId = reader.GetString(reader.GetOrdinal("recipient_actor_external_id"));
+                    var recipientStatus = reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk"));
+                    var recipientDate = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date"));
+                    
+                    // Check if this recipient already exists (avoid duplicates)
+                    if (!fileTransfer.RecipientCurrentStatuses.Any(r => r.Actor.ActorId == recipientActorId))
+                    {
+                        fileTransfer.RecipientCurrentStatuses.Add(new ActorFileTransferStatusEntity
+                        {
+                            FileTransferId = fileTransferId,
+                            Actor = new ActorEntity
+                            {
+                                ActorId = recipientActorId,
+                                ActorExternalId = recipientActorExternalId
+                            },
+                            Status = (ActorFileTransferStatus)recipientStatus,
+                            Date = recipientDate
+                        });
+                    }
+                }
+            }
+            
+            return (fileTransfersDict.Values.ToList(), serviceOwnerIdsDict);
         }, cancellationToken);
     }
 }

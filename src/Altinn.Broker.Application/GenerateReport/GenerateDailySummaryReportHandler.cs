@@ -31,9 +31,9 @@ public class GenerateDailySummaryReportHandler(
         {
             logger.LogInformation("Starting daily summary report generation with Altinn2Included={altinn2Included}", request.Altinn2Included);
 
-            // Get file transfers for statistics
+            // Get file transfers for statistics with service owner IDs (optimized to avoid N+1 queries)
             // Note: Broker only supports Altinn3, so Altinn2Included is ignored but kept for API compatibility
-            var fileTransfers = await fileTransferRepository.GetFileTransfersForReport(cancellationToken);
+            var (fileTransfers, serviceOwnerIds) = await fileTransferRepository.GetFileTransfersForReportWithServiceOwnerIds(cancellationToken);
             logger.LogInformation("Retrieved {count} file transfers for daily summary report", fileTransfers.Count);
 
             if (fileTransfers.Count == 0)
@@ -41,8 +41,8 @@ public class GenerateDailySummaryReportHandler(
                 logger.LogWarning("No file transfers found for daily summary report generation");
                 return StatisticsErrors.NoFileTransfersFound;
             }
-            // Aggregate daily data
-            var summaryData = await AggregateDailyDataAsync(fileTransfers, cancellationToken);
+            // Aggregate daily data (using pre-fetched service owner IDs for performance)
+            var summaryData = await AggregateDailyDataAsync(fileTransfers, serviceOwnerIds, cancellationToken);
             logger.LogInformation("Aggregated data into {count} daily summary records", summaryData.Count);
 
             // Generate parquet file and upload to blob storage
@@ -70,7 +70,10 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private async Task<List<DailySummaryData>> AggregateDailyDataAsync(List<FileTransferEntity> fileTransfers, CancellationToken cancellationToken)
+    private async Task<List<DailySummaryData>> AggregateDailyDataAsync(
+        List<FileTransferEntity> fileTransfers, 
+        Dictionary<Guid, string> preFetchedServiceOwnerIds,
+        CancellationToken cancellationToken)
     {
         // Flatten file transfers with recipients - each recipient gets its own row
         var flattenedData = new List<(FileTransferEntity ft, string recipientId)>();
@@ -91,47 +94,77 @@ public class GenerateDailySummaryReportHandler(
             }
         }
 
-        // Pre-fetch service owner IDs, names, and resource titles to avoid blocking in LINQ
-        var serviceOwnerIds = new Dictionary<Guid, string>();
+        // Use pre-fetched service owner IDs from SQL query (avoids N database queries)
+        var serviceOwnerIds = preFetchedServiceOwnerIds;
+        
+        // For file transfers without service owner ID in query, fall back to lookup
+        var missingServiceOwnerIds = new List<FileTransferEntity>();
+        foreach (var ft in fileTransfers)
+        {
+            if (!serviceOwnerIds.ContainsKey(ft.FileTransferId))
+            {
+                missingServiceOwnerIds.Add(ft);
+            }
+        }
+
+        // Fetch missing service owner IDs in parallel
+        if (missingServiceOwnerIds.Any())
+        {
+            var missingIdsTasks = missingServiceOwnerIds.Select(async ft =>
+            {
+                var serviceOwnerId = await GetServiceOwnerIdAsync(ft, cancellationToken);
+                return (ft.FileTransferId, serviceOwnerId);
+            });
+            
+            var missingIdsResults = await Task.WhenAll(missingIdsTasks);
+            foreach (var (fileTransferId, serviceOwnerId) in missingIdsResults)
+            {
+                serviceOwnerIds[fileTransferId] = serviceOwnerId;
+            }
+        }
+
+        // Fetch service owner names in parallel (batch processing)
+        var uniqueServiceOwnerIds = serviceOwnerIds.Values.Distinct().Where(id => !string.IsNullOrEmpty(id) && id != "unknown").ToList();
         var serviceOwnerNames = new Dictionary<string, string>();
-        var resourceTitles = new Dictionary<string, string>();
+        
+        var serviceOwnerNameTasks = uniqueServiceOwnerIds.Select(async serviceOwnerId =>
+        {
+            var name = await GetServiceOwnerNameAsync(serviceOwnerId, cancellationToken);
+            return (serviceOwnerId, name);
+        });
+        
+        var serviceOwnerNameResults = await Task.WhenAll(serviceOwnerNameTasks);
+        foreach (var (serviceOwnerId, name) in serviceOwnerNameResults)
+        {
+            serviceOwnerNames[serviceOwnerId] = name;
+        }
 
-        // Get unique file transfers by ID to avoid duplicate lookups
-        var uniqueFileTransfers = flattenedData
-            .Select(x => x.ft)
-            .GroupBy(ft => ft.FileTransferId)
-            .Select(g => g.First())
+        // Fetch resource titles in parallel (batch processing for HTTP calls)
+        var uniqueResourceIds = flattenedData
+            .Select(x => x.ft.ResourceId ?? "unknown")
+            .Distinct()
+            .Where(id => id != "unknown")
             .ToList();
-
-        foreach (var fileTransfer in uniqueFileTransfers)
+        
+        var resourceTitles = new Dictionary<string, string>();
+        
+        var resourceTitleTasks = uniqueResourceIds.Select(async resourceId =>
         {
-            if (!serviceOwnerIds.ContainsKey(fileTransfer.FileTransferId))
-            {
-                serviceOwnerIds[fileTransfer.FileTransferId] = await GetServiceOwnerIdAsync(fileTransfer, cancellationToken);
-            }
-        }
-
-        foreach (var serviceOwnerId in serviceOwnerIds.Values.Distinct())
+            var title = await GetResourceTitleAsync(resourceId, cancellationToken);
+            return (resourceId, title);
+        });
+        
+        var resourceTitleResults = await Task.WhenAll(resourceTitleTasks);
+        foreach (var (resourceId, title) in resourceTitleResults)
         {
-            if (!serviceOwnerNames.ContainsKey(serviceOwnerId))
-            {
-                serviceOwnerNames[serviceOwnerId] = await GetServiceOwnerNameAsync(serviceOwnerId, cancellationToken);
-            }
-        }
-
-        foreach (var resourceId in flattenedData.Select(x => x.ft.ResourceId ?? "unknown").Distinct())
-        {
-            if (resourceId != "unknown" && !resourceTitles.ContainsKey(resourceId))
-            {
-                resourceTitles[resourceId] = await GetResourceTitleAsync(resourceId, cancellationToken);
-            }
+            resourceTitles[resourceId] = title;
         }
 
         var groupedData = flattenedData
             .GroupBy(item => new
             {
                 item.ft.Created.Date,
-                ServiceOwnerId = serviceOwnerIds[item.ft.FileTransferId],
+                ServiceOwnerId = serviceOwnerIds.GetValueOrDefault(item.ft.FileTransferId, "unknown"),
                 ResourceId = item.ft.ResourceId ?? "unknown",
                 RecipientId = item.recipientId,
                 RecipientType = GetRecipientType(item.recipientId),
@@ -356,8 +389,8 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            // Get file transfers data
-            var fileTransfers = await fileTransferRepository.GetFileTransfersForReport(cancellationToken);
+            // Get file transfers data with service owner IDs (optimized to avoid N+1 queries)
+            var (fileTransfers, serviceOwnerIds) = await fileTransferRepository.GetFileTransfersForReportWithServiceOwnerIds(cancellationToken);
             
             if (!fileTransfers.Any())
             {
@@ -367,8 +400,8 @@ public class GenerateDailySummaryReportHandler(
 
             logger.LogInformation("Found {count} file transfers for report generation", fileTransfers.Count);
 
-            // Aggregate data by day and service owner
-            var summaryData = await AggregateDailyDataAsync(fileTransfers, cancellationToken);
+            // Aggregate data by day and service owner (using pre-fetched service owner IDs for performance)
+            var summaryData = await AggregateDailyDataAsync(fileTransfers, serviceOwnerIds, cancellationToken);
 
             // Generate the parquet file as a stream
             var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, request.Altinn2Included, cancellationToken);
