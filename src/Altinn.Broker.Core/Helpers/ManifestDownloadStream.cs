@@ -195,6 +195,26 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         }
     }
 
+    /// <summary>
+    /// Adds (or replaces) the manifest.xml file inside the ZIP content represented by this stream.
+    /// </summary>
+    /// <param name="fileTransferEntity">
+    /// The file transfer entity containing metadata used to construct the manifest (e.g. sender, recipients, properties).
+    /// </param>
+    /// <param name="resource">
+    /// The resource entity providing contextual configuration for manifest creation.
+    /// </param>
+    /// <remarks>
+    /// Behavior:
+    /// 1. If the current stream is completely empty (zero bytes), a new ZIP archive is created containing only manifest.xml.
+    /// 2. If non-empty, the method validates the ZIP signature (supports normal, empty, and spanned ZIP headers).
+    /// 3. Existing manifest.xml and recipients.xml entries (case-insensitive) are removed.
+    /// 4. A new manifest.xml is generated and added.
+    /// 5. The internal byte content is replaced with the modified ZIP and the read position reset to 0.
+    /// The stream must be open; otherwise an <see cref="ObjectDisposedException"/> is thrown.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the stream has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if existing content is not a valid ZIP archive.</exception>
     public async Task AddManifestFile(FileTransferEntity fileTransferEntity, ResourceEntity resource)
     {
         ValidateNotClosed();
@@ -257,9 +277,27 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         _position = 0;
     }
 
+    /// <summary>
+    /// Determines whether the provided byte span starts with a recognized ZIP file signature.
+    /// </summary>
+    /// <param name="span">
+    /// A read-only span of bytes representing the beginning of a stream or buffer.
+    /// Must contain at least 4 bytes to evaluate a signature.
+    /// </param>
+    /// <returns>
+    /// True if the span begins with one of the accepted ZIP signatures
+    /// </returns>
+    /// <remarks>
+    /// This lightweight check is sufficient for early validation before attempting to
+    /// open the data with <see cref="ZipArchive"/>. It does not perform full structural verification.
+    /// </remarks>
     private static bool HasZipSignature(ReadOnlySpan<byte> span)
     {
-        if (span.Length < 4) return false;
+        if (span.Length < 4)
+        {
+            return false;
+        }
+
         // Accept:
         // PK 03 04 - Local file header (standard non-empty zip)
         // PK 05 06 - End of central directory (empty zip)
