@@ -574,6 +574,24 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task DownloadNotAZipFile_WithManifestShimEnabled_Exception()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        await UploadFile(fileTransferId);
+
+        // Act
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+
+        // Assert
+        Assert.False(downloadedFile.IsSuccessStatusCode);
+    }
+
+    [Fact]
     public async Task DownloadZipFile_WithoutManifestShimEnabled_ManifestIsNotAdded()
     {
         // Arrange
