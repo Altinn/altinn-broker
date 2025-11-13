@@ -675,11 +675,9 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task<long> UploadEmptyZipFile(string fileTransferId)
     {
-        
         using var zipStream = new MemoryStream();
         using (var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
         {
-            
         }
         zipStream.Position = 0;
         var zipBytes = zipStream.ToArray();
