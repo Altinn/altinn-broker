@@ -1,11 +1,13 @@
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OneOf;
 using Parquet.Serialization;
 using System.Security.Cryptography;
@@ -18,6 +20,7 @@ public class GenerateDailySummaryReportHandler(
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IBrokerStorageService storageService,
+    IOptions<ReportStorageOptions> reportStorageOptions,
     ILogger<GenerateDailySummaryReportHandler> logger,
     IHostEnvironment hostEnvironment)
 {
@@ -243,10 +246,11 @@ public class GenerateDailySummaryReportHandler(
         // Reports are stored in a "reports" container in the default storage account
         try
         {
-            // Get connection string from environment or configuration
-            // For now, use development storage or get from configuration
-            var connectionString = Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING") 
-                ?? "UseDevelopmentStorage=true"; // Default to local development storage
+            var connectionString = reportStorageOptions.Value.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("ReportStorageOptions.ConnectionString is not configured");
+            }
             
             var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(connectionString);
             var blobContainerClient = blobServiceClient.GetBlobContainerClient("reports");

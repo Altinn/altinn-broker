@@ -94,6 +94,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
