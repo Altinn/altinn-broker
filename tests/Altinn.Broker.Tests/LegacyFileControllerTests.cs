@@ -665,7 +665,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         }
         zipStream.Position = 0;
         var zipBytes = zipStream.ToArray();
-        using (var content = new ByteArrayContent(zipStream.ToArray()))
+        using (var content = new ByteArrayContent(zipBytes))
         {
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
