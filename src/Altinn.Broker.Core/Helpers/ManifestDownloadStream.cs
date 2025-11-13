@@ -195,16 +195,33 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         }
     }
 
-
     public async Task AddManifestFile(FileTransferEntity fileTransferEntity, ResourceEntity resource)
     {
         ValidateNotClosed();
 
-        if (!IsZipFile())
+        // Handle zero-length (completely empty) stream: create a new ZIP containing only manifest.xml
+        // To handle Some Altinn 2 use cases where an empty file is uploaded, but is expected to have a manifest.xml on download
+        if (_content.Length == 0)
         {
-            throw new InvalidOperationException("The stream must contain a valid ZIP archive");
+            using var newZipStream = new MemoryStream();
+            using (var archive = new ZipArchive(newZipStream, ZipArchiveMode.Create, true))
+            {
+                var manifestEntry = archive.CreateEntry("manifest.xml");
+                using var manifestStream = manifestEntry.Open();
+                var manifest = fileTransferEntity.CreateManifest(resource);
+                WriteSerializeManifestToZip(manifest, manifestStream);
+            }
+            _content = new ReadOnlyMemory<byte>(newZipStream.ToArray());
+            _position = 0;
+            return;
         }
 
+        // Validate ZIP signature (accept normal, empty, spanned archive signatures)
+        if (!HasZipSignature(_content.Span))
+        {
+            throw new InvalidOperationException("The stream must contain a valid ZIP archive.");
+        }
+        
         // Create a memory stream to hold our modified ZIP content
         using var modifiedZipStream = new MemoryStream();
 
@@ -212,15 +229,19 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         Position = 0;
         await CopyToAsync(modifiedZipStream);
         modifiedZipStream.Position = 0;
-
+        
         using (var archive = new ZipArchive(modifiedZipStream, ZipArchiveMode.Update, true))
         {
-            // Remove existing manifest files
-            var manifestEntry = archive.Entries.FirstOrDefault(entry => entry.Name.ToLowerInvariant() == "manifest.xml");
-            manifestEntry?.Delete();
-
-            var recipientsEntry = archive.Entries.FirstOrDefault(entry => entry.Name.ToLowerInvariant() == "recipients.xml");
-            recipientsEntry?.Delete();
+            // Remove existing manifest/recipients entries (single pass, case-insensitive)
+            foreach (var entry in archive.Entries.ToList())
+            {
+                var name = entry.Name;
+                if (string.Equals(name, "manifest.xml", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, "recipients.xml", StringComparison.OrdinalIgnoreCase))
+                {
+                    entry.Delete();
+                }
+            }
 
             // Create new manifest entry
             var newManifestEntry = archive.CreateEntry("manifest.xml");
@@ -236,17 +257,19 @@ public class ManifestDownloadStream : Stream, IManifestDownloadStream
         _position = 0;
     }
 
-    private bool IsZipFile()
+    private static bool HasZipSignature(ReadOnlySpan<byte> span)
     {
-        if (_content.Length < 4)
-        {
-            return false;
-        }
-
-        // Check for ZIP magic number
-        var span = _content.Span;
-        return span[0] == 0x50 && span[1] == 0x4B && span[2] == 0x03 && span[3] == 0x04;
+        if (span.Length < 4) return false;
+        // Accept:
+        // PK 03 04 - Local file header (standard non-empty zip)
+        // PK 05 06 - End of central directory (empty zip)
+        // PK 07 08 - Spanned archive header (rare, but valid)
+        return span[0] == 0x50 && span[1] == 0x4B &&
+               ((span[2] == 0x03 && span[3] == 0x04) ||
+                (span[2] == 0x05 && span[3] == 0x06) ||
+                (span[2] == 0x07 && span[3] == 0x08));
     }
+
     private void WriteSerializeManifestToZip(BrokerServiceManifest manifest, Stream stream)
     {
         var ns = new XmlSerializerNamespaces();
