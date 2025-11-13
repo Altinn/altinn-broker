@@ -19,7 +19,6 @@ public class GenerateDailySummaryReportHandler(
     IServiceOwnerRepository serviceOwnerRepository,
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
-    IBrokerStorageService storageService,
     IOptions<ReportStorageOptions> reportStorageOptions,
     ILogger<GenerateDailySummaryReportHandler> logger,
     IHostEnvironment hostEnvironment)
@@ -43,7 +42,7 @@ public class GenerateDailySummaryReportHandler(
                 return StatisticsErrors.NoFileTransfersFound;
             }
             // Aggregate daily data
-            var summaryData = AggregateDailyData(fileTransfers);
+            var summaryData = await AggregateDailyDataAsync(fileTransfers, cancellationToken);
             logger.LogInformation("Aggregated data into {count} daily summary records", summaryData.Count);
 
             // Generate parquet file and upload to blob storage
@@ -71,7 +70,7 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private List<DailySummaryData> AggregateDailyData(List<FileTransferEntity> fileTransfers)
+    private async Task<List<DailySummaryData>> AggregateDailyDataAsync(List<FileTransferEntity> fileTransfers, CancellationToken cancellationToken)
     {
         // Flatten file transfers with recipients - each recipient gets its own row
         var flattenedData = new List<(FileTransferEntity ft, string recipientId)>();
@@ -92,11 +91,47 @@ public class GenerateDailySummaryReportHandler(
             }
         }
 
+        // Pre-fetch service owner IDs, names, and resource titles to avoid blocking in LINQ
+        var serviceOwnerIds = new Dictionary<Guid, string>();
+        var serviceOwnerNames = new Dictionary<string, string>();
+        var resourceTitles = new Dictionary<string, string>();
+
+        // Get unique file transfers by ID to avoid duplicate lookups
+        var uniqueFileTransfers = flattenedData
+            .Select(x => x.ft)
+            .GroupBy(ft => ft.FileTransferId)
+            .Select(g => g.First())
+            .ToList();
+
+        foreach (var fileTransfer in uniqueFileTransfers)
+        {
+            if (!serviceOwnerIds.ContainsKey(fileTransfer.FileTransferId))
+            {
+                serviceOwnerIds[fileTransfer.FileTransferId] = await GetServiceOwnerIdAsync(fileTransfer, cancellationToken);
+            }
+        }
+
+        foreach (var serviceOwnerId in serviceOwnerIds.Values.Distinct())
+        {
+            if (!serviceOwnerNames.ContainsKey(serviceOwnerId))
+            {
+                serviceOwnerNames[serviceOwnerId] = await GetServiceOwnerNameAsync(serviceOwnerId, cancellationToken);
+            }
+        }
+
+        foreach (var resourceId in flattenedData.Select(x => x.ft.ResourceId ?? "unknown").Distinct())
+        {
+            if (resourceId != "unknown" && !resourceTitles.ContainsKey(resourceId))
+            {
+                resourceTitles[resourceId] = await GetResourceTitleAsync(resourceId, cancellationToken);
+            }
+        }
+
         var groupedData = flattenedData
             .GroupBy(item => new
             {
                 item.ft.Created.Date,
-                ServiceOwnerId = GetServiceOwnerId(item.ft),
+                ServiceOwnerId = serviceOwnerIds[item.ft.FileTransferId],
                 ResourceId = item.ft.ResourceId ?? "unknown",
                 RecipientId = item.recipientId,
                 RecipientType = GetRecipientType(item.recipientId),
@@ -109,9 +144,9 @@ public class GenerateDailySummaryReportHandler(
                 Month = g.Key.Date.Month,
                 Day = g.Key.Date.Day,
                 ServiceOwnerId = g.Key.ServiceOwnerId,
-                ServiceOwnerName = GetServiceOwnerName(g.Key.ServiceOwnerId),
+                ServiceOwnerName = serviceOwnerNames.GetValueOrDefault(g.Key.ServiceOwnerId, "Unknown"),
                 ResourceId = g.Key.ResourceId,
-                ResourceTitle = GetResourceTitle(g.Key.ResourceId),
+                ResourceTitle = resourceTitles.GetValueOrDefault(g.Key.ResourceId, "Unknown"),
                 RecipientType = g.Key.RecipientType,
                 AltinnVersion = g.Key.AltinnVersion,
                 MessageCount = g.Count(),
@@ -128,17 +163,18 @@ public class GenerateDailySummaryReportHandler(
         return groupedData;
     }
 
-    private string GetServiceOwnerId(FileTransferEntity fileTransfer)
+    private async Task<string> GetServiceOwnerIdAsync(FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
         // Get service owner from database resource table (service_owner_id_fk -> service_owner.service_owner_id_pk)
         // This matches the mapping: serviceownerorgnr -> service_owner.service_owner_id_pk
         try
         {
-            var resource = resourceRepository.GetResource(fileTransfer.ResourceId, CancellationToken.None).GetAwaiter().GetResult();
+            var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
             return resource?.ServiceOwnerId ?? "unknown";
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Failed to get service owner ID for resource: {ResourceId}", fileTransfer.ResourceId);
             return "unknown";
         }
     }
@@ -168,7 +204,7 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private string GetServiceOwnerName(string? serviceOwnerId)
+    private async Task<string> GetServiceOwnerNameAsync(string? serviceOwnerId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(serviceOwnerId) || serviceOwnerId == "unknown")
         {
@@ -177,7 +213,7 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            var serviceOwner = serviceOwnerRepository.GetServiceOwner(serviceOwnerId).GetAwaiter().GetResult();
+            var serviceOwner = await serviceOwnerRepository.GetServiceOwner(serviceOwnerId);
             return serviceOwner?.Name ?? $"Unknown ({serviceOwnerId})";
         }
         catch (Exception ex)
@@ -187,7 +223,7 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private string GetResourceTitle(string? resourceId)
+    private async Task<string> GetResourceTitleAsync(string? resourceId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(resourceId) || resourceId == "unknown")
         {
@@ -198,7 +234,7 @@ public class GenerateDailySummaryReportHandler(
         {
             // Get service owner name from Resource Registry (like correspondence does)
             // This returns the name from HasCompetentAuthority.Name (e.g., "Digitaliseringsdirektoratet", "NAV", etc.)
-            var serviceOwnerName = altinnResourceRepository.GetServiceOwnerNameOfResource(resourceId, CancellationToken.None).GetAwaiter().GetResult();
+            var serviceOwnerName = await altinnResourceRepository.GetServiceOwnerNameOfResource(resourceId, cancellationToken);
             return serviceOwnerName ?? $"Unknown ({resourceId})";
         }
         catch (Exception ex)
@@ -332,7 +368,7 @@ public class GenerateDailySummaryReportHandler(
             logger.LogInformation("Found {count} file transfers for report generation", fileTransfers.Count);
 
             // Aggregate data by day and service owner
-            var summaryData = AggregateDailyData(fileTransfers);
+            var summaryData = await AggregateDailyDataAsync(fileTransfers, cancellationToken);
 
             // Generate the parquet file as a stream
             var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, request.Altinn2Included, cancellationToken);
@@ -348,7 +384,7 @@ public class GenerateDailySummaryReportHandler(
                 FileHash = fileHash,
                 FileSizeBytes = fileSize,
                 ServiceOwnerCount = summaryData.Select(d => d.ServiceOwnerId).Distinct().Count(),
-                TotalFileTransferCount = fileTransfers.Count,
+                TotalFileTransferCount = summaryData.Sum(d => d.MessageCount),
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Environment = hostEnvironment.EnvironmentName ?? "Unknown",
                 Altinn2Included = false // Broker only supports Altinn3

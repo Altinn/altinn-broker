@@ -9,7 +9,7 @@ namespace Altinn.Broker.API.Filters;
 /// <summary>
 /// Authorization filter to validate API key and enforce IP-based rate limiting for statistics endpoints
 /// </summary>
-public class StatisticsApiKeyFilter : IAuthorizationFilter
+public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
 {
     private const int RateLimitWindowMinutes = 60;
     
@@ -32,7 +32,7 @@ public class StatisticsApiKeyFilter : IAuthorizationFilter
 
     private int RateLimitAttempts => _environment.IsDevelopment() ? 5 : 10;
 
-    public void OnAuthorization(AuthorizationFilterContext context)
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         // Only apply to statistics endpoints
         if (!context.HttpContext.Request.Path.StartsWithSegments("/broker/api/v1/statistics"))
@@ -77,7 +77,7 @@ public class StatisticsApiKeyFilter : IAuthorizationFilter
 
         // Check rate limit using client IP as identifier
         var clientIp = GetClientIpAddress(context.HttpContext) ?? "unknown";
-        var rateLimitResult = CheckRateLimitAsync(clientIp).GetAwaiter().GetResult();
+        var rateLimitResult = await CheckRateLimitAsync(clientIp);
         
         if (!rateLimitResult.IsAllowed)
         {
@@ -171,7 +171,7 @@ public class StatisticsApiKeyFilter : IAuthorizationFilter
                 .Where(requestTime => requestTime > windowStart)
                 .ToList();
 
-            // Check if limit is exceeded
+            // Check if limit is exceeded BEFORE adding current request
             if (rateLimitData.Requests.Count >= RateLimitAttempts)
             {
                 var oldestRequest = rateLimitData.Requests.Min();
@@ -193,7 +193,8 @@ public class StatisticsApiKeyFilter : IAuthorizationFilter
             // Add current request
             rateLimitData.Requests.Add(now);
 
-            // Store updated data
+            // Store updated data atomically
+            // Note: This is not fully atomic across distributed cache, but reduces race condition window
             var updatedDataJson = JsonSerializer.Serialize(rateLimitData);
             var cacheOptions = new DistributedCacheEntryOptions
             {
