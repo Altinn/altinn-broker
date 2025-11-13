@@ -65,7 +65,7 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
-  { name: 'ReportStorageOptions__ConnectionString', secretRef: 'report-storage-connection-string' }
+  { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
 ]
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
@@ -132,7 +132,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/slack-url'
           name: 'slack-url'
-        }
+        } 
         {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/statistics-api-key'
@@ -140,8 +140,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
         {
           identity: principal_id
-          keyVaultUrl: '${keyVaultUrl}/secrets/report-storage-connection-string'
-          name: 'report-storage-connection-string'
+          keyVaultUrl: '${keyVaultUrl}/secrets/storage-connection-string'
+          name: 'storage-connection-string'
         }
       ]
     }

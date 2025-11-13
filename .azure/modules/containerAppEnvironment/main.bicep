@@ -79,13 +79,13 @@ module containerAppEnvIdSecret '../keyvault/upsertSecret.bicep' = {
   }
 }
 
-var reportStorageConnectionStringSecretName = 'report-storage-connection-string'
-module reportStorageConnectionStringSecret '../keyvault/upsertSecret.bicep' = {
-  name: reportStorageConnectionStringSecretName
+var storageAccountConnectionStringSecretName = 'storage-connection-string'
+module storageAccountConnectionStringSecret '../keyvault/upsertSecret.bicep' = {
+  name: storageAccountConnectionStringSecretName
   params: {
     destKeyVaultName: keyVaultName
-    secretName: reportStorageConnectionStringSecretName
-    secretValue: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+    secretName: storageAccountConnectionStringSecretName
+    secretValue: 'DefaultEndpointsProtocol=https;AccountName=${migrationsStorageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
   }
 }
 
