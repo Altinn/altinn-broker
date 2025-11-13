@@ -549,6 +549,49 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task DownloadEmptyZipFile_WithManifestShimEnabled_ManifestIsAdded()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        var uploadedFileLength = await UploadEmptyZipFile(fileTransferId);
+
+        // Act
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        var downloadedFileBytes = await downloadedFile.Content.ReadAsByteArrayAsync();
+        Assert.True(downloadedFileBytes.Length > uploadedFileLength);
+        var manifestDownloadStream = new ManifestDownloadStream(downloadedFileBytes);
+        var addedManifest = manifestDownloadStream.GetBrokerManifest();
+
+        // Assert
+        Assert.NotNull(addedManifest);
+        Assert.Equal("991825827", addedManifest.Reportee);
+        Assert.Equal(addedManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.True(addedManifest.PropertyList.All(property => file.PropertyList[property.PropertyKey] == property.PropertyValue));
+    }
+
+    [Fact]
+    public async Task DownloadNotAZipFile_WithManifestShimEnabled_Exception()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        await UploadFile(fileTransferId);
+
+        // Act
+        var downloadedFile = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+
+        // Assert
+        Assert.False(downloadedFile.IsSuccessStatusCode);
+    }
+
+    [Fact]
     public async Task DownloadZipFile_WithoutManifestShimEnabled_ManifestIsNotAdded()
     {
         // Arrange
@@ -628,6 +671,23 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
             var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
             Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
         }
+    }
+
+    private async Task<long> UploadEmptyZipFile(string fileTransferId)
+    {
+        using var zipStream = new MemoryStream();
+        using (var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+        {
+        }
+        zipStream.Position = 0;
+        var zipBytes = zipStream.ToArray();
+        using (var content = new ByteArrayContent(zipBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+        return zipStream.Length;
     }
 
     private async Task<long> UploadZipFile(string fileTransferId) {
