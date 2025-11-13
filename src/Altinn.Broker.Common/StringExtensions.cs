@@ -48,23 +48,39 @@ public static class StringExtensions
             return false;
         }
 
-        // Calculate first control digit
+        // Calculate first control digit using Norwegian mod11 standard: k = 11 - (sum % 11)
         int sum1 = 0;
         for (int i = 0; i < 9; i++)
         {
             sum1 += int.Parse(identifier[i].ToString(), CultureInfo.InvariantCulture) * SocialSecurityNumberWeights1[i];
         }
-        int control1 = sum1 % 11;
-        if (control1 == 11) control1 = 0;
+        int control1 = 11 - (sum1 % 11);
+        // If result is 11, set to 0. If result is 10, the number is invalid.
+        if (control1 == 11)
+        {
+            control1 = 0;
+        }
+        else if (control1 == 10)
+        {
+            return false; // Invalid control digit
+        }
 
-        // Calculate second control digit
+        // Calculate second control digit using Norwegian mod11 standard: k = 11 - (sum % 11)
         int sum2 = 0;
         for (int i = 0; i < 10; i++)
         {
             sum2 += int.Parse(identifier[i].ToString(), CultureInfo.InvariantCulture) * SocialSecurityNumberWeights2[i];
         }
-        int control2 = sum2 % 11;
-        if (control2 == 11) control2 = 0;
+        int control2 = 11 - (sum2 % 11);
+        // If result is 11, set to 0. If result is 10, the number is invalid.
+        if (control2 == 11)
+        {
+            control2 = 0;
+        }
+        else if (control2 == 10)
+        {
+            return false; // Invalid control digit
+        }
 
         return control1 == int.Parse(identifier[9..10], CultureInfo.InvariantCulture) &&
                control2 == int.Parse(identifier[10..11], CultureInfo.InvariantCulture);
