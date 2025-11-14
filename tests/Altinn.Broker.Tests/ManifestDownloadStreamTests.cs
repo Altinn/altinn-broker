@@ -34,6 +34,30 @@ public class ManifestDownloadStreamTests
     }
 
     [Fact]
+    public async Task StreamWithEmptyZip_AddManifest_ManifestIsAddedAsync()
+    {
+        var resource = new ResourceEntity
+        {
+            Id = "manifest-shim-resource",
+            ServiceOwnerId = "someServiceOwnerId",
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "someExternalServiceCode",
+            ExternalServiceEditionCodeLegacy = 123
+        };
+        var stream = ReadFile("Data/ManifestFileTests/Empty.zip");
+        var originalFileLength = stream.Length;
+        var file = FileTransferEntityFactory.BasicFileTransfer();
+        DateTime expectedSentDate = file.Created.ToLocalTime().DateTime;
+        await stream.AddManifestFile(file, resource);
+        Assert.True(stream.Length > originalFileLength);
+        var brokerManifest = stream.GetBrokerManifest();
+        Assert.NotNull(brokerManifest);
+        Assert.Equal("991825827", brokerManifest.Reportee);
+        Assert.Equal(brokerManifest.SendersReference, file.SendersFileTransferReference);
+        Assert.Equal(brokerManifest.SentDate, expectedSentDate);
+    }
+
+    [Fact]
     public async Task StreamWithManifest_AddManifest_ExistingManifestIsReplacedAsync()
     {
         var resource = new ResourceEntity

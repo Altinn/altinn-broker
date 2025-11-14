@@ -55,7 +55,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             var fileBuffer = new byte[fileTransfer.FileTransferSize];
             downloadStream.ReadExactly(fileBuffer, 0, fileBuffer.Length);
             downloadStream = new ManifestDownloadStream(fileBuffer);
-            (downloadStream as ManifestDownloadStream)?.AddManifestFile(fileTransfer, resource);
+            await ((ManifestDownloadStream)downloadStream).AddManifestFile(fileTransfer, resource);
         }
         var caller = request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId();
         await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller.WithPrefix(), cancellationToken);
