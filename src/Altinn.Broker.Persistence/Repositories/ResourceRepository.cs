@@ -41,7 +41,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
 
         if (resource is null)
         {
-            resource = await altinnResourceRepository.GetResource(resourceId, cancellationToken);
+            resource = await altinnResourceRepository.GetResourceEntity(resourceId, cancellationToken);
             if (resource is null || string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
             {
                 return null;

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
@@ -93,6 +94,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.Configure<StatisticsApiKeyOptions>(config.GetSection(StatisticsApiKeyOptions.SectionName));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
@@ -100,6 +102,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
     services.AddProblemDetails();
+
+    // Register statistics API key filter
+    services.AddScoped<StatisticsApiKeyFilter>();
 
     services.ConfigureHangfire();
 

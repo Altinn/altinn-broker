@@ -14,6 +14,7 @@ param maskinportenJwk = readEnvironmentVariable('MASKINPORTEN_JWK')
 param maskinportenClientId = readEnvironmentVariable('MASKINPORTEN_CLIENT_ID')
 param platformSubscriptionKey = readEnvironmentVariable('PLATFORM_SUBSCRIPTION_KEY')
 param slackUrl = readEnvironmentVariable('SLACK_URL')
+param statisticsApiKey = readEnvironmentVariable('STATISTICS_API_KEY')
 
 // SKUs
 param keyVaultSku = {

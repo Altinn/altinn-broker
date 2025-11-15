@@ -29,4 +29,5 @@ public static class Errors
     public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
     public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it.", HttpStatusCode.BadRequest);
     public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
+    public static Error ReportGenerationFailed = new Error(24, "Failed to generate statistics report", HttpStatusCode.InternalServerError);
 }
