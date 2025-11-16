@@ -122,10 +122,7 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         }
         else
         {
-            var originalIds = fileTransfers.Select(f => f.Id).OrderBy(id => id).ToList();
-            var denormalizedIds = fileTransfersFromDenormalized.Select(f => f.Id).OrderBy(id => id).ToList();
-
-            if (!originalIds.SequenceEqual(denormalizedIds))
+            if (!fileTransfers.SequenceEqual(fileTransfersFromDenormalized))
             {
                 logger.LogError("Result mismatch! Same count ({count}) but different IDs returned", originalCount);
             }
