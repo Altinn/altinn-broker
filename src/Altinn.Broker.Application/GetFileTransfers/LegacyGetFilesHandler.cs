@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -73,7 +74,56 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         }
 
         logger.LogInformation("Searching for files with constructed search criteria: {fileSearch}", JsonSerializer.Serialize(fileSearch));
-        var fileTransfers = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+
+        var sw1 = Stopwatch.StartNew();
+        var sw2 = Stopwatch.StartNew();
+
+        var task1 = Task.Run(async () =>
+        {
+            var result = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+            sw1.Stop();
+            return result;
+        });
+
+        var task2 = Task.Run(async () =>
+        {
+            var result = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatusDenormalized(fileSearch, cancellationToken);
+            sw2.Stop();
+            return result;
+        });
+
+        var results = await Task.WhenAll(task1, task2);
+        var fileTransfers = results[0];
+        var fileTransfersFromDenormalized = results[1];
+
+        logger.LogInformation("Query performance - Original: {originalMs}ms, Denormalized: {denormalizedMs}ms",
+            sw1.ElapsedMilliseconds, sw2.ElapsedMilliseconds);
+
+        // Compare results
+        var originalCount = fileTransfers?.Count() ?? 0;
+        var denormalizedCount = fileTransfersFromDenormalized?.Count() ?? 0;
+
+        if (originalCount != denormalizedCount)
+        {
+            logger.LogError("Result mismatch! Original returned {originalCount} items, Denormalized returned {denormalizedCount} items",
+                originalCount, denormalizedCount);
+        }
+        else
+        {
+            // Optional: Deep comparison if counts match
+            var originalIds = fileTransfers.Select(f => f.Id).OrderBy(id => id).ToList();
+            var denormalizedIds = fileTransfersFromDenormalized.Select(f => f.Id).OrderBy(id => id).ToList();
+
+            if (!originalIds.SequenceEqual(denormalizedIds))
+            {
+                logger.LogError("Result mismatch! Same count ({count}) but different IDs returned", originalCount);
+            }
+            else
+            {
+                logger.LogInformation("Results match - both queries returned {count} items with identical IDs", originalCount);
+            }
+        }
+
         return fileTransfers;
     }
 }
