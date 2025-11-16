@@ -92,11 +92,23 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
             return result;
         });
 
-        var results = await Task.WhenAll(task1, task2);
-        var fileTransfers = results[0];
-        var fileTransfersFromDenormalized = results[1];
+        // Always wait for the base case
+        var fileTransfers = await task1;
 
-        logger.LogInformation("Query performance - Original: {originalMs}ms, Denormalized: {denormalizedMs}ms",
+        logger.LogInformation("Base query completed in {baseMs}ms", sw1.ElapsedMilliseconds);
+
+        // Check if denormalized query is done
+        if (!task2.IsCompleted)
+        {
+            logger.LogError("Denormalized query is slower than base query! Base: {baseMs}ms, Denormalized: still running. Returning base result without waiting.",
+                sw1.ElapsedMilliseconds);
+            return fileTransfers;
+        }
+
+        // Denormalized query finished, get its result
+        var fileTransfersFromDenormalized = await task2;
+
+        logger.LogInformation("Query performance - Base: {baseMs}ms, Denormalized: {denormalizedMs}ms",
             sw1.ElapsedMilliseconds, sw2.ElapsedMilliseconds);
 
         // Compare results
@@ -105,12 +117,11 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
 
         if (originalCount != denormalizedCount)
         {
-            logger.LogError("Result mismatch! Original returned {originalCount} items, Denormalized returned {denormalizedCount} items",
+            logger.LogError("Result mismatch! Base returned {originalCount} items, Denormalized returned {denormalizedCount} items",
                 originalCount, denormalizedCount);
         }
         else
         {
-            // Optional: Deep comparison if counts match
             var originalIds = fileTransfers.Select(f => f.Id).OrderBy(id => id).ToList();
             var denormalizedIds = fileTransfersFromDenormalized.Select(f => f.Id).OrderBy(id => id).ToList();
 
