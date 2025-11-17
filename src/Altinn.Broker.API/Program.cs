@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
@@ -93,6 +94,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
@@ -100,6 +102,21 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
     services.AddProblemDetails();
+
+    // Add distributed cache for rate limiting (use memory cache for development, Redis for production)
+    if (hostEnvironment.IsDevelopment())
+    {
+        services.AddDistributedMemoryCache();
+    }
+    else
+    {
+        // In production, use Redis if available
+        // For now, fall back to memory cache
+        services.AddDistributedMemoryCache();
+    }
+
+    // Register filters
+    services.AddScoped<StatisticsApiKeyFilter>();
 
     services.ConfigureHangfire();
 

@@ -79,4 +79,14 @@ module containerAppEnvIdSecret '../keyvault/upsertSecret.bicep' = {
   }
 }
 
+var storageAccountConnectionStringSecretName = 'storage-connection-string'
+module storageAccountConnectionStringSecret '../keyvault/upsertSecret.bicep' = {
+  name: storageAccountConnectionStringSecretName
+  params: {
+    destKeyVaultName: keyVaultName
+    secretName: storageAccountConnectionStringSecretName
+    secretValue: 'DefaultEndpointsProtocol=https;AccountName=${migrationsStorageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+  }
+}
+
 output containerAppEnvironmentId string = containerAppEnvironment.id
