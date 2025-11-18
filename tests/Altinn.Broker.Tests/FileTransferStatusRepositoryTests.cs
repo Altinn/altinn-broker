@@ -40,7 +40,8 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal((int)FileTransferStatus.Initialized, reader.GetInt32(reader.GetOrdinal("latest_file_status_id")));
-        Assert.NotNull(reader.GetValue(reader.GetOrdinal("latest_file_status_date")));
+        var dateOrdinal = reader.GetOrdinal("latest_file_status_date");
+        Assert.False(reader.IsDBNull(dateOrdinal));
     }
 
     [Fact]
