@@ -61,9 +61,11 @@ var containerAppEnvVars = [
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
   { name: 'GeneralSettings__SlackUrl', secretRef: 'slack-url' }
   { name: 'GeneralSettings__ApplicationInsightsConnectionString', secretRef: 'application-insights-connection-string' }
+  { name: 'StatisticsApiKey', secretRef: 'statistics-api-key' }
   { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
+  { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
 ]
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
@@ -131,6 +133,16 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUrl}/secrets/slack-url'
           name: 'slack-url'
         } 
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/statistics-api-key'
+          name: 'statistics-api-key'
+        }
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/storage-connection-string'
+          name: 'storage-connection-string'
+        }
       ]
     }
 

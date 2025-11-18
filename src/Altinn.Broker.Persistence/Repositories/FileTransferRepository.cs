@@ -115,7 +115,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             return new List<FileTransferEntity>(0);
         }
-        
+
         await using var command = dataSource.CreateCommand(overviewCommandMultiple);
 
         var parameter = new NpgsqlParameter("@fileTransferIds", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
@@ -246,14 +246,14 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             WHERE file_transfer_id_pk = @fileTransferId 
             GROUP BY afs.actor_id_fk, a.actor_external_id
         ");
-        
+
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        
+
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
             await using var reader = await command.ExecuteReaderAsync(ct);
-                
+
             while (await reader.ReadAsync(ct))
             {
                 fileTransferStatuses.Add(new ActorFileTransferStatusEntity()
@@ -288,7 +288,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             actorId = actor.ActorId;
         }
-            
+
         var fileTransferId = Guid.NewGuid();
         await using NpgsqlCommand command = dataSource.CreateCommand(
             "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
@@ -317,81 +317,95 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     {
         StringBuilder commandString = new StringBuilder();
         long[] actorIds = fileTransferSearch.GetActorIds();
-        commandString.AppendLine(@"
-SELECT DISTINCT f.file_transfer_id_pk, f.Created
-FROM broker.file_transfer f
-INNER JOIN LATERAL
-(
-	SELECT * FROM broker.actor_file_transfer_status afts
-	WHERE afts.file_transfer_id_fk = f.file_transfer_id_pk
-");
 
-        // Actor filtering in inner join lateral clause
+        // Build CTE for latest actor file transfer status
+        commandString.AppendLine(@"
+        WITH latest_actor_status AS (
+          SELECT DISTINCT ON (file_transfer_id_fk)
+            file_transfer_id_fk,
+            actor_file_transfer_status_description_id_fk
+          FROM broker.actor_file_transfer_status
+          WHERE 1=1");
+
+        // Actor filtering in CTE
         if (actorIds.Length > 1)
         {
-            commandString.AppendLine("  AND afts.actor_id_fk = ANY(@actorIds)");
+            commandString.AppendLine("    AND actor_id_fk = ANY(@actorIds)");
         }
         else if (actorIds.Length == 1)
         {
-            commandString.AppendLine($"  AND afts.actor_id_fk = @actorId");
+            commandString.AppendLine("    AND actor_id_fk = @actorId");
         }
 
-        commandString.AppendLine(@" ORDER BY afts.actor_file_transfer_status_id_pk DESC
-	LIMIT 1
-) as afts on true
-        ");
+        commandString.AppendLine(@"  ORDER BY file_transfer_id_fk, actor_file_transfer_status_id_pk DESC
+)");
 
+        // Build CTE for latest file transfer status if needed
         if (fileTransferSearch.FileTransferStatus.HasValue)
         {
-            // File transfer status check
-            commandString.AppendLine(@"INNER JOIN LATERAL
-(
-	SELECT * FROM broker.file_transfer_status fs
-	WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
-	ORDER BY fs.file_transfer_status_id_pk DESC
-	LIMIT 1
-) as fs on true
-WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
-        }
-        else
-        {
-            commandString.AppendLine("WHERE 1=1");
+            commandString.AppendLine(@",
+latest_file_status AS (
+  SELECT DISTINCT ON (file_transfer_id_fk)
+    file_transfer_id_fk,
+    file_transfer_status_description_id_fk
+  FROM broker.file_transfer_status
+  ORDER BY file_transfer_id_fk, file_transfer_status_id_pk DESC
+)");
         }
 
-        // Recipient status filtering
+        // Main query
+        commandString.AppendLine(@"
+SELECT f.file_transfer_id_pk, f.created
+FROM broker.file_transfer f
+INNER JOIN latest_actor_status las 
+  ON las.file_transfer_id_fk = f.file_transfer_id_pk");
+
+        // Recipient status filtering in JOIN condition
         if (fileTransferSearch.RecipientFileTransferStatus.HasValue)
         {
             if (fileTransferSearch.RecipientFileTransferStatus.Value == ActorFileTransferStatus.Initialized)
             {
-                commandString.AppendLine("    AND afts.actor_file_transfer_status_description_id_fk IN (0,1)");
+                commandString.AppendLine("  AND las.actor_file_transfer_status_description_id_fk IN (0,1)");
             }
             else
             {
-                commandString.AppendLine("    AND afts.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
+                commandString.AppendLine("  AND las.actor_file_transfer_status_description_id_fk = @recipientFileTransferStatus");
             }
         }
+
+        // Join file transfer status if filtering by it
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            commandString.AppendLine(@"
+INNER JOIN latest_file_status lfs 
+  ON lfs.file_transfer_id_fk = f.file_transfer_id_pk
+  AND lfs.file_transfer_status_description_id_fk = @fileTransferStatus");
+        }
+
+        commandString.AppendLine("WHERE 1=1");
 
         // Date range filtering
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created BETWEEN @from AND @to");
+            commandString.AppendLine("  AND f.created BETWEEN @from AND @to");
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            commandString.AppendLine("AND f.created > @from");
+            commandString.AppendLine("  AND f.created > @from");
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("AND f.created < @to");
+            commandString.AppendLine("  AND f.created < @to");
         }
 
         // Resource ID filtering
         if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
         {
-            commandString.AppendLine("AND f.resource_id = @resourceId");
+            commandString.AppendLine("  AND f.resource_id = @resourceId");
         }
 
         commandString.AppendLine("ORDER BY f.created ASC;");
+
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             await using var command = dataSource.CreateCommand(commandString.ToString());
@@ -408,7 +422,7 @@ WHERE fs.file_transfer_status_description_id_fk = @fileTransferStatus");
             {
                 command.Parameters.AddWithValue("@actorId", actorIds[0]);
             }
-            
+
             if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
             {
                 command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
@@ -622,14 +636,14 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var files = new List<Guid>();
-            
+
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
                 var fileTransferId = reader.GetGuid(0);
                 files.Add(fileTransferId);
             }
-            
+
             return files;
         }, cancellationToken);
     }
@@ -695,18 +709,18 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var files = new List<Guid>();
-            
+
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
                 var fileTransferId = reader.GetGuid(0);
                 files.Add(fileTransferId);
             }
-            
+
             return files;
         }, cancellationToken);
     }
-    
+
     public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
     {
         await using (var command = dataSource.CreateCommand(
@@ -729,12 +743,12 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     {
         await using var command = dataSource.CreateCommand("SELECT key, value FROM broker.file_transfer_property WHERE file_transfer_id_fk = @filetransferId");
         command.Parameters.AddWithValue("@filetransferId", fileTransferId);
-        
+
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var metadata = new Dictionary<string, string>();
             await using var reader = await command.ExecuteReaderAsync(ct);
-                
+
             while (await reader.ReadAsync(ct))
             {
                 metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
@@ -803,5 +817,123 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
             await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
         }
+    }
+
+    public async Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken)
+    {
+        // Optimized query: Get all file transfers with sender, recipients, and service owner ID in one query (no N+1 problem)
+        // Using DISTINCT to handle potential duplicates (same recipient can have multiple status changes)
+        // JOIN with altinn_resource to get service_owner_id_fk directly, avoiding extra lookups
+        const string query = @"
+            SELECT DISTINCT ON (f.file_transfer_id_pk, recipient.actor_id_pk)
+                f.file_transfer_id_pk,
+                f.resource_id,
+                f.filename,
+                f.checksum,
+                f.sender_actor_id_fk,
+                f.external_file_transfer_reference,
+                f.created,
+                f.file_location,
+                f.file_transfer_size,
+                f.expiration_time,
+                f.hangfire_job_id,
+                f.use_virus_scan,
+                sender.actor_external_id as sender_actor_external_id,
+                recipient.actor_id_pk as recipient_actor_id_pk,
+                recipient.actor_external_id as recipient_actor_external_id,
+                afs.actor_file_transfer_status_description_id_fk,
+                afs.actor_file_transfer_status_date,
+                r.service_owner_id_fk as service_owner_id
+            FROM broker.file_transfer f
+            INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+            LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
+            LEFT JOIN broker.actor_file_transfer_status afs ON afs.file_transfer_id_fk = f.file_transfer_id_pk
+            LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afs.actor_id_fk
+            ORDER BY f.file_transfer_id_pk, recipient.actor_id_pk NULLS LAST, afs.actor_file_transfer_status_date DESC";
+
+        await using var command = dataSource.CreateCommand(query);
+        
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransfersDict = new Dictionary<Guid, FileTransferEntity>();
+            var serviceOwnerIdsDict = new Dictionary<Guid, string>(); // Store service owner IDs from query
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                
+                // Get or create file transfer entity
+                if (!fileTransfersDict.TryGetValue(fileTransferId, out var fileTransfer))
+                {
+                    var senderActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk"));
+                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    
+                    // Store service owner ID from query (if available)
+                    if (!reader.IsDBNull(reader.GetOrdinal("service_owner_id")))
+                    {
+                        serviceOwnerIdsDict[fileTransferId] = reader.GetString(reader.GetOrdinal("service_owner_id"));
+                    }
+                    
+                    fileTransfer = new FileTransferEntity
+                    {
+                        FileTransferId = fileTransferId,
+                        ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                        FileName = reader.GetString(reader.GetOrdinal("filename")),
+                        Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                        Sender = new ActorEntity
+                        {
+                            ActorId = senderActorId,
+                            ActorExternalId = senderActorExternalId
+                        },
+                        SendersFileTransferReference = reader.IsDBNull(reader.GetOrdinal("external_file_transfer_reference")) ? null : reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                        ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                        FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                        HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                        FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                        UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
+                        RecipientCurrentStatuses = new List<ActorFileTransferStatusEntity>(),
+                        FileTransferStatusEntity = new FileTransferStatusEntity
+                        {
+                            FileTransferId = fileTransferId,
+                            Status = FileTransferStatus.UploadStarted, // Default, actual status not needed for report
+                            Date = reader.GetDateTime(reader.GetOrdinal("created"))
+                        },
+                        FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("created")),
+                        PropertyList = new Dictionary<string, string>()
+                    };
+                    
+                    fileTransfersDict[fileTransferId] = fileTransfer;
+                }
+                
+                // Add recipient if present (check for duplicates)
+                if (!reader.IsDBNull(reader.GetOrdinal("recipient_actor_id_pk")))
+                {
+                    var recipientActorId = reader.GetInt64(reader.GetOrdinal("recipient_actor_id_pk"));
+                    var recipientActorExternalId = reader.GetString(reader.GetOrdinal("recipient_actor_external_id"));
+                    var recipientStatus = reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk"));
+                    var recipientDate = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date"));
+                    
+                    // Check if this recipient already exists (avoid duplicates)
+                    if (!fileTransfer.RecipientCurrentStatuses.Any(r => r.Actor.ActorId == recipientActorId))
+                    {
+                        fileTransfer.RecipientCurrentStatuses.Add(new ActorFileTransferStatusEntity
+                        {
+                            FileTransferId = fileTransferId,
+                            Actor = new ActorEntity
+                            {
+                                ActorId = recipientActorId,
+                                ActorExternalId = recipientActorExternalId
+                            },
+                            Status = (ActorFileTransferStatus)recipientStatus,
+                            Date = recipientDate
+                        });
+                    }
+                }
+            }
+            
+            return (fileTransfersDict.Values.ToList(), serviceOwnerIdsDict);
+        }, cancellationToken);
     }
 }
