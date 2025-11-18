@@ -1,5 +1,6 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Altinn.Broker.Common.Constants;
 
 namespace Altinn.Broker.Common;
 
@@ -110,5 +111,19 @@ public static class StringExtensions
             return orgNumber;
         }
         return $"0192:{orgNumber}";
+    }
+
+    public static string WithUrnPrefix(this string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return string.Empty;
+        }
+        if (identifier.StartsWith(UrnConstants.OrganizationNumberAttribute))
+        {
+            return identifier;
+        }
+        return $"{UrnConstants.OrganizationNumberAttribute}:{identifier}";
+        throw new ArgumentException("Identifier is not a valid organization number or social security number", nameof(identifier));
     }
 }
