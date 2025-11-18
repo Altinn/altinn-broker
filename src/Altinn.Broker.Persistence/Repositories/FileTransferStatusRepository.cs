@@ -10,6 +10,18 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
 {
     public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
     {
+        // This query performs two operations atomically:
+        // 1. Inserts a new file transfer status record into the history table
+        // 2. Updates the denormalized latest_file_status_id and latest_file_status_date columns on the file_transfer table
+        //
+        // The denormalization logic:
+        // - Updates the file_transfer table only if the new status is "newer" than the existing latest:
+        //   * No latest status exists (latest_file_status_date IS NULL), OR
+        //   * Newer by timestamp (new_date > old_date), OR
+        //   * Same timestamp but higher ID (handles edge case of simultaneous inserts)
+        //
+        // The WHERE clause ensures we only update when the new status is actually newer,
+        // preventing race conditions where an older status might overwrite a newer one.
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.file_transfer_status (
@@ -29,9 +41,14 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                 FROM inserted_status
                 WHERE file_transfer.file_transfer_id_pk = @fileTransferId
                     AND (
+                        -- Update if no latest status exists yet
                         file_transfer.latest_file_status_date IS NULL 
-                        OR inserted_status.file_transfer_status_date > file_transfer.latest_file_status_date
-                        OR (inserted_status.file_transfer_status_date = file_transfer.latest_file_status_date 
+                        OR 
+                        -- Update if new status has a newer timestamp
+                        inserted_status.file_transfer_status_date > file_transfer.latest_file_status_date
+                        OR 
+                        -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
+                        (inserted_status.file_transfer_status_date = file_transfer.latest_file_status_date 
                             AND inserted_status.file_transfer_status_id_pk > COALESCE(
                                 (SELECT file_transfer_status_id_pk 
                                  FROM broker.file_transfer_status 

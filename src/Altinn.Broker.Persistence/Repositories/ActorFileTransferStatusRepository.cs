@@ -55,6 +55,18 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
             actorId = actor.ActorId;
         }
         
+        // This query performs two operations atomically:
+        // 1. Inserts a new actor file transfer status record into the history table
+        // 2. Updates the denormalized latest_status table to keep the most recent status per (file_transfer, actor) pair
+        //
+        // The denormalization logic:
+        // - If no latest status exists for this (file_transfer, actor) pair, insert it
+        // - If a latest status exists, update it only if the new status is "newer":
+        //   * Newer by timestamp (new_date > old_date), OR
+        //   * Same timestamp but higher ID (handles edge case of simultaneous inserts)
+        //
+        // The WHERE clause in ON CONFLICT ensures we only update when the new status is actually newer,
+        // preventing race conditions where an older status might overwrite a newer one.
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.actor_file_transfer_status (
@@ -83,19 +95,21 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                 latest_actor_status_id = EXCLUDED.latest_actor_status_id,
                 latest_actor_status_date = EXCLUDED.latest_actor_status_date
             WHERE 
+                -- Update if new status has a newer timestamp
                 EXCLUDED.latest_actor_status_date > actor_file_transfer_latest_status.latest_actor_status_date
-                OR (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
+                OR 
+                -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
+                (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
                     AND (SELECT MAX(actor_file_transfer_status_id_pk)
                          FROM broker.actor_file_transfer_status
                          WHERE file_transfer_id_fk = EXCLUDED.file_transfer_id_fk
                            AND actor_id_fk = EXCLUDED.actor_id_fk
-                           AND actor_file_transfer_status_date = EXCLUDED.latest_actor_status_date) >= COALESCE(
-                            (SELECT MAX(actor_file_transfer_status_id_pk)
-                             FROM broker.actor_file_transfer_status
-                             WHERE file_transfer_id_fk = actor_file_transfer_latest_status.file_transfer_id_fk
-                               AND actor_id_fk = actor_file_transfer_latest_status.actor_id_fk
-                               AND actor_file_transfer_status_date = actor_file_transfer_latest_status.latest_actor_status_date), 0)
-                );";
+                           AND actor_file_transfer_status_date = EXCLUDED.latest_actor_status_date) >= 
+                        (SELECT MAX(actor_file_transfer_status_id_pk)
+                         FROM broker.actor_file_transfer_status
+                         WHERE file_transfer_id_fk = actor_file_transfer_latest_status.file_transfer_id_fk
+                           AND actor_id_fk = actor_file_transfer_latest_status.actor_id_fk
+                           AND actor_file_transfer_status_date = actor_file_transfer_latest_status.latest_actor_status_date));";
 
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@actorId", actorId);
