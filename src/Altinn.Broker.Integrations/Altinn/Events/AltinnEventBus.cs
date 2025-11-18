@@ -94,7 +94,7 @@ public class AltinnEventBus : IEventBus
             Type = "no.altinn.broker." + type.ToString().ToLowerInvariant(),
             Source = _altinnOptions.PlatformGatewayUrl + "broker/api/v1/filetransfer",
             Subject = organizationNumber.WithUrnPrefix(),
-            AlternativeSubject = partyId.WithUrnPrefix(),
+            AlternativeSubject = !string.IsNullOrWhiteSpace(partyId) ? "/organisation/" + partyId : null,
             Data = data,
         };
 
