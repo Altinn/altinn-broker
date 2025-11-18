@@ -10,9 +10,41 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
 {
     public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
     {
-        await using var command = dataSource.CreateCommand(
-                    "INSERT INTO broker.file_transfer_status (file_transfer_id_fk, file_transfer_status_description_id_fk, file_transfer_status_date, file_transfer_status_detailed_description) " +
-                    "VALUES (@fileTransferId, @statusId, NOW(), @detailedFileTransferStatus) RETURNING file_transfer_status_id_pk;");
+        var query = @"
+            WITH inserted_status AS (
+                INSERT INTO broker.file_transfer_status (
+                    file_transfer_id_fk, 
+                    file_transfer_status_description_id_fk, 
+                    file_transfer_status_date, 
+                    file_transfer_status_detailed_description
+                )
+                VALUES (@fileTransferId, @statusId, NOW(), @detailedFileTransferStatus)
+                RETURNING file_transfer_status_id_pk, file_transfer_status_date, file_transfer_status_description_id_fk
+            ),
+            updated_file_transfer AS (
+                UPDATE broker.file_transfer
+                SET 
+                    latest_file_status_id = inserted_status.file_transfer_status_description_id_fk,
+                    latest_file_status_date = inserted_status.file_transfer_status_date
+                FROM inserted_status
+                WHERE file_transfer.file_transfer_id_pk = @fileTransferId
+                    AND (
+                        file_transfer.latest_file_status_date IS NULL 
+                        OR inserted_status.file_transfer_status_date > file_transfer.latest_file_status_date
+                        OR (inserted_status.file_transfer_status_date = file_transfer.latest_file_status_date 
+                            AND inserted_status.file_transfer_status_id_pk > COALESCE(
+                                (SELECT file_transfer_status_id_pk 
+                                 FROM broker.file_transfer_status 
+                                 WHERE file_transfer_id_fk = @fileTransferId 
+                                   AND file_transfer_status_date = inserted_status.file_transfer_status_date
+                                 ORDER BY file_transfer_status_id_pk DESC 
+                                 LIMIT 1), 0)
+                        )
+                    )
+            )
+            SELECT file_transfer_status_id_pk FROM inserted_status;";
+
+        await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@statusId", (int)status);
         command.Parameters.AddWithValue("@detailedFileTransferStatus", detailedFileTransferStatus is null ? DBNull.Value : detailedFileTransferStatus);

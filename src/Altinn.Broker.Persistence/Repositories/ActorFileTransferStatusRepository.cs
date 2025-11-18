@@ -55,9 +55,49 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
             actorId = actor.ActorId;
         }
         
-        await using var command = dataSource.CreateCommand(
-            "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date) " +
-            "VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())");
+        var query = @"
+            WITH inserted_status AS (
+                INSERT INTO broker.actor_file_transfer_status (
+                    actor_id_fk, 
+                    file_transfer_id_fk, 
+                    actor_file_transfer_status_description_id_fk, 
+                    actor_file_transfer_status_date
+                )
+                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())
+                RETURNING actor_file_transfer_status_id_pk, actor_file_transfer_status_date, actor_file_transfer_status_description_id_fk, actor_id_fk, file_transfer_id_fk
+            )
+            INSERT INTO broker.actor_file_transfer_latest_status (
+                file_transfer_id_fk,
+                actor_id_fk,
+                latest_actor_status_id,
+                latest_actor_status_date
+            )
+            SELECT 
+                inserted_status.file_transfer_id_fk,
+                inserted_status.actor_id_fk,
+                inserted_status.actor_file_transfer_status_description_id_fk,
+                inserted_status.actor_file_transfer_status_date
+            FROM inserted_status
+            ON CONFLICT (file_transfer_id_fk, actor_id_fk) 
+            DO UPDATE SET
+                latest_actor_status_id = EXCLUDED.latest_actor_status_id,
+                latest_actor_status_date = EXCLUDED.latest_actor_status_date
+            WHERE 
+                EXCLUDED.latest_actor_status_date > actor_file_transfer_latest_status.latest_actor_status_date
+                OR (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
+                    AND (SELECT MAX(actor_file_transfer_status_id_pk)
+                         FROM broker.actor_file_transfer_status
+                         WHERE file_transfer_id_fk = EXCLUDED.file_transfer_id_fk
+                           AND actor_id_fk = EXCLUDED.actor_id_fk
+                           AND actor_file_transfer_status_date = EXCLUDED.latest_actor_status_date) >= COALESCE(
+                            (SELECT MAX(actor_file_transfer_status_id_pk)
+                             FROM broker.actor_file_transfer_status
+                             WHERE file_transfer_id_fk = actor_file_transfer_latest_status.file_transfer_id_fk
+                               AND actor_id_fk = actor_file_transfer_latest_status.actor_id_fk
+                               AND actor_file_transfer_status_date = actor_file_transfer_latest_status.latest_actor_status_date), 0)
+                );";
+
+        await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@actorFileTransferStatusId", (int)status);
