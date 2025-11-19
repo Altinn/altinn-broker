@@ -42,7 +42,7 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         {
             logger.LogInformation("Getting actors for specified recipients: {recipients}", string.Join(',', request.Recipients).SanitizeForLogs());
             fileSearch.Actors = await GetActors(request.Recipients, cancellationToken);
-            logger.LogInformation("Got actors for specified recipients: {recipients}", string.Join(',', request.Recipients).SanitizeForLogs());
+            logger.LogInformation("Got actors: {actors}", string.Join(',', fileSearch.Actors.Select(actor => actor.ActorId)).SanitizeForLogs());
         }
         else
         {
