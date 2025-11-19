@@ -74,72 +74,8 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         }
 
         logger.LogInformation("Searching for files with constructed search criteria: {fileSearch}", JsonSerializer.Serialize(fileSearch));
-
-        var sw1 = Stopwatch.StartNew();
-        var sw2 = Stopwatch.StartNew();
-
-        var task1 = Task.Run(async () =>
-        {
-            var result = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
-            sw1.Stop();
-            return result;
-        });
-
-        var task2 = Task.Run(async () =>
-        {
-            var result = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatusDenormalized(fileSearch, cancellationToken);
-            sw2.Stop();
-            return result;
-        });
-
-        // Always wait for the base case
-        var fileTransfers = await task1;
-
-        logger.LogInformation("Base query completed in {baseMs}ms", sw1.ElapsedMilliseconds);
-
-        // Check if denormalized query is done
-        if (!task2.IsCompleted)
-        {
-            logger.LogError("Denormalized query is slower than base query! Base: {baseMs}ms, Denormalized: still running. Returning base result without waiting.",
-                sw1.ElapsedMilliseconds);
-            return fileTransfers;
-        }
-
-        // Denormalized query finished, get its result
-        List<Guid> fileTransfersFromDenormalized; 
-        try 
-        { 
-            fileTransfersFromDenormalized = await task2; 
-        }
-        catch (Exception ex) 
-        { 
-            logger.LogError(ex, "Denormalized query failed; returning base result"); 
-            return fileTransfers; 
-        }
-        logger.LogInformation("Query performance - Base: {baseMs}ms, Denormalized: {denormalizedMs}ms",
-            sw1.ElapsedMilliseconds, sw2.ElapsedMilliseconds);
-
-        // Compare results
-        var originalCount = fileTransfers?.Count() ?? 0;
-        var denormalizedCount = fileTransfersFromDenormalized?.Count() ?? 0;
-
-        if (originalCount != denormalizedCount)
-        {
-            logger.LogError("Result mismatch! Base returned {originalCount} items, Denormalized returned {denormalizedCount} items",
-                originalCount, denormalizedCount);
-        }
-        else
-        {
-            if (!fileTransfers.SequenceEqual(fileTransfersFromDenormalized))
-            {
-                logger.LogError("Result mismatch! Same count ({count}) but different IDs returned", originalCount);
-            }
-            else
-            {
-                logger.LogInformation("Results match - both queries returned {count} items with identical IDs", originalCount);
-            }
-        }
-
+        var fileTransfers = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+        logger.LogInformation("Got {count} file transfers", fileTransfers.Count);
         return fileTransfers;
     }
 }
