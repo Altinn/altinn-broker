@@ -1,12 +1,12 @@
 ﻿using System.Security.Claims;
 
-using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
+using Altinn.Broker.Application.PurgeFileTransfer;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
@@ -15,8 +15,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
-
-using Serilog.Context;
 
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
@@ -87,7 +85,7 @@ public class InitializeFileTransferHandler(
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
-        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId, cancellationToken));
+        var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId.WithoutPrefix().WithPrefix(), cancellationToken));
         try
         {
             await Task.WhenAll(addRecipientEventTasks);

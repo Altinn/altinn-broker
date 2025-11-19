@@ -21,7 +21,6 @@ public interface IFileTransferRepository
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken);
-    Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatusDenormalized(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken);
     Task SetStorageDetails(
         Guid fileTransferId,
