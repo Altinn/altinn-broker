@@ -123,7 +123,10 @@ public static class StringExtensions
         {
             return identifier;
         }
-        return $"{UrnConstants.OrganizationNumberAttribute}:{identifier}";
+        else if (identifier.IsOrganizationNumber())
+        {
+        return $"{UrnConstants.OrganizationNumberAttribute}:{identifier}";   
+        }
         throw new ArgumentException("Identifier is not a valid organization number or social security number", nameof(identifier));
     }
 }
