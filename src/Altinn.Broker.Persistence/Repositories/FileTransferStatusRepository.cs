@@ -49,14 +49,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                         OR 
                         -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
                         (inserted_status.file_transfer_status_date = file_transfer.latest_file_status_date 
-                            AND inserted_status.file_transfer_status_id_pk > COALESCE(
-                                (SELECT file_transfer_status_id_pk 
-                                 FROM broker.file_transfer_status 
-                                 WHERE file_transfer_id_fk = @fileTransferId 
-                                   AND file_transfer_status_date = inserted_status.file_transfer_status_date
-                                 ORDER BY file_transfer_status_id_pk DESC 
-                                 LIMIT 1), 0)
-                        )
+                            AND inserted_status.file_transfer_status_description_id_fk > file_transfer.latest_file_status_id)
                     )
             )
             SELECT file_transfer_status_id_pk FROM inserted_status;";

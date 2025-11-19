@@ -100,16 +100,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                 OR 
                 -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
                 (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
-                    AND (SELECT MAX(actor_file_transfer_status_id_pk)
-                         FROM broker.actor_file_transfer_status
-                         WHERE file_transfer_id_fk = EXCLUDED.file_transfer_id_fk
-                           AND actor_id_fk = EXCLUDED.actor_id_fk
-                           AND actor_file_transfer_status_date = EXCLUDED.latest_actor_status_date) >= 
-                        (SELECT MAX(actor_file_transfer_status_id_pk)
-                         FROM broker.actor_file_transfer_status
-                         WHERE file_transfer_id_fk = actor_file_transfer_latest_status.file_transfer_id_fk
-                           AND actor_id_fk = actor_file_transfer_latest_status.actor_id_fk
-                           AND actor_file_transfer_status_date = actor_file_transfer_latest_status.latest_actor_status_date));";
+                    AND EXCLUDED.latest_actor_status_id > actor_file_transfer_latest_status.latest_actor_status_id);";
 
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@actorId", actorId);
