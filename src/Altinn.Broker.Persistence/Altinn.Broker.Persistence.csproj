@@ -15,11 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="doc__backfill_denormalized_file_transfer_status.sql" />
-    <Content Include="V0019__more_vacuum_hangfire_tables.sql" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.14.2" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.12" />
