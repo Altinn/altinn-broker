@@ -73,6 +73,18 @@ public class SlackExceptionNotificationHandler : IExceptionHandler
             };
             var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
             problemDetails.Extensions["traceId"] = traceId;
+            
+            // Include full exception details in development/test environments for debugging
+            if (_hostEnvironment.IsDevelopment())
+            {
+                problemDetails.Extensions["exceptionType"] = exception.GetType().FullName;
+                problemDetails.Extensions["stackTrace"] = exception.StackTrace;
+                if (exception.InnerException != null)
+                {
+                    problemDetails.Extensions["innerException"] = exception.InnerException.Message;
+                    problemDetails.Extensions["innerExceptionType"] = exception.InnerException.GetType().FullName;
+                }
+            }
 
             await _problemDetailsService.WriteAsync(new ProblemDetailsContext
             {

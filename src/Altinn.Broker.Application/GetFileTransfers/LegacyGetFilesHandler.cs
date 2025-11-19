@@ -106,8 +106,16 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         }
 
         // Denormalized query finished, get its result
-        var fileTransfersFromDenormalized = await task2;
-
+        List<Guid> fileTransfersFromDenormalized; 
+        try 
+        { 
+            fileTransfersFromDenormalized = await task2; 
+        }
+        catch (Exception ex) 
+        { 
+            logger.LogError(ex, "Denormalized query failed; returning base result"); 
+            return fileTransfers; 
+        }
         logger.LogInformation("Query performance - Base: {baseMs}ms, Denormalized: {denormalizedMs}ms",
             sw1.ElapsedMilliseconds, sw2.ElapsedMilliseconds);
 
