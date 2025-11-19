@@ -38,7 +38,7 @@ services:
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
   database_migration:
     image: flyway/flyway:latest
-    command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true'
+    command: -url='jdbc:postgresql://database:5432/broker' -user=postgres -password=postgres -connectRetries=60 migrate -validateMigrationNaming='true' -mixed='true'
     volumes:
       - ./src/Altinn.Broker.Persistence/Migrations:/flyway/sql
       - ./tests/Altinn.Broker.Tests/Data/:/flyway/sql/R__Prepare_Test_Data.sql

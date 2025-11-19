@@ -19,9 +19,6 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         //   * No latest status exists (latest_file_status_date IS NULL), OR
         //   * Newer by timestamp (new_date > old_date), OR
         //   * Same timestamp but higher ID (handles edge case of simultaneous inserts)
-        //
-        // The WHERE clause ensures we only update when the new status is actually newer,
-        // preventing race conditions where an older status might overwrite a newer one.
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.file_transfer_status (
