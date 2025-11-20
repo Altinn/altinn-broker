@@ -9,7 +9,6 @@ public class CloudEvent
     public string Resource { get; set; } = null!;
     public string ResourceInstance { get; set; } = null!;
     public string? Subject { get; set; }
-    public string? AlternativeSubject { get; set; }
     public string Source { get; set; } = null!;
     public Dictionary<string, object>? Data { get; set; }
 }
