@@ -55,9 +55,54 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
             actorId = actor.ActorId;
         }
         
-        await using var command = dataSource.CreateCommand(
-            "INSERT INTO broker.actor_file_transfer_status (actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date) " +
-            "VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())");
+        // This query performs two operations atomically:
+        // 1. Inserts a new actor file transfer status record into the history table
+        // 2. Updates the denormalized latest_status table to keep the most recent status per (file_transfer, actor) pair
+        //
+        // The denormalization logic:
+        // - If no latest status exists for this (file_transfer, actor) pair, insert it
+        // - If a latest status exists, update it only if the new status is "newer":
+        //   * Newer by timestamp (new_date > old_date), OR
+        //   * Same timestamp but higher ID (handles edge case of simultaneous inserts)
+        //
+        // The WHERE clause in ON CONFLICT ensures we only update when the new status is actually newer,
+        // preventing race conditions where an older status might overwrite a newer one.
+        var query = @"
+            WITH inserted_status AS (
+                INSERT INTO broker.actor_file_transfer_status (
+                    actor_id_fk, 
+                    file_transfer_id_fk, 
+                    actor_file_transfer_status_description_id_fk, 
+                    actor_file_transfer_status_date
+                )
+                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())
+                RETURNING actor_file_transfer_status_id_pk, actor_file_transfer_status_date, actor_file_transfer_status_description_id_fk, actor_id_fk, file_transfer_id_fk
+            )
+            INSERT INTO broker.actor_file_transfer_latest_status (
+                file_transfer_id_fk,
+                actor_id_fk,
+                latest_actor_status_id,
+                latest_actor_status_date
+            )
+            SELECT 
+                inserted_status.file_transfer_id_fk,
+                inserted_status.actor_id_fk,
+                inserted_status.actor_file_transfer_status_description_id_fk,
+                inserted_status.actor_file_transfer_status_date
+            FROM inserted_status
+            ON CONFLICT (file_transfer_id_fk, actor_id_fk) 
+            DO UPDATE SET
+                latest_actor_status_id = EXCLUDED.latest_actor_status_id,
+                latest_actor_status_date = EXCLUDED.latest_actor_status_date
+            WHERE 
+                -- Update if new status has a newer timestamp
+                EXCLUDED.latest_actor_status_date > actor_file_transfer_latest_status.latest_actor_status_date
+                OR 
+                -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
+                (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
+                    AND EXCLUDED.latest_actor_status_id > actor_file_transfer_latest_status.latest_actor_status_id);";
+
+        await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@actorFileTransferStatusId", (int)status);

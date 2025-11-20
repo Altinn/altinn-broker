@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
@@ -38,7 +40,9 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
         // TODO: should we just call GetFiles for each recipient or should we gather everything into 1 single SQL request.
         if (request.Recipients?.Length > 0)
         {
+            logger.LogInformation("Getting actors for specified recipients: {recipients}", string.Join(',', request.Recipients).SanitizeForLogs());
             fileSearch.Actors = await GetActors(request.Recipients, cancellationToken);
+            logger.LogInformation("Got actors: {actors}", string.Join(',', fileSearch.Actors.Select(actor => actor.ActorId)).SanitizeForLogs());
         }
         else
         {
@@ -69,6 +73,9 @@ public class LegacyGetFilesHandler(IFileTransferRepository fileTransferRepositor
             fileSearch.FileTransferStatus = request.FileTransferStatus;
         }
 
-        return await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+        logger.LogInformation("Searching for files with constructed search criteria: {fileSearch}", JsonSerializer.Serialize(fileSearch));
+        var fileTransfers = await fileTransferRepository.LegacyGetFilesForRecipientsWithRecipientStatus(fileSearch, cancellationToken);
+        logger.LogInformation("Got {count} file transfers", fileTransfers.Count);
+        return fileTransfers;
     }
 }
