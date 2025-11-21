@@ -66,7 +66,8 @@ public class ConfirmDownloadHandler(
         {
             return Task.CompletedTask;
         }
-        if (!fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == caller && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted)) //TODO: Replace with DownloadFinished when implemented
+        if (request.IsLegacy == false 
+            && !fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == caller && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted))
         {
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }

@@ -635,6 +635,31 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Null(addedManifest);
     }
 
+    [Fact]
+    public async Task ConfirmNotDownloadedFile_PermittedInLegacyNotInA3()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse.FileTransferId.ToString();
+        var uploadedFileLength = await UploadZipFile(fileTransferId);
+
+        // Act
+        var confirmA3Response = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
+        var confirmLegacyResponse = await _legacyClient.PostAsync($"broker/api/v1/legacy/file/{fileTransferId}/confirmdownload?onBehalfOfConsumer={file.Recipients[0]}", null);
+        var statusResponse = await _legacyClient.GetAsync($"broker/api/v1/legacy/file/{fileTransferId}?onBehalfOfConsumer={file.Recipients[0]}");
+        var result = await statusResponse.Content.ReadFromJsonAsync<LegacyFileOverviewExt>(_responseSerializerOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, confirmA3Response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, confirmLegacyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+        Assert.Equal(LegacyRecipientFileStatusExt.DownloadConfirmed, result?.Recipients[0]?.CurrentRecipientFileStatusCode);
+        Assert.Equal(LegacyFileStatusExt.AllConfirmedDownloaded, result?.FileStatus);
+
+    }
+
     private string GetMalwareScanResultJson(string filePath, string fileId)
     {
         string jsonBody = File.ReadAllText(filePath);
