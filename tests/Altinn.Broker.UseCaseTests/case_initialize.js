@@ -43,7 +43,11 @@ export default async function () {
 
     // Cleanup test data
     await cleanupUseCaseTestData();
-}
+
+    
+        check(null, { 'Intentional failure (force_fail)': () => false });
+    }
+
 
 async function TC1_InitializeFileTransfer() {
     const token = await getSenderAltinnToken();
@@ -121,7 +125,8 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         sleep(1);
         const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
-        if (res.status === 404) {
+        if (res.status === 200) {
+            
             let statusVal = null;
             try {
                 statusVal = res.json('fileTransferStatus');
