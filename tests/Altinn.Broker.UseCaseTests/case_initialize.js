@@ -121,7 +121,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         sleep(1);
         const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
-        if (res.status === 200) {
+        if (res.status === 404) {
             let statusVal = null;
             try {
                 statusVal = res.json('fileTransferStatus');
