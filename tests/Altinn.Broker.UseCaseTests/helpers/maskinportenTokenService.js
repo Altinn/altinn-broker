@@ -1,5 +1,4 @@
 import http from 'k6/http';
-import encoding from 'k6/encoding';
 import { buildMaskinportenJwt } from './maskinportenJwtBuilder.js';
 
 const maskinportenUrl = (__ENV.base_url.toLowerCase().includes('platform.altinn.no'))
@@ -20,13 +19,10 @@ export async function retrieveMaskinportenToken({ clientId, kid, pem, scope, isS
 }
 
 export async function getMaintenanceMaskinportenToken() {
-    const pem = __ENV.mp_client_pem_b64
-        ? encoding.b64decode(__ENV.mp_client_pem_b64, 'std', 's').toString()
-        : __ENV.mp_client_pem;
     return await retrieveMaskinportenToken({
         clientId: __ENV.mp_client_id,
         kid: __ENV.mp_kid,
-        pem,
+        pem: __ENV.mp_client_pem,
         scope: 'altinn:broker.maintenance',
     });
 }

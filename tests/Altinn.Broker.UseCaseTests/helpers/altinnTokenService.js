@@ -1,5 +1,4 @@
 import http from 'k6/http';
-import encoding from 'k6/encoding';
 import { retrieveMaskinportenToken } from './maskinportenTokenService.js';
 
 const authorizationBaseUrl = (__ENV.base_url.toLowerCase().includes('platform.altinn.no'))
@@ -21,28 +20,22 @@ async function retrieveAltinnToken({ baseUrl, clientId, kid, pem, scope, isSende
 }
 
 export async function getSenderAltinnToken() {
-    const pem = __ENV.mp_client_pem_b64
-        ? encoding.b64decode(__ENV.mp_client_pem_b64, 'std', 's').toString()
-        : __ENV.mp_client_pem;
     return await retrieveAltinnToken({
         baseUrl: authorizationBaseUrl,
         clientId: __ENV.mp_client_id,
         kid: __ENV.mp_kid,
-        pem,
+        pem: __ENV.mp_client_pem,
         scope: 'altinn:broker.write',
         isSender: true
     });
 }
 
 export async function getRecipientAltinnToken() {
-    const pem = __ENV.mp_client_pem_b64
-        ? encoding.b64decode(__ENV.mp_client_pem_b64, 'std', 's').toString()
-        : __ENV.mp_client_pem;
     return await retrieveAltinnToken({
         baseUrl: authorizationBaseUrl,
         clientId: __ENV.mp_client_id,
         kid: __ENV.mp_kid,
-        pem,
+        pem: __ENV.mp_client_pem,
         scope: 'altinn:broker.read altinn:serviceowner',
         isSender: false
     });
