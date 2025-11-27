@@ -24,7 +24,7 @@ on:
         description: 'Environment to run tests against'
         required: true
         type: string
-run_name: Test use cases for environment ${{ inputs.environment || github.event.inputs.environment || "test"}}
+run-name: Test use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'test' }}
 
 jobs:
   usecase-test:
