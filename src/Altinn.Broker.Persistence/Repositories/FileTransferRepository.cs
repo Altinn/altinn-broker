@@ -814,8 +814,13 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                 COALESCE(f.resource_id, 'unknown') as resource_id,
                 COALESCE(recipient.actor_external_id, 'unknown') as recipient_id,
                 CASE 
-                    WHEN recipient.actor_external_id ~ '^(\d{4}:)?\d{9}$' THEN 1
-                    WHEN recipient.actor_external_id ~ '^\d{11}$' THEN 0
+                    -- Organization: Extract part after colon (if exists) and check if it's 9 digits
+                    -- Matches C# logic: WithoutPrefix() then IsOrganizationNumber() which accepts 9 digits
+                    -- Note: C# pattern is ^(?:\d{9}|0192:\d{9})$, but after WithoutPrefix() it's just 9 digits
+                    WHEN COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{9}$' THEN 1
+                    -- Person: Extract part after colon (if exists) and check if it's 11 digits
+                    -- Note: C# also validates mod11 checksum, but for aggregation format check is acceptable
+                    WHEN COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
                     ELSE 2
                 END as recipient_type,
                 3 as altinn_version,
@@ -836,8 +841,12 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                 COALESCE(f.resource_id, 'unknown'),
                 COALESCE(recipient.actor_external_id, 'unknown'),
                 CASE 
-                    WHEN recipient.actor_external_id ~ '^(\d{4}:)?\d{9}$' THEN 1
-                    WHEN recipient.actor_external_id ~ '^\d{11}$' THEN 0
+                    -- Organization: Extract part after colon (if exists) and check if it's 9 digits
+                    -- Matches C# logic: WithoutPrefix() then IsOrganizationNumber()
+                    WHEN COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{9}$' THEN 1
+                    -- Person: Extract part after colon (if exists) and check if it's 11 digits
+                    -- Note: C# also validates mod11 checksum, but for aggregation format check is acceptable
+                    WHEN COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
                     ELSE 2
                 END
             ORDER BY 
