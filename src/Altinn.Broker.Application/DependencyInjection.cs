@@ -9,6 +9,7 @@ using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.CleanupUseCaseTests;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,5 +34,6 @@ public static class DependencyInjection
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();
+        services.AddScoped<CleanupUseCaseTestsHandler>();
     }
 }
