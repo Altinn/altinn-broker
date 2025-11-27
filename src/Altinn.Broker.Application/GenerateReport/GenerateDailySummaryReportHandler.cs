@@ -31,18 +31,19 @@ public class GenerateDailySummaryReportHandler(
         {
             logger.LogInformation("Starting daily summary report generation with Altinn2Included={altinn2Included}", request.Altinn2Included);
 
-            // Get file transfers for statistics with service owner IDs (optimized to avoid N+1 queries)
+            // Get aggregated data directly from SQL (optimized with GROUP BY)
             // Note: Broker only supports Altinn3, so Altinn2Included is ignored but kept for API compatibility
-            var (fileTransfers, serviceOwnerIds) = await fileTransferRepository.GetFileTransfersForReportWithServiceOwnerIds(cancellationToken);
-            logger.LogInformation("Retrieved {count} file transfers for daily summary report", fileTransfers.Count);
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
+            logger.LogInformation("Retrieved {count} aggregated records for daily summary report", aggregatedData.Count);
 
-            if (fileTransfers.Count == 0)
+            if (aggregatedData.Count == 0)
             {
                 logger.LogWarning("No file transfers found for daily summary report generation");
                 return StatisticsErrors.NoFileTransfersFound;
             }
-            // Aggregate daily data (using pre-fetched service owner IDs for performance)
-            var summaryData = await AggregateDailyDataAsync(fileTransfers, serviceOwnerIds, cancellationToken);
+
+            // Enrich with service owner names and resource titles
+            var summaryData = await EnrichAggregatedDataAsync(aggregatedData, cancellationToken);
             logger.LogInformation("Aggregated data into {count} daily summary records", summaryData.Count);
 
             // Generate parquet file and upload to blob storage
@@ -70,61 +71,17 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private async Task<List<DailySummaryData>> AggregateDailyDataAsync(
-        List<FileTransferEntity> fileTransfers, 
-        Dictionary<Guid, string> preFetchedServiceOwnerIds,
+    private async Task<List<DailySummaryData>> EnrichAggregatedDataAsync(
+        List<Core.Repositories.AggregatedDailySummaryData> aggregatedData,
         CancellationToken cancellationToken)
     {
-        // Flatten file transfers with recipients - each recipient gets its own row
-        var flattenedData = new List<(FileTransferEntity ft, string recipientId)>();
+        // Fetch service owner names in parallel
+        var uniqueServiceOwnerIds = aggregatedData
+            .Select(d => d.ServiceOwnerId)
+            .Distinct()
+            .Where(id => !string.IsNullOrEmpty(id) && id != "unknown")
+            .ToList();
         
-        foreach (var ft in fileTransfers)
-        {
-            if (ft.RecipientCurrentStatuses.Any())
-            {
-                foreach (var recipient in ft.RecipientCurrentStatuses)
-                {
-                    flattenedData.Add((ft, recipient.Actor.ActorExternalId));
-                }
-            }
-            else
-            {
-                // If no recipients, still include the file transfer with unknown recipient
-                flattenedData.Add((ft, "unknown"));
-            }
-        }
-
-        // Use pre-fetched service owner IDs from SQL query (avoids N database queries)
-        var serviceOwnerIds = preFetchedServiceOwnerIds;
-        
-        // For file transfers without service owner ID in query, fall back to lookup
-        var missingServiceOwnerIds = new List<FileTransferEntity>();
-        foreach (var ft in fileTransfers)
-        {
-            if (!serviceOwnerIds.ContainsKey(ft.FileTransferId))
-            {
-                missingServiceOwnerIds.Add(ft);
-            }
-        }
-
-        // Fetch missing service owner IDs in parallel
-        if (missingServiceOwnerIds.Any())
-        {
-            var missingIdsTasks = missingServiceOwnerIds.Select(async ft =>
-            {
-                var serviceOwnerId = await GetServiceOwnerIdAsync(ft, cancellationToken);
-                return (ft.FileTransferId, serviceOwnerId);
-            });
-            
-            var missingIdsResults = await Task.WhenAll(missingIdsTasks);
-            foreach (var (fileTransferId, serviceOwnerId) in missingIdsResults)
-            {
-                serviceOwnerIds[fileTransferId] = serviceOwnerId;
-            }
-        }
-
-        // Fetch service owner names in parallel (batch processing)
-        var uniqueServiceOwnerIds = serviceOwnerIds.Values.Distinct().Where(id => !string.IsNullOrEmpty(id) && id != "unknown").ToList();
         var serviceOwnerNames = new Dictionary<string, string>();
         
         var serviceOwnerNameTasks = uniqueServiceOwnerIds.Select(async serviceOwnerId =>
@@ -139,11 +96,11 @@ public class GenerateDailySummaryReportHandler(
             serviceOwnerNames[serviceOwnerId] = name;
         }
 
-        // Fetch resource titles in parallel (batch processing for HTTP calls)
-        var uniqueResourceIds = flattenedData
-            .Select(x => x.ft.ResourceId ?? "unknown")
+        // Fetch resource titles in parallel
+        var uniqueResourceIds = aggregatedData
+            .Select(d => d.ResourceId)
             .Distinct()
-            .Where(id => id != "unknown")
+            .Where(id => !string.IsNullOrEmpty(id) && id != "unknown")
             .ToList();
         
         var resourceTitles = new Dictionary<string, string>();
@@ -160,40 +117,23 @@ public class GenerateDailySummaryReportHandler(
             resourceTitles[resourceId] = title;
         }
 
-        var groupedData = flattenedData
-            .GroupBy(item => new
-            {
-                item.ft.Created.Date,
-                ServiceOwnerId = serviceOwnerIds.GetValueOrDefault(item.ft.FileTransferId, "unknown"),
-                ResourceId = item.ft.ResourceId ?? "unknown",
-                RecipientId = item.recipientId,
-                RecipientType = GetRecipientType(item.recipientId),
-                AltinnVersion = AltinnVersion.Altinn3 // Broker only supports Altinn3
-            })
-            .Select(g => new DailySummaryData
-            {
-                Date = g.Key.Date,
-                Year = g.Key.Date.Year,
-                Month = g.Key.Date.Month,
-                Day = g.Key.Date.Day,
-                ServiceOwnerId = g.Key.ServiceOwnerId,
-                ServiceOwnerName = serviceOwnerNames.GetValueOrDefault(g.Key.ServiceOwnerId, "Unknown"),
-                ResourceId = g.Key.ResourceId,
-                ResourceTitle = resourceTitles.GetValueOrDefault(g.Key.ResourceId, "Unknown"),
-                RecipientType = g.Key.RecipientType,
-                AltinnVersion = g.Key.AltinnVersion,
-                MessageCount = g.Count(),
-                DatabaseStorageBytes = CalculateDatabaseStorage(g.Select(x => x.ft).ToList()),
-                AttachmentStorageBytes = CalculateAttachmentStorage(g.Select(x => x.ft).ToList())
-            })
-            .OrderBy(d => d.Date)
-            .ThenBy(d => d.ServiceOwnerId)
-            .ThenBy(d => d.ResourceId)
-            .ThenBy(d => d.RecipientType)
-            .ThenBy(d => d.AltinnVersion)
-            .ToList();
-
-        return groupedData;
+        // Convert to DailySummaryData with enrichment
+        return aggregatedData.Select(d => new DailySummaryData
+        {
+            Date = d.Date,
+            Year = d.Year,
+            Month = d.Month,
+            Day = d.Day,
+            ServiceOwnerId = d.ServiceOwnerId,
+            ServiceOwnerName = serviceOwnerNames.GetValueOrDefault(d.ServiceOwnerId, "Unknown"),
+            ResourceId = d.ResourceId,
+            ResourceTitle = resourceTitles.GetValueOrDefault(d.ResourceId, "Unknown"),
+            RecipientType = (RecipientType)d.RecipientType,
+            AltinnVersion = (AltinnVersion)d.AltinnVersion,
+            MessageCount = d.MessageCount,
+            DatabaseStorageBytes = d.DatabaseStorageBytes,
+            AttachmentStorageBytes = d.AttachmentStorageBytes
+        }).ToList();
     }
 
     private async Task<string> GetServiceOwnerIdAsync(FileTransferEntity fileTransfer, CancellationToken cancellationToken)
@@ -389,19 +329,19 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            // Get file transfers data with service owner IDs (optimized to avoid N+1 queries)
-            var (fileTransfers, serviceOwnerIds) = await fileTransferRepository.GetFileTransfersForReportWithServiceOwnerIds(cancellationToken);
+            // Get aggregated data directly from SQL (optimized with GROUP BY)
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
             
-            if (!fileTransfers.Any())
+            if (!aggregatedData.Any())
             {
                 logger.LogWarning("No file transfers found for report generation");
                 return StatisticsErrors.NoFileTransfersFound;
             }
 
-            logger.LogInformation("Found {count} file transfers for report generation", fileTransfers.Count);
+            logger.LogInformation("Found {count} aggregated records for report generation", aggregatedData.Count);
 
-            // Aggregate data by day and service owner (using pre-fetched service owner IDs for performance)
-            var summaryData = await AggregateDailyDataAsync(fileTransfers, serviceOwnerIds, cancellationToken);
+            // Enrich with service owner names and resource titles
+            var summaryData = await EnrichAggregatedDataAsync(aggregatedData, cancellationToken);
 
             // Generate the parquet file as a stream
             var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, request.Altinn2Included, cancellationToken);
