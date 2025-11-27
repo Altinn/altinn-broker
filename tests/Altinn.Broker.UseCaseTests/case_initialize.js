@@ -43,17 +43,17 @@ export default async function () {
 
     // Cleanup test data
     await cleanupUseCaseTestData();
-
-    
+        
         check(null, { 'Intentional failure (force_fail)': () => false });
     }
+
 
 
 async function TC1_InitializeFileTransfer() {
     const token = await getSenderAltinnToken();
     check(token, { 'Sender Altinn token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = isProduction ? __ENV.sender_org_no : __ENV.recipient_org_no;
+    const recipient = isProduction ? "orgnummerforprod" : "311167898"
     const payload = buildInitializeFileTransferPayload(resourceId, recipient);
 
     const headers = {
