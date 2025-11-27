@@ -1,0 +1,13 @@
+name: Test Use Cases - PROD
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  test-prod:
+    name: Run use case tests on production
+    uses: ./.github/workflows/test-use-cases.yml
+    with:
+      environment: production
+    secrets: inherit

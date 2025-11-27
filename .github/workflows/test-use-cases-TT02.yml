@@ -1,0 +1,13 @@
+name: Test Use Cases - TT02
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  test-staging:
+    name: Run use case tests on staging
+    uses: ./.github/workflows/test-use-cases.yml
+    with:
+      environment: staging
+    secrets: inherit
