@@ -42,7 +42,7 @@ jobs:
           mp_kid: ${{ secrets.USE_CASE_MASKINPORTEN_KID }}
           mp_client_pem: ${{ secrets.USE_CASE_MASKINPORTEN_PEM }}
         with:
-          filename: Test/Altinn.Broker.UseCaseTests/case_initialize.js
+          filename: tests/Altinn.Broker.UseCaseTests/case_initialize.js
 
       - name: Build failure report
         if: failure()
