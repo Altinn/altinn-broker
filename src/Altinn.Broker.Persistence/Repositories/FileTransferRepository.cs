@@ -823,7 +823,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                     WHEN COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
                     ELSE 2
                 END as recipient_type,
-                3 as altinn_version,
+                1 as altinn_version,  -- Altinn3 = 1 (Broker only supports Altinn3)
                 COUNT(*)::int as message_count,
                 0::bigint as database_storage_bytes,
                 COALESCE(SUM(f.file_transfer_size), 0)::bigint as attachment_storage_bytes
