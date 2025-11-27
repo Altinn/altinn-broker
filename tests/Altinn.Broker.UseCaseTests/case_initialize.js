@@ -121,7 +121,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         sleep(1);
         const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
-        if (res.status === 2) {
+        if (res.status === 404) {
             let statusVal = null;
             try {
                 statusVal = res.json('fileTransferStatus');
@@ -151,7 +151,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
                 console.log(`TC3: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
             }
         }
-        else if (res.status === 200) {
+        else if (res.status === 404) {
             console.log(`TC3: File transfer not found during polling attempt ${attempt + 1}/${maxRetries}`);
         }
         else {
