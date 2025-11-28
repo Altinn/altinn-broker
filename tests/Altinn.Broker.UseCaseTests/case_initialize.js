@@ -44,7 +44,7 @@ export default async function () {
     // Cleanup test data
     await cleanupUseCaseTestData();
         
-        check(null, { 'Intentional failure :( (force_fail)': () => false });
+        check(null, { 'Intentional failure :() (force_fail)': () => false });
     }
 
 
