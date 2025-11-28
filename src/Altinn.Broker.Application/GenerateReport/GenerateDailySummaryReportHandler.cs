@@ -31,8 +31,6 @@ public class GenerateDailySummaryReportHandler(
         {
             logger.LogInformation("Starting daily summary report generation with Altinn2Included={altinn2Included}", request.Altinn2Included);
 
-            // Get aggregated data directly from SQL (optimized with GROUP BY)
-            // Note: Broker only supports Altinn3, so Altinn2Included is ignored but kept for API compatibility
             var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
             logger.LogInformation("Retrieved {count} aggregated records for daily summary report", aggregatedData.Count);
 
@@ -42,11 +40,9 @@ public class GenerateDailySummaryReportHandler(
                 return StatisticsErrors.NoFileTransfersFound;
             }
 
-            // Enrich with service owner names and resource titles
             var summaryData = await EnrichAggregatedDataAsync(aggregatedData, cancellationToken);
             logger.LogInformation("Aggregated data into {count} daily summary records", summaryData.Count);
 
-            // Generate parquet file and upload to blob storage
             var (blobUrl, fileHash, fileSize) = await GenerateAndUploadParquetFile(summaryData, request.Altinn2Included, cancellationToken);
 
             var response = new GenerateDailySummaryReportResponse
@@ -58,7 +54,7 @@ public class GenerateDailySummaryReportHandler(
                 Environment = hostEnvironment.EnvironmentName ?? "Unknown",
                 FileSizeBytes = fileSize,
                 FileHash = fileHash,
-                Altinn2Included = false // Broker only supports Altinn3
+                Altinn2Included = false
             };
 
             logger.LogInformation("Successfully generated and uploaded daily summary report to blob storage: {blobUrl}", blobUrl);
@@ -75,7 +71,6 @@ public class GenerateDailySummaryReportHandler(
         List<Core.Repositories.AggregatedDailySummaryData> aggregatedData,
         CancellationToken cancellationToken)
     {
-        // Fetch service owner names in parallel
         var uniqueServiceOwnerIds = aggregatedData
             .Select(d => d.ServiceOwnerId)
             .Distinct()
@@ -96,7 +91,6 @@ public class GenerateDailySummaryReportHandler(
             serviceOwnerNames[serviceOwnerId] = name;
         }
 
-        // Fetch resource titles in parallel
         var uniqueResourceIds = aggregatedData
             .Select(d => d.ResourceId)
             .Distinct()
@@ -117,7 +111,6 @@ public class GenerateDailySummaryReportHandler(
             resourceTitles[resourceId] = title;
         }
 
-        // Convert to DailySummaryData with enrichment
         return aggregatedData.Select(d => new DailySummaryData
         {
             Date = d.Date,
@@ -138,8 +131,6 @@ public class GenerateDailySummaryReportHandler(
 
     private async Task<string> GetServiceOwnerIdAsync(FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
-        // Get service owner from database resource table (service_owner_id_fk -> service_owner.service_owner_id_pk)
-        // This matches the mapping: serviceownerorgnr -> service_owner.service_owner_id_pk
         try
         {
             var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
@@ -205,8 +196,6 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            // Get service owner name from Resource Registry (like correspondence does)
-            // This returns the name from HasCompetentAuthority.Name (e.g., "Digitaliseringsdirektoratet", "NAV", etc.)
             var serviceOwnerName = await altinnResourceRepository.GetServiceOwnerNameOfResource(resourceId, cancellationToken);
             return serviceOwnerName ?? $"Unknown ({resourceId})";
         }
@@ -219,29 +208,23 @@ public class GenerateDailySummaryReportHandler(
 
     private long CalculateDatabaseStorage(List<FileTransferEntity> fileTransfers)
     {
-        // TODO: Calculate database storage based on file transfer metadata
-        // For now, return 0 as placeholder
         return 0;
     }
 
     private long CalculateAttachmentStorage(List<FileTransferEntity> fileTransfers)
     {
-        // Sum up file transfer sizes
         return fileTransfers.Sum(ft => ft.FileTransferSize);
     }
 
     private async Task<(string blobUrl, string fileHash, long fileSize)> GenerateAndUploadParquetFile(List<DailySummaryData> summaryData, bool altinn2Included, CancellationToken cancellationToken)
     {
-        // Generate filename with timestamp as prefix and Altinn version indicator
-        var altinnVersionIndicator = "A3"; // Broker only supports Altinn3
+        var altinnVersionIndicator = "A3";
         var fileName = $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_daily_summary_report_{altinnVersionIndicator}_{hostEnvironment.EnvironmentName}.parquet";
 
         logger.LogInformation("Generating daily summary parquet file with {count} records for blob storage", summaryData.Count);
 
-        // Generate the parquet file as a stream
         var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, altinn2Included, cancellationToken);
 
-        // Upload to blob storage - need to add this method to storage service
         var blobUrl = await UploadReportFileToStorage(fileName, parquetStream, cancellationToken);
 
         logger.LogInformation("Successfully generated and uploaded daily summary parquet file to blob storage: {blobUrl}", blobUrl);
@@ -251,8 +234,6 @@ public class GenerateDailySummaryReportHandler(
 
     private async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
     {
-        // Use Azure Storage directly for reports (similar to correspondence implementation)
-        // Reports are stored in a "reports" container in the default storage account
         try
         {
             var connectionString = reportStorageOptions.Value.ConnectionString;
@@ -264,12 +245,10 @@ public class GenerateDailySummaryReportHandler(
             var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(connectionString);
             var blobContainerClient = blobServiceClient.GetBlobContainerClient("reports");
             
-            // Ensure the reports container exists
             await blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
             var blobClient = blobContainerClient.GetBlobClient(fileName);
             
-            // Upload the file
             await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
             
             logger.LogInformation("Successfully uploaded report file to blob storage: {fileName}", fileName);
@@ -286,7 +265,6 @@ public class GenerateDailySummaryReportHandler(
     {
         logger.LogInformation("Generating daily summary parquet file with {count} records", summaryData.Count);
 
-        // Convert to parquet-friendly model
         var parquetData = summaryData.Select(d => new ParquetDailySummaryData
         {
             Date = d.Date.ToString("yyyy-MM-dd"),
@@ -304,17 +282,14 @@ public class GenerateDailySummaryReportHandler(
             AttachmentStorageBytes = d.AttachmentStorageBytes
         }).ToList();
 
-        // Create a memory stream for the parquet data
         var memoryStream = new MemoryStream();
         
-        // Write parquet data to memory stream
         await ParquetSerializer.SerializeAsync(parquetData, memoryStream, cancellationToken: cancellationToken);
-        memoryStream.Position = 0; // Reset position for reading
+        memoryStream.Position = 0;
 
-        // Calculate MD5 hash
         using var md5 = MD5.Create();
         var hash = Convert.ToBase64String(md5.ComputeHash(memoryStream.ToArray()));
-        memoryStream.Position = 0; // Reset position for reading
+        memoryStream.Position = 0;
 
         logger.LogInformation("Successfully generated daily summary parquet file stream");
 
@@ -329,7 +304,6 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            // Get aggregated data directly from SQL (optimized with GROUP BY)
             var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
             
             if (!aggregatedData.Any())
@@ -340,14 +314,11 @@ public class GenerateDailySummaryReportHandler(
 
             logger.LogInformation("Found {count} aggregated records for report generation", aggregatedData.Count);
 
-            // Enrich with service owner names and resource titles
             var summaryData = await EnrichAggregatedDataAsync(aggregatedData, cancellationToken);
 
-            // Generate the parquet file as a stream
             var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, request.Altinn2Included, cancellationToken);
 
-            // Generate filename
-            var altinnVersionIndicator = "A3"; // Broker only supports Altinn3
+            var altinnVersionIndicator = "A3";
             var fileName = $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_daily_summary_report_{altinnVersionIndicator}_{hostEnvironment.EnvironmentName}.parquet";
 
             var response = new GenerateAndDownloadDailySummaryReportResponse
@@ -360,7 +331,7 @@ public class GenerateDailySummaryReportHandler(
                 TotalFileTransferCount = summaryData.Sum(d => d.MessageCount),
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Environment = hostEnvironment.EnvironmentName ?? "Unknown",
-                Altinn2Included = false // Broker only supports Altinn3
+                Altinn2Included = false
             };
 
             logger.LogInformation("Successfully generated daily summary report for download with {serviceOwnerCount} service owners and {totalCount} file transfers", 

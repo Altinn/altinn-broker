@@ -802,13 +802,8 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
 
     public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
     {
-        // Optimized query: Aggregate data directly in SQL using GROUP BY
-        // Uses actor_file_transfer_status (history table) with CTE to get latest status per recipient
-        // This matches the old query logic to ensure we get the same results
-        // Includes file transfers with recipients AND file transfers without recipients
         const string query = @"
             WITH latest_recipient_status AS (
-                -- Get the latest status per (file_transfer, recipient) pair
                 SELECT DISTINCT ON (afs.file_transfer_id_fk, afs.actor_id_fk)
                     afs.file_transfer_id_fk,
                     afs.actor_id_fk,
@@ -826,17 +821,13 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                 COALESCE(f.resource_id, 'unknown') as resource_id,
                 COALESCE(recipient.actor_external_id, 'unknown') as recipient_id,
                 CASE 
-                    -- Organization: Extract part after colon (if exists) and check if it's 9 digits
-                    -- Matches C# logic: WithoutPrefix() then IsOrganizationNumber() which accepts 9 digits
                     WHEN recipient.actor_external_id IS NOT NULL 
                         AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{9}$' THEN 1
-                    -- Person: Extract part after colon (if exists) and check if it's 11 digits
-                    -- Note: C# also validates mod11 checksum, but for aggregation format check is acceptable
                     WHEN recipient.actor_external_id IS NOT NULL 
                         AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
                     ELSE 2
                 END as recipient_type,
-                1 as altinn_version,  -- Altinn3 = 1 (Broker only supports Altinn3)
+                1 as altinn_version,
                 COUNT(*)::int as message_count,
                 0::bigint as database_storage_bytes,
                 COALESCE(SUM(f.file_transfer_size), 0)::bigint as attachment_storage_bytes
@@ -868,7 +859,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                 altinn_version";
 
         await using var command = dataSource.CreateCommand(query);
-        command.CommandTimeout = 600; // 10 minutes timeout (20x typical execution time of 30 seconds)
+        command.CommandTimeout = 600;
         
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
