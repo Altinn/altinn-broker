@@ -868,7 +868,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
                 altinn_version";
 
         await using var command = dataSource.CreateCommand(query);
-        command.CommandTimeout = 3600; // 1 hour timeout for large datasets
+        command.CommandTimeout = 600; // 10 minutes timeout (20x typical execution time of 30 seconds)
         
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
