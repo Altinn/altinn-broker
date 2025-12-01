@@ -26,3 +26,12 @@ export async function getMaintenanceMaskinportenToken() {
         scope: 'altinn:broker.maintenance',
     });
 }
+
+export async function getLegacyMaskinportenToken() {
+    return await retrieveMaskinportenToken({
+        clientId: __ENV.mp_client_id,
+        kid: __ENV.mp_kid,
+        pem: __ENV.mp_client_pem,
+        scope: 'altinn:broker.legacy',
+    });
+}

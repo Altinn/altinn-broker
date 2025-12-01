@@ -36,7 +36,7 @@ export async function getRecipientAltinnToken() {
         clientId: __ENV.mp_client_id,
         kid: __ENV.mp_kid,
         pem: __ENV.mp_client_pem,
-        scope: 'altinn:broker.read altinn:serviceowner',
+        scope: 'altinn:broker.read',
         isSender: false
     });
 }
