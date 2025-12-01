@@ -47,7 +47,7 @@ jobs:
       - name: Build failure report
         if: failure()
         run: |
-            report=":warning: Broker use case test failure :warning: \n"
+            report=":warning: (LEGACY) Broker use case test failure :warning: \n"
             report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}"
             report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo "stepreport=$report" >> $GITHUB_ENV
