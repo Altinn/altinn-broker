@@ -50,6 +50,7 @@ export default async function () {
 
 
 async function TC1_InitializeFileTransfer() {
+    console.log(`TC1: Starting file transfer initialization`);
     const token = await getSenderAltinnToken();
     check(token, { 'Sender Altinn token obtained': t => typeof t === 'string' && t.length > 0 });
 
