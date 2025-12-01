@@ -303,10 +303,46 @@ async function TC8_InitializeAndUpload() {
         console.error(`Error parsing InitializeAndUpload response: ${e.message}`);
     }
 
-    const ovParams = { headers: { Authorization: `Bearer ${senderToken}` } };
-    const ovRes = http.get(`${baseUrl}/broker/api/v1/filetransfer/${iauFileTransferId}`, ovParams);
-    check(ovRes, { 'TC8 overview 200': r => r.status === 200 });
-    check(ovRes.json('fileTransferStatus'), { 'TC8 status Published': s => s === 'Published' });
+    const ovHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
+    const maxRetries = 10;
+    let published = false;
+    let statusVal = null;
+    let ovRes = null;
+
+    const isPublished = (val) => {
+        if (typeof val === 'number') return val === 3; // FileTransferStatus.Published
+        if (typeof val === 'string') return val.toLowerCase() === 'published';
+        return false;
+    };
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        ovRes = http.get(`${baseUrl}/broker/api/v1/filetransfer/${iauFileTransferId}`, { headers: ovHeaders });
+        if (ovRes.status === 200) {
+            try {
+                statusVal = ovRes.json('fileTransferStatus');
+            } catch (e) {
+                console.error(`TC8: Error parsing overview response: ${e.message}`);
+            }
+            if (isPublished(statusVal)) {
+                published = true;
+                console.log(`TC8: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                break;
+            } else {
+                console.log(`TC8: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+            }
+        } else if (ovRes.status === 404) {
+            console.log(`TC8: File transfer not found during polling attempt ${attempt + 1}/${maxRetries}`);
+        } else {
+            console.error(`TC8: Failed to get file transfer overview. Status: ${ovRes.status}. Body: ${ovRes.body}`);
+        }
+        sleep(1);
+    }
+
+    if (ovRes) {
+        check(ovRes, { 'TC8 overview 200': r => r.status === 200 });
+    }
+    check(isPublished(statusVal), { 'TC8 status Published (num|string)': v => v === true });
+    check(published, { 'TC8 reached Published within 10s': p => p === true });
 
     console.log('TC8: InitializeAndUpload completed');
     return { iauFileTransferId };

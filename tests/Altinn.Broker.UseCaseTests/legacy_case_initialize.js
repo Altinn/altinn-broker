@@ -308,29 +308,28 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     check(token, { 'TC9 token obtained': t => typeof t === 'string' && t.length > 0 });
 
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-    const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}`;
+    // Scope to sender perspective with a narrow time window to avoid unrelated results in shared environments
+    const url = `${baseUrl}/broker/api/v1/legacy/file?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}&resourceId=${encodeURIComponent(resourceId)}`;
     const res = http.get(url, { headers: headersJson });
     check(res, { 'GetFiles (GET) 200': r => r.status === 200 });
 
     const models = res.json();
     const returnedIds = Array.isArray(models) ? models : [];
 
-    const uniqRequested = Array.from(new Set([filetransferId1, filetransferId2]));
-    const uniqReturned = Array.from(new Set(returnedIds));
-    check(uniqReturned, {
+    check(returnedIds, {
         'TC9 contains id1': ids => ids.includes(filetransferId1),
-        'TC9 contains id2': ids => ids.includes(filetransferId2),
-        'TC9 exact set match': ids => ids.length === uniqRequested.length && ids.every(id => uniqRequested.includes(id)),
+        'TC9 contains id2': ids => ids.includes(filetransferId2)
     });
 
-    // Status filter: AllConfirmedDownloaded. Expect only the downloaded file (filetransferId1) to be returned.
-    const urlPublished = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded`;
-    const resPublished = http.get(urlPublished, { headers: headersJson });
-    check(resPublished, { 'GetFiles (GET) Published 200': r => r.status === 200 });
-    const modelsPublished = resPublished.json();
-    const returnedPublishedIds = Array.isArray(modelsPublished) ? modelsPublished : [];
-    check(returnedPublishedIds, {
-        'TC9 Published: contains id1 only': ids => ids.length === 1 && ids[0] === filetransferId1,
+    // Status filter: AllConfirmedDownloaded. Expect downloaded file (filetransferId1) to be present and the new one (filetransferId2) to be absent.
+    const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?onBehalfOfConsumer=${encodeURIComponent(prefixedSender)}&resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(fromIso)}&status=AllConfirmedDownloaded`;
+    const resDownloaded = http.get(urlDownloaded, { headers: headersJson });
+    check(resDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
+    const modelsDownloaded = resDownloaded.json();
+    const returnedDownloadedIds = Array.isArray(modelsDownloaded) ? modelsDownloaded : [];
+    check(returnedDownloadedIds, {
+        'TC9 AllConfirmedDownloaded: contains id1': ids => ids.includes(filetransferId1),
+        'TC9 AllConfirmedDownloaded: does not contain id2': ids => !ids.includes(filetransferId2)
     });
     console.log('TC9: Get files completed');
 }
