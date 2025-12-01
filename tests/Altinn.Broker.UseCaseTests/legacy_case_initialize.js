@@ -309,7 +309,7 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
 
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
     // Scope to sender perspective with a narrow time window to avoid unrelated results in shared environments
-    const url = `${baseUrl}/broker/api/v1/legacy/file?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}&resourceId=${encodeURIComponent(resourceId)}`;
+    const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}`;
     const res = http.get(url, { headers: headersJson });
     check(res, { 'GetFiles (GET) 200': r => r.status === 200 });
 
@@ -322,7 +322,7 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     });
 
     // Status filter: AllConfirmedDownloaded. Expect downloaded file (filetransferId1) to be present and the new one (filetransferId2) to be absent.
-    const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?onBehalfOfConsumer=${encodeURIComponent(prefixedSender)}&resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(fromIso)}&status=AllConfirmedDownloaded`;
+    const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded`;
     const resDownloaded = http.get(urlDownloaded, { headers: headersJson });
     check(resDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
     const modelsDownloaded = resDownloaded.json();
