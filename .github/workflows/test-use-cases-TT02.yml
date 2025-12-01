@@ -11,3 +11,10 @@ jobs:
     with:
       environment: staging
     secrets: inherit
+
+  test-staging-legacy:
+    name: Run legacy use case tests on staging
+    uses: ./.github/workflows/test-use-cases-legacy.yml
+    with:
+      environment: staging
+    secrets: inherit
