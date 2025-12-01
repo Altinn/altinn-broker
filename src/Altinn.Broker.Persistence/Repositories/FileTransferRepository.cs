@@ -799,4 +799,99 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             return (fileTransfersDict.Values.ToList(), serviceOwnerIdsDict);
         }, cancellationToken);
     }
+
+    public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
+    {
+        const string query = @"
+            WITH latest_recipient_status AS (
+                SELECT DISTINCT ON (afs.file_transfer_id_fk, afs.actor_id_fk)
+                    afs.file_transfer_id_fk,
+                    afs.actor_id_fk,
+                    afs.actor_file_transfer_status_description_id_fk,
+                    afs.actor_file_transfer_status_date
+                FROM broker.actor_file_transfer_status afs
+                ORDER BY afs.file_transfer_id_fk, afs.actor_id_fk, afs.actor_file_transfer_status_date DESC, afs.actor_file_transfer_status_id_pk DESC
+            )
+            SELECT 
+                DATE(f.created) as report_date,
+                EXTRACT(YEAR FROM f.created)::int as year,
+                EXTRACT(MONTH FROM f.created)::int as month,
+                EXTRACT(DAY FROM f.created)::int as day,
+                COALESCE(r.service_owner_id_fk, 'unknown') as service_owner_id,
+                COALESCE(f.resource_id, 'unknown') as resource_id,
+                COALESCE(recipient.actor_external_id, 'unknown') as recipient_id,
+                CASE 
+                    WHEN recipient.actor_external_id IS NOT NULL 
+                        AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{9}$' THEN 1
+                    WHEN recipient.actor_external_id IS NOT NULL 
+                        AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
+                    ELSE 2
+                END as recipient_type,
+                1 as altinn_version,
+                COUNT(*)::int as message_count,
+                0::bigint as database_storage_bytes,
+                COALESCE(SUM(f.file_transfer_size), 0)::bigint as attachment_storage_bytes
+            FROM broker.file_transfer f
+            INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+            LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
+            LEFT JOIN latest_recipient_status lrs ON lrs.file_transfer_id_fk = f.file_transfer_id_pk
+            LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = lrs.actor_id_fk
+            GROUP BY 
+                DATE(f.created),
+                EXTRACT(YEAR FROM f.created),
+                EXTRACT(MONTH FROM f.created),
+                EXTRACT(DAY FROM f.created),
+                COALESCE(r.service_owner_id_fk, 'unknown'),
+                COALESCE(f.resource_id, 'unknown'),
+                COALESCE(recipient.actor_external_id, 'unknown'),
+                CASE 
+                    WHEN recipient.actor_external_id IS NOT NULL 
+                        AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{9}$' THEN 1
+                    WHEN recipient.actor_external_id IS NOT NULL 
+                        AND COALESCE(SPLIT_PART(recipient.actor_external_id, ':', -1), recipient.actor_external_id) ~ '^\d{11}$' THEN 0
+                    ELSE 2
+                END
+            ORDER BY 
+                report_date,
+                service_owner_id,
+                resource_id,
+                recipient_type,
+                altinn_version";
+
+        await using var command = dataSource.CreateCommand(query);
+        command.CommandTimeout = 600;
+        
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var aggregatedData = new List<AggregatedDailySummaryData>();
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            
+            while (await reader.ReadAsync(ct))
+            {
+                aggregatedData.Add(new AggregatedDailySummaryData
+                {
+                    Date = reader.GetDateTime(reader.GetOrdinal("report_date")),
+                    Year = reader.GetInt32(reader.GetOrdinal("year")),
+                    Month = reader.GetInt32(reader.GetOrdinal("month")),
+                    Day = reader.GetInt32(reader.GetOrdinal("day")),
+                    ServiceOwnerId = reader.IsDBNull(reader.GetOrdinal("service_owner_id")) 
+                        ? "unknown" 
+                        : reader.GetString(reader.GetOrdinal("service_owner_id")),
+                    ResourceId = reader.IsDBNull(reader.GetOrdinal("resource_id")) 
+                        ? "unknown" 
+                        : reader.GetString(reader.GetOrdinal("resource_id")),
+                    RecipientId = reader.IsDBNull(reader.GetOrdinal("recipient_id")) 
+                        ? "unknown" 
+                        : reader.GetString(reader.GetOrdinal("recipient_id")),
+                    RecipientType = reader.GetInt32(reader.GetOrdinal("recipient_type")),
+                    AltinnVersion = reader.GetInt32(reader.GetOrdinal("altinn_version")),
+                    MessageCount = reader.GetInt32(reader.GetOrdinal("message_count")),
+                    DatabaseStorageBytes = reader.GetInt64(reader.GetOrdinal("database_storage_bytes")),
+                    AttachmentStorageBytes = reader.GetInt64(reader.GetOrdinal("attachment_storage_bytes"))
+                });
+            }
+            
+            return aggregatedData;
+        }, cancellationToken);
+    }
 }
