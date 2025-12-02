@@ -289,6 +289,9 @@ async function TC8_InitializeAndUpload() {
         'Metadata.Sender': meta.sender,
         'Metadata.Recipients[0]': meta.recipients[0],
         'Metadata.DisableVirusScan': String(!!meta.disableVirusScan),
+        'Metadata.PropertyList.testTag': meta.propertyList.testTag,
+        'Metadata.PropertyList.useCase': meta.propertyList.useCase,
+        'Metadata.PropertyList.description': meta.propertyList.description,
         'FileTransfer': http.file(fixture2Bytes, 'usecase-broker-test-file2.txt', 'text/plain')
     };
 
