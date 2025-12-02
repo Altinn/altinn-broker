@@ -45,12 +45,11 @@ export default async function () {
     await TC5_DownloadAndVerifyBytes(filetransferId);
     await TC6_ConfirmDownload(filetransferId);
     await TC7_VerifyUpdatedStatus(filetransferId);
-    const { iauFileTransferId } = await TC8_InitializeAndUpload();
-    await TC9_GetFileTransfers(filetransferId, iauFileTransferId);
+    const { initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload();
+    await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
 
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_A3);
-    //test
 }
 
 
@@ -68,18 +67,18 @@ async function TC1_InitializeFileTransfer() {
         'Accept': 'application/json'
     };
 
-    const res = http.post(`${baseUrl}/broker/api/v1/filetransfer`, JSON.stringify(payload), { headers });
-    check(res, { 'File transfer initialized status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File transfer initialization failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.post(`${baseUrl}/broker/api/v1/filetransfer`, JSON.stringify(payload), { headers });
+    check(response, { 'File transfer initialized status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File transfer initialization failed. Status: ${response.status}. Body: ${response.body}`);
         return { filetransferId: null };
     }
 
     let filetransferId = null;
     try {
-        const response = res.json();
-        if (response && response.fileTransferId) {
-            filetransferId = response.fileTransferId;
+        const jsonResponse = response.json();
+        if (jsonResponse && jsonResponse.fileTransferId) {
+            filetransferId = jsonResponse.fileTransferId;
         }
         check(filetransferId, { 'File transfer ID obtained': id => typeof id === 'string' && id.length > 0 });
     } catch (e) {
@@ -107,8 +106,8 @@ async function TC2_UploadFileTransfer(filetransferId) {
     };
 
     // Upload the exact fixture bytes so we can verify later
-    const res = http.post(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/upload`, fixtureBytes, { headers });
-    check(res, { 'File upload status 200': r => r.status === 200 });
+    const response = http.post(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/upload`, fixtureBytes, { headers });
+    check(response, { 'File upload status 200': r => r.status === 200 });
 
     console.log(`TC2: Upload file transfer completed`);
 }
@@ -128,8 +127,8 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
 
     const maxRetries = 10;
     let published = false;
-    let statusVal = null;
-    let lastRes = null;
+    let statusValue = null;
+    let lastResponse = null;
 
     const isPublished = (val) => {
         if (typeof val === 'number') return val === 3; // FileTransferStatus.Published
@@ -139,37 +138,37 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         sleep(1);
-        lastRes = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
+        lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
-        if (lastRes.status === 200) {
+        if (lastResponse.status === 200) {
             try {
-                statusVal = lastRes.json('fileTransferStatus');
+                statusValue = lastResponse.json('fileTransferStatus');
             } catch (e) {
                 console.error(`TC3: Error parsing details response: ${e.message}`);
             }
 
-            if (isPublished(statusVal)) {
+            if (isPublished(statusValue)) {
                 published = true;
-                console.log(`TC3: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.log(`TC3: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
                 break;
             } else {
-                console.log(`TC3: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.log(`TC3: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
             }
         }
-        else if (lastRes.status === 404) {
+        else if (lastResponse.status === 404) {
             console.log(`TC3: File transfer not found during polling attempt ${attempt + 1}/${maxRetries}`);
         }
         else {
-            console.error(`TC3: Failed to get information about the file transfer. Status: ${lastRes.status}. Body: ${lastRes.body}`);
+            console.error(`TC3: Failed to get information about the file transfer. Status: ${lastResponse.status}. Body: ${lastResponse.body}`);
         }
     }
 
-    if (lastRes && lastRes.status === 200) {
-        check(lastRes, {
+    if (lastResponse && lastResponse.status === 200) {
+        check(lastResponse, {
             'fileTransferStatus Published': r => r.json('fileTransferStatus') === 'Published'
         });
     }
-    check(isPublished(statusVal), { 'fileTransferStatus is Published (num|string)': v => v === true });
+    check(isPublished(statusValue), { 'fileTransferStatus is Published (num|string)': v => v === true });
     check(published, { 'File transfer reached published status within 10s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
@@ -183,10 +182,10 @@ async function TC4_SearchFileAsRecipient(filetransferId) {
         Authorization: `Bearer ${recipientToken}`
     };
 
-    const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}`, { headers });
-    check(res, { 'File transfer found by recipient status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File transfer search by recipient failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}`, { headers });
+    check(response, { 'File transfer found by recipient status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File transfer search by recipient failed. Status: ${response.status}. Body: ${response.body}`);
     }
     console.log(`TC4: Search file as recipient completed`);
 }
@@ -206,16 +205,16 @@ async function TC5_DownloadAndVerifyBytes(filetransferId) {
     };
 
     // Request binary to receive an ArrayBuffer for exact byte comparison
-    const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/download`, { headers, responseType: 'binary' });
-    check(res, { 'File download status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File download failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/download`, { headers, responseType: 'binary' });
+    check(response, { 'File download status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File download failed. Status: ${response.status}. Body: ${response.body}`);
         return null;
     }
 
     // Verify downloaded content matches fixture via SHA-256
-    const downloadedHash = crypto.sha256(res.body, 'hex');
-    const lengthMatches = (res.body.byteLength === fixtureBytes.byteLength);
+    const downloadedHash = crypto.sha256(response.body, 'hex');
+    const lengthMatches = (response.body.byteLength === fixtureBytes.byteLength);
 
     check(downloadedHash, { 'Downloaded hash equals fixture': h => h === fixtureHash });
     check(lengthMatches, { 'Downloaded length equals fixture length': m => m === true });
@@ -232,10 +231,10 @@ async function TC6_ConfirmDownload(filetransferId) {
         Authorization: `Bearer ${recipientToken}`
     };
 
-    const res = http.post(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/confirmdownload`, null, { headers });
-    check(res, { 'Confirm download status 204': r => r.status === 204 });
-    if (res.status !== 204) {
-        console.error(`Confirm download failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.post(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/confirmdownload`, null, { headers });
+    check(response, { 'Confirm download status 204': r => r.status === 204 });
+    if (response.status !== 204) {
+        console.error(`Confirm download failed. Status: ${response.status}. Body: ${response.body}`);
         return;
     }
     console.log(`TC6: Confirm download completed`);
@@ -249,16 +248,16 @@ async function TC7_VerifyUpdatedStatus(filetransferId) {
     const headers = {
         Authorization: `Bearer ${senderToken}`
     };
-    const res = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}`, { headers });
-    check(res, { 'File transfer status after download status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`Failed to get file transfer status after download. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}`, { headers });
+    check(response, { 'File transfer status after download status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`Failed to get file transfer status after download. Status: ${response.status}. Body: ${response.body}`);
         return;
     }
 
     let statusAfterDownload = null;
     try {
-        statusAfterDownload = res.json('fileTransferStatus');
+        statusAfterDownload = response.json('fileTransferStatus');
     } catch (e) {
         console.error(`Error parsing details response: ${e.message}`);
     }
@@ -296,27 +295,27 @@ async function TC8_InitializeAndUpload() {
     };
 
     const params = { headers: { Authorization: `Bearer ${senderToken}` } };
-    const res = http.post(`${baseUrl}/broker/api/v1/filetransfer/upload`, formBody, params);
-    check(res, { 'InitializeAndUpload 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`InitializeAndUpload failed. Status: ${res.status}. Body: ${res.body}`);
-        return { iauFileTransferId: null };
+    const response = http.post(`${baseUrl}/broker/api/v1/filetransfer/upload`, formBody, params);
+    check(response, { 'InitializeAndUpload 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`InitializeAndUpload failed. Status: ${response.status}. Body: ${response.body}`);
+        return { initializeAndUploadFileTransferId: null };
     }
 
-    let iauFileTransferId = null;
+    let initializeAndUploadFileTransferId = null;
     try {
-        iauFileTransferId = res.json('fileTransferId');
-        check(iauFileTransferId, { 'TC8 fileTransferId obtained': id => typeof id === 'string' && id.length > 0 });
+        initializeAndUploadFileTransferId = response.json('fileTransferId');
+        check(initializeAndUploadFileTransferId, { 'TC8 fileTransferId obtained': id => typeof id === 'string' && id.length > 0 });
     } catch (e) {
         console.error(`Error parsing InitializeAndUpload response: ${e.message}`);
     }
 
-    const ovHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
+    const overviewHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
     
     const maxRetries = 20;
     let published = false;
-    let statusVal = null;
-    let ovRes = null;
+    let statusValue = null;
+    let overviewResponse = null;
 
     const isPublished = (val) => {
         if (typeof val === 'number') return val === 3; // FileTransferStatus.Published
@@ -325,36 +324,36 @@ async function TC8_InitializeAndUpload() {
     };
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        ovRes = http.get(`${baseUrl}/broker/api/v1/filetransfer/${iauFileTransferId}`, { headers: ovHeaders });
-        if (ovRes.status === 200) {
+        overviewResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${initializeAndUploadFileTransferId}`, { headers: overviewHeaders });
+        if (overviewResponse.status === 200) {
             try {
-                statusVal = ovRes.json('fileTransferStatus');
+                statusValue = overviewResponse.json('fileTransferStatus');
             } catch (e) {
                 console.error(`TC8: Error parsing overview response: ${e.message}`);
             }
-            if (isPublished(statusVal)) {
+            if (isPublished(statusValue)) {
                 published = true;
-                console.log(`TC8: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.log(`TC8: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
                 break;
             } else {
-                console.log(`TC8: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.log(`TC8: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
             }
-        } else if (ovRes.status === 404) {
+        } else if (overviewResponse.status === 404) {
             console.log(`TC8: File transfer not found during polling attempt ${attempt + 1}/${maxRetries}`);
         } else {
-            console.error(`TC8: Failed to get file transfer overview. Status: ${ovRes.status}. Body: ${ovRes.body}`);
+            console.error(`TC8: Failed to get file transfer overview. Status: ${overviewResponse.status}. Body: ${overviewResponse.body}`);
         }
         sleep(1);
     }
 
-    if (ovRes) {
-        check(ovRes, { 'TC8 overview 200': r => r.status === 200 });
+    if (overviewResponse) {
+        check(overviewResponse, { 'TC8 overview 200': r => r.status === 200 });
     }
-    check(isPublished(statusVal), { 'TC8 status Published (num|string)': v => v === true });
+    check(isPublished(statusValue), { 'TC8 status Published (num|string)': v => v === true });
     check(published, { 'TC8 reached Published within 10s': p => p === true });
 
     console.log('TC8: InitializeAndUpload completed');
-    return { iauFileTransferId };
+    return { initializeAndUploadFileTransferId };
 }
 
 async function TC9_GetFileTransfers(fileTransferId1, fileTransferId2) {
@@ -368,14 +367,14 @@ async function TC9_GetFileTransfers(fileTransferId1, fileTransferId2) {
 
     const headers = { Authorization: `Bearer ${senderToken}` };
     const url = `${baseUrl}/broker/api/v1/filetransfer?resourceId=${encodeURIComponent(resourceId)}&role=Sender`;
-    const res = http.get(url, { headers });
-    check(res, { 'GetFileTransfers 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`GetFileTransfers failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(url, { headers });
+    check(response, { 'GetFileTransfers 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`GetFileTransfers failed. Status: ${response.status}. Body: ${response.body}`);
         return;
     }
 
-    const ids = Array.isArray(res.json()) ? res.json() : [];
+    const ids = Array.isArray(response.json()) ? response.json() : [];
     check(ids, {
         'GetFileTransfers contains TC1 id': list => list.includes(fileTransferId1),
         'GetFileTransfers contains TC8 id': list => list.includes(fileTransferId2)

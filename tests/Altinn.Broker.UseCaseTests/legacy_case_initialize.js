@@ -6,7 +6,6 @@ import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
 import { getLegacyMaskinportenToken } from './helpers/maskinportenTokenService.js';
 
 const baseUrl = __ENV.base_url;
-const resourceId = 'bruksmonster-broker';
 const isProduction = (baseUrl.toLowerCase().includes('platform.altinn.no') ? true : false);
 // Legacy controller expects onBehalfOfConsumer as a string (org number)
 const onBehalfOfConsumerSender = isProduction ? "orgnummerforprod" : "313896013";
@@ -64,18 +63,18 @@ async function TC1_InitializeLegacyFileTransfer() {
         'Accept': 'application/json'
     };
 
-    const res = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers });
-    check(res, { 'File transfer initialized status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File transfer initialization failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers });
+    check(response, { 'File transfer initialized status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File transfer initialization failed. Status: ${response.status}. Body: ${response.body}`);
         return { filetransferId: null };
     }
 
     let filetransferId = null;
     try {
-        const response = res.json();
-        if (response) {
-            filetransferId = response;
+        const jsonResponse = response.json();
+        if (jsonResponse) {
+            filetransferId = jsonResponse;
         }
         check(filetransferId, { 'File transfer ID obtained': id => typeof id === 'string' && id.length > 0 });
     } catch (e) {
@@ -101,12 +100,12 @@ async function TC2_UploadLegacyFileTransfer(filetransferId) {
     };
 
     // Upload the exact fixture bytes so we can verify later
-    const res = http.post(
+    const response = http.post(
         `${baseUrl}/broker/api/v1/legacy/file/${filetransferId}/upload?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`,
         fixtureBytes,
         { headers }
     );
-    check(res, { 'File upload status 200': r => r.status === 200 });
+    check(response, { 'File upload status 200': r => r.status === 200 });
 
     console.log(`TC2: Upload legacy file transfer completed`);
 }
@@ -126,48 +125,48 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
 
     const maxRetries = 10;
     let published = false;
-    let statusVal = null;
-    let lastRes = null;
+    let statusValue = null;
+    let lastResponse = null;
 
-    const isPublished = (val) => {
-        if (typeof val === 'number') return val === 3; // FileStatus.Published
-        if (typeof val === 'string') return val.toLowerCase() === 'published';
+    const isPublished = (value) => {
+        if (typeof value === 'number') return value === 3; // FileStatus.Published
+        if (typeof value === 'string') return value.toLowerCase() === 'published';
         return false;
     };
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         sleep(1);
-        lastRes = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
-        if (lastRes.status === 200) {
+        lastResponse = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
+        if (lastResponse.status === 200) {
             try {
-                statusVal = lastRes.json('fileStatus');
+                statusValue = lastResponse.json('fileStatus');
             } catch (e) {
                 console.error(`TC3: Error parsing details response: ${e.message}`);
             }
 
-            if (isPublished(statusVal)) {
+            if (isPublished(statusValue)) {
                 published = true;
-                console.log(`TC3: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.log(`TC3: File transfer is published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
                 break;
             } else {
-                console.error(`TC3: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusVal})`);
+                console.error(`TC3: Status not yet Published on attempt ${attempt + 1}/${maxRetries} (status=${statusValue})`);
             }
         }
-        else if (lastRes.status === 404) {
+        else if (lastResponse.status === 404) {
             console.error(`TC3: File transfer not found during polling attempt ${attempt + 1}/${maxRetries}`);
         }
         else {
-            console.error(`TC3: Failed to get information about the file transfer. Status: ${lastRes.status}. Body: ${lastRes.body}`);
+            console.error(`TC3: Failed to get information about the file transfer. Status: ${lastResponse.status}. Body: ${lastResponse.body}`);
         }
     }
 
     // Checks outside the loop
-    if (lastRes && lastRes.status === 200) {
-        check(lastRes, {
+    if (lastResponse && lastResponse.status === 200) {
+        check(lastResponse, {
             'fileStatus Published': r => r.json('fileStatus') === 'Published'
         });
     }
-    check(isPublished(statusVal), { 'fileStatus is Published (num|string)': v => v === true });
+    check(isPublished(statusValue), { 'fileStatus is Published (num|string)': v => v === true });
     check(published, { 'File transfer reached published status within 10s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
@@ -181,10 +180,10 @@ async function TC4_SearchLegacyFileAsRecipient(filetransferId) {
         Authorization: `Bearer ${legacyToken}`
     };
 
-    const res = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers });
-    check(res, { 'File transfer found by recipient status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File transfer search by recipient failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers });
+    check(response, { 'File transfer found by recipient status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File transfer search by recipient failed. Status: ${response.status}. Body: ${response.body}`);
     }
     console.log(`TC4: Test case completed`);
 }
@@ -204,16 +203,16 @@ async function TC5_LegacyDownloadAndVerifyBytes(filetransferId) {
     };
 
     // Request binary to receive an ArrayBuffer for exact byte comparison
-    const res = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}/download?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers, responseType: 'binary' });
-    check(res, { 'File download status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`File download failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}/download?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers, responseType: 'binary' });
+    check(response, { 'File download status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`File download failed. Status: ${response.status}. Body: ${response.body}`);
         return null;
     }
 
     // Verify downloaded content matches fixture via SHA-256
-    const downloadedHash = crypto.sha256(res.body, 'hex');
-    const lengthMatches = (res.body.byteLength === fixtureBytes.byteLength);
+    const downloadedHash = crypto.sha256(response.body, 'hex');
+    const lengthMatches = (response.body.byteLength === fixtureBytes.byteLength);
 
     check(downloadedHash, { 'Downloaded hash equals fixture': h => h === fixtureHash });
     check(lengthMatches, { 'Downloaded length equals fixture length': m => m === true });
@@ -230,10 +229,10 @@ async function TC6_LegacyConfirmDownload(filetransferId) {
         Authorization: `Bearer ${legacyToken}`
     };
 
-    const res = http.post(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}/confirmdownload?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, null, { headers });
-    check(res, { 'Confirm download status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`Confirm download failed. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.post(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}/confirmdownload?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, null, { headers });
+    check(response, { 'Confirm download status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`Confirm download failed. Status: ${response.status}. Body: ${response.body}`);
         return;
     }
     console.log(`TC6: Confirm download completed`);
@@ -247,23 +246,23 @@ async function TC7_LegacyVerifyUpdatedStatus(filetransferId) {
     const headers = {
         Authorization: `Bearer ${legacyToken}`
     };
-    const res = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers });
-    check(res, { 'File transfer status after download status 200': r => r.status === 200 });
-    if (res.status !== 200) {
-        console.error(`Failed to get file transfer status after download. Status: ${res.status}. Body: ${res.body}`);
+    const response = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerRecipient)}`, { headers });
+    check(response, { 'File transfer status after download status 200': r => r.status === 200 });
+    if (response.status !== 200) {
+        console.error(`Failed to get file transfer status after download. Status: ${response.status}. Body: ${response.body}`);
         return;
     }
 
     let statusAfterDownload = null;
     try {
-        statusAfterDownload = res.json('fileStatus');
+        statusAfterDownload = response.json('fileStatus');
     } catch (e) {
         console.error(`Error parsing details response: ${e.message}`);
     }
 
-    const isDownloaded = (val) => {
-        if (typeof val === 'number') return val === 5;
-        if (typeof val === 'string') return val.toLowerCase() === 'allconfirmeddownloaded';
+    const isDownloaded = (value) => {
+        if (typeof value === 'number') return value === 5;
+        if (typeof value === 'string') return value.toLowerCase() === 'allconfirmeddownloaded';
         return false;
     };
 
@@ -278,26 +277,26 @@ async function TC8_LegacyGetFileOverviews(filetransferId1) {
     const recipient = isProduction ? 'orgnummerforprod' : '311167898';
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
-    const resInit2 = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers: headersJson });
-    check(resInit2, { 'TC8 init2 200': r => r.status === 200 });
-    const filetransferId2 = resInit2.json();
+    const responseInitialize2 = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers: headersJson });
+    check(responseInitialize2, { 'TC8 initialize2 200': r => r.status === 200 });
+    const filetransferId2 = responseInitialize2.json();
 
     const requestedIds = [filetransferId1, filetransferId2, filetransferId1];
     const url = `${baseUrl}/broker/api/v1/legacy/file/overviews?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`;
-    const res = http.post(url, JSON.stringify(requestedIds), { headers: headersJson });
-    check(res, { 'Overviews 200': r => r.status === 200 });
+    const response = http.post(url, JSON.stringify(requestedIds), { headers: headersJson });
+    check(response, { 'Overviews 200': r => r.status === 200 });
 
-    const models = res.json();
+    const models = response.json();
     const returnedIds = models.map(m => m.fileId || m.fileTransferId);
 
-    const uniqRequested = Array.from(new Set([filetransferId1, filetransferId2]));
-    const uniqReturned = Array.from(new Set(returnedIds));
+    const uniqueRequested = Array.from(new Set([filetransferId1, filetransferId2]));
+    const uniqueReturned = Array.from(new Set(returnedIds));
 
-    check(uniqReturned, {
+    check(uniqueReturned, {
         'Contains id1': ids => ids.includes(filetransferId1),
         'Contains id2': ids => ids.includes(filetransferId2),
         'No duplicates in response': ids => ids.length === returnedIds.length,
-        'Exact set match': ids => ids.length === uniqRequested.length && ids.every(id => uniqRequested.includes(id)),
+        'Exact set match': ids => ids.length === uniqueRequested.length && ids.every(id => uniqueRequested.includes(id)),
     });
     console.log(`TC8: Get file overviews completed`);
     return { filetransferId2 };
@@ -310,10 +309,10 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
     // Scope to sender perspective with a narrow time window to avoid unrelated results in shared environments
     const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}`;
-    const res = http.get(url, { headers: headersJson });
-    check(res, { 'GetFiles (GET) 200': r => r.status === 200 });
+    const response = http.get(url, { headers: headersJson });
+    check(response, { 'GetFiles (GET) 200': r => r.status === 200 });
 
-    const models = res.json();
+    const models = response.json();
     const returnedIds = Array.isArray(models) ? models : [];
 
     check(returnedIds, {
@@ -323,9 +322,9 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
 
     // Status filter: AllConfirmedDownloaded. Expect downloaded file (filetransferId1) to be present and the new one (filetransferId2) to be absent.
     const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded`;
-    const resDownloaded = http.get(urlDownloaded, { headers: headersJson });
-    check(resDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
-    const modelsDownloaded = resDownloaded.json();
+    const responseDownloaded = http.get(urlDownloaded, { headers: headersJson });
+    check(responseDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
+    const modelsDownloaded = responseDownloaded.json();
     const returnedDownloadedIds = Array.isArray(modelsDownloaded) ? modelsDownloaded : [];
     check(returnedDownloadedIds, {
         'TC9 AllConfirmedDownloaded: contains id1': ids => ids.includes(filetransferId1),
