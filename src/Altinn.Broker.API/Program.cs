@@ -15,6 +15,7 @@ using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
+using Altinn.Broker.API.Swagger;
 
 using Hangfire;
 
@@ -87,6 +88,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
+        options.OperationFilter<BinaryRequestBodyOperationFilter>();
     });
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
