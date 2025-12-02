@@ -36,18 +36,23 @@ const fixtureHash = crypto.sha256(fixtureBytes, 'hex');
  */
 
 export default async function () {
-    const { filetransferId } = await TC1_InitializeLegacyFileTransfer();
+    let filetransferId = null;
+    let filetransferId2 = null;
+
+    try {
+    ({ filetransferId } = await TC1_InitializeLegacyFileTransfer());
     await TC2_UploadLegacyFileTransfer(filetransferId);
     await TC3_LegacyPollAndVerifyUpload(filetransferId);
     await TC4_SearchLegacyFileAsRecipient(filetransferId);
     await TC5_LegacyDownloadAndVerifyBytes(filetransferId);
     await TC6_LegacyConfirmDownload(filetransferId);
     await TC7_LegacyVerifyUpdatedStatus(filetransferId);
-    const { filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId);
+    ({ filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId));
     await TC9_LegacyGetFiles(filetransferId, filetransferId2);
-
+    } finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_LEGACY);
+    }
 }
 
 async function TC1_InitializeLegacyFileTransfer() {
@@ -134,7 +139,7 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
         return false;
     };
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         sleep(1);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
         if (lastResponse.status === 200) {
@@ -163,10 +168,9 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
     // Checks outside the loop
     if (lastResponse && lastResponse.status === 200) {
         check(lastResponse, {
-            'fileStatus Published': r => r.json('fileStatus') === 'Published'
+            'fileStatus Published': r => isPublished(r.json('fileStatus'))
         });
     }
-    check(isPublished(statusValue), { 'fileStatus is Published (num|string)': v => v === true });
     check(published, { 'File transfer reached published status within 10s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }

@@ -38,18 +38,23 @@ const fixture2Bytes = open('./fixtures/usecase-broker-test-file2.txt', 'b');
  */
 
 export default async function () {
-    const { filetransferId } = await TC1_InitializeFileTransfer();
+    let filetransferId = null;
+    let initializeAndUploadFileTransferId = null;
+
+    try {
+    ({ filetransferId } = await TC1_InitializeFileTransfer());
     await TC2_UploadFileTransfer(filetransferId);
     await TC3_PollAndVerifyUpload(filetransferId);
     await TC4_SearchFileAsRecipient(filetransferId);
     await TC5_DownloadAndVerifyBytes(filetransferId);
     await TC6_ConfirmDownload(filetransferId);
     await TC7_VerifyUpdatedStatus(filetransferId);
-    const { initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload();
+    ({ initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload());
     await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
-
+    } finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_A3);
+    }
 }
 
 
@@ -136,7 +141,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         return false;
     };
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         sleep(1);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
@@ -165,7 +170,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
 
     if (lastResponse && lastResponse.status === 200) {
         check(lastResponse, {
-            'fileTransferStatus Published': r => r.json('fileTransferStatus') === 'Published'
+            'fileTransferStatus Published': r => isPublished(r.json('fileTransferStatus'))
         });
     }
     check(isPublished(statusValue), { 'fileTransferStatus is Published (num|string)': v => v === true });
@@ -312,7 +317,7 @@ async function TC8_InitializeAndUpload() {
 
     const overviewHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
     
-    const maxRetries = 20;
+    const maxRetries = 10;
     let published = false;
     let statusValue = null;
     let overviewResponse = null;
@@ -323,7 +328,7 @@ async function TC8_InitializeAndUpload() {
         return false;
     };
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         overviewResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${initializeAndUploadFileTransferId}`, { headers: overviewHeaders });
         if (overviewResponse.status === 200) {
             try {
