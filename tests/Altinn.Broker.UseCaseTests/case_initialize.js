@@ -44,7 +44,7 @@ export default async function () {
     await TC9_GetFileTransfers(filetransferId, iauFileTransferId);
 
     // Cleanup test data
-    await cleanupUseCaseTestData();
+    // await cleanupUseCaseTestData();
 }
 
 
