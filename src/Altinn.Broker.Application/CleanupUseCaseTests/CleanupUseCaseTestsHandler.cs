@@ -20,7 +20,7 @@ public class CleanupUseCaseTestsHandler(
 
     public async Task<OneOf<CleanupUseCaseTestsResponse, Error>> Process(CleanupUseCaseTestsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Starting cleanup of use case test data for testTag: {TestTag}", request.TestTag);
+        logger.LogInformation("Starting cleanup of use case test data for testTag: {TestTag}", request.TestTag.SanitizeForLogs());
         var fileTransferIds = await fileTransferRepository.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, request.TestTag, cancellationToken);
         return await TransactionWithRetriesPolicy.Execute<CleanupUseCaseTestsResponse>(async (ct) =>
         {
@@ -44,7 +44,7 @@ public class CleanupUseCaseTestsHandler(
         await TransactionWithRetriesPolicy.Execute<Task>(async (ct) =>
         {
             int deletedFileTransfers = await fileTransferRepository.HardDeleteFileTransfersByIds(fileTransferIds, cancellationToken);
-            logger.LogInformation("Deleted {deletedFileTransfers} file transfers for resourceId {resourceId} with testTag {testTag}", deletedFileTransfers, resourceId, testTag);
+            logger.LogInformation("Deleted {deletedFileTransfers} file transfers for resourceId {resourceId} with testTag {testTag}", deletedFileTransfers, resourceId, testTag.SanitizeForLogs());
 			
             return Task.CompletedTask;
         }, logger, cancellationToken);

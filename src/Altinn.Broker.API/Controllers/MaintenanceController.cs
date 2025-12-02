@@ -3,6 +3,7 @@ using Altinn.Broker.API.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Altinn.Broker.Application.CleanupUseCaseTests;
+using Altinn.Broker.Core.Helpers;
 
 namespace Altinn.Broker.API.Controllers;
 
@@ -35,7 +36,7 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
         [FromServices] CleanupUseCaseTestsHandler handler,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Request to cleanup use case test data received for testTag: {TestTag}", testTag);
+        _logger.LogInformation("Request to cleanup use case test data received for testTag: {TestTag}", testTag.SanitizeForLogs());
         var result = await handler.Process(new CleanupUseCaseTestsRequest { TestTag = testTag }, HttpContext.User, cancellationToken);
         return result.Match(
             Ok,
