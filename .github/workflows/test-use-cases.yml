@@ -1,23 +1,21 @@
 name: Test Use Cases On environment
 
 on:
-  push:
   workflow_dispatch:
-    schedule:
-      inputs:
-        environment:
-          description: 'Environment to run tests against'
-          required: true
-          default: 'test'
-          type: choice
-          options:
-            - yt01
-            - at22
-            - at23
-            - at24
-            - test
-            - staging
-            - production
+    inputs:
+      environment:
+        description: 'Environment to run tests against'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - yt01
+          - at22
+          - at23
+          - at24
+          - test
+          - staging
+          - production
   workflow_call:
     inputs:
       environment:
