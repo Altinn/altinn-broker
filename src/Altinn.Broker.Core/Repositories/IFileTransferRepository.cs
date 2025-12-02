@@ -32,5 +32,6 @@ public interface IFileTransferRepository
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
     Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, CancellationToken cancellationToken);
+    Task<List<Guid>> GetFileTransfersByPropertyTag(string resourceId, string propertyKey, string propertyValue, CancellationToken cancellationToken);
     Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken);
 }

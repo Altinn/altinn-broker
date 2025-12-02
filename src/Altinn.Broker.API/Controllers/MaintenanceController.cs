@@ -17,9 +17,10 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
     private readonly ILogger<MaintenanceController> _logger = logger;
 
     /// <summary>
-    /// Cleanup test data (dialogs and correspondences) for a given resourceId used by use case tests
+    /// Cleanup test data for a given testTag used by use case tests
     /// </summary>
-    /// <response code="200">Returns a summary of deleted correspondences</response>
+    /// <param name="testTag">The test tag to identify which test's data to clean up (e.g., 'useCaseTestsA3' or 'useCaseTestsLegacy')</param>
+    /// <response code="200">Returns a summary of deleted file transfers</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="403">Forbidden</response>
     [HttpPost]
@@ -30,11 +31,12 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> CleanupUseCaseTestsData(
+        [FromQuery] string testTag,
         [FromServices] CleanupUseCaseTestsHandler handler,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Request to cleanup use case test data received");
-        var result = await handler.Process(HttpContext.User, cancellationToken);
+        _logger.LogInformation("Request to cleanup use case test data received for testTag: {TestTag}", testTag);
+        var result = await handler.Process(new CleanupUseCaseTestsRequest { TestTag = testTag }, HttpContext.User, cancellationToken);
         return result.Match(
             Ok,
             Problem

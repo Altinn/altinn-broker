@@ -1,5 +1,8 @@
 import { toUrn } from './commonUtils.js';
 
+export const TEST_TAG_A3 = 'useCaseTestsA3';
+export const TEST_TAG_LEGACY = 'useCaseTestsLegacy';
+
 export function buildInitializeFileTransferPayload(recipientOrgNo) {
     const recipient = toUrn(recipientOrgNo);
     const nowRef = `usecase-broker-${Date.now()}`;
@@ -11,6 +14,7 @@ export function buildInitializeFileTransferPayload(recipientOrgNo) {
         sender: '0192:313896013',
         recipients: [recipient],
         propertyList: {
+            testTag: TEST_TAG_A3,
             useCase: 'Use case tests',
             description: 'Test file transfer initialization for use case tests'
         },
@@ -28,6 +32,7 @@ export function buildLegacyInitializeFileTransferPayload(recipientOrgNo) {
         sender: '0192:313896013',
         recipients: [recipient],
         propertyList: {
+            testTag: TEST_TAG_LEGACY,
             useCase: 'Use case tests',
             description: 'Test file transfer initialization for legacy use case tests'
         },

@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
-import { buildLegacyInitializeFileTransferPayload } from './helpers/brokerPayloadBuilder.js';
+import { buildLegacyInitializeFileTransferPayload, TEST_TAG_LEGACY } from './helpers/brokerPayloadBuilder.js';
 import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
 import { getLegacyMaskinportenToken } from './helpers/maskinportenTokenService.js';
 
@@ -48,7 +48,7 @@ export default async function () {
     await TC9_LegacyGetFiles(filetransferId, filetransferId2);
 
     // Cleanup test data
-    await cleanupUseCaseTestData();
+    await cleanupUseCaseTestData(TEST_TAG_LEGACY);
 }
 
 async function TC1_InitializeLegacyFileTransfer() {

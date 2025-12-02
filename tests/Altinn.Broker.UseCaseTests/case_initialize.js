@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
-import { buildInitializeFileTransferPayload } from './helpers/brokerPayloadBuilder.js';
+import { buildInitializeFileTransferPayload, TEST_TAG_A3 } from './helpers/brokerPayloadBuilder.js';
 import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
 import { getSenderAltinnToken, getRecipientAltinnToken } from './helpers/altinnTokenService.js';
 
@@ -32,6 +32,8 @@ const fixture2Bytes = open('./fixtures/usecase-broker-test-file2.txt', 'b');
  * TC5: Download and verify correct bytes
  * TC6: Confirm download
  * TC7: Verify updated status
+ * TC8: Initialize and upload
+ * TC9: Get file transfers 
  * Cleanup: Remove test data created during the test
  */
 
@@ -47,8 +49,7 @@ export default async function () {
     await TC9_GetFileTransfers(filetransferId, iauFileTransferId);
 
     // Cleanup test data
-    // await cleanupUseCaseTestData();
-    //again
+    await cleanupUseCaseTestData(TEST_TAG_A3);
 }
 
 

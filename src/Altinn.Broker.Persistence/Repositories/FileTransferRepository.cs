@@ -824,6 +824,33 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         }, cancellationToken);
     }
 
+    public async Task<List<Guid>> GetFileTransfersByPropertyTag(string resourceId, string propertyKey, string propertyValue, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT f.file_transfer_id_pk " +
+            "FROM broker.file_transfer f " +
+            "INNER JOIN broker.file_transfer_property p ON p.file_transfer_id_fk = f.file_transfer_id_pk " +
+            "WHERE f.resource_id = @resourceId AND p.key = @propertyKey AND p.value = @propertyValue");
+
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@propertyKey", propertyKey);
+        command.Parameters.AddWithValue("@propertyValue", propertyValue);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransferIds = new List<Guid>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                fileTransferIds.Add(fileTransferId);
+            }
+
+            return fileTransferIds;
+        }, cancellationToken);
+    }
+
     public async Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken)
     {
         var idsArray = fileTransferIds.ToArray();
