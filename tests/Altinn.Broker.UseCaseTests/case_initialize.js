@@ -21,6 +21,9 @@ export const options = {
 const fixtureBytes = open('./fixtures/usecase-broker-test-file.txt', 'b');
 const fixtureHash = crypto.sha256(fixtureBytes, 'hex');
 
+// Second fixture for TC8 to test with different file content
+const fixture2Bytes = open('./fixtures/usecase-broker-test-file2.txt', 'b');
+
 /**
  * TC1: Initialize a file transfer
  * TC2: Upload the initialized file transfer
@@ -44,7 +47,7 @@ export default async function () {
     await TC9_GetFileTransfers(filetransferId, iauFileTransferId);
 
     // Cleanup test data
-    // await cleanupUseCaseTestData();
+    await cleanupUseCaseTestData();
 }
 
 
@@ -277,13 +280,13 @@ async function TC8_InitializeAndUpload() {
 
     // Build multipart/form-data with nested form keys for Metadata and a file part for FileTransfer
     const formBody = {
-        'Metadata.FileName': meta.fileName,
+        'Metadata.FileName': 'usecase-broker-test-file2.txt',
         'Metadata.ResourceId': meta.resourceId,
         'Metadata.SendersFileTransferReference': meta.sendersFileTransferReference,
         'Metadata.Sender': meta.sender,
         'Metadata.Recipients[0]': meta.recipients[0],
         'Metadata.DisableVirusScan': String(!!meta.disableVirusScan),
-        'FileTransfer': http.file(fixtureBytes, meta.fileName, 'text/plain')
+        'FileTransfer': http.file(fixture2Bytes, 'usecase-broker-test-file2.txt', 'text/plain')
     };
 
     const params = { headers: { Authorization: `Bearer ${senderToken}` } };
