@@ -11,6 +11,11 @@ namespace Altinn.Broker.Tests;
 
 public class CleanupUseCaseTestsHandlerTests
 {
+	private const string ResourceId = "bruksmonster-broker";
+	private const string TestTagPropertyKey = "testTag";
+	private const string TestTagA3 = "unitTestsA3";
+	private const string TestTagLegacy = "unitTestsLegacy";
+
 	private static CleanupUseCaseTestsHandler CreateHandler(
 		Mock<IBackgroundJobClient> bgClientMock,
 		Mock<IFileTransferRepository> repoMock)
@@ -23,11 +28,10 @@ public class CleanupUseCaseTestsHandlerTests
 	public async Task Process_EnqueuesDeleteJob_ReturnsResponseWithCounts()
 	{
 		// Arrange
-		var resourceIdExpected = "bruksmonster-broker";
 		var existingIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
 
 		var repoMock = new Mock<IFileTransferRepository>();
-		repoMock.Setup(r => r.GetFileTransfersByResourceId(resourceIdExpected, It.IsAny<CancellationToken>()))
+		repoMock.Setup(r => r.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, TestTagA3, It.IsAny<CancellationToken>()))
 			.ReturnsAsync(existingIds);
 
 		Job? capturedJob = null;
@@ -38,18 +42,20 @@ public class CleanupUseCaseTestsHandlerTests
 			.Returns("job-123");
 
 		var handler = CreateHandler(bgClientMock, repoMock);
+		var request = new CleanupUseCaseTestsRequest { TestTag = TestTagA3 };
 
 		// Act
-		var result = await handler.Process(null, CancellationToken.None);
+		var result = await handler.Process(request, null, CancellationToken.None);
 
 		// Assert
 		var response = result.AsT0; 
-		Assert.Equal(resourceIdExpected, response.ResourceId);
+		Assert.Equal(ResourceId, response.ResourceId);
+		Assert.Equal(TestTagA3, response.TestTag);
 		Assert.Equal(existingIds.Count, response.FileTransfersFound);
 		Assert.Equal("job-123", response.DeleteFileTransfersJobId);
 
 		bgClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
-		repoMock.Verify(r => r.GetFileTransfersByResourceId(resourceIdExpected, It.IsAny<CancellationToken>()), Times.Once);
+		repoMock.Verify(r => r.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, TestTagA3, It.IsAny<CancellationToken>()), Times.Once);
 
 		// Validate job target & args
 		Assert.NotNull(capturedJob);
@@ -57,18 +63,19 @@ public class CleanupUseCaseTestsHandlerTests
 		Assert.Equal(nameof(CleanupUseCaseTestsHandler.DeleteFileTransfers), capturedJob.Method.Name);
 		var argFileTransfersVal = capturedJob.Args[0] as List<Guid>;
 		var argResourceVal = capturedJob.Args[1] as string;
+		var argTestTagVal = capturedJob.Args[2] as string;
 		Assert.NotNull(argFileTransfersVal);
 		Assert.Equal(existingIds.OrderBy(x => x), argFileTransfersVal!.OrderBy(x => x));
-		Assert.Equal(resourceIdExpected, argResourceVal);
+		Assert.Equal(ResourceId, argResourceVal);
+		Assert.Equal(TestTagA3, argTestTagVal);
 	}
 
 	[Fact]
 	public async Task Process_EmptyList_StillEnqueuesJobWithEmptyIds()
 	{
 		// Arrange
-		var resourceIdExpected = "bruksmonster-broker";
 		var repoMock = new Mock<IFileTransferRepository>();
-		repoMock.Setup(r => r.GetFileTransfersByResourceId(resourceIdExpected, It.IsAny<CancellationToken>()))
+		repoMock.Setup(r => r.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, TestTagLegacy, It.IsAny<CancellationToken>()))
 			.ReturnsAsync(new List<Guid>());
 
 		Job? capturedJob = null;
@@ -79,17 +86,20 @@ public class CleanupUseCaseTestsHandlerTests
 			.Returns("job-empty");
 
 		var handler = CreateHandler(bgClientMock, repoMock);
+		var request = new CleanupUseCaseTestsRequest { TestTag = TestTagLegacy };
 
 		// Act
-		var result = await handler.Process(null, CancellationToken.None);
+		var result = await handler.Process(request, null, CancellationToken.None);
 
 		// Assert
 		var response = result.AsT0;
+		Assert.Equal(ResourceId, response.ResourceId);
+		Assert.Equal(TestTagLegacy, response.TestTag);
 		Assert.Equal(0, response.FileTransfersFound);
 		Assert.Equal("job-empty", response.DeleteFileTransfersJobId);
 		bgClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
         repoMock.Verify(
-            r => r.GetFileTransfersByResourceId(resourceIdExpected, It.IsAny<CancellationToken>()),
+            r => r.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, TestTagLegacy, It.IsAny<CancellationToken>()),
     Times.Once);
 		Assert.NotNull(capturedJob);
 		var argFileTransfersVal = capturedJob!.Args[0] as List<Guid>;
@@ -110,7 +120,7 @@ public class CleanupUseCaseTestsHandlerTests
 		var handler = CreateHandler(bgClientMock, repoMock);
 
 		// Act
-		await handler.DeleteFileTransfers(ids, "bruksmonster-broker", CancellationToken.None);
+		await handler.DeleteFileTransfers(ids, ResourceId, TestTagA3, CancellationToken.None);
 
 		// Assert
 		repoMock.Verify(r => r.HardDeleteFileTransfersByIds(ids, It.IsAny<CancellationToken>()), Times.Once);

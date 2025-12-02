@@ -23,25 +23,47 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetFileTransfersByResourceId_ReturnsAllMatchingIds()
+	public async Task GetFileTransfersByPropertyTag_ReturnsOnlyMatchingTaggedTransfers()
 	{
 		// Arrange
-		var matchingResourceId = TestConstants.RESOURCE_FOR_TEST;
-		var otherResourceId = "non-matching-resource";
+		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var testTagA3 = "unitTestsA3";
+		var testTagLegacy = "unitTestsLegacy";
 
-		var id1 = await InsertFileTransfer(matchingResourceId);
-		var id2 = await InsertFileTransfer(matchingResourceId);
-		var id3 = await InsertFileTransfer(matchingResourceId);
-		var otherId = await InsertFileTransfer(otherResourceId);
+		var id1 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
+		var id2 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
+		var id3 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
+		var id4 = await InsertFileTransfer(resourceId);
 
 		// Act
-		var result = await _repository.GetFileTransfersByResourceId(matchingResourceId, cancellationToken: default);
+		var resultA3 = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
+		var resultLegacy = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagLegacy, cancellationToken: default);
+
+		// Assert - A3 tag
+		Assert.Contains(id1, resultA3);
+		Assert.Contains(id2, resultA3);
+		Assert.DoesNotContain(id3, resultA3);
+		Assert.DoesNotContain(id4, resultA3);
+
+		// Assert - Legacy tag
+		Assert.Contains(id3, resultLegacy);
+		Assert.DoesNotContain(id1, resultLegacy);
+		Assert.DoesNotContain(id2, resultLegacy);
+		Assert.DoesNotContain(id4, resultLegacy);
+	}
+
+	[Fact]
+	public async Task GetFileTransfersByPropertyTag_NoMatches_ReturnsEmptyList()
+	{
+		// Arrange
+		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var id1 = await InsertFileTransferWithProperty(resourceId, "testTag", "someOtherTag");
+
+		// Act
+		var result = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", "nonExistentTag", cancellationToken: default);
 
 		// Assert
-		Assert.Contains(id1, result);
-		Assert.Contains(id2, result);
-		Assert.Contains(id3, result);
-		Assert.DoesNotContain(otherId, result);
+		Assert.Empty(result);
 	}
 
 	[Fact]
@@ -79,6 +101,76 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		// Assert
 		Assert.Equal(0, deletedCount);
 		Assert.Equal(1, await CountFileTransfer(id));
+	}
+
+	[Fact]
+	public async Task DeleteTaggedFiles_OnlyDeletesFilesWithMatchingTag()
+	{
+		// Arrange
+		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var testTagA3 = "unitTestsA3";
+		var testTagLegacy = "unitTestsLegacy";
+
+		var a3Id1 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
+		var a3Id2 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
+		var legacyId = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
+		var untaggedId = await InsertFileTransfer(resourceId);
+
+		// Act - Get and delete only A3 tagged files
+		var a3FileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
+		var deletedCount = await _repository.HardDeleteFileTransfersByIds(a3FileIds, cancellationToken: default);
+
+		// Assert
+		Assert.Equal(2, deletedCount);
+		Assert.Equal(0, await CountFileTransfer(a3Id1));
+		Assert.Equal(0, await CountFileTransfer(a3Id2));
+		Assert.Equal(1, await CountFileTransfer(legacyId)); // Legacy still exists
+		Assert.Equal(1, await CountFileTransfer(untaggedId)); // Untagged still exists
+	}
+
+	[Fact]
+	public async Task DeleteTaggedFiles_LegacyAndA3TagsAreIsolated()
+	{
+		// Arrange
+		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var testTagA3 = "unitTestsA3";
+		var testTagLegacy = "unitTestsLegacy";
+
+		var a3Id = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
+		var legacyId = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
+
+		// Act - Delete legacy tagged files
+		var legacyFileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagLegacy, cancellationToken: default);
+		await _repository.HardDeleteFileTransfersByIds(legacyFileIds, cancellationToken: default);
+
+		// Assert - A3 files should NOT be deleted
+		Assert.Equal(1, await CountFileTransfer(a3Id));
+		Assert.Equal(0, await CountFileTransfer(legacyId));
+
+		// Act - Now delete A3 tagged files
+		var a3FileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
+		await _repository.HardDeleteFileTransfersByIds(a3FileIds, cancellationToken: default);
+
+		// Assert - Now A3 files are also deleted
+		Assert.Equal(0, await CountFileTransfer(a3Id));
+	}
+
+	[Fact]
+	public async Task GetFileTransfersByPropertyTag_DifferentResourceId_ReturnsEmpty()
+	{
+		// Arrange
+		var resourceId1 = TestConstants.RESOURCE_FOR_TEST;
+		var resourceId2 = "different-resource";
+		var testTag = "unitTestsA3";
+
+		var id1 = await InsertFileTransferWithProperty(resourceId1, "testTag", testTag);
+
+		// Act - Query with different resourceId
+		var result = await _repository.GetFileTransfersByPropertyTag(resourceId2, "testTag", testTag, cancellationToken: default);
+
+		// Assert
+		Assert.Empty(result);
+		Assert.Equal(1, await CountFileTransfer(id1)); // Original file still exists
 	}
 
 	private async Task<int> CountFileTransfer(Guid fileTransferId)
@@ -153,6 +245,21 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		insertFileTransferCommand.Parameters.AddWithValue("@storageProviderId", storageProviderId);
 		insertFileTransferCommand.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.AddHours(1));
 		await insertFileTransferCommand.ExecuteNonQueryAsync();
+
+		return fileTransferId;
+	}
+
+	private async Task<Guid> InsertFileTransferWithProperty(string resourceId, string propertyKey, string propertyValue)
+	{
+		var fileTransferId = await InsertFileTransfer(resourceId);
+
+		// Insert property
+		await using var insertPropertyCommand = _dataSource.CreateCommand(
+			"INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value) VALUES (@fileTransferId, @key, @value)");
+		insertPropertyCommand.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+		insertPropertyCommand.Parameters.AddWithValue("@key", propertyKey);
+		insertPropertyCommand.Parameters.AddWithValue("@value", propertyValue);
+		await insertPropertyCommand.ExecuteNonQueryAsync();
 
 		return fileTransferId;
 	}
