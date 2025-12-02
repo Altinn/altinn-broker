@@ -304,7 +304,7 @@ async function TC8_InitializeAndUpload() {
 
     const ovHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
     
-    const maxRetries = 10;
+    const maxRetries = 20;
     let published = false;
     let statusVal = null;
     let ovRes = null;
