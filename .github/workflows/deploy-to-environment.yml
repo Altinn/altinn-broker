@@ -73,6 +73,7 @@ jobs:
         SLACK_URL: ${{ secrets.SLACK_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
         STATISTICS_API_KEY: ${{ secrets.STATISTICS_API_KEY }}
+        GRAFANA_MONITORING_PRINCIPAL_ID: ${{ secrets.GRAFANA_MONITORING_PRINCIPAL_ID }}
 
     - name: Migrate database
       uses: ./.github/actions/migrate-database
