@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Core.Helpers;
+using System.ComponentModel.DataAnnotations;
 
 namespace Altinn.Broker.API.Controllers;
 
@@ -32,7 +33,7 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> CleanupUseCaseTestsData(
-        [FromQuery] string testTag,
+        [FromQuery][Required] string testTag,
         [FromServices] CleanupUseCaseTestsHandler handler,
         CancellationToken cancellationToken)
     {
