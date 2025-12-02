@@ -24,6 +24,7 @@ export async function getMaintenanceMaskinportenToken() {
         kid: __ENV.mp_kid,
         pem: __ENV.mp_client_pem,
         scope: 'altinn:broker.maintenance',
+        isSender: false
     });
 }
 
@@ -33,5 +34,6 @@ export async function getLegacyMaskinportenToken() {
         kid: __ENV.mp_kid,
         pem: __ENV.mp_client_pem,
         scope: 'altinn:broker.legacy',
+        isSender: false
     });
 }
