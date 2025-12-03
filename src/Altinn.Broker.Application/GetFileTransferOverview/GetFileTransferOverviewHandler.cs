@@ -11,7 +11,8 @@ using OneOf;
 
 namespace Altinn.Broker.Application.GetFileTransferOverview;
 
-public class GetFileTransferOverviewHandler(IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
+public class GetFileTransferOverviewHandler(IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, IFileTransferStatusRepository fileTransferStatusRepository,
+ ILogger<GetFileTransferOverviewHandler> logger) : IHandler<GetFileTransferOverviewRequest, GetFileTransferOverviewResponse>
 {
     public async Task<OneOf<GetFileTransferOverviewResponse, Error>> Process(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -34,9 +35,11 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
         {
             return Errors.NoAccessToResource;
         }
+        var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
         return new GetFileTransferOverviewResponse()
         {
-            FileTransfer = fileTransfer
+            FileTransfer = fileTransfer,
+            FileTransferEvents = fileTransferEvents
         };
     }
 

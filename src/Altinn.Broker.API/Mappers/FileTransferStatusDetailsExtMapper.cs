@@ -8,7 +8,7 @@ internal static class FileTransferStatusDetailsExtMapper
 {
     internal static FileTransferStatusDetailsExt MapToExternalModel(FileTransferEntity fileTransfer, List<FileTransferStatusEntity> fileTransferEvents, List<ActorFileTransferStatusEntity> actorEvents)
     {
-        var fileTransferOverview = FileTransferStatusOverviewExtMapper.MapToExternalModel(fileTransfer);
+        var fileTransferOverview = FileTransferStatusOverviewExtMapper.MapToExternalModel(fileTransfer, fileTransferEvents);
         return new FileTransferStatusDetailsExt()
         {
             FileTransferId = fileTransfer.FileTransferId,

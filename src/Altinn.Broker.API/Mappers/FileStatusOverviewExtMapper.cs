@@ -9,8 +9,9 @@ namespace Altinn.Broker.Mappers;
 
 internal static class FileTransferStatusOverviewExtMapper
 {
-    internal static FileTransferOverviewExt MapToExternalModel(FileTransferEntity fileTransfer)
+    internal static FileTransferOverviewExt MapToExternalModel(FileTransferEntity fileTransfer, List<FileTransferStatusEntity> fileTransferEvents)
     {
+        var publishedEvent = fileTransferEvents.FirstOrDefault(e => e.Status == FileTransferStatus.Published);
         return new FileTransferOverviewExt()
         {
             ResourceId = fileTransfer.ResourceId,
@@ -22,6 +23,7 @@ internal static class FileTransferStatusOverviewExtMapper
             FileTransferStatusChanged = fileTransfer.FileTransferStatusChanged,
             FileTransferStatusText = MapToFileTransferStatusText(fileTransfer.FileTransferStatusEntity),
             PropertyList = fileTransfer.PropertyList,
+            Published = publishedEvent?.Date,
             Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
             SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
             Created = fileTransfer.Created,
