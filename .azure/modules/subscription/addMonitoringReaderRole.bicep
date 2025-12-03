@@ -2,7 +2,7 @@ targetScope = 'subscription'
 
 param grafanaPrincipalId string
 
-var monitoringReaderRoleDefinitionId = '43d0d8ad-25c7-4714-9337-8ba2594b49b5'
+var monitoringReaderRoleDefinitionId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
 
 resource monitoringReaderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(subscription().id, grafanaPrincipalId, monitoringReaderRoleDefinitionId)
