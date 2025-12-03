@@ -45,8 +45,11 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
     administratorLogin: databaseUser
     administratorLoginPassword: administratorLoginPassword
     storage: {
-      storageSizeGB: 32
-      tier: environment == 'test' ? 'P4' : 'P20'
+      storageSizeGB: environment == 'production' ? 128 : 32
+      tier: environment == 'test'
+        ? 'P4'
+        : environment == 'production' ? 'P15' : 'P20'
+      autoGrow: environment == 'production' ? 'Enabled' : 'Disabled'
     }
     backup: { backupRetentionDays: 35 }
     authConfig: {

@@ -192,7 +192,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           probes: probes
           resources: {
             cpu: json('0.5')
-            memory: '1.0Gi'
+            memory: environment == 'production' ? '4.0Gi' : '1.0Gi'
           }
         }
       ]
