@@ -191,7 +191,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: containerAppEnvVars
           probes: probes
           resources: {
-            cpu: json('0.5')
+            cpu: environment == 'production' ? json('2.0') : json('0.5')
             memory: environment == 'production' ? '4.0Gi' : '1.0Gi'
           }
         }

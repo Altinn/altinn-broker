@@ -48,7 +48,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
       storageSizeGB: environment == 'production' ? 128 : 32
       tier: environment == 'test'
         ? 'P4'
-        : environment == 'production' ? 'P15' : 'P20'
+        : environment == 'production' ? 'P20' : 'P15'
       autoGrow: environment == 'production' ? 'Enabled' : 'Disabled'
     }
     backup: { backupRetentionDays: 35 }
