@@ -125,7 +125,57 @@ resource maxPreparedTransactions 'Microsoft.DBforPostgreSQL/flexibleServers/conf
   parent: postgres
   dependsOn: [database, maintenanceWorkMemConfiguration]
   properties: {
-    value: prodLikeEnvironment ? '3000' : '50'
+    value: prodLikeEnvironment ? '100' : '50'
+    source: 'user-override'
+  }
+}
+
+resource autovacuumVacuumScaleFactor 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'autovacuum_vacuum_scale_factor'
+  parent: postgres
+  dependsOn: [database, maxPreparedTransactions]
+  properties: {
+    value: '0.01'
+    source: 'user-override'
+  }
+}
+
+resource autovacuumVacuumThreshold 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'autovacuum_vacuum_threshold'
+  parent: postgres
+  dependsOn: [database, autovacuumVacuumScaleFactor]
+  properties: {
+    value: '5000'
+    source: 'user-override'
+  }
+}
+
+resource autovacuumAnalyzeScaleFactor 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'autovacuum_analyze_scale_factor'
+  parent: postgres
+  dependsOn: [database, autovacuumVacuumThreshold]
+  properties: {
+    value: '0.005'
+    source: 'user-override'
+  }
+}
+
+resource autovacuumNaptime 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'autovacuum_naptime'
+  parent: postgres
+  dependsOn: [database, autovacuumAnalyzeScaleFactor]
+  properties: {
+    value: '10'
+    source: 'user-override'
+  }
+}
+
+resource autovacuumMaxWorkers 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'autovacuum_max_workers'
+  parent: postgres
+  dependsOn: [database, autovacuumNaptime]
+  properties: {
+    value: '6'
     source: 'user-override'
   }
 }
@@ -133,7 +183,7 @@ resource maxPreparedTransactions 'Microsoft.DBforPostgreSQL/flexibleServers/conf
 resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
   name: 'azure-access'
   parent: postgres
-  dependsOn: [maxPreparedTransactions] // Needs to depend on database to avoid updating at the same time
+  dependsOn: [database, autovacuumMaxWorkers] // Needs to depend on previous parameter to avoid updating at the same time
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
