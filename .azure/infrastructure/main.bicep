@@ -25,6 +25,8 @@ param platformSubscriptionKey string
 param slackUrl string
 @secure()
 param statisticsApiKey string
+@secure()
+param grafanaMonitoringPrincipalId string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -144,6 +146,13 @@ module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
 
 module virusscan '../modules/virusscan/create.bicep' = {
   name: 'virusscan'
+}
+
+module grafanaMonitoringReaderRole '../modules/subscription/addMonitoringReaderRole.bicep' = {
+  name: 'grafana-monitoring-reader'
+  params: {
+    grafanaPrincipalId: grafanaMonitoringPrincipalId
+  }
 }
 
 output resourceGroupName string = resourceGroup.name

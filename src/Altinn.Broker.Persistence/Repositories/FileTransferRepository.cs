@@ -800,6 +800,82 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         }, cancellationToken);
     }
 
+
+    public async Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT file_transfer_id_pk " +
+            "FROM broker.file_transfer " +
+            "WHERE resource_id = @resourceId");
+
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransferIds = new List<Guid>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                fileTransferIds.Add(fileTransferId);
+            }
+
+            return fileTransferIds;
+        }, cancellationToken);
+    }
+
+    public async Task<List<Guid>> GetFileTransfersByPropertyTag(string resourceId, string propertyKey, string propertyValue, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT f.file_transfer_id_pk " +
+            "FROM broker.file_transfer f " +
+            "INNER JOIN broker.file_transfer_property p ON p.file_transfer_id_fk = f.file_transfer_id_pk " +
+            "WHERE f.resource_id = @resourceId AND p.key = @propertyKey AND p.value = @propertyValue");
+
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@propertyKey", propertyKey);
+        command.Parameters.AddWithValue("@propertyValue", propertyValue);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransferIds = new List<Guid>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                fileTransferIds.Add(fileTransferId);
+            }
+
+            return fileTransferIds;
+        }, cancellationToken);
+    }
+
+    public async Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken)
+    {
+        var idsArray = fileTransferIds.ToArray();
+        if (idsArray.Length == 0)
+        {
+            return 0;
+        }
+        if (idsArray.Length > 1000) //Safety margin
+        {
+            throw new ArgumentException($"Too many file transfers to delete. Total file transfers in requested hard delete: {idsArray.Length}", nameof(fileTransferIds));
+        }
+
+        await using var command = dataSource.CreateCommand(
+            "DELETE FROM broker.file_transfer " +
+            "WHERE file_transfer_id_pk = ANY(@fileTransferIds)");
+
+        command.Parameters.Add(new NpgsqlParameter("@fileTransferIds", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
+        {
+            Value = idsArray
+        });
+
+        return await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+    }
+
     public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
     {
         const string query = @"
@@ -895,3 +971,4 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         }, cancellationToken);
     }
 }
+
