@@ -87,4 +87,11 @@ public class FileTransferOverviewExt
     /// </summary>
     [JsonPropertyName("propertyList")]
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Date/Time for when the file transfer was published (ready for download).
+    /// Null if not yet published.
+    /// </summary>
+    [JsonPropertyName("published")]
+    public DateTimeOffset? Published { get; set; }
 }

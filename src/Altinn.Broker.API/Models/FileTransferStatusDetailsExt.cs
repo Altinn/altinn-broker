@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Core.Models;
@@ -15,4 +17,10 @@ public class FileTransferStatusDetailsExt : FileTransferOverviewExt
     /// The status history of the file transfer for each recipient.
     /// </summary>
     public List<RecipientFileTransferStatusEventExt> RecipientFileTransferStatusHistory { get; set; } = new List<RecipientFileTransferStatusEventExt>();
+
+    /// <summary>
+    /// Hide the Published property from the details response since it's redundant with FileTransferStatusHistory.
+    /// </summary>
+    [JsonIgnore]
+    public new DateTimeOffset? Published { get; set; }
 }

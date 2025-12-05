@@ -967,4 +967,30 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 
     }
+
+    [Fact]
+    public async Task GetFileTransferOverview_PublishedFieldIsVisible_NullBeforePublished_HasValueAfterPublished()
+    {
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterInitialize);
+        Assert.Equal(FileTransferStatusExt.Initialized, fileTransferAfterInitialize.FileTransferStatus);
+        Assert.Null(fileTransferAfterInitialize.Published);
+
+        
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        var fileTransferAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
+        Assert.NotNull(fileTransferAfterUpload);
+        Assert.Equal(FileTransferStatusExt.Published, fileTransferAfterUpload.FileTransferStatus);
+
+        Assert.NotNull(fileTransferAfterUpload.Published);
+        Assert.True(fileTransferAfterUpload.Published > DateTimeOffset.MinValue);
+    }
 }

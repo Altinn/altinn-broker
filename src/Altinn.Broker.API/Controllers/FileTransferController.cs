@@ -209,7 +209,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
             FileTransferId = fileTransferId
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
-            result => Ok(FileTransferStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer)),
+            result => Ok(FileTransferStatusOverviewExtMapper.MapToExternalModel(result.FileTransfer, result.FileTransferEvents)),
             Problem
         );
     }
