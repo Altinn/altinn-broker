@@ -174,7 +174,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         });
     }
     check(isPublished(statusValue), { 'fileTransferStatus is Published (num|string)': v => v === true });
-    check(published, { 'File transfer reached published status within 10s': p => p === true });
+    check(published, { 'File transfer reached published status within 30s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
 
@@ -355,7 +355,7 @@ async function TC8_InitializeAndUpload() {
         check(overviewResponse, { 'TC8 overview 200': r => r.status === 200 });
     }
     check(isPublished(statusValue), { 'TC8 status Published (num|string)': v => v === true });
-    check(published, { 'TC8 reached Published within 10s': p => p === true });
+    check(published, { 'TC8 reached Published within 30s': p => p === true });
 
     console.log('TC8: InitializeAndUpload completed');
     return { initializeAndUploadFileTransferId };

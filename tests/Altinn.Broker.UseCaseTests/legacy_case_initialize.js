@@ -171,7 +171,7 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
             'fileStatus Published': r => isPublished(r.json('fileStatus'))
         });
     }
-    check(published, { 'File transfer reached published status within 10s': p => p === true });
+    check(published, { 'File transfer reached published status within 30s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
 
