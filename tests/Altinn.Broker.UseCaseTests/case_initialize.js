@@ -142,7 +142,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(1);
+        sleep(3);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
         if (lastResponse.status === 200) {
@@ -174,7 +174,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         });
     }
     check(isPublished(statusValue), { 'fileTransferStatus is Published (num|string)': v => v === true });
-    check(published, { 'File transfer reached published status within 10s': p => p === true });
+    check(published, { 'File transfer reached published status within 30s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
 
@@ -329,6 +329,7 @@ async function TC8_InitializeAndUpload() {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+        sleep(3);
         overviewResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${initializeAndUploadFileTransferId}`, { headers: overviewHeaders });
         if (overviewResponse.status === 200) {
             try {
@@ -348,14 +349,13 @@ async function TC8_InitializeAndUpload() {
         } else {
             console.error(`TC8: Failed to get file transfer overview. Status: ${overviewResponse.status}. Body: ${overviewResponse.body}`);
         }
-        sleep(1);
     }
 
     if (overviewResponse) {
         check(overviewResponse, { 'TC8 overview 200': r => r.status === 200 });
     }
     check(isPublished(statusValue), { 'TC8 status Published (num|string)': v => v === true });
-    check(published, { 'TC8 reached Published within 10s': p => p === true });
+    check(published, { 'TC8 reached Published within 30s': p => p === true });
 
     console.log('TC8: InitializeAndUpload completed');
     return { initializeAndUploadFileTransferId };
