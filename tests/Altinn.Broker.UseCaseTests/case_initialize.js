@@ -142,7 +142,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(1);
+        sleep(3);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
         if (lastResponse.status === 200) {
@@ -329,6 +329,7 @@ async function TC8_InitializeAndUpload() {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+        sleep(3);
         overviewResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${initializeAndUploadFileTransferId}`, { headers: overviewHeaders });
         if (overviewResponse.status === 200) {
             try {
@@ -348,7 +349,6 @@ async function TC8_InitializeAndUpload() {
         } else {
             console.error(`TC8: Failed to get file transfer overview. Status: ${overviewResponse.status}. Body: ${overviewResponse.body}`);
         }
-        sleep(1);
     }
 
     if (overviewResponse) {
