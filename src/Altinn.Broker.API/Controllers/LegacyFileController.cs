@@ -231,5 +231,5 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         );
     }
 
-    private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
+private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

@@ -389,5 +389,5 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         );
     }
     
-    private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
+private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

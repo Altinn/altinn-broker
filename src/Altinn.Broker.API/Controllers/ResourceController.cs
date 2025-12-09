@@ -3,6 +3,7 @@ using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
+using Altinn.Broker.Helpers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -97,5 +98,5 @@ public class ResourceController : Controller
             Problem
         );
     }
-    private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
+    private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }
