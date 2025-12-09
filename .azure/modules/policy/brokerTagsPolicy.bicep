@@ -125,7 +125,7 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
         effect: 'modify'
         details: {
           roleDefinitionIds: [
-            '/providers/Microsoft.Authorization/roleDefinitions/4a9ae827-6dc8-4573-8ac7-8239d42aa03f' // Contributor
+            '/providers/Microsoft.Authorization/roleDefinitions/4a9ae827-6dc8-4573-8ac7-8239d42aa03f' // Tag Contributor
           ]
           operations: [
             {
