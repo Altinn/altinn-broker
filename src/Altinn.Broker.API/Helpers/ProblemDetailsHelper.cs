@@ -17,10 +17,7 @@ public static class ProblemDetailsHelper
         { HttpStatusCode.Forbidden, ("https://tools.ietf.org/html/rfc9110#section-15.5.4", "Forbidden") },
         { HttpStatusCode.NotFound, ("https://tools.ietf.org/html/rfc9110#section-15.5.5", "Not Found") },
         { HttpStatusCode.Conflict, ("https://tools.ietf.org/html/rfc9110#section-15.5.10", "Conflict") },
-        { HttpStatusCode.UnprocessableEntity, ("https://tools.ietf.org/html/rfc9110#section-15.5.21", "Unprocessable Entity") },
-        { HttpStatusCode.UnavailableForLegalReasons, ("https://tools.ietf.org/html/rfc7725#section-3", "Unavailable For Legal Reasons") },
         { HttpStatusCode.InternalServerError, ("https://tools.ietf.org/html/rfc9110#section-15.6.1", "Internal Server Error") },
-        { HttpStatusCode.BadGateway, ("https://tools.ietf.org/html/rfc9110#section-15.6.3", "Bad Gateway") },
     };
 
     public static ObjectResult ToProblemResult(Error error)
