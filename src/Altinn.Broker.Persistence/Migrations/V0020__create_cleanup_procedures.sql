@@ -54,6 +54,12 @@ BEGIN
                 
                 GET DIAGNOSTICS deleted_file_transfers = ROW_COUNT;
                 batch_count := batch_count + 1;
+                
+                IF deleted_file_transfers = 0 THEN
+                    RAISE NOTICE 'No rows deleted in batch %. Exiting loop.', batch_count;
+                    EXIT;
+                END IF;
+                
                 remaining_count := remaining_count - deleted_file_transfers;
                 deleted_count := deleted_count + deleted_file_transfers;
                 
@@ -142,6 +148,12 @@ BEGIN
                 
                 GET DIAGNOSTICS deleted_file_transfers = ROW_COUNT;
                 batch_count := batch_count + 1;
+                
+                IF deleted_file_transfers = 0 THEN
+                    RAISE NOTICE 'No rows deleted in batch %. Exiting loop.', batch_count;
+                    EXIT;
+                END IF;
+                
                 remaining_count := remaining_count - deleted_file_transfers;
                 deleted_count := deleted_count + deleted_file_transfers;
                 
@@ -230,6 +242,12 @@ BEGIN
                 
                 GET DIAGNOSTICS deleted_file_transfers = ROW_COUNT;
                 batch_count := batch_count + 1;
+                
+                IF deleted_file_transfers = 0 THEN
+                    RAISE NOTICE 'No rows deleted in batch %. Exiting loop.', batch_count;
+                    EXIT;
+                END IF;
+                
                 remaining_count := remaining_count - deleted_file_transfers;
                 deleted_count := deleted_count + deleted_file_transfers;
                 
