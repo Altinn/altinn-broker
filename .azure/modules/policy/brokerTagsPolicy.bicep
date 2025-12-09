@@ -22,100 +22,36 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
           {
             anyOf: [
               {
-                allOf: [
-                  {
-                    field: 'tags[finops_environment]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.finops_environment]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[finops_environment]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[finops_product]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.finops_product]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[finops_product]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[finops_serviceownercode]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.finops_serviceownercode]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[finops_serviceownercode]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[finops_serviceownerorgnr]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.finops_serviceownerorgnr]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[finops_serviceownerorgnr]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[repository]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.repository]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[repository]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[env]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.env]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[env]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[product]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.product]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[product]'
+                exists: 'false'
               }
               {
-                allOf: [
-                  {
-                    field: 'tags[org]'
-                    exists: 'false'
-                  }
-                  {
-                    value: '[resourceGroup().tags.org]'
-                    notEquals: ''
-                  }
-                ]
+                field: 'tags[org]'
+                exists: 'false'
               }
             ]
           }
@@ -125,48 +61,48 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
         effect: 'modify'
         details: {
           roleDefinitionIds: [
-            '/providers/Microsoft.Authorization/roleDefinitions/4a9ae827-6dc8-4573-8ac7-8239d42aa03f' // Tag Contributor
+            '/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
           ]
           operations: [
             {
               operation: 'add'
               field: 'tags[finops_environment]'
-              value: '[resourceGroup().tags.finops_environment]'
+              value: environment
             }
             {
               operation: 'add'
               field: 'tags[finops_product]'
-              value: '[resourceGroup().tags.finops_product]'
+              value: 'formidling'
             }
             {
               operation: 'add'
               field: 'tags[finops_serviceownercode]'
-              value: '[resourceGroup().tags.finops_serviceownercode]'
+              value: 'digdir'
             }
             {
               operation: 'add'
               field: 'tags[finops_serviceownerorgnr]'
-              value: '[resourceGroup().tags.finops_serviceownerorgnr]'
+              value: '991825827'
             }
             {
               operation: 'add'
               field: 'tags[repository]'
-              value: '[resourceGroup().tags.repository]'
+              value: 'https://github.com/Altinn/altinn-broker'
             }
             {
               operation: 'add'
               field: 'tags[env]'
-              value: '[resourceGroup().tags.env]'
+              value: environment
             }
             {
               operation: 'add'
               field: 'tags[product]'
-              value: '[resourceGroup().tags.product]'
+              value: 'formidling'
             }
             {
               operation: 'add'
               field: 'tags[org]'
-              value: '[resourceGroup().tags.org]'
+              value: 'digdir'
             }
           ]
         }

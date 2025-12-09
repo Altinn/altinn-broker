@@ -1,0 +1,46 @@
+name: Remediate standard tags
+
+description: "Run remediation for the correspondence standard tags policy"
+
+inputs:
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
+  AZURE_SUBSCRIPTION_ID:
+    description: "Subscription ID for the service principal"
+    required: true
+  AZURE_NAME_PREFIX:
+    description: "Prefix for all resources (resource group name prefix)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: OIDC Login to Azure Public Cloud
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Remediate standard tags policy
+      shell: pwsh
+      run: |
+        $rgName = "${{ inputs.AZURE_NAME_PREFIX }}-rg"
+        $subscriptionId = "${{ inputs.AZURE_SUBSCRIPTION_ID }}"
+        $assignmentId = "/subscriptions/$subscriptionId/resourceGroups/$rgName/providers/Microsoft.Authorization/policyAssignments/correspondence-standard-tags"
+        az policy remediation create `
+          --name "correspondence-standard-tags-remediation" `
+          --policy-assignment $assignmentId `
+          --resource-group $rgName
+
+    - name: Logout from azure
+      shell: bash
+      if: ${{failure() || success()}}
+      continue-on-error: true
+      run: az logout
+
+
