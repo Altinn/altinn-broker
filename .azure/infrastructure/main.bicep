@@ -78,7 +78,7 @@ var secrets = [
 ]
 
 // Create resource groups
-resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
+resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: '${namePrefix}-rg'
   location: location
   tags: standardTags
