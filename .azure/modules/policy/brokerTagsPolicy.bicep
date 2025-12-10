@@ -6,7 +6,7 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
   name: 'broker-standard-tags-${environment}'
   properties: {
     policyType: 'Custom'
-    mode: 'Indexed'
+    mode: 'All'
     displayName: 'Ensure standard tags on Broker resources'
     description: 'Adds or updates standard FinOps and repository tags on Broker resource groups and resources.'
     metadata: {
@@ -18,6 +18,10 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
           {
             field: 'type'
             notEquals: 'Microsoft.Authorization/policyAssignments'
+          }
+          {
+            field: 'type'
+            exists: 'true' 
           }
           {
             anyOf: [
@@ -61,7 +65,7 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
         effect: 'modify'
         details: {
           roleDefinitionIds: [
-            '/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+            '/providers/Microsoft.Authorization/roleDefinitions/4a9ae827-6dc8-4573-8ac7-8239d42aa03f' // Tag Contributor
           ]
           operations: [
             {

@@ -18,7 +18,7 @@ resource brokerTagsAssignment 'Microsoft.Authorization/policyAssignments@2025-03
 resource brokerTagsAssignmentRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroup().id, 'broker-standard-tags-contributor')
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c') // Contributor
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4a9ae827-6dc8-4573-8ac7-8239d42aa03f') // Tag Contributor
     principalId: brokerTagsAssignment.identity.principalId
     principalType: 'ServicePrincipal'
   }

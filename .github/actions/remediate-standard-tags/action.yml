@@ -31,7 +31,7 @@ runs:
       run: |
         $rgName = "${{ inputs.AZURE_NAME_PREFIX }}-rg"
         $subscriptionId = "${{ inputs.AZURE_SUBSCRIPTION_ID }}"
-        $assignmentId = "/subscriptions/$subscriptionId/resourceGroups/$rgName/providers/Microsoft.Authorization/policyAssignments/correspondence-standard-tags"
+        $assignmentId = "/subscriptions/$subscriptionId/resourceGroups/$rgName/providers/Microsoft.Authorization/policyAssignments/broker-standard-tags"
         az policy remediation create `
           --name "correspondence-standard-tags-remediation" `
           --policy-assignment $assignmentId `
