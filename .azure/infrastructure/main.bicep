@@ -32,6 +32,16 @@ import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
 
 var resourceGroupName = '${namePrefix}-rg'
+var standardTags = {
+  finops_environment: environment
+  finops_product: 'formidling'
+  finops_serviceownercode: 'digdir'
+  finops_serviceownerorgnr: '991825827'
+  repository: 'https://github.com/Altinn/altinn-broker'
+  env: environment
+  product: 'formidling'
+  org: 'digdir'
+}
 
 module grantTestClientSecretsOfficerRole '../modules/keyvault/addSecretsOfficerRole.bicep' = if (environment == 'test') {
   scope: resourceGroup
@@ -71,6 +81,7 @@ var secrets = [
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   name: '${namePrefix}-rg'
   location: location
+  tags: standardTags
 }
 
 module environmentKeyVault '../modules/keyvault/create.bicep' = {

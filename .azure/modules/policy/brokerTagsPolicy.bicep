@@ -7,51 +7,113 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
   properties: {
     policyType: 'Custom'
     mode: 'Indexed'
-    displayName: 'Ensure standard tags on Broker resources'
-    description: 'Adds or updates standard FinOps and repository tags on Broker resource groups and resources.'
+    displayName: 'Ensure standard tags on Broker resources (inherit from resource group)'
+    description: 'Adds or updates standard FinOps/repository tags on resources by inheriting values from the containing resource group.'
     metadata: {
       category: 'Tags'
     }
     policyRule: {
       if: {
         allOf: [
-          {
-            field: 'type'
-            notEquals: 'Microsoft.Authorization/policyAssignments'
-          }
+          { 
+            field: 'type', notEquals: 'Microsoft.Authorization/policyAssignments' }
           {
             anyOf: [
-              {
-                field: 'tags[finops_environment]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[finops_environment]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.finops_environment]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[finops_product]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[finops_product]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.finops_product]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[finops_serviceownercode]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[finops_serviceownercode]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.finops_serviceownercode]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[finops_serviceownerorgnr]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[finops_serviceownerorgnr]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.finops_serviceownerorgnr]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[repository]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[repository]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.repository]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[env]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[env]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.env]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[product]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[product]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.product]'
+                    notEquals: ''
+                  }
+                ]
               }
-              {
-                field: 'tags[org]'
-                exists: 'false'
+              { 
+                allOf: [
+                  {
+                    field: 'tags[org]'
+                    exists: 'false'
+                  }
+                  {
+                    value: '[resourceGroup().tags.org]'
+                    notEquals: ''
+                  }
+                ]
               }
             ]
           }
@@ -67,42 +129,42 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
             {
               operation: 'add'
               field: 'tags[finops_environment]'
-              value: environment
+              value: '[resourceGroup().tags.finops_environment]'
             }
             {
               operation: 'add'
               field: 'tags[finops_product]'
-              value: 'formidling'
+              value: '[resourceGroup().tags.finops_product]'
             }
             {
               operation: 'add'
               field: 'tags[finops_serviceownercode]'
-              value: 'digdir'
+              value: '[resourceGroup().tags.finops_serviceownercode]'
             }
             {
               operation: 'add'
               field: 'tags[finops_serviceownerorgnr]'
-              value: '991825827'
+              value: '[resourceGroup().tags.finops_serviceownerorgnr]'
             }
             {
               operation: 'add'
               field: 'tags[repository]'
-              value: 'https://github.com/Altinn/altinn-broker'
+              value: '[resourceGroup().tags.repository]'
             }
             {
               operation: 'add'
               field: 'tags[env]'
-              value: environment
+              value: '[resourceGroup().tags.env]'
             }
             {
               operation: 'add'
               field: 'tags[product]'
-              value: 'formidling'
+              value: '[resourceGroup().tags.product]'
             }
             {
               operation: 'add'
               field: 'tags[org]'
-              value: 'digdir'
+              value: '[resourceGroup().tags.org]'
             }
           ]
         }
