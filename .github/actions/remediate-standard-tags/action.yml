@@ -1,6 +1,6 @@
 name: Remediate standard tags
 
-description: "Run remediation for the correspondence standard tags policy"
+description: "Run remediation for the broker standard tags policy"
 
 inputs:
   AZURE_CLIENT_ID:
@@ -36,7 +36,7 @@ runs:
         $subscriptionId = "${{ inputs.AZURE_SUBSCRIPTION_ID }}"
         $assignmentId = "/subscriptions/$subscriptionId/resourceGroups/$rgName/providers/Microsoft.Authorization/policyAssignments/broker-standard-tags"
         az policy remediation create `
-          --name "correspondence-standard-tags-remediation" `
+          --name "broker-standard-tags-remediation" `
           --policy-assignment $assignmentId `
           --resource-group $rgName
 
