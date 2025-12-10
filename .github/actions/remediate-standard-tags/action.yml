@@ -26,6 +26,20 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Ensure RG tags
+      uses: azure/cli@v2
+      with:
+        inlineScript: |
+          az group update -n ${AZURE_NAME_PREFIX}-rg --set \
+            tags.finops_environment=${{ inputs.environment }} \
+            tags.finops_product=broker \
+            tags.finops_serviceownercode=digdir \
+            tags.finops_serviceownerorgnr=991825827 \
+            tags.repository=https://github.com/Altinn/altinn-broker \
+            tags.env=${{ inputs.environment }} \
+            tags.product=broker \
+            tags.org=digdir
+
     - name: Remediate standard tags policy
       shell: pwsh
       run: |
