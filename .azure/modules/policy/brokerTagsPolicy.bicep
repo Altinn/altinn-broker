@@ -28,6 +28,12 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
             exists: 'true'
           }
           {
+            field: 'location'
+            notIn: [
+              ''
+            ]
+          }
+          {
             anyOf: [
               {
                 field: 'tags[finops_environment]'
