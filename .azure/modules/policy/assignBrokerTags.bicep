@@ -1,12 +1,22 @@
 targetScope = 'resourceGroup'
 
 param policyDefinitionId string
+param userAssignedIdentityName string
+
+var userAssignedIdentityId = resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', userAssignedIdentityName)
+
+resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: userAssignedIdentityName
+}
 
 resource brokerTagsAssignment 'Microsoft.Authorization/policyAssignments@2025-03-01' = {
   name: 'broker-standard-tags'
   location: resourceGroup().location
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${userAssignedIdentityId}': {}
+    }
   }
   properties: {
     displayName: 'Ensure standard tags on Broker resources'
@@ -19,7 +29,7 @@ resource brokerTagsAssignmentRole 'Microsoft.Authorization/roleAssignments@2022-
   name: guid(resourceGroup().id, brokerTagsAssignment.name, 'broker-standard-tags-contributor')
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4a9ae827-6dc8-4573-8ac7-8239d42aa03f') // Tag Contributor
-    principalId: brokerTagsAssignment.identity.principalId
+    principalId: userAssignedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }

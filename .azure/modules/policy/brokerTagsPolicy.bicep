@@ -8,7 +8,7 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
     policyType: 'Custom'
     mode: 'Indexed'
     displayName: 'Ensure standard tags on Broker resources'
-    description: 'Adds or updates standard FinOps and repository tags on Broker resource groups and resources.'
+    description: 'Inherits standard tags from the resource group and applies them to Broker resources.'
     metadata: {
       category: 'Tags'
     }
@@ -21,38 +21,14 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
           }
           {
             anyOf: [
-              {
-                field: 'tags[finops_environment]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[finops_product]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[finops_serviceownercode]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[finops_serviceownerorgnr]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[repository]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[env]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[product]'
-                exists: 'false'
-              }
-              {
-                field: 'tags[org]'
-                exists: 'false'
-              }
+              { field: 'tags[finops_environment]', exists: 'false' }
+              { field: 'tags[finops_product]', exists: 'false' }
+              { field: 'tags[finops_serviceownercode]', exists: 'false' }
+              { field: 'tags[finops_serviceownerorgnr]', exists: 'false' }
+              { field: 'tags[repository]', exists: 'false' }
+              { field: 'tags[env]', exists: 'false' }
+              { field: 'tags[product]', exists: 'false' }
+              { field: 'tags[org]', exists: 'false' }
             ]
           }
         ]
@@ -65,44 +41,44 @@ resource brokerTagsPolicy 'Microsoft.Authorization/policyDefinitions@2025-03-01'
           ]
           operations: [
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[finops_environment]'
-              value: environment
+              value: '''[resourceGroup().tags['finops_environment']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[finops_product]'
-              value: 'formidling'
+              value: '''[resourceGroup().tags['finops_product']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[finops_serviceownercode]'
-              value: 'digdir'
+              value: '''[resourceGroup().tags['finops_serviceownercode']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[finops_serviceownerorgnr]'
-              value: '991825827'
+              value: '''[resourceGroup().tags['finops_serviceownerorgnr']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[repository]'
-              value: 'https://github.com/Altinn/altinn-broker'
+              value: '''[resourceGroup().tags['repository']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[env]'
-              value: environment
+              value: '''[resourceGroup().tags['env']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[product]'
-              value: 'formidling'
+              value: '''[resourceGroup().tags['product']]'''
             }
             {
-              operation: 'add'
+              operation: 'addOrReplace'
               field: 'tags[org]'
-              value: 'digdir'
+              value: '''[resourceGroup().tags['org']]'''
             }
           ]
         }
