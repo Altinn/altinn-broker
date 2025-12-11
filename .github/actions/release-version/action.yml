@@ -77,15 +77,51 @@ runs:
         failOnStdErr: false
         parameters: ./.azure/applications/api/params.bicepparam
 
+    - name: Wait for revision to be available
+      uses: azure/CLI@v2
+      id: wait-revision
+      with:
+        azcliversion: 2.72.0
+        inlineScript: |
+          APP_NAME="${{ inputs.AZURE_NAME_PREFIX }}-app"
+          RG_NAME="${{ inputs.AZURE_NAME_PREFIX }}-rg"
+          REVISION_NAME="${{ steps.deploy.outputs.revisionName }}"
+          
+          # If revisionName is not available from output, wait for it
+          if [ -z "$REVISION_NAME" ] || [ "$REVISION_NAME" = "null" ] || [ "$REVISION_NAME" = "" ]; then
+            echo "Revision name not in outputs, waiting for revision to be created..."
+            for i in {1..30}; do
+              REVISION_NAME=$(az containerapp revision list -g "$RG_NAME" -n "$APP_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+              if [ -n "$REVISION_NAME" ] && [ "$REVISION_NAME" != "null" ]; then
+                echo "Revision found: $REVISION_NAME"
+                echo "revisionName=$REVISION_NAME" >> $GITHUB_ENV
+                break
+              fi
+              echo "Attempt $i: Waiting for revision..."
+              sleep 5
+            done
+          else
+            echo "Using revision name from deployment output: $REVISION_NAME"
+            echo "revisionName=$REVISION_NAME" >> $GITHUB_ENV
+          fi
+          
+          if [ -z "$REVISION_NAME" ] || [ "$REVISION_NAME" = "null" ]; then
+            echo "Error: Could not determine revision name after waiting"
+            exit 1
+          fi
+
     - name: Verify deployment
       uses: azure/CLI@v2
       id: verify-deployment
       with:
-        timeout-minutes: 3
         azcliversion: 2.72.0
         inlineScript: |
           chmod +x ./.github/tools/revisionVerifier.sh
-          ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ inputs.AZURE_NAME_PREFIX }}-rg
+          REVISION_NAME="${{ env.revisionName }}"
+          if [ -z "$REVISION_NAME" ]; then
+            REVISION_NAME="${{ steps.deploy.outputs.revisionName }}"
+          fi
+          ./.github/tools/revisionVerifier.sh "$REVISION_NAME" "${{ inputs.AZURE_NAME_PREFIX }}-rg"
 
     - name: Logout from azure
       shell: bash
