@@ -80,12 +80,12 @@ runs:
     - name: Verify deployment
       uses: azure/CLI@v2
       id: verify-deployment
+      timeout-minutes: 3
       with:
-        timeout-minutes: 3
         azcliversion: 2.72.0
         inlineScript: |
           chmod +x ./.github/tools/revisionVerifier.sh
-          ./.github/tools/revisionVerifier.sh ${{ steps.deploy.outputs.revisionName }} ${{ inputs.AZURE_NAME_PREFIX }}-rg
+          ./.github/tools/revisionVerifier.sh '${{ steps.deploy.outputs.revisionName }}' '${{ inputs.AZURE_NAME_PREFIX }}-rg'
 
     - name: Logout from azure
       shell: bash
