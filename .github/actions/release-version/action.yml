@@ -80,7 +80,6 @@ runs:
     - name: Verify deployment
       uses: azure/CLI@v2
       id: verify-deployment
-      timeout-minutes: 3
       with:
         azcliversion: 2.72.0
         inlineScript: |
