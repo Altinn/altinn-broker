@@ -84,7 +84,6 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   tags: standardTags
 }
 
-// Stable user-assigned identity for policy assignment
 module brokerTagsIdentity '../modules/identity/createUserAssigned.bicep' = {
   scope: resourceGroup
   name: 'broker-tags-identity'
