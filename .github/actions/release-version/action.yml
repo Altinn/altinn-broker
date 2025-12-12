@@ -77,6 +77,14 @@ runs:
         failOnStdErr: false
         parameters: ./.azure/applications/api/params.bicepparam
 
+    - name: Debug deploy outputs
+      shell: bash
+      run: |
+        echo "steps.deploy.outputs = ${{ toJson(steps.deploy.outputs) }}"
+        echo "steps.deploy.outputs.revisionName = '${{ steps.deploy.outputs.revisionName }}'"
+        echo "resourceGroupName input = '${{ inputs.AZURE_NAME_PREFIX }}-rg'"
+        echo "deploymentName = '${{ inputs.AZURE_NAME_PREFIX }}-${{ inputs.imageTag }}'"
+
     - name: Verify deployment
       uses: azure/CLI@v2
       id: verify-deployment
