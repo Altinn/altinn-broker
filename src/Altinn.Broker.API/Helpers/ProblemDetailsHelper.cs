@@ -4,7 +4,7 @@ using Altinn.Authorization.ProblemDetails;
 using Altinn.Broker.Application;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Altinn.Broker.Helpers;
+namespace Altinn.Broker.API.Helpers;
 
 public static class ProblemDetailsHelper
 {
@@ -31,7 +31,7 @@ public static class ProblemDetailsHelper
             problemDetails.Title = mapping.Title;
         }
 
-        var traceId = Activity.Current?.Id ?? System.Diagnostics.Activity.Current?.TraceId.ToString();
+        var traceId = Activity.Current?.Id;
         if (!string.IsNullOrEmpty(traceId))
         {
             problemDetails.Extensions["traceId"] = traceId;

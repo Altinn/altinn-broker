@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Core.Helpers;
-using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 
 using System.ComponentModel.DataAnnotations;
 

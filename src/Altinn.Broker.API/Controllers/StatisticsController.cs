@@ -1,7 +1,7 @@
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GenerateReport;
-using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.API.Controllers;

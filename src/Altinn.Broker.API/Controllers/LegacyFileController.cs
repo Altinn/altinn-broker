@@ -11,6 +11,7 @@ using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 

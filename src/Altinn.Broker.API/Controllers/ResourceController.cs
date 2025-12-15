@@ -3,7 +3,7 @@ using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
-using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
