@@ -993,4 +993,26 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.NotNull(fileTransferAfterUpload.Published);
         Assert.True(fileTransferAfterUpload.Published > DateTimeOffset.MinValue);
     }
+
+    [Fact]
+        public async Task InitializeFileTransfer_InvalidFileTransferId_ReturnsLegacyProblemDetailsFields()
+        {
+            var fileTransferId = new Guid();
+            var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+            
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            var content = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(content);
+            var problem = document.RootElement;
+
+            Assert.NotNull(problem.GetProperty("type").GetString());
+            Assert.Equal("Not Found", problem.GetProperty("title").GetString());
+            Assert.Equal((int)HttpStatusCode.NotFound, problem.GetProperty("status").GetInt32());
+            Assert.Equal(Errors.FileTransferNotFound.Message, problem.GetProperty("detail").GetString());
+            Assert.True(problem.TryGetProperty("traceId", out var traceIdProperty));
+            Assert.False(string.IsNullOrWhiteSpace(traceIdProperty.GetString()));
+            Assert.Equal(Errors.FileTransferNotFound.ErrorCode, problem.GetProperty("errorCode").GetInt32());
+            Assert.True(problem.TryGetProperty("code", out var codeProperty));
+            Assert.False(string.IsNullOrWhiteSpace(codeProperty.GetString()));
+        }
 }
