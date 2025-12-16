@@ -57,12 +57,6 @@ runs:
         failOnStdErr: false
         parameters: ./.azure/applications/migration/params.bicepparam
 
-    - name: Temporary work-around due to azure CLI bug https://github.com/Azure/azure-cli/issues/31189
-      id: az-cli-workaround
-      shell: pwsh
-      run: |
-        az config set bicep.use_binary_from_path=false
-
     - name: Upload Migration Files to Azure File Share
       uses: azure/CLI@v2
       with:
