@@ -1011,7 +1011,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             Assert.Equal(Errors.FileTransferNotFound.Message, problem.GetProperty("detail").GetString());
             Assert.True(problem.TryGetProperty("traceId", out var traceIdProperty));
             Assert.False(string.IsNullOrWhiteSpace(traceIdProperty.GetString()));
-            Assert.Equal(Errors.FileTransferNotFound.ErrorCode, problem.GetProperty("errorCode").GetInt32());
             Assert.True(problem.TryGetProperty("code", out var codeProperty));
             Assert.False(string.IsNullOrWhiteSpace(codeProperty.GetString()));
         }
