@@ -30,6 +30,9 @@ inputs:
   AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
     description: "Name of the storage account for migration files"
     required: true
+  AZURE_BACKUP_STORAGE_ACCOUNT_NAME:
+    description: "Name of the storage account for database backups"
+    required: true
   MASKINPORTEN_JWK:
     description: "JWK for maskinporten"
     required: true
@@ -92,6 +95,7 @@ runs:
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         MIGRATION_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
+        BACKUP_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_BACKUP_STORAGE_ACCOUNT_NAME }}
         MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
