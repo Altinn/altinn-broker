@@ -3,10 +3,9 @@ targetScope = 'resourceGroup'
 param policyDefinitionId string
 param userAssignedIdentityName string
 
-var userAssignedIdentityId = resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', userAssignedIdentityName)
-
-resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: userAssignedIdentityName
+  location: resourceGroup().location
 }
 
 resource brokerTagsAssignment 'Microsoft.Authorization/policyAssignments@2025-03-01' = {
@@ -15,7 +14,7 @@ resource brokerTagsAssignment 'Microsoft.Authorization/policyAssignments@2025-03
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${userAssignedIdentityId}': {}
+      '${userAssignedIdentity.id}': {}
     }
   }
   properties: {

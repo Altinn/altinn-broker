@@ -84,15 +84,6 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   tags: standardTags
 }
 
-module brokerTagsIdentity '../modules/identity/createUserAssigned.bicep' = {
-  scope: resourceGroup
-  name: 'broker-tags-identity'
-  params: {
-    identityName: '${namePrefix}-broker-tags-mi'
-    location: location
-  }
-}
-
 module environmentKeyVault '../modules/keyvault/create.bicep' = {
   scope: resourceGroup
   name: 'keyVault'
@@ -187,7 +178,7 @@ module brokerTagsAssignment '../modules/policy/assignBrokerTags.bicep' = {
   scope: resourceGroup
   params: {
     policyDefinitionId: brokerTagsPolicy.outputs.policyDefinitionId
-    userAssignedIdentityName: brokerTagsIdentity.outputs.name
+    userAssignedIdentityName: '${namePrefix}-broker-tags-mi'
   }
 }
 
