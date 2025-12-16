@@ -36,9 +36,7 @@ public static class ProblemDetailsHelper
         {
             problemDetails.Extensions["traceId"] = traceId;
         }
-
-        problemDetails.Extensions["errorCode"] = error.ErrorCode;
-
+        
         return new ObjectResult(problemDetails)
         {
             StatusCode = (int)error.StatusCode
