@@ -136,7 +136,7 @@ module migrationsStorageAccount '../modules/storageAccount/create.bicep' = {
 
 module backupStorageAccount '../modules/dbBackupStorage/create.bicep' = {
   scope: resourceGroup
-  name: backupStorageAccountName
+  name: 'backup-storage-account'
   params: {
     backupStorageAccountName: backupStorageAccountName
     location: location
