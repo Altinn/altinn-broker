@@ -63,7 +63,6 @@ async function TC1_InitializeLegacyFileTransfer() {
     const token = await getLegacyMaskinportenToken();
     check(token, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = recipient;
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const headers = {
@@ -282,7 +281,6 @@ async function TC7_LegacyVerifyUpdatedStatus(filetransferId) {
 async function TC8_LegacyGetFileOverviews(filetransferId1) {
     const token = await getLegacyMaskinportenToken();
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-    const recipient = recipient;
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const responseInitialize2 = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers: headersJson });
