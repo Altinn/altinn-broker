@@ -53,7 +53,11 @@ export default async function () {
     await TC7_VerifyUpdatedStatus(filetransferId);
     ({ initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload());
     await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
-    } finally {
+    } catch (e) {
+        check(false, { 'No exceptions in test execution': () => false });
+        throw e;
+    }
+    finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_A3);
     }

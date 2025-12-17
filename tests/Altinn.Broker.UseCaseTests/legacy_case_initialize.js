@@ -51,6 +51,9 @@ export default async function () {
     await TC7_LegacyVerifyUpdatedStatus(filetransferId);
     ({ filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId));
     await TC9_LegacyGetFiles(filetransferId, filetransferId2);
+    } catch (e) {
+        check(false, { 'No exceptions in test execution': () => false });
+        throw e;
     } finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_LEGACY);
