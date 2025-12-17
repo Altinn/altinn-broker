@@ -13,9 +13,9 @@ on:
           - at22
           - at23
           - at24
-          - test
-          - staging
-          - production
+          - use-case-test
+          - use-case-staging
+          - use-case-production
   workflow_call:
     inputs:
       environment:
