@@ -6,7 +6,7 @@ on:
       environment:
         description: 'Environment to run tests against'
         required: true
-        default: 'test'
+        default: 'use-case-test'
         type: choice
         options:
           - yt01
@@ -22,11 +22,11 @@ on:
         description: 'Environment to run tests against'
         required: true
         type: string
-run-name: Test legacy use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+run-name: Test legacy use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
 
 jobs:
   usecase-test:
-    environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,7 +48,7 @@ jobs:
         if: failure()
         run: |
             report=":warning: (LEGACY) Broker use case test failure :warning: \n"
-            report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}"
+            report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
             report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo "stepreport=$report" >> $GITHUB_ENV
       - name: Report failure to Slack
