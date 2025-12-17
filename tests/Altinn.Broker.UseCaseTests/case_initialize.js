@@ -7,6 +7,8 @@ import { getSenderAltinnToken, getRecipientAltinnToken } from './helpers/altinnT
 
 const baseUrl = __ENV.base_url;
 const resourceId = 'bruksmonster-broker';
+const prodSender = __ENV.sender;
+const prodRecipient = __ENV.recipient;
 const isProduction = (baseUrl.toLowerCase().includes('platform.altinn.no') ? true : false);
 
 export const options = {
@@ -63,7 +65,7 @@ async function TC1_InitializeFileTransfer() {
     const token = await getSenderAltinnToken();
     check(token, { 'Sender Altinn token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = isProduction ? "orgnummerforprod" : "311167898"
+    const recipient = isProduction ? prodRecipient : "311167898"
     const payload = buildInitializeFileTransferPayload(recipient);
 
     const headers = {
@@ -282,7 +284,7 @@ async function TC8_InitializeAndUpload() {
     const senderToken = await getSenderAltinnToken();
     check(senderToken, { 'Sender token for TC8 obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipientOrg = isProduction ? 'orgnummerforprod' : '311167898';
+    const recipientOrg = isProduction ? prodRecipient : '311167898';
     const meta = buildInitializeFileTransferPayload(recipientOrg);
 
     // Build multipart/form-data with nested form keys for Metadata and a file part for FileTransfer
