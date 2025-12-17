@@ -6,12 +6,11 @@ import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
 import { getLegacyMaskinportenToken } from './helpers/maskinportenTokenService.js';
 
 const baseUrl = __ENV.base_url;
-const isProduction = (baseUrl.toLowerCase().includes('platform.altinn.no') ? true : false);
-const prodRecipient = __ENV.recipient;
-const prodSender = __ENV.sender;
+const recipient = __ENV.recipient;
+const sender = __ENV.sender;
 // Legacy controller expects onBehalfOfConsumer as a string (org number)
-const onBehalfOfConsumerSender = isProduction ? prodSender : "313896013";
-const onBehalfOfConsumerRecipient = isProduction ? prodRecipient : "311167898"
+const onBehalfOfConsumerSender = sender;
+const onBehalfOfConsumerRecipient = recipient;
 export const options = {
     thresholds: {
         checks: ["rate==1"],
@@ -64,7 +63,7 @@ async function TC1_InitializeLegacyFileTransfer() {
     const token = await getLegacyMaskinportenToken();
     check(token, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = isProduction ? prodRecipient : "311167898"
+    const recipient = recipient;
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const headers = {
@@ -283,7 +282,7 @@ async function TC7_LegacyVerifyUpdatedStatus(filetransferId) {
 async function TC8_LegacyGetFileOverviews(filetransferId1) {
     const token = await getLegacyMaskinportenToken();
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-    const recipient = isProduction ? prodRecipient : '311167898';
+    const recipient = recipient;
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const responseInitialize2 = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers: headersJson });

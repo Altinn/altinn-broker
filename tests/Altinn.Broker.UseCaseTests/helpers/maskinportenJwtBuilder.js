@@ -5,7 +5,6 @@ const sender = __ENV.sender;
 const recipient = __ENV.recipient;
 
 export async function buildMaskinportenJwt({ clientId, kid, pem, scope, tokenUrl, isSender }) {
-    const isProduction = !tokenUrl.includes('test');
     const now = Math.floor(Date.now() / 1000);
     const header = { alg: 'RS256', typ: 'JWT', kid };
     const payload = {
@@ -19,7 +18,7 @@ export async function buildMaskinportenJwt({ clientId, kid, pem, scope, tokenUrl
                 systemuser_org:
                     {
                         authority : "iso6523-actorid-upis",
-                        ID: isProduction ? (isSender ? sender : recipient) : (isSender ? "313896013" : "311167898")
+                        ID:  isSender ? sender : recipient  
                     }
             }
         ],

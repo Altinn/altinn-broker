@@ -12,7 +12,7 @@ export function buildInitializeFileTransferPayload(recipientOrgNo) {
         resourceId: "bruksmonster-broker",
         fileName: 'usecase-broker-test-file.txt',
         sendersFileTransferReference: nowRef,
-        sender: isProduction ? `0192:${sender}` : '0192:313896013',
+        sender: `0192:${sender}`,
         recipients: [recipient],
         propertyList: {
             testTag: TEST_TAG_A3,
@@ -30,7 +30,7 @@ export function buildLegacyInitializeFileTransferPayload(recipientOrgNo) {
         resourceId: "bruksmonster-broker",
         fileName: 'usecase-broker-test-file.txt',
         sendersFileTransferReference: nowRef,
-        sender: isProduction ? `0192:${sender}` : '0192:313896013',
+        sender:`0192:${sender}`,
         recipients: [recipient],
         propertyList: {
             testTag: TEST_TAG_LEGACY,
