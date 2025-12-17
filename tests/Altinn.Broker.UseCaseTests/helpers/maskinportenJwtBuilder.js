@@ -16,7 +16,7 @@ export async function buildMaskinportenJwt({ clientId, kid, pem, scope, tokenUrl
                 systemuser_org:
                     {
                         authority : "iso6523-actorid-upis",
-                        ID: isProduction ? (isSender/**Legg inn orgnummer for prod her */ ? "" : "") : (isSender ? "313896013" : "311167898")
+                        ID: isProduction ? (isSender ? prodSender : prodRecipient) : (isSender ? "313896013" : "311167898")
                     }
             }
         ],

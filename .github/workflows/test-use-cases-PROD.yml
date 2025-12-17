@@ -9,12 +9,12 @@ jobs:
     name: Run use case tests on production
     uses: ./.github/workflows/test-use-cases.yml
     with:
-      environment: production
+      environment: use-case-production
     secrets: inherit
 
   test-prod-legacy:
     name: Run legacy use case tests on prod
     uses: ./.github/workflows/test-use-cases-legacy.yml
     with:
-      environment: prod
+      environment: use-case-production
     secrets: inherit
