@@ -7,7 +7,8 @@ import { getSenderAltinnToken, getRecipientAltinnToken } from './helpers/altinnT
 
 const baseUrl = __ENV.base_url;
 const resourceId = 'bruksmonster-broker';
-const isProduction = (baseUrl.toLowerCase().includes('platform.altinn.no') ? true : false);
+const sender = __ENV.sender;
+const recipient = __ENV.recipient;
 
 export const options = {
     thresholds: {
@@ -51,7 +52,11 @@ export default async function () {
     await TC7_VerifyUpdatedStatus(filetransferId);
     ({ initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload());
     await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
-    } finally {
+    } catch (e) {
+        check(false, { 'No exceptions in test execution': () => false });
+        throw e;
+    }
+    finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_A3);
     }
@@ -63,7 +68,6 @@ async function TC1_InitializeFileTransfer() {
     const token = await getSenderAltinnToken();
     check(token, { 'Sender Altinn token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = isProduction ? "orgnummerforprod" : "311167898"
     const payload = buildInitializeFileTransferPayload(recipient);
 
     const headers = {
@@ -282,8 +286,7 @@ async function TC8_InitializeAndUpload() {
     const senderToken = await getSenderAltinnToken();
     check(senderToken, { 'Sender token for TC8 obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipientOrg = isProduction ? 'orgnummerforprod' : '311167898';
-    const meta = buildInitializeFileTransferPayload(recipientOrg);
+    const meta = buildInitializeFileTransferPayload(recipient);
 
     // Build multipart/form-data with nested form keys for Metadata and a file part for FileTransfer
     const formBody = {
