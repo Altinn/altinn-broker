@@ -16,6 +16,8 @@ param namePrefix string
 @secure()
 param migrationsStorageAccountName string
 @secure()
+param backupStorageAccountName string
+@secure()
 param maskinportenJwk string
 @secure()
 param maskinportenClientId string
@@ -140,6 +142,16 @@ module migrationsStorageAccount '../modules/storageAccount/create.bicep' = {
     migrationsStorageAccountName: migrationsStorageAccountName
     location: location
     fileshare: 'migrations'
+  }
+}
+
+module backupStorageAccount '../modules/dbBackupStorage/create.bicep' = {
+  scope: resourceGroup
+  name: 'backup-storage-account'
+  params: {
+    backupStorageAccountName: backupStorageAccountName
+    location: location
+    containerName: 'database-backups'
   }
 }
 
