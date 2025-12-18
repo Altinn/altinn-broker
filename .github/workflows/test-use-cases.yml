@@ -6,27 +6,27 @@ on:
       environment:
         description: 'Environment to run tests against'
         required: true
-        default: 'test'
+        default: 'use-case-test'
         type: choice
         options:
           - yt01
           - at22
           - at23
           - at24
-          - test
-          - staging
-          - production
+          - use-case-test
+          - use-case-staging
+          - use-case-production
   workflow_call:
     inputs:
       environment:
         description: 'Environment to run tests against'
         required: true
         type: string
-run-name: Test use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+run-name: Test use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
 
 jobs:
   usecase-test:
-    environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,9 +36,11 @@ jobs:
         uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
         env:
           base_url: ${{ secrets.BROKER_BASE_URL }}
-          mp_client_id: ${{ secrets.USECASE_MASKINPORTEN_ID }}
-          mp_kid: ${{ secrets.USECASE_MASKINPORTEN_KID }}
-          mp_client_pem: ${{ secrets.USECASE_MASKINPORTEN_PEM }}
+          mp_client_id: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_CLIENT_ID }}
+          mp_kid: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_KID }}
+          mp_client_pem: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_PEM }}
+          recipient: ${{ secrets.BRUKSMONSTER_RECIPIENT }}
+          sender: ${{ secrets.BRUKSMONSTER_SENDER }}
         with:
           filename: tests/Altinn.Broker.UseCaseTests/case_initialize.js
 
@@ -46,7 +48,7 @@ jobs:
         if: failure()
         run: |
             report=":warning: Broker use case test failure :warning: \n"
-            report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}"
+            report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
             report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo "stepreport=$report" >> $GITHUB_ENV
       - name: Report failure to Slack
@@ -55,7 +57,7 @@ jobs:
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           webhook-type: incoming-webhook
-          webhook: ${{ secrets.USECASE_SLACK_URL || secrets.SLACK_URL }}
+          webhook: ${{ secrets.BRUKSMONSTER_SLACK_URL || secrets.SLACK_URL }}
           payload: |
             {
               "text": "${{ env.stepreport }}"

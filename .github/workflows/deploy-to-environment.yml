@@ -103,3 +103,12 @@ jobs:
         MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
         APIM_IP: ${{ secrets.APIM_IP }}
 
+    - name: Remediate standard tags
+      uses: ./.github/actions/remediate-standard-tags
+      with:
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+        environment: ${{ inputs.environment }}
+

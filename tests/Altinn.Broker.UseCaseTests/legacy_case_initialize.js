@@ -6,10 +6,11 @@ import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
 import { getLegacyMaskinportenToken } from './helpers/maskinportenTokenService.js';
 
 const baseUrl = __ENV.base_url;
-const isProduction = (baseUrl.toLowerCase().includes('platform.altinn.no') ? true : false);
+const recipient = __ENV.recipient;
+const sender = __ENV.sender;
 // Legacy controller expects onBehalfOfConsumer as a string (org number)
-const onBehalfOfConsumerSender = isProduction ? "orgnummerforprod" : "313896013";
-const onBehalfOfConsumerRecipient = isProduction ? "orgnummerforprod" : "311167898"
+const onBehalfOfConsumerSender = sender;
+const onBehalfOfConsumerRecipient = recipient;
 export const options = {
     thresholds: {
         checks: ["rate==1"],
@@ -49,6 +50,9 @@ export default async function () {
     await TC7_LegacyVerifyUpdatedStatus(filetransferId);
     ({ filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId));
     await TC9_LegacyGetFiles(filetransferId, filetransferId2);
+    } catch (e) {
+        check(false, { 'No exceptions in test execution': () => false });
+        throw e;
     } finally {
     // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_LEGACY);
@@ -59,7 +63,6 @@ async function TC1_InitializeLegacyFileTransfer() {
     const token = await getLegacyMaskinportenToken();
     check(token, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
 
-    const recipient = isProduction ? "orgnummerforprod" : "311167898"
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const headers = {
@@ -278,7 +281,6 @@ async function TC7_LegacyVerifyUpdatedStatus(filetransferId) {
 async function TC8_LegacyGetFileOverviews(filetransferId1) {
     const token = await getLegacyMaskinportenToken();
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-    const recipient = isProduction ? 'orgnummerforprod' : '311167898';
     const payload = buildLegacyInitializeFileTransferPayload(recipient);
 
     const responseInitialize2 = http.post(`${baseUrl}/broker/api/v1/legacy/file`, JSON.stringify(payload), { headers: headersJson });

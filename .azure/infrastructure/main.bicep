@@ -34,6 +34,16 @@ import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
 
 var resourceGroupName = '${namePrefix}-rg'
+var standardTags = {
+  finops_environment: environment
+  finops_product: 'formidling'
+  finops_serviceownercode: 'digdir'
+  finops_serviceownerorgnr: '991825827'
+  repository: 'https://github.com/Altinn/altinn-broker'
+  env: environment
+  product: 'formidling'
+  org: 'digdir'
+}
 
 module grantTestClientSecretsOfficerRole '../modules/keyvault/addSecretsOfficerRole.bicep' = if (environment == 'test') {
   scope: resourceGroup
@@ -73,6 +83,7 @@ var secrets = [
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: '${namePrefix}-rg'
   location: location
+  tags: standardTags
 }
 
 module environmentKeyVault '../modules/keyvault/create.bicep' = {
@@ -164,6 +175,22 @@ module grafanaMonitoringReaderRole '../modules/subscription/addMonitoringReaderR
   name: 'grafana-monitoring-reader'
   params: {
     grafanaPrincipalId: grafanaMonitoringPrincipalId
+  }
+}
+
+module brokerTagsPolicy '../modules/policy/brokerTagsPolicy.bicep' = {
+  name: 'broker-standard-tags-definition'
+  params: {
+    environment: environment
+  }
+}
+
+module brokerTagsAssignment '../modules/policy/assignBrokerTags.bicep' = {
+  name: 'broker-standard-tags-assignment'
+  scope: resourceGroup
+  params: {
+    policyDefinitionId: brokerTagsPolicy.outputs.policyDefinitionId
+    userAssignedIdentityName: '${namePrefix}-broker-tags-mi'
   }
 }
 
