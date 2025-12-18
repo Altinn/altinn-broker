@@ -12,6 +12,7 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 
@@ -389,5 +390,5 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         );
     }
     
-    private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
+private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

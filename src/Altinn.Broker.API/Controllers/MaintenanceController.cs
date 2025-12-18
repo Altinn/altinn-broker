@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.API.Helpers;
+
 using System.ComponentModel.DataAnnotations;
 
 namespace Altinn.Broker.API.Controllers;
@@ -45,8 +47,5 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
         );
     }
 
-    private ActionResult Problem(Error error) => Problem(
-        detail: error.Message,
-        statusCode: (int)error.StatusCode,
-        extensions: new Dictionary<string, object?> { { "errorCode", error.ErrorCode } });
+    private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

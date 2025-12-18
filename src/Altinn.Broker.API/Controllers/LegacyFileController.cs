@@ -11,6 +11,7 @@ using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Helpers;
+using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 
@@ -231,5 +232,5 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         );
     }
 
-    private ObjectResult Problem(Error error) => Problem(detail: error.Message, statusCode: (int)error.StatusCode);
+private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

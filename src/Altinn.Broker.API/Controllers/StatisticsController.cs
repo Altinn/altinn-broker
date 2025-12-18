@@ -1,6 +1,7 @@
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GenerateReport;
+using Altinn.Broker.API.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.API.Controllers;
@@ -125,9 +126,6 @@ public class StatisticsController(ILogger<StatisticsController> logger) : Contro
         }
     }
 
-    private ActionResult Problem(Error error) => Problem(
-        detail: error.Message,
-        statusCode: (int)error.StatusCode,
-        extensions: new Dictionary<string, object?> { { "errorCode", error.ErrorCode } });
+    private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }
 
