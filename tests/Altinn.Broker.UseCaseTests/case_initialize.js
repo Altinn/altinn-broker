@@ -146,7 +146,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(3);
+        sleep(10);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
         if (lastResponse.status === 200) {
