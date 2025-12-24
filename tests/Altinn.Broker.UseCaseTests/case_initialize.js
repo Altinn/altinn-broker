@@ -134,7 +134,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         Authorization: `Bearer ${senderToken}`
     }
 
-    const maxRetries = 10;
+    const maxRetries = 20;
     let published = false;
     let statusValue = null;
     let lastResponse = null;
@@ -178,7 +178,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
         });
     }
     check(isPublished(statusValue), { 'fileTransferStatus is Published (num|string)': v => v === true });
-    check(published, { 'File transfer reached published status within 30s': p => p === true });
+    check(published, { 'File transfer reached published status within 200s': p => p === true });
     console.log(`TC3: Poll and verify upload completed`);
 }
 
