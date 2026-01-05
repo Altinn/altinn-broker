@@ -66,6 +66,7 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
+  { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
 ]
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
