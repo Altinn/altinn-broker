@@ -1,4 +1,5 @@
 import http from 'k6/http';
+import { sleep } from 'k6';
 import { buildMaskinportenJwt } from './maskinportenJwtBuilder.js';
 
 const maskinportenUrl = (__ENV.base_url.toLowerCase().includes('platform.altinn.no'))
