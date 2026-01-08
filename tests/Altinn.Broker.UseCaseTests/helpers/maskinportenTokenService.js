@@ -1,4 +1,5 @@
 import http from 'k6/http';
+import { sleep } from 'k6';
 import { buildMaskinportenJwt } from './maskinportenJwtBuilder.js';
 
 const maskinportenUrl = (__ENV.base_url.toLowerCase().includes('platform.altinn.no'))
@@ -11,7 +12,12 @@ export async function retrieveMaskinportenToken({ clientId, kid, pem, scope, isS
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' };
     const body = Object.entries({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt })
         .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-    const res = http.post(url, body, { headers });
+    let res = http.post(url, body, { headers });
+    if (res.status === 503) {
+        // Retry once after 1 second
+        sleep(1);
+        res = http.post(url, body, { headers });
+    }
     if (res.status !== 200) {
         throw new Error(`Maskinporten token failed: status=${res.status} body=${res.body}`);
     }
