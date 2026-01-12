@@ -56,10 +56,7 @@ export default async function () {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
     }
-    finally {
-    // Cleanup test data
     await cleanupUseCaseTestData(TEST_TAG_A3);
-    }
 }
 
 

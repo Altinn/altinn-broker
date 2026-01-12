@@ -53,10 +53,8 @@ export default async function () {
     } catch (e) {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
-    } finally {
-    // Cleanup test data
+    } 
     await cleanupUseCaseTestData(TEST_TAG_LEGACY);
-    }
 }
 
 async function TC1_InitializeLegacyFileTransfer() {
