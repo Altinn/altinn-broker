@@ -317,10 +317,6 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&from=${encodeURIComponent(fromTime)}&resourceId=${encodeURIComponent(resourceId)}`;
     const response = http.get(url, { headers: headersJson });
     check(response, { 'GetFiles (GET) 200': r => r.status === 200 });
-    if (response.status !== 200) {
-        console.error(`TC9: GetFiles failed. Status: ${response.status}. Body: ${response.body}`);
-    }
-
     const models = response.json();
     const returnedIds = Array.isArray(models) ? models : [];
 
@@ -333,9 +329,6 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded&from=${encodeURIComponent(fromTime)}&resourceId=${encodeURIComponent(resourceId)}`;
     const responseDownloaded = http.get(urlDownloaded, { headers: headersJson });
     check(responseDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
-    if (responseDownloaded.status !== 200) {
-        console.error(`TC9: GetFiles AllConfirmedDownloaded failed. Status: ${responseDownloaded.status}. Body: ${responseDownloaded.body}`);
-    }
     const modelsDownloaded = responseDownloaded.json();
     const returnedDownloadedIds = Array.isArray(modelsDownloaded) ? modelsDownloaded : [];
     check(returnedDownloadedIds, {
