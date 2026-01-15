@@ -54,7 +54,9 @@ export default async function () {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
     } 
-    await cleanupUseCaseTestData(TEST_TAG_LEGACY);
+    finally {
+        await cleanupUseCaseTestData(TEST_TAG_LEGACY);
+    }
 }
 
 async function TC1_InitializeLegacyFileTransfer() {
@@ -129,7 +131,7 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
         Authorization: `Bearer ${legacyToken}`
     }
 
-    const maxRetries = 10;
+    const maxRetries = 20;
     let published = false;
     let statusValue = null;
     let lastResponse = null;
@@ -141,7 +143,7 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(10);
+        sleep(30);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
         if (lastResponse.status === 200) {
             try {

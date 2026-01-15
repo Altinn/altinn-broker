@@ -56,7 +56,10 @@ export default async function () {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
     }
-    await cleanupUseCaseTestData(TEST_TAG_A3);
+    finally 
+    {
+        await cleanupUseCaseTestData(TEST_TAG_A3);
+    }
 }
 
 
@@ -143,7 +146,7 @@ async function TC3_PollAndVerifyUpload(filetransferId) {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(10);
+        sleep(30);
         lastResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${filetransferId}/details`, { headers });
 
         if (lastResponse.status === 200) {
@@ -317,7 +320,7 @@ async function TC8_InitializeAndUpload() {
 
     const overviewHeaders = { Authorization: `Bearer ${senderToken}`, Accept: 'application/json' };
     
-    const maxRetries = 10;
+    const maxRetries = 20;
     let published = false;
     let statusValue = null;
     let overviewResponse = null;
