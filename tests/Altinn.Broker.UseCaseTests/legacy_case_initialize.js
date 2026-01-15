@@ -313,11 +313,12 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     check(token, { 'TC9 token obtained': t => typeof t === 'string' && t.length > 0 });
 
     const headersJson = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-    // Scope to sender perspective with a narrow time window to avoid unrelated results in shared environments
-    const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}`;
+    // Scope to a narrow time window and specific resource to avoid unrelated results in shared environments
+    const fromTime = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 1 hour ago
+    const resourceId = 'bruksmonster-broker';
+    const url = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&from=${encodeURIComponent(fromTime)}&resourceId=${encodeURIComponent(resourceId)}`;
     const response = http.get(url, { headers: headersJson });
     check(response, { 'GetFiles (GET) 200': r => r.status === 200 });
-
     const models = response.json();
     const returnedIds = Array.isArray(models) ? models : [];
 
@@ -327,7 +328,7 @@ async function TC9_LegacyGetFiles(filetransferId1, filetransferId2) {
     });
 
     // Status filter: AllConfirmedDownloaded. Expect downloaded file (filetransferId1) to be present and the new one (filetransferId2) to be absent.
-    const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded`;
+    const urlDownloaded = `${baseUrl}/broker/api/v1/legacy/file?recipients=${encodeURIComponent(onBehalfOfConsumerRecipient)}&status=AllConfirmedDownloaded&from=${encodeURIComponent(fromTime)}&resourceId=${encodeURIComponent(resourceId)}`;
     const responseDownloaded = http.get(urlDownloaded, { headers: headersJson });
     check(responseDownloaded, { 'GetFiles (GET) AllConfirmedDownloaded 200': r => r.status === 200 });
     const modelsDownloaded = responseDownloaded.json();
