@@ -8,12 +8,12 @@
    
   <ItemGroup>
     <PackageReference Include="Altinn.Authorization.ProblemDetails" Version="4.0.1" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
-    <PackageReference Include="Hangfire.Core" Version="1.8.20" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.7" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.22" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.12" />
     <PackageReference Include="OneOf" Version="3.0.271" />
-    <PackageReference Include="Parquet.Net" Version="5.3.0" />
+    <PackageReference Include="Parquet.Net" Version="5.4.0" />
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Slack.Webhooks" Version="1.1.5" />
   </ItemGroup>
