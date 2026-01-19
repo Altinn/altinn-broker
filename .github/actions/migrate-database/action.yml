@@ -64,7 +64,7 @@ runs:
         inlineScript: |
           for file in ./src/Altinn.Broker.Persistence/Migrations/*; do
             az storage file upload --share-name migrations --account-name ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }} \
-              --source "$file" --path "$(basename "$file")" --auth-mode login
+              --source "$file" --path "$(basename "$file")" --auth-mode login --enable-file-backup-request-intent
           done
 
     - name: Start migration job

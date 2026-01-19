@@ -17,6 +17,7 @@ param platformSubscriptionKey = readEnvironmentVariable('PLATFORM_SUBSCRIPTION_K
 param slackUrl = readEnvironmentVariable('SLACK_URL')
 param statisticsApiKey = readEnvironmentVariable('STATISTICS_API_KEY')
 param grafanaMonitoringPrincipalId = readEnvironmentVariable('GRAFANA_MONITORING_PRINCIPAL_ID')
+param deploymentPrincipalObjectId = readEnvironmentVariable('DEPLOYMENT_PRINCIPAL_OBJECT_ID')
 
 // SKUs
 param keyVaultSku = {
