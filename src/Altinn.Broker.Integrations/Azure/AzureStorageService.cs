@@ -23,7 +23,14 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
     {
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
         var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
-        var blobServiceClient = new BlobServiceClient(connectionString);
+        var storageUri = new Uri(connectionString);
+        var blobServiceClient = new BlobServiceClient(storageUri, new DefaultAzureCredential(), new BlobClientOptions()
+        {
+            Retry =
+                {
+                    NetworkTimeout = TimeSpan.FromHours(1),
+                }
+        });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         return containerClient;
     }
