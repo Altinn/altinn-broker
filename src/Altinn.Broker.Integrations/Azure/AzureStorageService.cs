@@ -232,7 +232,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         return blobServiceClient;
     }
 
-    public static string GetAccountNameFromConnectionString(string connectionString)
+    public static string? GetAccountNameFromConnectionString(string connectionString)
     {
         var parts = connectionString.Split(';');
         foreach (var part in parts)
