@@ -355,7 +355,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// One of the scopes: <br/> 
     /// - altinn:broker.read <br/>
     /// </remarks>
-    /// <response code="200">Returns the file</response>
+    /// <response code="204">The download has been confirmed</response>
     /// <response code="400"><ul>
     /// <li>Cannot confirm before the files have been downloaded</li>
     /// <li>No file uploaded yet</li>
@@ -366,7 +366,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// <response code="404">The requested file transfer was not found</response>
     [HttpPost]
     [Produces("application/json")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
