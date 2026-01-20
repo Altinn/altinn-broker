@@ -1,0 +1,7 @@
+FROM flyway/flyway:latest
+
+# Copy broker database migrations into the standard Flyway migrations directory.
+# These scripts will be executed when the job runs `flyway migrate`.
+COPY src/Altinn.Broker.Persistence/Migrations /flyway/sql
+
+

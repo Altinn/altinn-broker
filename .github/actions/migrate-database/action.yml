@@ -18,8 +18,8 @@ inputs:
   AZURE_NAME_PREFIX:
     description: "Prefix for all resources"
     required: true
-  AZURE_MIGRATION_STORAGE_ACCOUNT_NAME:
-    description: "Name of the storage account for migration files"
+  MIGRATION_DOCKER_IMAGE_BASE_NAME:
+    description: "Base name for the migration image (e.g. ghcr.io/altinn/altinn-broker-migration)"
     required: true
 
 runs:
@@ -39,6 +39,19 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Publish migration image
+      uses: ./.github/actions/publish-image
+      with:
+        dockerImageBaseName: ${{ inputs.MIGRATION_DOCKER_IMAGE_BASE_NAME }}
+        imageTag: ${{ steps.get-version.outputs.imageTag }}
+        GITHUB_TOKEN: ${{ github.token }}
+        dockerfile: Dockerfile.migration
+
+    - name: Set MIGRATION_IMAGE environment variable
+      shell: bash
+      run: |
+        echo "MIGRATION_IMAGE=${{ inputs.MIGRATION_DOCKER_IMAGE_BASE_NAME }}:${{ steps.get-version.outputs.imageTag }}" >> "$GITHUB_ENV"
+
     - name: Deploy migration job
       uses: azure/arm-deploy@v2
       id: migration-job
@@ -56,16 +69,6 @@ runs:
         region: norwayeast
         failOnStdErr: false
         parameters: ./.azure/applications/migration/params.bicepparam
-
-    - name: Upload Migration Files to Azure File Share
-      uses: azure/CLI@v2
-      with:
-        azcliversion: 2.72.0
-        inlineScript: |
-          for file in ./src/Altinn.Broker.Persistence/Migrations/*; do
-            az storage file upload --share-name migrations --account-name ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }} \
-              --source "$file" --path "$(basename "$file")" --auth-mode login --enable-file-backup-request-intent
-          done
 
     - name: Start migration job
       uses: azure/CLI@v2
