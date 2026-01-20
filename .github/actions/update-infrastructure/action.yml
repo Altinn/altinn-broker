@@ -72,14 +72,7 @@ runs:
         client-id: ${{ inputs.AZURE_CLIENT_ID }}
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
-
-    - name: Get deployment principal object ID
-      id: get-principal-id
-      shell: bash
-      run: |
-        OBJECT_ID=$(az ad sp show --id ${{ inputs.AZURE_CLIENT_ID }} --query id -o tsv)
-        echo "objectId=$OBJECT_ID" >> $GITHUB_OUTPUT
-
+        
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh
@@ -110,7 +103,6 @@ runs:
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         STATISTICS_API_KEY: ${{ inputs.STATISTICS_API_KEY }}
         GRAFANA_MONITORING_PRINCIPAL_ID: ${{ inputs.GRAFANA_MONITORING_PRINCIPAL_ID }}
-        DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ steps.get-principal-id.outputs.objectId }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep

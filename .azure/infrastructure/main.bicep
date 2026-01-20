@@ -29,8 +29,6 @@ param slackUrl string
 param statisticsApiKey string
 @secure()
 param grafanaMonitoringPrincipalId string
-@secure()
-param deploymentPrincipalObjectId string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -144,18 +142,6 @@ module migrationsStorageAccount '../modules/storageAccount/create.bicep' = {
     migrationsStorageAccountName: migrationsStorageAccountName
     location: location
     fileshare: 'migrations'
-  }
-}
-
-module migrationsStorageAccountFileShareRole '../modules/storageAccount/addFileShareRole.bicep' = {
-  scope: resourceGroup
-  name: 'migrations-storage-file-share-role'
-  dependsOn: [migrationsStorageAccount]
-  params: {
-    storageAccountName: migrationsStorageAccountName
-    fileShareName: 'migrations'
-    principalId: deploymentPrincipalObjectId
-    principalType: 'ServicePrincipal'
   }
 }
 
