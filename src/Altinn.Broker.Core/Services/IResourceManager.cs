@@ -13,7 +13,7 @@ public interface IResourceManager
     /// <param name="serviceOwnerEntity"></param>
     /// <returns></returns>
     Task Deploy(ServiceOwnerEntity serviceOwnerEntity, bool virusScan, CancellationToken cancellationToken);
-    void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
+    void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken);
     Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken);
     Task<ServiceTagsListResult?> RetrieveServiceTags(CancellationToken cancellationToken);
     Task<Dictionary<string, string>> RetrieveCurrentIpRanges(CancellationToken cancellationToken);

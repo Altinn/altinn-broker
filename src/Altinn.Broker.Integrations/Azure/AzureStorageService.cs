@@ -18,7 +18,7 @@ using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
+public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
     private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
