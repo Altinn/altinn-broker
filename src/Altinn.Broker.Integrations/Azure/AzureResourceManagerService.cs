@@ -182,16 +182,6 @@ public class AzureResourceManagerService : IResourceManager
         return DeploymentStatus.Ready;
     }
 
-    public async Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity)
-    {
-        _logger.LogInformation($"Retrieving connection string for storage provider {storageProviderEntity.Id}");
-        if (storageProviderEntity.ResourceName == null)
-        {
-            throw new InvalidOperationException("Storage account has not been deployed");
-        }
-        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
-    }
-
     public async Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken)
     {
         try 

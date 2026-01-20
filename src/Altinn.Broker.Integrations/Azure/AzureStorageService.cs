@@ -27,7 +27,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             return new BlobServiceClient(AzureConstants.AzuriteUrl).GetBlobContainerClient("brokerfiles");
         }
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
-        var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
+        var connectionString = GetStorageConnectionString(storageProvider);
         var storageUri = new Uri(connectionString);
         var blobServiceClient = new BlobServiceClient(storageUri, new DefaultAzureCredential(), new BlobClientOptions()
         {
@@ -38,6 +38,15 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         return containerClient;
+    }
+
+    private string GetStorageConnectionString(StorageProviderEntity? storageProviderEntity)
+    {
+        if (storageProviderEntity?.ResourceName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
     }
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
