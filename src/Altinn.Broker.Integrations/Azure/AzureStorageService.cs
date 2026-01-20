@@ -10,6 +10,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,10 +18,14 @@ using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, ILogger<AzureStorageService> logger) : IBrokerStorageService
+public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
     private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
+        if (hostEnvironment.IsDevelopment())
+        {
+            return new BlobServiceClient(AzureConstants.AzuriteUrl).GetBlobContainerClient("brokerfiles");
+        }
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
         var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
         var storageUri = new Uri(connectionString);

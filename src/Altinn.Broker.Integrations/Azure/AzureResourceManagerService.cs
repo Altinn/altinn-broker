@@ -185,10 +185,6 @@ public class AzureResourceManagerService : IResourceManager
     public async Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity)
     {
         _logger.LogInformation($"Retrieving connection string for storage provider {storageProviderEntity.Id}");
-        if (_hostEnvironment.IsDevelopment())
-        {
-            return AzureConstants.AzuriteUrl;
-        }
         if (storageProviderEntity.ResourceName == null)
         {
             throw new InvalidOperationException("Storage account has not been deployed");
