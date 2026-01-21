@@ -135,6 +135,18 @@ module postgresql '../modules/postgreSql/create.bicep' = {
   }
 }
 
+module postgresBackupVault '../modules/backupVault/postgresBackup.bicep' = {
+  scope: resourceGroup
+  name: 'postgres-backup-vault'
+  params: {
+    environment: environment
+    location: location
+    pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
+    // Midlertidig satt for å teste at backup kjører i dag kl. 12 lokal tid (≈ 11:00 UTC)
+    backupStartTimeUtc: '2026-01-21T11:00:00Z'
+  }
+}
+
 module migrationsStorageAccount '../modules/storageAccount/create.bicep' = {
   scope: resourceGroup
   name: migrationsStorageAccountName
