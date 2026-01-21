@@ -135,7 +135,7 @@ module postgresql '../modules/postgreSql/create.bicep' = {
   }
 }
 
-module postgresBackupVault '../modules/backupVault/postgresBackup.bicep' = {
+module postgresBackupVault '../modules/backup/postgresBackup.bicep' = {
   scope: resourceGroup
   name: 'postgres-backup-vault'
   params: {
