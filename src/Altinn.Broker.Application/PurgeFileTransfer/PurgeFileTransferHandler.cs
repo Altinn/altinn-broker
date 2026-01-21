@@ -26,7 +26,8 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
 
         if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
-            logger.LogInformation("FileTransfer has already been set to purged");
+            logger.LogWarning("FileTransfer has already been set to purged");
+            return Task.CompletedTask;
         }
         if (
             fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.AllConfirmedDownloaded 
