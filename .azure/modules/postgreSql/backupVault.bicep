@@ -20,8 +20,8 @@ param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 @description('Om immutability (låsing av recovery points) skal være på for vaulten.')
 param enableImmutability bool = false
 
-@description('Om soft delete skal være på for vaulten.')
-param enableSoftDelete bool = true
+@description('Om soft delete skal være på for vaulten. TODO: REVERSER - Satt til false for testing, skal tilbake til true.')
+param enableSoftDelete bool = false
 
 @description('Soft delete-retensjon i dager for slettede recovery points.')
 @minValue(1)
@@ -34,8 +34,8 @@ param enableSystemAssignedIdentity bool = true
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
 // var backupVaultName = '${namePrefix}-backup-vault'
 // var backupPolicyName = '${namePrefix}-backup-policy'
-var backupVaultName = 'test-backup-vault-temp'
-var backupPolicyName = 'test-backup-policy-temp'
+var backupVaultName = 'test-backup-vault-v3'
+var backupPolicyName = 'test-backup-policy-v3'
 // Backup instance navn må være på formatet: {serverName}-{databaseName}
 // Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
 var resourceIdParts = split(pgDatabaseResourceId, '/')
