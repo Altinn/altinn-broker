@@ -136,7 +136,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
               dataStoreType: 'VaultStore'
               objectType: 'DataStoreInfoBase'
             }
-            targetDataStoreCopySettings: []
           }
         ]
       }
