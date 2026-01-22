@@ -11,8 +11,8 @@ param location string
 @minLength(1)
 param pgDatabaseResourceId string
 
-@description('Antall dager backup skal beholdes. Standard er 3650 dager (10 år) for prod-lignende miljøer, 90 dager for test.')
-param retentionDays int = environment == 'production' ? 3650 : environment == 'test' ? 90 : 180
+@description('Antall dager backup skal beholdes. Standard er 3650 dager (10 år) for prod/production-lignende miljøer, 90 dager for test.')
+param retentionDays int = (environment == 'production' || environment == 'prod') ? 3650 : environment == 'test' ? 90 : 180
 
 @description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
 param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
