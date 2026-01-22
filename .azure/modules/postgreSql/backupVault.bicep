@@ -108,7 +108,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
                 tagName: 'Default'
               }
               taggingPriority: 99
-              isDefault: true
               criteria: [
                 {
                   objectType: 'ScheduleBasedBackupCriteria'
@@ -125,7 +124,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
         // match tagName
         name: 'Default'
         objectType: 'AzureRetentionRule'
-        isDefault: true
         lifecycles: [
           {
             deleteAfter: {
