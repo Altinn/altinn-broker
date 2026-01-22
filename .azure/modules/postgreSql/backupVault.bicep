@@ -76,7 +76,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
       pgDatasourceType
     ]
     policyRules: [
-      // Backup schedule
       {
         name: 'DefaultBackupRule'
         objectType: 'AzureBackupRule'
@@ -89,28 +88,25 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
           objectType: 'DataStoreInfoBase'
         }
         trigger: {
+          objectType: 'ScheduleBasedTriggerContext'
           schedule: {
             repeatingTimeIntervals: [
-              // Daglig backup, starter på angitt tidspunkt
               'R/${backupStartTimeUtc}/P1D'
             ]
             timeZone: 'UTC'
           }
-          objectType: 'ScheduleBasedTriggerContext'
-        }
-        taggingCriteria: [
-          {
-            tagInfo: {
-              tagName: 'Default'
-              id: 'Default_'
+          taggingCriteria: [
+            {
+              tagInfo: {
+                tagName: 'Default'
+              }
+              taggingPriority: 99
+              isDefault: true
+              criteria: []
             }
-            taggingPriority: 99
-            isDefault: true
-            criteria: []
-          }
-        ]
+          ]
+        }
       }
-      // Retention-regel
       {
         name: 'DefaultRetentionRule'
         objectType: 'AzureRetentionRule'
@@ -119,7 +115,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
           {
             deleteAfter: {
               objectType: 'AbsoluteDeleteOption'
-              // ISO8601 duration P<n>D
               duration: 'P${retentionDays}D'
             }
             sourceDataStore: {
@@ -129,7 +124,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
             targetDataStoreCopySettings: []
           }
         ]
-        resourceID: pgDatabaseResourceId
       }
     ]
   }
