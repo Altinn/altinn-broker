@@ -19,6 +19,7 @@ using Altinn.Broker.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Altinn.Authorization.ProblemDetails;
 
 namespace Altinn.Broker.Controllers;
 
@@ -324,12 +325,11 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// </ul></response>
     /// <response code="404">The requested file transfer was not found</response>
     [HttpGet]
-    [Produces("application/octet-stream")]
-    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK, "application/octet-stream")]
+    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status400BadRequest, "application/json")]
+    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status401Unauthorized, "application/json")]
+    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status403Forbidden, "application/json")]
+    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status404NotFound, "application/json")]
     [Route("{fileTransferId}/download")]
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> DownloadFile(
