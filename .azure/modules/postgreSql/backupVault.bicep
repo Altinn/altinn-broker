@@ -42,11 +42,9 @@ var pgDatasourceType = 'Microsoft.DBforPostgreSQL/flexibleServers/databases'
 resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
   name: backupVaultName
   location: location
-  ...(enableSystemAssignedIdentity ? {
-    identity: {
-      type: 'SystemAssigned'
-    }
-  } : {})
+  identity: enableSystemAssignedIdentity ? {
+    type: 'SystemAssigned'
+  } : null
   properties: {
     storageSettings: [
       {
