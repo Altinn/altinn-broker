@@ -80,11 +80,11 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
   properties: {
     objectType: 'BackupPolicy'
     datasourceTypes: [
-      pgDatasourceType
+      pgDatasourceType // Microsoft.DBforPostgreSQL/flexibleServers
     ]
     policyRules: [
       {
-        name: 'DefaultBackupRule'
+        name: 'BackupDaily'
         objectType: 'AzureBackupRule'
         backupParameters: {
           objectType: 'AzureBackupParams'
@@ -104,26 +104,21 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
           }
           taggingCriteria: [
             {
+              isDefault: true
+              taggingPriority: 99
               tagInfo: {
                 tagName: 'Default'
+                id: 'Default_'
               }
-              taggingPriority: 99
-              criteria: [
-                {
-                  objectType: 'ScheduleBasedBackupCriteria'
-                  absoluteCriteria: [
-                    'AllBackup'
-                  ]
-                }
-              ]
+              // NB: ingen "criteria" på Default for PG Flex
             }
           ]
         }
       }
       {
-        // match tagName
         name: 'Default'
         objectType: 'AzureRetentionRule'
+        isDefault: true
         lifecycles: [
           {
             deleteAfter: {
@@ -134,6 +129,7 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
               dataStoreType: 'VaultStore'
               objectType: 'DataStoreInfoBase'
             }
+            targetDataStoreCopySettings: []
           }
         ]
       }
