@@ -135,15 +135,16 @@ module postgresql '../modules/postgreSql/create.bicep' = {
   }
 }
 
-module postgresBackupVault '../modules/backup/postgresBackup.bicep' = {
+module postgresBackupVault '../modules/postgreSql/backupVault.bicep' = {
   scope: resourceGroup
   name: 'postgres-backup-vault'
   params: {
+    namePrefix: namePrefix
     environment: environment
     location: location
     pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
-    // Midlertidig satt for å teste at backup kjører i dag kl. 12 lokal tid (≈ 11:00 UTC)
-    backupStartTimeUtc: '2026-01-21T11:00:00Z'
+    // Backup starter klokka 8 lokal tid i dag (07:00 UTC for Norge) - KUN FOR TESTING
+    backupStartTimeUtc: '2026-01-22T07:00:00Z'
   }
 }
 
