@@ -144,7 +144,7 @@ module postgresBackupVault '../modules/postgreSql/backupVault.bicep' = {
     location: location
     pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
     // Backup starter klokka 8:45 lokal tid i dag (07:45 UTC for Norge) - KUN FOR TESTING
-    backupStartTimeUtc: '2026-01-22T07:45:00Z'
+    backupStartTimeUtc: '2026-01-22T08:00:00Z'
   }
 }
 

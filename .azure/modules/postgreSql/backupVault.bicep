@@ -36,7 +36,8 @@ var backupPolicyName = '${namePrefix}-backup-policy'
 var backupInstanceName = last(split(pgDatabaseResourceId, '/'))
 
 // Datasource-type for Azure Database for PostgreSQL – Flexible Server
-var pgDatasourceType = 'Microsoft.DBforPostgreSQL/flexibleServers/databases'
+// For backup vault, datasource type skal være uten /databases
+var pgDatasourceType = 'Microsoft.DBforPostgreSQL/flexibleServers'
 
 // Backup vault med ZRS (ZoneRedundant)
 resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
