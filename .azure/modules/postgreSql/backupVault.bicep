@@ -33,7 +33,12 @@ param enableSystemAssignedIdentity bool = true
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
 var backupVaultName = '${namePrefix}-backup-vault'
 var backupPolicyName = '${namePrefix}-backup-policy'
-var backupInstanceName = last(split(pgDatabaseResourceId, '/'))
+// Backup instance navn må være på formatet: {serverName}-{databaseName}
+// Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
+var resourceIdParts = split(pgDatabaseResourceId, '/')
+var serverName = resourceIdParts[length(resourceIdParts) - 2]
+var databaseName = resourceIdParts[length(resourceIdParts) - 1]
+var backupInstanceName = '${serverName}-${databaseName}'
 
 // Datasource-type for Azure Database for PostgreSQL – Flexible Server
 // For backup vault, datasource type skal være uten /databases
@@ -141,7 +146,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
       objectType: 'Datasource'
       resourceID: pgDatabaseResourceId
       resourceLocation: location
-      resourceName: backupInstanceName
+      resourceName: databaseName
       datasourceType: pgDatasourceType
       resourceType: pgDatasourceType
     }
