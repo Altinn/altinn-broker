@@ -30,9 +30,12 @@ param softDeleteRetentionInDays int = 14
 @description('Om system-assigned managed identity skal aktiveres på vaulten.')
 param enableSystemAssignedIdentity bool = true
 
+// TODO: REVERSER DETTE - Hardkodet navn for testing, skal tilbake til namePrefix-basert
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
-var backupVaultName = '${namePrefix}-backup-vault'
-var backupPolicyName = '${namePrefix}-backup-policy'
+// var backupVaultName = '${namePrefix}-backup-vault'
+// var backupPolicyName = '${namePrefix}-backup-policy'
+var backupVaultName = 'test-backup-vault-temp'
+var backupPolicyName = 'test-backup-policy-temp'
 // Backup instance navn må være på formatet: {serverName}-{databaseName}
 // Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
 var resourceIdParts = split(pgDatabaseResourceId, '/')
@@ -148,7 +151,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
       resourceLocation: location
       resourceName: databaseName
       datasourceType: pgDatasourceType
-      resourceType: pgDatasourceType
+      resourceType: 'Microsoft.DBforPostgreSQL/flexibleServers/databases'
     }
   }
 }
