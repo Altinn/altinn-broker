@@ -39,12 +39,14 @@ var backupInstanceName = last(split(pgDatabaseResourceId, '/'))
 var pgDatasourceType = 'Microsoft.DBforPostgreSQL/flexibleServers/databases'
 
 // Backup vault med ZRS (ZoneRedundant)
-resource backupVault 'Microsoft.DataProtection/backupVaults@2022-11-01' = {
+resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
   name: backupVaultName
   location: location
-  identity: enableSystemAssignedIdentity ? {
-    type: 'SystemAssigned'
-  } : null
+  ...(enableSystemAssignedIdentity ? {
+    identity: {
+      type: 'SystemAssigned'
+    }
+  } : {})
   properties: {
     storageSettings: [
       {
@@ -65,8 +67,9 @@ resource backupVault 'Microsoft.DataProtection/backupVaults@2022-11-01' = {
 }
 
 // Backup policy for Azure Database for PostgreSQL – Flexible Server
-resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@2022-11-01' = {
-  name: '${backupVault.name}/${backupPolicyName}'
+resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@2024-03-01' = {
+  parent: backupVault
+  name: backupPolicyName
   properties: {
     objectType: 'BackupPolicy'
     datasourceTypes: [
@@ -120,8 +123,9 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
 }
 
 // Backup instance som knytter databasen til vault + policy
-resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances@2022-11-01' = {
-  name: '${backupVault.name}/${backupInstanceName}'
+resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances@2024-03-01' = {
+  parent: backupVault
+  name: backupInstanceName
   properties: {
     objectType: 'BackupInstance'
     policyInfo: {
