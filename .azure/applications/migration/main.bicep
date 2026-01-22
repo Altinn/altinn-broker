@@ -1,6 +1,7 @@
 param namePrefix string
 param location string
 param appVersion string
+param migrationImage string
 @secure()
 param keyVaultUrl string
 @secure()
@@ -52,23 +53,6 @@ var containerAppEnvVars = [
   }
 ]
 
-var volumes = [
-  {
-    name: 'migrations'
-    storageName: 'migrations'
-    storageType: 'AzureFile'
-    mountOptions: 'cache=none'
-  }
-]
-
-var volumeMounts = [
-  {
-    volumeName: 'migrations'
-    mountPath: '/flyway/sql'
-    subPath: ''
-  }
-]
-
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: containerAppEnvName
 }
@@ -85,9 +69,7 @@ module containerAppJob '../../modules/migrationJob/main.bicep' = {
     environmentVariables: containerAppEnvVars
     secrets: secrets
     command: ['/bin/bash', '-c', 'flyway migrate;']
-    image: 'flyway/flyway:latest'
-    volumes: volumes
-    volumeMounts: volumeMounts
+    image: migrationImage
     principalId: userAssignedIdentity.id
   }
 }

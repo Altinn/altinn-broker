@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -19,8 +17,6 @@ using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Storage;
 using Azure.ResourceManager.Storage.Models;
-using Azure.Storage;
-using Azure.Storage.Sas;
 
 using Hangfire;
 
@@ -34,9 +30,6 @@ public class AzureResourceManagerService : IResourceManager
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
-    private readonly ConcurrentDictionary<string, (DateTime Created, string Token)> _sasTokens =
-        new ConcurrentDictionary<string, (DateTime Created, string Token)>();
-    private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private readonly TokenCredential _credentials;
     private readonly IServiceOwnerRepository _serviceOwnerRepository;
     private readonly IBackgroundJobClient _backgroundJobClient;
@@ -91,6 +84,7 @@ public class AzureResourceManagerService : IResourceManager
         // Create or get the storage account
         var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
         storageAccountData.MinimumTlsVersion = "TLS1_2";
+        storageAccountData.AllowSharedKeyAccess = false;
         storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
@@ -186,81 +180,6 @@ public class AzureResourceManagerService : IResourceManager
         }
 
         return DeploymentStatus.Ready;
-    }
-
-    public async Task<string> GetStorageConnectionString(StorageProviderEntity storageProviderEntity)
-    {
-        _logger.LogInformation($"Retrieving connection string for storage provider {storageProviderEntity.Id}");
-        if (_hostEnvironment.IsDevelopment())
-        {
-            return AzureConstants.AzuriteUrl;
-        }
-        if (storageProviderEntity.ResourceName == null)
-        {
-            throw new InvalidOperationException("Storage account has not been deployed");
-        }
-        var sasToken = await GetSasToken(storageProviderEntity, storageProviderEntity.ResourceName);
-        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net/brokerfiles?{sasToken}";
-    }
-
-
-    private async Task<string> GetSasToken(StorageProviderEntity storageProviderEntity, string storageAccountName)
-    {
-        if (_sasTokens.TryGetValue(storageAccountName, out (DateTime Created, string Token) sasToken) && sasToken.Created.AddHours(8) > DateTime.UtcNow)
-        {
-            return sasToken.Token;
-        }
-
-        _sasTokens.TryRemove(storageAccountName, out _);
-
-        await _semaphore.WaitAsync();
-        try
-        {
-            if (_sasTokens.TryGetValue(storageAccountName, out sasToken))
-            {
-                return sasToken.Token;
-            }
-            (DateTime Created, string Token) newSasToken = default;
-            newSasToken.Created = DateTime.UtcNow;
-            newSasToken.Token = await CreateSasToken(storageProviderEntity, storageAccountName);
-
-            _sasTokens.TryAdd(storageAccountName, newSasToken);
-
-            return newSasToken.Token;
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
-    }
-    private async Task<string> CreateSasToken(StorageProviderEntity storageProviderEntity, string storageAccountName)
-    {
-        _logger.LogInformation($"Creating new SAS token for {storageProviderEntity.ServiceOwnerId}: {storageProviderEntity.ResourceName}");
-        var resourceGroupName = GetResourceGroupName(storageProviderEntity.ServiceOwnerId);
-        var subscription = GetSubscription();
-        var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroup = await resourceGroupCollection.GetAsync(resourceGroupName);
-        var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccount = await storageAccountCollection.GetAsync(storageAccountName);
-        string accountKey = "";
-        var keys = storageAccount.Value.GetKeysAsync();
-        await using (var keyEnumerator = keys.GetAsyncEnumerator())
-        {
-            accountKey = await keyEnumerator.MoveNextAsync() ? keyEnumerator.Current.Value : "";
-        }
-        StorageSharedKeyCredential credential = new StorageSharedKeyCredential(storageAccountName, accountKey);
-        var containerName = "brokerfiles";
-        BlobSasBuilder sasBuilder = new BlobSasBuilder()
-        {
-            BlobContainerName = containerName,
-            Resource = "c",
-            StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(24),
-        };
-        sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.List | BlobSasPermissions.Write | BlobSasPermissions.Delete);
-        string sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
-        _logger.LogInformation("SAS Token created");
-        return sasToken;
     }
 
     public async Task UpdateContainerAppIpRestrictionsAsync(Dictionary<string, string> newIps, CancellationToken cancellationToken)
