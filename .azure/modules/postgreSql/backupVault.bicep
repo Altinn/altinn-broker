@@ -82,6 +82,7 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
         objectType: 'AzureBackupRule'
         backupParameters: {
           objectType: 'AzureBackupParams'
+          backupType: 'Full'
         }
         dataStore: {
           dataStoreType: 'VaultStore'
@@ -97,7 +98,17 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
           }
           objectType: 'ScheduleBasedTriggerContext'
         }
-        retentionTag: 'Default'
+        taggingCriteria: [
+          {
+            tagInfo: {
+              tagName: 'Default'
+              id: 'Default_'
+            }
+            taggingPriority: 99
+            isDefault: true
+            criteria: []
+          }
+        ]
       }
       // Retention-regel
       {
@@ -115,8 +126,10 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
               dataStoreType: 'VaultStore'
               objectType: 'DataStoreInfoBase'
             }
+            targetDataStoreCopySettings: []
           }
         ]
+        resourceID: pgDatabaseResourceId
       }
     ]
   }
@@ -133,7 +146,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
     }
     dataSourceInfo: {
       objectType: 'Datasource'
-      resourceId: pgDatabaseResourceId
+      resourceID: pgDatabaseResourceId
       resourceLocation: location
       resourceName: backupInstanceName
       datasourceType: pgDatasourceType
