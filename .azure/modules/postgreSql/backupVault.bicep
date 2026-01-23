@@ -171,7 +171,7 @@ resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 
 // PostgreSQL Flexible Server Long Term Retention Backup Role
-var pgLtrBackupRoleDefinitionId = '7c42c0d2-3e51-4d42-818d-32b0c31523ab'
+var pgLtrBackupRoleDefinitionId = 'c088a766-074b-43ba-90d4-1fb21feae531'
 resource pgLtrBackupRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableSystemAssignedIdentity) {
   name: guid(resourceGroup().id, backupVault.id, pgLtrBackupRoleDefinitionId)
   scope: resourceGroup()
