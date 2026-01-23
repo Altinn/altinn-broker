@@ -157,6 +157,31 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
   }
 }
 
+// Role assignments for backup vault på resource group-nivå
+// Reader role
+var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
+resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableSystemAssignedIdentity) {
+  name: guid(resourceGroup().id, backupVault.id, readerRoleDefinitionId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleDefinitionId)
+    principalId: backupVault.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// PostgreSQL Flexible Server Long Term Retention Backup Role
+var pgLtrBackupRoleDefinitionId = '7c42c0d2-3e51-4d42-818d-32b0c31523ab'
+resource pgLtrBackupRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableSystemAssignedIdentity) {
+  name: guid(resourceGroup().id, backupVault.id, pgLtrBackupRoleDefinitionId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pgLtrBackupRoleDefinitionId)
+    principalId: backupVault.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 output backupVaultNameOut string = backupVault.name
 output backupPolicyNameOut string = pgBackupPolicy.name
 output backupInstanceNameOut string = pgBackupInstance.name
