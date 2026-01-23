@@ -161,7 +161,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
 // Reader role
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableSystemAssignedIdentity) {
-  name: guid(resourceGroup().id, backupVault.id, readerRoleDefinitionId)
+  name: guid(resourceGroup().id, backupVault.name, readerRoleDefinitionId, 'backup-vault-reader')
   scope: resourceGroup()
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleDefinitionId)
@@ -173,7 +173,7 @@ resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 // PostgreSQL Flexible Server Long Term Retention Backup Role
 var pgLtrBackupRoleDefinitionId = 'c088a766-074b-43ba-90d4-1fb21feae531'
 resource pgLtrBackupRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableSystemAssignedIdentity) {
-  name: guid(resourceGroup().id, backupVault.id, pgLtrBackupRoleDefinitionId)
+  name: guid(resourceGroup().id, backupVault.name, pgLtrBackupRoleDefinitionId, 'backup-vault-pg-ltr')
   scope: resourceGroup()
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pgLtrBackupRoleDefinitionId)
