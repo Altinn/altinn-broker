@@ -7,7 +7,7 @@ param environment string
 @description('Location for Backup vault og tilhørende ressurser.')
 param location string
 
-@description('Resource ID til PostgreSQL-databasen (Flexible Server) som skal ha backup).')
+@description('Resource ID til PostgreSQL Flexible Server som skal ha backup).')
 @minLength(1)
 param pgDatabaseResourceId string
 
@@ -37,12 +37,11 @@ param existingBackupPolicyName string = ''
 var backupVaultName = '${namePrefix}-broker-backup-vault'
 var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-broker-bkp-pol'
 var useExistingPolicy = existingBackupPolicyName != ''
-// Backup instance navn må være på formatet: {serverName}-{databaseName}
-// Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
+// Backup instance navn settes til server-navnet
+// Vi henter server-navnet fra resource ID (siste del)
 var resourceIdParts = split(pgDatabaseResourceId, '/')
-var serverName = resourceIdParts[length(resourceIdParts) - 2]
-var databaseName = resourceIdParts[length(resourceIdParts) - 1]
-var backupInstanceName = '${serverName}-${databaseName}'
+var serverName = resourceIdParts[length(resourceIdParts) - 1]
+var backupInstanceName = serverName
 
 // Datasource-type for Azure Database for PostgreSQL – Flexible Server
 // For backup vault, datasource type skal være uten /databases
@@ -160,9 +159,9 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
       objectType: 'Datasource'
       resourceID: pgDatabaseResourceId
       resourceLocation: location
-      resourceName: databaseName
+      resourceName: serverName
       datasourceType: pgDatasourceType
-      resourceType: 'Microsoft.DBforPostgreSQL/flexibleServers/databases'
+      resourceType: 'Microsoft.DBforPostgreSQL/flexibleServers'
     }
   }
 }
