@@ -35,7 +35,7 @@ param existingBackupPolicyName string = ''
 
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
 var backupVaultName = '${namePrefix}-broker-backup-vault'
-var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-broker-backup-policy'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-backup-policy'
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn må være på formatet: {serverName}-{databaseName}
 // Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
