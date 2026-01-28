@@ -93,7 +93,7 @@ runs:
 
         echo "EXISTING_BACKUP_POLICY_NAME=" >> "$GITHUB_ENV"
 
-    - name: Remove existing backup vault role assignments (one-time)
+    - name: Remove existing backup vault role assignments (every run)
       shell: bash
       run: |
         set -euo pipefail
