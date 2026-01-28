@@ -11,14 +11,14 @@ param location string
 @minLength(1)
 param pgDatabaseResourceId string
 
-@description('Antall dager backup skal beholdes. Standard er 3650 dager (10 år) for prod/production-lignende miljøer, 90 dager for test.')
-param retentionDays int = (environment == 'production' || environment == 'prod') ? 3650 : environment == 'test' ? 90 : 180
+@description('Antall dager backup skal beholdes. Standard er 365 dager (1 år) for prod/production-lignende miljøer, 90 dager for test.')
+param retentionDays int = (environment == 'production' || environment == 'prod') ? 365 : environment == 'test' ? 90 : 180
 
 @description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
 param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 
 @description('Om immutability (låsing av recovery points) skal være på for vaulten.')
-param enableImmutability bool = false
+param enableImmutability bool = true
 
 @description('Om soft delete skal være på for vaulten. TODO: REVERSER - Satt til false for testing, skal tilbake til true.')
 param enableSoftDelete bool = false
@@ -33,12 +33,9 @@ param enableSystemAssignedIdentity bool = true
 @description('Hvis satt, bruker eksisterende backup policy med dette navnet. Hvis tom, opprettes ny policy.')
 param existingBackupPolicyName string = ''
 
-// TODO: REVERSER DETTE - Hardkodet navn for testing, skal tilbake til namePrefix-basert
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
-// var backupVaultName = '${namePrefix}-backup-vault'
-// var backupPolicyName = '${namePrefix}-backup-policy'
-var backupVaultName = 'test-backup-vault-v3'
-var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : 'test-backup-policy-v3'
+var backupVaultName = '${namePrefix}-broker-backup-vault'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-broker-backup-policy'
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn må være på formatet: {serverName}-{databaseName}
 // Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
@@ -66,6 +63,9 @@ resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
       }
     ]
     securitySettings: {
+      crossSubscriptionRestoreSettings: {
+        state: 'Disabled'
+      }
       softDeleteSettings: {
         state: enableSoftDelete ? 'On' : 'Off'
         retentionDurationInDays: softDeleteRetentionInDays
