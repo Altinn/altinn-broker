@@ -13,6 +13,9 @@ param environment string
 @secure()
 param namePrefix string
 
+@description('Navn på eksisterende backup policy å bruke. Hvis tom, opprettes ny policy.')
+param existingBackupPolicyName string = ''
+
 @secure()
 param migrationsStorageAccountName string
 @secure()
@@ -143,6 +146,7 @@ module postgresBackupVault '../modules/postgreSql/backupVault.bicep' = {
     environment: environment
     location: location
     pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
+    existingBackupPolicyName: existingBackupPolicyName
     // TODO: REVERSER DETTE - Backup starter klokka 10:15 lokal tid i dag (09:15 UTC for Norge) - KUN FOR TESTING
     backupStartTimeUtc: '2026-01-23T11:30:00Z'
   }

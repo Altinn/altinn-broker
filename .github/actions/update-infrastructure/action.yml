@@ -73,6 +73,27 @@ runs:
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
         subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Detect existing backup policy
+      shell: bash
+      run: |
+        set -euo pipefail
+        RG="${{ inputs.AZURE_NAME_PREFIX }}-rg"
+        # TODO: align with dynamic namePrefix-based naming when test hardcoding is removed
+        VAULT_NAME="test-backup-vault-v3"
+        POLICY_NAME="test-backup-policy-v3"
+
+        az extension add --name dataprotection --yes --only-show-errors >/dev/null 2>&1 || \
+          az extension update --name dataprotection --yes --only-show-errors >/dev/null 2>&1
+
+        if az dataprotection backup-vault show --resource-group "$RG" --vault-name "$VAULT_NAME" >/dev/null 2>&1; then
+          if az dataprotection backup-policy show --resource-group "$RG" --vault-name "$VAULT_NAME" --name "$POLICY_NAME" >/dev/null 2>&1; then
+            echo "EXISTING_BACKUP_POLICY_NAME=$POLICY_NAME" >> "$GITHUB_ENV"
+            exit 0
+          fi
+        fi
+
+        echo "EXISTING_BACKUP_POLICY_NAME=" >> "$GITHUB_ENV"
+
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh
@@ -93,6 +114,7 @@ runs:
         TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
         TEST_CLIENT_ID: ${{ inputs.AZURE_TEST_ACCESS_CLIENT_ID }}
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        EXISTING_BACKUP_POLICY_NAME: ${{ env.EXISTING_BACKUP_POLICY_NAME }}
         KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         MIGRATION_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
         BACKUP_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_BACKUP_STORAGE_ACCOUNT_NAME }}

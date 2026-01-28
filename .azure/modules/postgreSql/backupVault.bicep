@@ -30,12 +30,16 @@ param softDeleteRetentionInDays int = 14
 @description('Om system-assigned managed identity skal aktiveres på vaulten.')
 param enableSystemAssignedIdentity bool = true
 
+@description('Hvis satt, bruker eksisterende backup policy med dette navnet. Hvis tom, opprettes ny policy.')
+param existingBackupPolicyName string = ''
+
 // TODO: REVERSER DETTE - Hardkodet navn for testing, skal tilbake til namePrefix-basert
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
 // var backupVaultName = '${namePrefix}-backup-vault'
 // var backupPolicyName = '${namePrefix}-backup-policy'
 var backupVaultName = 'test-backup-vault-v3'
-var backupPolicyName = 'test-backup-policy-v3'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : 'test-backup-policy-v3'
+var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn må være på formatet: {serverName}-{databaseName}
 // Vi henter server-navnet fra resource ID (nest siste del) og database-navnet (siste del)
 var resourceIdParts = split(pgDatabaseResourceId, '/')
@@ -74,7 +78,13 @@ resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
 }
 
 // Backup policy for Azure Database for PostgreSQL – Flexible Server
-resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@2024-03-01' = {
+// Bruk eksisterende policy hvis spesifisert, ellers opprett ny
+resource pgBackupPolicyExisting 'Microsoft.DataProtection/backupVaults/backupPolicies@2024-03-01' existing = if (useExistingPolicy) {
+  parent: backupVault
+  name: backupPolicyName
+}
+
+resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@2024-03-01' = if (!useExistingPolicy) {
   parent: backupVault
   name: backupPolicyName
   properties: {
@@ -144,7 +154,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
   properties: {
     objectType: 'BackupInstance'
     policyInfo: {
-      policyId: pgBackupPolicy.id
+      policyId: useExistingPolicy ? pgBackupPolicyExisting.id : pgBackupPolicy.id
     }
     dataSourceInfo: {
       objectType: 'Datasource'
@@ -183,6 +193,6 @@ resource pgLtrBackupRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 }
 
 output backupVaultNameOut string = backupVault.name
-output backupPolicyNameOut string = pgBackupPolicy.name
+output backupPolicyNameOut string = useExistingPolicy ? pgBackupPolicyExisting.name : pgBackupPolicy.name
 output backupInstanceNameOut string = pgBackupInstance.name
 
