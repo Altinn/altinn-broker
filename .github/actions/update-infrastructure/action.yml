@@ -78,8 +78,8 @@ runs:
       run: |
         set -euo pipefail
         RG="${{ inputs.AZURE_NAME_PREFIX }}-rg"
-        VAULT_NAME="${{ inputs.AZURE_NAME_PREFIX }}-broker-backup-vault"
-        POLICY_NAME="${{ inputs.AZURE_NAME_PREFIX }}-broker-bkp-pol"
+        VAULT_NAME="${{ inputs.AZURE_NAME_PREFIX }}-backup-vault"
+        POLICY_NAME="${{ inputs.AZURE_NAME_PREFIX }}-bkp-pol"
 
         az extension add --name dataprotection --yes --only-show-errors >/dev/null 2>&1 || \
           az extension update --name dataprotection --yes --only-show-errors >/dev/null 2>&1
@@ -93,28 +93,6 @@ runs:
 
         echo "EXISTING_BACKUP_POLICY_NAME=" >> "$GITHUB_ENV"
 
-    - name: Remove existing backup vault role assignments (every run)
-      shell: bash
-      run: |
-        set -euo pipefail
-        RG="${{ inputs.AZURE_NAME_PREFIX }}-rg"
-        VAULT_NAME="${{ inputs.AZURE_NAME_PREFIX }}-broker-backup-vault"
-        READER_ROLE_ID="acdd72a7-3385-48ef-bd42-f606fba81ae7"
-        PG_LTR_ROLE_ID="c088a766-074b-43ba-90d4-1fb21feae531"
-
-        if az dataprotection backup-vault show --resource-group "$RG" --vault-name "$VAULT_NAME" >/dev/null 2>&1; then
-          RG_ID="$(az group show -n "$RG" --query id -o tsv)"
-          PRINCIPAL_ID="$(az dataprotection backup-vault show --resource-group "$RG" --vault-name "$VAULT_NAME" --query identity.principalId -o tsv)"
-          if [ -n "$PRINCIPAL_ID" ]; then
-            for ROLE_ID in "$READER_ROLE_ID" "$PG_LTR_ROLE_ID"; do
-              RA_NAMES=$(az role assignment list --assignee-object-id "$PRINCIPAL_ID" --scope "$RG_ID" --query "[?roleDefinitionId=='/providers/Microsoft.Authorization/roleDefinitions/${ROLE_ID}'].name" -o tsv)
-              for RA_NAME in $RA_NAMES; do
-                az role assignment delete --resource-group "$RG" --name "$RA_NAME" >/dev/null 2>&1 || true
-              done
-            done
-          fi
-        fi
-
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh
@@ -122,7 +100,7 @@ runs:
         Import-module "./.github/tools/pwdGenerator.ps1" -Force
         $password = (GeneratePassword -length 30).Password
         echo "::add-mask::$password"
-        echo "::set-output name=postgresqlPassword::$password"
+        echo "::set-output nameß=postgresqlPassword::$password"
 
     - name: Deploy to Azure
       uses: azure/arm-deploy@v2

@@ -34,8 +34,8 @@ param enableSystemAssignedIdentity bool = true
 param existingBackupPolicyName string = ''
 
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
-var backupVaultName = '${namePrefix}-broker-backup-vault'
-var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-broker-bkp-pol'
+var backupVaultName = '${namePrefix}-backup-vault'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-bkp-pol'
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn settes til server-navnet
 // Vi henter server-navnet fra resource ID (siste del)
