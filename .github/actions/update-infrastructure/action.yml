@@ -100,7 +100,7 @@ runs:
         Import-module "./.github/tools/pwdGenerator.ps1" -Force
         $password = (GeneratePassword -length 30).Password
         echo "::add-mask::$password"
-        echo "::set-output nameß=postgresqlPassword::$password"
+        echo "::set-output name=postgresqlPassword::$password"
 
     - name: Deploy to Azure
       uses: azure/arm-deploy@v2
