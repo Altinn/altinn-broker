@@ -20,8 +20,8 @@ param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 @description('Om immutability (låsing av recovery points) skal være på for vaulten.')
 param enableImmutability bool = true
 
-@description('Om soft delete skal være på for vaulten. TODO: REVERSER - Satt til false for testing, skal tilbake til true.')
-param enableSoftDelete bool = false
+@description('Om soft delete skal være på for vaulten.')
+param enableSoftDelete bool = true
 
 @description('Soft delete-retensjon i dager for slettede recovery points.')
 @minValue(1)
