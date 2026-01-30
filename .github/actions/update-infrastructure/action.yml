@@ -78,8 +78,8 @@ runs:
       run: |
         set -euo pipefail
         RG="${{ inputs.AZURE_NAME_PREFIX }}-rg"
-        VAULT_NAME="${{ inputs.AZURE_NAME_PREFIX }}-backup-vault"
-        POLICY_NAME="${{ inputs.AZURE_NAME_PREFIX }}-bkp-pol"
+        VAULT_NAME="${{ inputs.AZURE_NAME_PREFIX }}-backup-vault-v2"
+        POLICY_NAME="${{ inputs.AZURE_NAME_PREFIX }}-bkp-pol-v2"
 
         az extension add --name dataprotection --yes --only-show-errors >/dev/null 2>&1 || \
           az extension update --name dataprotection --yes --only-show-errors >/dev/null 2>&1

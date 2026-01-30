@@ -17,11 +17,11 @@ param retentionDays int = (environment == 'production' || environment == 'prod')
 @description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
 param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 
-@description('Om immutability (låsing av recovery points) skal være på for vaulten.')
-param enableImmutability bool = true
+@description('Om immutability (låsing av recovery points) skal være på for vaulten. TODO: REVERSER - midlertidig av for å kunne slette vault.')
+param enableImmutability bool = false
 
-@description('Om soft delete skal være på for vaulten.')
-param enableSoftDelete bool = true
+@description('Om soft delete skal være på for vaulten. TODO: REVERSER - midlertidig av for å kunne slette vault.')
+param enableSoftDelete bool = false
 
 @description('Soft delete-retensjon i dager for slettede recovery points.')
 @minValue(1)
@@ -34,8 +34,9 @@ param enableSystemAssignedIdentity bool = true
 param existingBackupPolicyName string = ''
 
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
-var backupVaultName = '${namePrefix}-backup-vault'
-var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-bkp-pol'
+// TODO: REVERSER - midlertidig v2-navn for testdeploy
+var backupVaultName = '${namePrefix}-backup-vault-v2'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-bkp-pol-v2'
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn settes til server-navnet
 // Vi henter server-navnet fra resource ID (siste del)
@@ -61,10 +62,12 @@ resource backupVault 'Microsoft.DataProtection/backupVaults@2024-03-01' = {
         type: 'ZoneRedundant'
       }
     ]
-    securitySettings: {
+    featureSettings: {
       crossSubscriptionRestoreSettings: {
         state: 'Disabled'
       }
+    }
+    securitySettings: {
       softDeleteSettings: {
         state: enableSoftDelete ? 'On' : 'Off'
         retentionDurationInDays: softDeleteRetentionInDays
@@ -117,7 +120,6 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
               taggingPriority: 99
               tagInfo: {
                 tagName: 'Default'
-                id: 'Default_'
               }
               // NB: ingen "criteria" på Default for PG Flex
             }
