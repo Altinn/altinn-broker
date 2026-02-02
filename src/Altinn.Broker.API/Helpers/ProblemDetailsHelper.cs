@@ -18,6 +18,8 @@ public static class ProblemDetailsHelper
         { HttpStatusCode.NotFound, ("https://tools.ietf.org/html/rfc9110#section-15.5.5", "Not Found") },
         { HttpStatusCode.Conflict, ("https://tools.ietf.org/html/rfc9110#section-15.5.10", "Conflict") },
         { HttpStatusCode.InternalServerError, ("https://tools.ietf.org/html/rfc9110#section-15.6.1", "Internal Server Error") },
+        { HttpStatusCode.BadGateway, ("https://tools.ietf.org/html/rfc9110#section-15.6.3", "Bad Gateway") },
+        { HttpStatusCode.ServiceUnavailable, ("https://tools.ietf.org/html/rfc9110#section-15.6.4", "Service Unavailable") },
     };
 
     public static ObjectResult ToProblemResult(Error error)
