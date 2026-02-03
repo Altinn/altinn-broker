@@ -14,8 +14,8 @@ param pgDatabaseResourceId string
 @description('Antall dager backup skal beholdes. Standard er 365 dager (1 år) for prod/production-lignende miljøer, 90 dager for test.')
 param retentionDays int = (environment == 'production' || environment == 'prod') ? 365 : environment == 'test' ? 90 : 180
 
-@description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
-param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
+@description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1W.')
+param backupStartTimeUtc string = '2024-01-06T01:00:00Z'
 
 @description('Om immutability (låsing av recovery points) skal være på for vaulten. Vurder Lock senere.')
 param enableImmutability bool = true
@@ -109,7 +109,7 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
           objectType: 'ScheduleBasedTriggerContext'
           schedule: {
             repeatingTimeIntervals: [
-              'R/${backupStartTimeUtc}/P1D'
+              'R/${backupStartTimeUtc}/P1W'
             ]
             timeZone: 'UTC'
           }
