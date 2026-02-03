@@ -17,7 +17,7 @@ param retentionDays int = (environment == 'production' || environment == 'prod')
 @description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
 param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 
-@description('Om immutability (låsing av recovery points) skal være på for vaulten. Vurder Lock i prod når alt er verifisert.')
+@description('Om immutability (låsing av recovery points) skal være på for vaulten. Vurder Lock senere.')
 param enableImmutability bool = true
 
 @description('Om soft delete skal være på for vaulten.')
