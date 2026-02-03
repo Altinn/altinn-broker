@@ -16,10 +16,8 @@ using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Altinn.Authorization.ProblemDetails;
 
 namespace Altinn.Broker.Controllers;
 
@@ -50,7 +48,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<Guid>> InitializeFileTransfer(FileTransferInitalizeExt initializeExt, [FromServices] InitializeFileTransferHandler handler, CancellationToken cancellationToken)
     {
         LogContextHelpers.EnrichLogsWithInitializeFile(initializeExt);
@@ -95,7 +93,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
     public async Task<ActionResult> UploadStreamed(
         Guid fileTransferId,
@@ -146,7 +144,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     [Route("upload")]
     [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue)]
     [Authorize(Policy = AuthorizationConstants.Sender)]
@@ -326,10 +324,10 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// <response code="404">The requested file transfer was not found</response>
     [HttpGet]
     [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK, "application/octet-stream")]
-    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status400BadRequest, "application/json")]
-    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status401Unauthorized, "application/json")]
-    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status403Forbidden, "application/json")]
-    [ProducesResponseType(typeof(AltinnProblemDetails), StatusCodes.Status404NotFound, "application/json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/json")]
     [Route("{fileTransferId}/download")]
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> DownloadFile(

@@ -332,7 +332,7 @@ async function TC8_InitializeAndUpload() {
     };
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        sleep(3);
+        sleep(30);
         overviewResponse = http.get(`${baseUrl}/broker/api/v1/filetransfer/${initializeAndUploadFileTransferId}`, { headers: overviewHeaders });
         if (overviewResponse.status === 200) {
             try {
