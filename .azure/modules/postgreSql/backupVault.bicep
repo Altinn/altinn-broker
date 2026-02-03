@@ -17,11 +17,11 @@ param retentionDays int = (environment == 'production' || environment == 'prod')
 @description('ISO8601 starttidspunkt (UTC) for første backup-kjøring. Brukes som start på R/<start>/P1D.')
 param backupStartTimeUtc string = '2024-01-01T22:00:00Z'
 
-@description('Om immutability (låsing av recovery points) skal være på for vaulten. TODO: REVERSER - midlertidig av for å kunne slette vault.')
-param enableImmutability bool = false
+@description('Om immutability (låsing av recovery points) skal være på for vaulten. Vurder Lock i prod når alt er verifisert.')
+param enableImmutability bool = true
 
-@description('Om soft delete skal være på for vaulten. TODO: REVERSER - midlertidig av for å kunne slette vault.')
-param enableSoftDelete bool = false
+@description('Om soft delete skal være på for vaulten.')
+param enableSoftDelete bool = true
 
 @description('Soft delete-retensjon i dager for slettede recovery points.')
 @minValue(1)
@@ -34,9 +34,8 @@ param enableSystemAssignedIdentity bool = true
 param existingBackupPolicyName string = ''
 
 // Ressursnavn bygget opp av namePrefix (som allerede inneholder miljø)
-// TODO: REVERSER - midlertidig v2-navn for testdeploy
-var backupVaultName = '${namePrefix}-backup-vault-v2'
-var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-bkp-pol-v2'
+var backupVaultName = '${namePrefix}-backup-vault'
+var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName : '${namePrefix}-bkp-pol'
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn settes til server-navnet
 // Vi henter server-navnet fra resource ID (siste del)
