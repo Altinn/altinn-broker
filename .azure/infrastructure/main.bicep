@@ -13,6 +13,9 @@ param environment string
 @secure()
 param namePrefix string
 
+@description('Navn på eksisterende backup policy å bruke. Hvis tom, opprettes ny policy.')
+param existingBackupPolicyName string = ''
+
 @secure()
 param migrationsStorageAccountName string
 @secure()
@@ -132,6 +135,18 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     administratorLoginPassword: brokerPgAdminPassword
     tenantId: tenantId
     environment: environment
+  }
+}
+
+module postgresBackupVault '../modules/postgreSql/backupVault.bicep' = {
+  scope: resourceGroup
+  name: 'postgres-backup-vault'
+  params: {
+    namePrefix: namePrefix
+    environment: environment
+    location: location
+    pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
+    existingBackupPolicyName: existingBackupPolicyName
   }
 }
 
