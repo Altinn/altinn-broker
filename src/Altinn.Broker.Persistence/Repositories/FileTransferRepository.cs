@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
@@ -801,14 +801,15 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     }
 
 
-    public async Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, CancellationToken cancellationToken)
+    public async Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
             "SELECT file_transfer_id_pk " +
             "FROM broker.file_transfer " +
-            "WHERE resource_id = @resourceId");
+            "WHERE resource_id = @resourceId AND created < @minAge");
 
         command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@minAge", minAge);
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
