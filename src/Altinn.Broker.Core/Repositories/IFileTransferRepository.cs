@@ -33,7 +33,6 @@ public interface IFileTransferRepository
     Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken);
 
     Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken);
-    Task<List<Guid>> GetFileTransfersByPropertyTag(string resourceId, string propertyKey, string propertyValue, CancellationToken cancellationToken);
     Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken);
     Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken);
 }
