@@ -26,8 +26,8 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task GetFileTransfersByResourceId_ReturnsOnlyTransfersOlderThanMinAgeForResource()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var otherResourceId = "different-resource";
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var otherResourceId = $"different-resource-{Guid.NewGuid()}";
 
 		var now = DateTimeOffset.UtcNow;
 		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
@@ -53,7 +53,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task GetFileTransfersByResourceId_NoMatches_ReturnsEmptyList()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
 		var now = DateTimeOffset.UtcNow;
 		var newCreated = now.Subtract(TimeSpan.FromDays(1));
 		var minAge = now.Subtract(TimeSpan.FromDays(10));
@@ -72,7 +72,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task HardDeleteFileTransfersByIds_DeletesSpecifiedTransfers()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
 		var keepId = await InsertFileTransfer(resourceId);
 		var deleteId1 = await InsertFileTransfer(resourceId);
 		var deleteId2 = await InsertFileTransfer(resourceId);
@@ -95,7 +95,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task HardDeleteFileTransfersByIds_EmptyList_ReturnsZero()
 	{
 		// Arrange
-		var id = await InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
+		var id = await InsertFileTransfer($"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}");
 
 		// Act
 		var deletedCount = await _repository.HardDeleteFileTransfersByIds(Array.Empty<Guid>(), cancellationToken: default);
@@ -109,8 +109,8 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task CleanupOldFilesByResourceId_OnlyDeletesOldFilesForResource()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var otherResourceId = "different-resource";
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var otherResourceId = $"different-resource-{Guid.NewGuid()}";
 
 		var now = DateTimeOffset.UtcNow;
 		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
@@ -138,8 +138,8 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task GetFileTransfersByResourceId_DifferentResourceId_ReturnsEmpty()
 	{
 		// Arrange
-		var resourceId1 = TestConstants.RESOURCE_FOR_TEST;
-		var resourceId2 = "different-resource";
+		var resourceId1 = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var resourceId2 = $"different-resource-{Guid.NewGuid()}";
 		var now = DateTimeOffset.UtcNow;
 		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
 		var minAge = now;
