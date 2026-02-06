@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
@@ -801,41 +801,15 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     }
 
 
-    public async Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, CancellationToken cancellationToken)
+    public async Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
             "SELECT file_transfer_id_pk " +
             "FROM broker.file_transfer " +
-            "WHERE resource_id = @resourceId");
+            "WHERE resource_id = @resourceId AND created < @minAge");
 
         command.Parameters.AddWithValue("@resourceId", resourceId);
-
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
-        {
-            var fileTransferIds = new List<Guid>();
-
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
-                fileTransferIds.Add(fileTransferId);
-            }
-
-            return fileTransferIds;
-        }, cancellationToken);
-    }
-
-    public async Task<List<Guid>> GetFileTransfersByPropertyTag(string resourceId, string propertyKey, string propertyValue, CancellationToken cancellationToken)
-    {
-        await using var command = dataSource.CreateCommand(
-            "SELECT f.file_transfer_id_pk " +
-            "FROM broker.file_transfer f " +
-            "INNER JOIN broker.file_transfer_property p ON p.file_transfer_id_fk = f.file_transfer_id_pk " +
-            "WHERE f.resource_id = @resourceId AND p.key = @propertyKey AND p.value = @propertyValue");
-
-        command.Parameters.AddWithValue("@resourceId", resourceId);
-        command.Parameters.AddWithValue("@propertyKey", propertyKey);
-        command.Parameters.AddWithValue("@propertyValue", propertyValue);
+        command.Parameters.AddWithValue("@minAge", minAge);
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
