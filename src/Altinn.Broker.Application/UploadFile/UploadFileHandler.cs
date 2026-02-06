@@ -106,25 +106,23 @@ public class UploadFileHandler(
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);
-        }
-        return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
+        }        
+        
+        await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
+        if (storageProvider.Type == StorageProviderType.Altinn3Azure && !hostEnvironment.IsDevelopment())
         {
-            await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
-            if (storageProvider.Type == StorageProviderType.Altinn3Azure && !hostEnvironment.IsDevelopment())
+            await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+        }
+        else
+        {
+            await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
             }
-            else
-            {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published);
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-                foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-                {
-                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
-                }
-            }
-            return fileTransfer.FileTransferId;
-        }, logger, cancellationToken);
+        }
+        return fileTransfer.FileTransferId;
     }
 }
