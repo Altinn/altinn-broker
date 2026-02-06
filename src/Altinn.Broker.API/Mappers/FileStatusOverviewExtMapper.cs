@@ -11,26 +11,33 @@ internal static class FileTransferStatusOverviewExtMapper
 {
     internal static FileTransferOverviewExt MapToExternalModel(FileTransferEntity fileTransfer, List<FileTransferStatusEntity> fileTransferEvents)
     {
+        var overview = new FileTransferOverviewExt();
+        MapBaseProperties(fileTransfer, fileTransferEvents, overview);
+        return overview;
+    }
+
+    internal static T MapBaseProperties<T>(FileTransferEntity fileTransfer, List<FileTransferStatusEntity> fileTransferEvents, T target) where T : FileTransferOverviewExt
+    {
         var publishedEvent = fileTransferEvents.FirstOrDefault(e => e.Status == FileTransferStatus.Published);
-        return new FileTransferOverviewExt()
-        {
-            ResourceId = fileTransfer.ResourceId,
-            FileTransferSize = fileTransfer.FileTransferSize,
-            FileTransferId = fileTransfer.FileTransferId,
-            FileName = fileTransfer.FileName,
-            FileTransferStatus = MapToExternalEnum(fileTransfer.FileTransferStatusEntity.Status),
-            Sender = fileTransfer.Sender.ActorExternalId,
-            FileTransferStatusChanged = fileTransfer.FileTransferStatusChanged,
-            FileTransferStatusText = MapToFileTransferStatusText(fileTransfer.FileTransferStatusEntity),
-            PropertyList = fileTransfer.PropertyList,
-            Published = publishedEvent?.Date,
-            Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses),
-            SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
-            Created = fileTransfer.Created,
-            ExpirationTime = fileTransfer.ExpirationTime,
-            Checksum = fileTransfer.Checksum,
-            UseVirusScan = fileTransfer.UseVirusScan
-        };
+        
+        target.ResourceId = fileTransfer.ResourceId;
+        target.FileTransferSize = fileTransfer.FileTransferSize;
+        target.FileTransferId = fileTransfer.FileTransferId;
+        target.FileName = fileTransfer.FileName;
+        target.FileTransferStatus = MapToExternalEnum(fileTransfer.FileTransferStatusEntity.Status);
+        target.Sender = fileTransfer.Sender.ActorExternalId;
+        target.FileTransferStatusChanged = fileTransfer.FileTransferStatusChanged;
+        target.FileTransferStatusText = MapToFileTransferStatusText(fileTransfer.FileTransferStatusEntity);
+        target.PropertyList = fileTransfer.PropertyList;
+        target.Published = publishedEvent?.Date;
+        target.Recipients = MapToRecipients(fileTransfer.RecipientCurrentStatuses);
+        target.SendersFileTransferReference = fileTransfer.SendersFileTransferReference;
+        target.Created = fileTransfer.Created;
+        target.ExpirationTime = fileTransfer.ExpirationTime;
+        target.Checksum = fileTransfer.Checksum;
+        target.UseVirusScan = fileTransfer.UseVirusScan;
+        
+        return target;
     }
 
     internal static FileTransferStatusExt MapToExternalEnum(FileTransferStatus domainEnum)

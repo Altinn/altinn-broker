@@ -8,27 +8,14 @@ internal static class FileTransferStatusDetailsExtMapper
 {
     internal static FileTransferStatusDetailsExt MapToExternalModel(FileTransferEntity fileTransfer, List<FileTransferStatusEntity> fileTransferEvents, List<ActorFileTransferStatusEntity> actorEvents)
     {
-        var fileTransferOverview = FileTransferStatusOverviewExtMapper.MapToExternalModel(fileTransfer, fileTransferEvents);
-        return new FileTransferStatusDetailsExt()
-        {
-            FileTransferId = fileTransfer.FileTransferId,
-            ResourceId = fileTransfer.ResourceId,
-            Checksum = fileTransferOverview.Checksum,
-            UseVirusScan = fileTransferOverview.UseVirusScan,
-            FileName = fileTransferOverview.FileName,
-            Sender = fileTransferOverview.Sender,
-            FileTransferStatus = fileTransferOverview.FileTransferStatus,
-            FileTransferStatusChanged = fileTransferOverview.FileTransferStatusChanged,
-            FileTransferStatusText = fileTransferOverview.FileTransferStatusText,
-            PropertyList = fileTransferOverview.PropertyList,
-            Recipients = fileTransferOverview.Recipients,
-            SendersFileTransferReference = fileTransferOverview.SendersFileTransferReference,
-            Created = fileTransfer.Created,
-            ExpirationTime = fileTransferOverview.ExpirationTime,
-            FileTransferStatusHistory = MapToFileTransferStatusHistoryExt(fileTransferEvents),
-            RecipientFileTransferStatusHistory = MapToRecipientEvents(actorEvents)
-        };
-
+        var details = new FileTransferStatusDetailsExt();
+        
+        FileTransferStatusOverviewExtMapper.MapBaseProperties(fileTransfer, fileTransferEvents, details);
+        
+        details.FileTransferStatusHistory = MapToFileTransferStatusHistoryExt(fileTransferEvents);
+        details.RecipientFileTransferStatusHistory = MapToRecipientEvents(actorEvents);
+        
+        return details;
     }
 
     public static List<FileTransferStatusEventExt> MapToFileTransferStatusHistoryExt(List<FileTransferStatusEntity> fileTransferHistory) => fileTransferHistory.Select(entity => new FileTransferStatusEventExt()
