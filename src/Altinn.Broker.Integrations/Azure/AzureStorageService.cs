@@ -5,10 +5,12 @@ using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 
 using Azure;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -16,15 +18,35 @@ using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, ILogger<AzureStorageService> logger) : IBrokerStorageService
+public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
     private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
+        if (hostEnvironment.IsDevelopment())
+        {
+            return new BlobServiceClient(AzureConstants.AzuriteUrl).GetBlobContainerClient("brokerfiles");
+        }
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
-        var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
-        var blobServiceClient = new BlobServiceClient(connectionString);
+        var connectionString = GetStorageConnectionString(storageProvider);
+        var storageUri = new Uri(connectionString);
+        var blobServiceClient = new BlobServiceClient(storageUri, new DefaultAzureCredential(), new BlobClientOptions()
+        {
+            Retry =
+                {
+                    NetworkTimeout = TimeSpan.FromHours(1),
+                }
+        });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         return containerClient;
+    }
+
+    private string GetStorageConnectionString(StorageProviderEntity? storageProviderEntity)
+    {
+        if (storageProviderEntity?.ResourceName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
     }
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
@@ -192,6 +214,58 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             throw;
         }
     }
+        public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connectionString = reportStorageOptions.Value.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("ReportStorageOptions.ConnectionString is not configured");
+            }
+            var blobServiceClient = GetOrCreateBlobServiceClient(connectionString);
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient("reports");
+            await blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            var blobClient = blobContainerClient.GetBlobClient(fileName);
+
+            await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
+
+            logger.LogInformation("Successfully uploaded report file to blob storage: {fileName}", fileName);
+            return blobClient.Uri.ToString();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload report file to blob storage: {fileName}", fileName);
+            throw;
+        }
+    }
+
+    private BlobServiceClient GetOrCreateBlobServiceClient(string connectionString)
+    {
+        var connectionStringParts = connectionString.Split(';');
+        if (connectionStringParts.Any(connectionStringPart => connectionStringPart.StartsWith("AccountName="))) // Using Broker's storage account
+        {
+            var storageResourceName = GetAccountNameFromConnectionString(connectionString) ?? throw new Exception("Failed to extract AccountName from connection string");
+            var storageUri = new Uri($"https://{storageResourceName}.blob.core.windows.net");
+            return new BlobServiceClient(storageUri, new DefaultAzureCredential());
+        }
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        return blobServiceClient;
+    }
+
+    public static string? GetAccountNameFromConnectionString(string connectionString)
+    {
+        var parts = connectionString.Split(';');
+        foreach (var part in parts)
+        {
+            if (part.StartsWith("AccountName="))
+            {
+                return part.Substring("AccountName=".Length);
+            }
+        }
+        return null;
+    }
+
     public async Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(fileTransferEntity.Checksum))

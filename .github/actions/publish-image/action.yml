@@ -13,6 +13,10 @@ inputs:
     description: "GitHub token"
     required: true
     default: ${{ github.token }}
+  dockerfile:
+    description: "Dockerfile to use when building the image"
+    required: false
+    default: Dockerfile
 
 runs:
   using: "composite"
@@ -30,5 +34,5 @@ runs:
       run: |
         # Construct the image tag using the Git hash
         IMAGE="${{ inputs.dockerImageBaseName }}:${{ inputs.imageTag }}"
-        docker build . --tag $IMAGE
+        docker build . -f "${{ inputs.dockerfile }}" --tag "$IMAGE"
         docker push $IMAGE

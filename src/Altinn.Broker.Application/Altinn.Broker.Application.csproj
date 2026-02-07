@@ -8,7 +8,6 @@
    
   <ItemGroup>
     <PackageReference Include="Altinn.Authorization.ProblemDetails" Version="4.0.1" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
     <PackageReference Include="Hangfire.Core" Version="1.8.20" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.7" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.7" />
