@@ -31,6 +31,8 @@ using Microsoft.Extensions.Options;
 namespace Altinn.Broker.Integrations.Azure;
 public class AzureResourceManagerService : IResourceManager
 {
+    private const string FinopsProduct = "formidling";
+    private const string RepositoryUrl = "https://github.com/Altinn/altinn-broker";
     private readonly AzureResourceManagerOptions _resourceManagerOptions;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ArmClient _armClient;
@@ -46,6 +48,22 @@ public class AzureResourceManagerService : IResourceManager
 
     private SubscriptionResource GetSubscription() => _armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{_resourceManagerOptions.SubscriptionId}"));
 
+    private Dictionary<string, string> GetServiceOwnerResourceGroupTags(ServiceOwnerEntity serviceOwnerEntity)
+    {
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["customer_id"] = serviceOwnerEntity.Id,
+            ["env"] = _resourceManagerOptions.Environment,
+            ["finops_environment"] = _resourceManagerOptions.Environment,
+            ["finops_product"] = FinopsProduct,
+            ["finops_serviceownercode"] = serviceOwnerEntity.Name,
+            ["finops_serviceownerorgnr"] = serviceOwnerEntity.Id,
+            ["org"] = serviceOwnerEntity.Name,
+            ["product"] = FinopsProduct,
+            ["repository"] = RepositoryUrl
+        };
+    }
+
     public AzureResourceManagerService(IOptions<AzureResourceManagerOptions> resourceManagerOptions, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostingEnvironment, IBackgroundJobClient backgroundJobClient, ILogger<AzureResourceManagerService> logger)
     {
         _resourceManagerOptions = resourceManagerOptions.Value;
@@ -59,7 +77,7 @@ public class AzureResourceManagerService : IResourceManager
 
     public void CreateStorageProviders(ServiceOwnerEntity serviceOwnerEntity, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Creating storage providers for {serviceOwnerEntity.Name}");
+        _logger.LogInformation("Creating storage providers for {ServiceOwnerName}", serviceOwnerEntity.Name);
         if (_hostEnvironment.IsDevelopment())
         {
             _backgroundJobClient.Enqueue<IServiceOwnerRepository>(service => service.InitializeStorageProvider(serviceOwnerEntity.Id, "Dummy value", StorageProviderType.Altinn3Azure));
@@ -85,13 +103,19 @@ public class AzureResourceManagerService : IResourceManager
         var subscription = GetSubscription();
         var resourceGroupCollection = subscription.GetResourceGroups();
         var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
-        resourceGroupData.Tags.Add("customer_id", serviceOwnerEntity.Id);
+        foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
+        {
+            resourceGroupData.Tags[tag.Key] = tag.Value;
+        }
         var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
 
         // Create or get the storage account
         var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
         storageAccountData.MinimumTlsVersion = "TLS1_2";
-        storageAccountData.Tags.Add("customer_id", serviceOwnerEntity.Id);
+        foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
+        {
+            storageAccountData.Tags[tag.Key] = tag.Value;
+        }
         var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
         var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
         if (virusScan) { 
