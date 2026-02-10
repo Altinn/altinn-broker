@@ -89,6 +89,7 @@ var ipSecurityRestrictions = concat(apimIpRestrictions, EventGridIpRestrictions)
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
   location: location
+  tags: resourceGroup().tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -204,6 +205,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 resource eventgrid_topic 'Microsoft.EventGrid/topics@2022-06-15' = {
   name: '${namePrefix}-malware-scan-event-topic'
   location: location
+  tags: resourceGroup().tags
 }
 
 resource eventgrid_event_subscription 'Microsoft.EventGrid/topics/eventSubscriptions@2022-06-15' = {

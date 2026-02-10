@@ -12,6 +12,7 @@ param principalId string
 resource job 'Microsoft.App/jobs@2024-03-01' = {
   name: name
   location: location
+  tags: resourceGroup().tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

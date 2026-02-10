@@ -8,6 +8,7 @@ param migrationsStorageAccountName string
 resource log_analytics_workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: '${namePrefix}-log'
   location: location
+  tags: resourceGroup().tags
   properties: {
     sku: {
       name: 'PerGB2018'
@@ -19,6 +20,7 @@ resource log_analytics_workspace 'Microsoft.OperationalInsights/workspaces@2023-
 resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
   name: '${namePrefix}-ai'
   location: location
+  tags: resourceGroup().tags
   kind: 'web'
   properties: {
     Application_Type: 'web'
@@ -29,6 +31,7 @@ resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: '${namePrefix}-env'
   location: location
+  tags: resourceGroup().tags
   properties: {
     infrastructureResourceGroup: '${namePrefix}-rg'
     appLogsConfiguration: {
