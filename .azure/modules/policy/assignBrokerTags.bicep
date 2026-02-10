@@ -6,6 +6,7 @@ param userAssignedIdentityName string
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: userAssignedIdentityName
   location: resourceGroup().location
+  tags: resourceGroup().tags
 }
 
 resource brokerTagsAssignment 'Microsoft.Authorization/policyAssignments@2025-03-01' = {

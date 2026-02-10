@@ -13,6 +13,7 @@ var migrationConnectionStringName = 'broker-migration-connection-string'
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-migration-identity'
   location: location
+  tags: resourceGroup().tags
 }
 
 module keyvaultAddReaderRolesMigrationIdentity '../../modules/keyvault/addReaderRoles.bicep' = {
