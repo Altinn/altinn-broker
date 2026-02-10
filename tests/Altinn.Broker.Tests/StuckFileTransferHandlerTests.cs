@@ -41,7 +41,7 @@ public class StuckFileTransferHandlerTests
         monitorLogger.Verify(l => l.Log(
             LogLevel.Information,
             It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, t) => v.ToString() == "Checking for file transfers stuck in upload processing"),
+            It.Is<It.IsAnyType>((v, t) => v.ToString() == "Checking for file transfers stuck in upload processing or upload started"),
             It.IsAny<Exception>(),
             (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
     }
@@ -81,7 +81,7 @@ public class StuckFileTransferHandlerTests
         monitorLogger.Verify(l => l.Log(
             LogLevel.Warning,
             It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, t) => v.ToString() == $"File transfer {fileTransferId} has been stuck in upload processing for more than 15 minutes"),
+            It.Is<It.IsAnyType>((v, t) => v.ToString() == $"File transfer {fileTransferId} has been stuck in UploadProcessing for more than 15 minutes"),
             It.IsAny<Exception>(),
             (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
 
