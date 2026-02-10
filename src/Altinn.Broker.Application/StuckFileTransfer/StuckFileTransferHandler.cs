@@ -24,15 +24,15 @@ public class StuckFileTransferHandler
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Checking for file transfers stuck in upload processing");
-        List<FileTransferStatusEntity> fileTransfersStuckInUploadProcessing = await _fileTransferStatusRepository.GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(
-            FileTransferStatus.UploadProcessing, 
+        _logger.LogInformation("Checking for file transfers stuck in upload processing or upload started");
+        List<FileTransferStatusEntity> stuckFileTransfers = await _fileTransferStatusRepository.GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(
+            new List<FileTransferStatus> { FileTransferStatus.UploadProcessing, FileTransferStatus.UploadStarted }, 
             DateTime.UtcNow.AddMinutes(-_stuckThresholdMinutes), 
             cancellationToken);
 
-        foreach (FileTransferStatusEntity status in fileTransfersStuckInUploadProcessing)
+        foreach (FileTransferStatusEntity status in stuckFileTransfers)
         {
-            _logger.LogWarning("File transfer {fileTransferId} has been stuck in upload processing for more than {thresholdMinutes} minutes", status.FileTransferId, _stuckThresholdMinutes);
+            _logger.LogWarning("File transfer {fileTransferId} has been stuck in {status} for more than {thresholdMinutes} minutes", status.FileTransferId, status.Status, _stuckThresholdMinutes);
             var succesfullNotification = await _slackNotifier.NotifyFileStuckWithStatus(status);
             if (!succesfullNotification)
             {

@@ -90,13 +90,13 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         }, cancellationToken);
     }
 
-    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus statusFilter, DateTime minStatusDate, CancellationToken cancellationToken)
+    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(List<FileTransferStatus> statusFilters, DateTime minStatusDate, CancellationToken cancellationToken)
     {
         var query = @"
             SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, 
                 file_transfer_status_date, file_transfer_status_detailed_description
             FROM broker.file_transfer_status fis
-            WHERE fis.file_transfer_status_description_id_fk = @statusFilter
+            WHERE fis.file_transfer_status_description_id_fk = ANY(@statusFilters)
             AND fis.file_transfer_status_date < @minStatusDate
             AND fis.file_transfer_status_date = (
                 SELECT MAX(file_transfer_status_date)
@@ -105,7 +105,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
             )";
 
         await using var command = dataSource.CreateCommand(query);
-        command.Parameters.AddWithValue("@statusFilter", (int)statusFilter);
+        command.Parameters.AddWithValue("@statusFilters", statusFilters.Select(s => (int)s).ToArray());
         command.Parameters.AddWithValue("@minStatusDate", minStatusDate);
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
