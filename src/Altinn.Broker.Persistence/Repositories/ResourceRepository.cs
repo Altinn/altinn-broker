@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Exceptions;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Helpers;
 
@@ -49,6 +50,10 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             if (await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId) is not null)
             {
                 await CreateResource(resource, cancellationToken);
+            }
+            else 
+            {
+                throw new ServiceOwnerNotConfiguredException(resource.ServiceOwnerId);
             }
         }
         return resource;

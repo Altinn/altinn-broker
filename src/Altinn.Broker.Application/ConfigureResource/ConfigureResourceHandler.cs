@@ -5,6 +5,7 @@ using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Exceptions;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
@@ -19,7 +20,10 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
-        var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        var resource = null as ResourceEntity;
+        try
+        {
+        resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
@@ -28,6 +32,11 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         {
             return Errors.NoAccessToResource;
         };
+        }
+        catch (ServiceOwnerNotConfiguredException)
+        {
+            return Errors.ServiceOwnerHasNotBeenConfigured;
+        }
 
         if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
         {
