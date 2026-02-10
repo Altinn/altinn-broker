@@ -31,7 +31,7 @@ public class StuckFileTransferHandlerTests
         var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         fileTransferStatusRepository.Setup(r => r
-            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<Core.Domain.Enums.FileTransferStatus>(), It.IsAny<DateTime>(), cancellationToken))
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<Core.Domain.Enums.FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
             .ReturnsAsync(new List<FileTransferStatusEntity>());
 
         // Act
@@ -71,7 +71,7 @@ public class StuckFileTransferHandlerTests
             }
         };
         fileTransferStatusRepository.Setup(r => r
-            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<Core.Domain.Enums.FileTransferStatus>(), It.IsAny<DateTime>(), cancellationToken))
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<Core.Domain.Enums.FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
             .ReturnsAsync(stuckfileTransferStatuses);
 
         // Act
