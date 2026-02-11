@@ -3,7 +3,6 @@
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Exceptions;
 using Altinn.Broker.Core.Repositories;
 
 using OneOf;
@@ -13,23 +12,15 @@ public class GetResourceHandler(IResourceRepository resourceRepository) : IHandl
 {
     public async Task<OneOf<ResourceEntity, Error>> Process(string resourceId, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        var resource = null as ResourceEntity;
-        try{
-        resource = await resourceRepository.GetResource(resourceId, cancellationToken);
+        var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.NoAccessToResource;
-        }
-        }catch (ServiceOwnerNotConfiguredException)
-        {
-            return Errors.ServiceOwnerHasNotBeenConfigured;
-        }
-        var serviceOwner = user.GetCallerOrganizationId();
+            return Errors.ResourceHasNotBeenConfigured;
+        };
         if (resource.OrganizationNumber.WithoutPrefix() != user.GetCallerOrganizationId().WithoutPrefix())
         {
             return Errors.NoAccessToResource;
         }
-
         return resource;
     }
 }

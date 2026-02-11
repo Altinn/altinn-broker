@@ -64,7 +64,7 @@ public class InitializeFileTransferHandler(
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.InvalidResourceDefinition;
+            return Errors.ResourceHasNotBeenConfigured;
         }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
