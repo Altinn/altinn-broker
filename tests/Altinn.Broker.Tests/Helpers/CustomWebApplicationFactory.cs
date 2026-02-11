@@ -98,14 +98,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(() => new ResourceEntity
-                {
-                    Id = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER,
-                    Created = DateTime.UtcNow,
-                    ServiceOwnerId = "",
-                    OrganizationNumber = "",
-                });
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
