@@ -23,7 +23,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         var resource = null as ResourceEntity;
         try
         {
-        resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        resource = await resourceRepository.ConfigureResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
