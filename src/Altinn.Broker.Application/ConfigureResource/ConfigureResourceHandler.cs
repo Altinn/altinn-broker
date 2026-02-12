@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -35,14 +35,13 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             {
                 return Errors.NoAccessToResource;
             }
-        try
-        {
-            existingResource = await resourceRepository.ConfigureResource(altinnResource, cancellationToken);
-        }
-        catch (ServiceOwnerNotConfiguredException)
-        {
-            return Errors.ServiceOwnerHasNotBeenConfigured;
-        }
+            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is not null)
+            {
+                existingResource = await resourceRepository.CreateResource(altinnResource, cancellationToken);
+            }else 
+            {
+                return Errors.ServiceOwnerHasNotBeenConfigured;
+            }
         }else {
             if (existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
             {

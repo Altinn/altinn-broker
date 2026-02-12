@@ -1,5 +1,4 @@
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Exceptions;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Helpers;
 
@@ -41,21 +40,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         }
         return resource;
     }
-
-    public async Task<ResourceEntity?> ConfigureResource(ResourceEntity? resource, CancellationToken cancellationToken)
-    {
-            if (await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId) is not null)
-            {
-                await CreateResource(resource, cancellationToken);
-            }
-            else 
-            {
-                throw new ServiceOwnerNotConfiguredException(resource.ServiceOwnerId);
-            }    
-        return resource;
-    }
     
-    public async Task CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
+    public async Task<ResourceEntity> CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
             "INSERT INTO broker.altinn_resource (resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk) " +
@@ -67,6 +53,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         command.Parameters.AddWithValue("@serviceOwnerId", resource.ServiceOwnerId);
         
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+        return resource;
     }
     
     public async Task UpdateMaxFileTransferSize(string resource, long maxSize, CancellationToken cancellationToken)
