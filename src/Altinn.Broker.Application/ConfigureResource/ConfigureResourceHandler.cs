@@ -15,23 +15,40 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
-        var resource = null as ResourceEntity;
+        
+        
+        var existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        
+        if (existingResource is null)
+        {
+            var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+            if (altinnResource is null || string.IsNullOrWhiteSpace(altinnResource.ServiceOwnerId))
+            {
+                return Errors.InvalidResourceDefinition;
+            }
+            if (altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            {
+                return Errors.NoAccessToResource;
+            }
+        }
+        ResourceEntity? resource;
         try
         {
-        resource = await resourceRepository.ConfigureResource(request.ResourceId, cancellationToken);
-        if (resource is null)
-        {
-            return Errors.InvalidResourceDefinition;
-        }
-        if (resource.ServiceOwnerId is null || resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
-        {
-            return Errors.NoAccessToResource;
-        };
+            resource = await resourceRepository.ConfigureResource(request.ResourceId, cancellationToken);
+            if (resource is null)
+            {
+                return Errors.InvalidResourceDefinition;
+            }
+            
+            if (resource.ServiceOwnerId is null || resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            {
+                return Errors.NoAccessToResource;
+            }
         }
         catch (ServiceOwnerNotConfiguredException)
         {
