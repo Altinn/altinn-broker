@@ -110,6 +110,30 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     PurgeFileTransferAfterAllRecipientsConfirmed = true,
                     PurgeFileTransferGracePeriod = TimeSpan.FromHours(24)
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:313301753",
+                    OrganizationNumber = "313301753",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_CONFIGURED_SERVICEOWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_CONFIGURED_SERVICEOWNER,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_NOT_CONFIGURED, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_NOT_CONFIGURED,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
