@@ -42,15 +42,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         return resource;
     }
 
-    public async Task<ResourceEntity?> ConfigureResource(string resourceId, CancellationToken cancellationToken)
+    public async Task<ResourceEntity?> ConfigureResource(ResourceEntity? resource, CancellationToken cancellationToken)
     {
-        var resource = await GetResource(resourceId, cancellationToken);
-        if (resource is null){ 
-            resource = await altinnResourceRepository.GetResource(resourceId, cancellationToken);
-            if (resource is null || string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
-            {
-                return null;
-            }
             if (await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId) is not null)
             {
                 await CreateResource(resource, cancellationToken);
@@ -58,8 +51,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
             else 
             {
                 throw new ServiceOwnerNotConfiguredException(resource.ServiceOwnerId);
-            }
-        }     
+            }    
         return resource;
     }
     
