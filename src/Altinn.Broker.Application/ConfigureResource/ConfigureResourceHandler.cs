@@ -5,7 +5,6 @@ using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Exceptions;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
