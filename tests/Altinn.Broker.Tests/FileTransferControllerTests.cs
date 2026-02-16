@@ -256,7 +256,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidKeyLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidKeyLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -271,18 +271,19 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidValueLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidValueLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+        string input = new string('A', 3001);
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", input);
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList Value can not be longer than 300", parsedError.Extensions.First().Value.ToString());
+        Assert.Contains("PropertyList Value can not be longer than 3000", parsedError.Extensions.First().Value.ToString());
     }
 
     [Fact]
