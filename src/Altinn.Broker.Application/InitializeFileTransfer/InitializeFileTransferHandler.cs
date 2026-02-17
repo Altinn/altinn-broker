@@ -19,6 +19,7 @@ using OneOf;
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
     IResourceRepository resourceRepository,
+    IAltinnResourceRepository altinnResourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
@@ -82,6 +83,33 @@ public class InitializeFileTransferHandler(
         {
             return Errors.StorageProviderNotReady;
         }
+
+        if (resource.RequiredParty == true)
+        {
+            var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+            if (altinnResource is null)
+            {
+                return Errors.InvalidResourceDefinition;
+            }
+            if (request.SenderExternalId.WithoutPrefix() == altinnResource.ServiceOwnerId.WithoutPrefix())
+            {
+            }
+            else
+            {
+                if (request.RecipientExternalIds.Count > 1)
+                {
+                    return Errors.RequiredPartyInvalidRecipientConfiguration;
+                }
+                
+                if (request.RecipientExternalIds.Count == 0 || 
+                    request.RecipientExternalIds[0].WithoutPrefix() != altinnResource.ServiceOwnerId.WithoutPrefix())
+                {
+                    return Errors.RequiredPartyNotSpecified;
+                }
+            return Errors.RequiredPartyNotSpecified;
+            }
+        }
+
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
