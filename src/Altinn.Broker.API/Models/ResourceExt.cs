@@ -56,7 +56,7 @@ public class ResourceExt
 
     /// <summary>
     /// If the resource requires the service owner party to be subject of the file transfer.
-    /// </summary>>
+    /// </summary>
     [JsonPropertyName("requiredParty")]
     public bool? RequiredParty { get; set; }
 }
