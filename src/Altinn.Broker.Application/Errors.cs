@@ -31,7 +31,7 @@ public static class Errors
     public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
     public static Error ServiceOwnerHasNotBeenConfigured = new Error(24, "The service owner associated with the resource has not been configured.", HttpStatusCode.BadRequest);
     public static Error ResourceHasNotBeenConfigured = new Error(25, "The resource has not been configured.", HttpStatusCode.BadRequest);
-    public static Error RequiredPartyNotSpecified = new Error(26, "The resource requires the service owner party to be specified.", HttpStatusCode.BadRequest);
+    public static Error RequiredPartyNotSpecified = new Error(26, "The resource requires the service owner party to be present as part of the transaction.", HttpStatusCode.BadRequest);
     public static Error RequiredPartyInvalidRecipientConfiguration = new Error(27, "When required party is specified and the required party is not the sender, the number of recipients can only be one", HttpStatusCode.BadRequest);
 }
 
