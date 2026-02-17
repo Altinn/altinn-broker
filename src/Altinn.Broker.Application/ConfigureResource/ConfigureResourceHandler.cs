@@ -92,6 +92,10 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
                 return updateManifestFileShimResult.AsT1;
             }
         }
+        if (request.RequiredParty is not null)
+        {
+            await resourceRepository.UpdateRequiredParty(existingResource.Id, request.RequiredParty.Value, cancellationToken);
+        }
         return Task.CompletedTask;
     }
 

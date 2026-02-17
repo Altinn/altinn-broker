@@ -54,7 +54,8 @@ public class ResourceController : Controller
             PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod,
             UseManifestFileShim = resourceExt.UseManifestFileShim,
             ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
-            ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy
+            ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy,
+            RequiredParty = resourceExt.RequiredParty
         }, HttpContext.User, cancellationToken);
 
         return result.Match(
@@ -93,7 +94,8 @@ public class ResourceController : Controller
                 MaxFileTransferSize = resource.MaxFileTransferSize,
                 PurgeFileTransferAfterAllRecipientsConfirmed = resource.PurgeFileTransferAfterAllRecipientsConfirmed,
                 PurgeFileTransferGracePeriod = resource.PurgeFileTransferGracePeriod.HasValue ? resource.PurgeFileTransferGracePeriod.Value.ToString() : null,
-                UseManifestFileShim = resource.UseManifestFileShim
+                UseManifestFileShim = resource.UseManifestFileShim,
+                RequiredParty = resource.RequiredParty
             }),
             Problem
         );
