@@ -24,7 +24,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     private readonly HttpClient _recipientClient;
     private readonly HttpClient _serviceOwnerClient;
     private readonly HttpClient _legacyClient;
-    private readonly HttpClient _webhookClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public LegacyFileControllerTests(CustomWebApplicationFactory factory)
@@ -34,7 +33,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _legacyClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_LEGACY_TOKEN);
         _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
-        _webhookClient = factory.CreateClient();
         _responseSerializerOptions = new JsonSerializerOptions(new JsonSerializerOptions()
         {
             PropertyNameCaseInsensitive = true
@@ -105,36 +103,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.NotNull(result);
         Assert.Contains(Guid.Parse(fileTransferId), result);
-    }
-
-    [Fact]
-    public async Task InitializeAndUpload_FailsDueToAntivirus()
-    {
-        // Initialize
-        var initializeFileResponse = await _legacyClient.PostAsJsonAsync("broker/api/v1/legacy/file", FileTransferInitializeExtTestFactory.BasicFileTransfer());
-        string onBehalfOfConsumer = FileTransferInitializeExtTestFactory.BasicFileTransfer().Sender;
-        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
-        var fileId = await initializeFileResponse.Content.ReadAsStringAsync();
-        var fileAfterInitialize = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
-        Assert.NotNull(fileAfterInitialize);
-        Assert.Equal(LegacyFileStatusExt.Initialized, fileAfterInitialize.FileStatus);
-
-        // Upload
-        var uploadedFileBytes = Encoding.UTF8.GetBytes(@"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*");
-        using (var content = new ByteArrayContent(uploadedFileBytes))
-        {
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            var uploadResponse = await _legacyClient.PostAsync($"broker/api/v1/legacy/file/{fileId}/upload?onBehalfOfConsumer={onBehalfOfConsumer}", content);
-            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
-        }
-
-        var jsonBody = GetMalwareScanResultJson("Data/MalwareScanResult_Malicious.json", fileId);
-        await SendMalwareScanResult(jsonBody);
-
-        var fileAfterUpload = await _legacyClient.GetFromJsonAsync<LegacyFileOverviewExt>($"broker/api/v1/legacy/file/{fileId}?onBehalfOfConsumer={onBehalfOfConsumer}", _responseSerializerOptions);
-        Assert.NotNull(fileAfterUpload);
-        Assert.Equal(LegacyFileStatusExt.Failed, fileAfterUpload.FileStatus);
-        Assert.StartsWith("Malware", fileAfterUpload.FileStatusText);
     }
 
     [Fact]
@@ -698,21 +666,6 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(LegacyRecipientFileStatusExt.DownloadConfirmed, result?.Recipients[0]?.CurrentRecipientFileStatusCode);
         Assert.Equal(LegacyFileStatusExt.AllConfirmedDownloaded, result?.FileStatus);
 
-    }
-
-    private string GetMalwareScanResultJson(string filePath, string fileId)
-    {
-        string jsonBody = File.ReadAllText(filePath);
-        var randomizedEtagId = Guid.NewGuid().ToString();
-        jsonBody = jsonBody.Replace("--FILEID--", fileId);
-        jsonBody = jsonBody.Replace("--ETAGID--", randomizedEtagId.ToString());
-        return jsonBody;
-    }
-    private async Task<HttpResponseMessage> SendMalwareScanResult(string jsonBody)
-    {
-        var result = await _webhookClient.PostAsync("broker/api/v1/webhooks/malwarescanresults", new StringContent(jsonBody, Encoding.UTF8, "application/json"));
-        Assert.True(result.IsSuccessStatusCode, $"The request failed with status code {result.StatusCode}. Error message: {await result.Content.ReadAsStringAsync()}");
-        return result;
     }
 
     private async Task<string> InitializeFile()

@@ -12,4 +12,5 @@ public interface IResourceRepository
     Task UpdateUseManifestFileShim(string resourceId, bool useManifestFileShim, CancellationToken cancellationToken = default);
     Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default);
     Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
+    Task UpdateRequiredParty(string resourceId, bool requiredParty, CancellationToken cancellationToken = default);
 }

@@ -4,8 +4,10 @@ using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services.Enums;
 
@@ -13,6 +15,7 @@ using Hangfire;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -28,6 +31,8 @@ public class UploadFileHandler(
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
+    IOptions<GeneralSettings> generalSettings,
+    MalwareScanningResultHandler malwareScanResultHandler,
     ILogger<UploadFileHandler> logger) : IHandler<UploadFileRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(UploadFileRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -109,14 +114,14 @@ public class UploadFileHandler(
         }        
         
         await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
-        if (storageProvider.Type == StorageProviderType.Altinn3Azure && !hostEnvironment.IsDevelopment())
-        {
+        
             await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-        }
-        else
+        
+
+        if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
         {
-            await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, cancellationToken: cancellationToken);
+            await SimulateMalwareScanResult(request.FileTransferId);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
             {
@@ -125,4 +130,46 @@ public class UploadFileHandler(
         }
         return fileTransfer.FileTransferId;
     }
+
+
+
+        /// <summary>
+        /// Simulates a malware scan result for local development and tests by calling the MalwareScanResultHandler with fake ScanResultData.
+        /// </summary>
+        public async Task SimulateMalwareScanResult(Guid fileTransferId)
+        {
+            if (!hostEnvironment.IsDevelopment())
+            {
+                logger.LogWarning("SimulateMalwareScanResult called outside development environment");
+                return;
+            }
+
+            logger.LogInformation("Simulating malware scan result for filetransfer {fileTransferId}", fileTransferId);
+
+            var simulatedScanResult = new ScanResultData
+            {
+                BlobUri = $"http://127.0.0.1:10000/devstoreaccount1/filetransfer/{fileTransferId}",
+                CorrelationId = Guid.NewGuid(),
+                ETag = "simulated-etag",
+                ScanFinishedTimeUtc = DateTime.UtcNow,
+                ScanResultDetails = new ScanResultDetails
+                {
+                    MalwareNamesFound = new List<string>(),
+                    Sha256 = "simulated-sha256"
+                },
+                ScanResultType = "No threats found"
+            };
+
+            var result = await malwareScanResultHandler.Process(simulatedScanResult, null, CancellationToken.None);
+
+            if (result.IsT0)
+            {
+                logger.LogInformation("Successfully simulated malware scan result for filetransfer {fileTransferId} using MalwareScanResultHandler", fileTransferId);
+            }
+            else
+            {
+                var error = result.AsT1;
+                logger.LogError("Error in simulated malware scan result for filetransfer {fileTransferId}: {Error}", fileTransferId, error.Message);
+            }
+        }
 }
