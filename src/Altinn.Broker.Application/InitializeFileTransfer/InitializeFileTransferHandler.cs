@@ -106,7 +106,6 @@ public class InitializeFileTransferHandler(
                 {
                     return Errors.RequiredPartyNotSpecified;
                 }
-            return Errors.RequiredPartyNotSpecified;
             }
         }
 
