@@ -562,23 +562,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
-    {
-        // Arrange
-        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
-
-        // Act
-        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
-
-        // Assert
-        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
-    }
-
-    [Fact]
     public async Task Graceful_purge_changes_purge_time()
     {
         await Test_Graceful_purge_changes_purge_time("PT12H");

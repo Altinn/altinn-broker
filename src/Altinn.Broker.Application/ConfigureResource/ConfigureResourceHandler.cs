@@ -14,28 +14,47 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
-        var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
-        if (resource is null)
+        
+        
+        ResourceEntity? existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        
+        if (existingResource is null)
         {
-            return Errors.InvalidResourceDefinition;
+            var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+            if (altinnResource is null || string.IsNullOrWhiteSpace(altinnResource.ServiceOwnerId))
+            {
+                return Errors.InvalidResourceDefinition;
+            }
+            if (altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            {
+                return Errors.NoAccessToResource;
+            }
+            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is not null)
+            {
+                existingResource = await resourceRepository.CreateResource(altinnResource, cancellationToken);
+            }else 
+            {
+                return Errors.ServiceOwnerHasNotBeenConfigured;
+            }
+        }else {
+            if (existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            {
+                return Errors.NoAccessToResource;
+            }
         }
-        if (resource.ServiceOwnerId is null || resource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
-        {
-            return Errors.NoAccessToResource;
-        };
 
         if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
         {
-            await resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(resource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
+            await resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(existingResource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
         }
         if (request.PurgeFileTransferGracePeriod is not null)
         {
-            var updatePurgeFileTransferGracePeriodResult = await UpdatePurgeFileTransferGracePeriod(resource, request.PurgeFileTransferGracePeriod, cancellationToken);
+            var updatePurgeFileTransferGracePeriodResult = await UpdatePurgeFileTransferGracePeriod(existingResource, request.PurgeFileTransferGracePeriod, cancellationToken);
             if (updatePurgeFileTransferGracePeriodResult.IsT1)
             {
                 return updatePurgeFileTransferGracePeriodResult.AsT1;
@@ -43,7 +62,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         }
         if (request.MaxFileTransferSize is not null)
         {
-            var updateMaxFileTransferSizeResult = await UpdateMaxFileTransferSize(resource, request.MaxFileTransferSize.Value, cancellationToken);
+            var updateMaxFileTransferSizeResult = await UpdateMaxFileTransferSize(existingResource, request.MaxFileTransferSize.Value, cancellationToken);
             if (updateMaxFileTransferSizeResult.IsT1)
             {
                 return updateMaxFileTransferSizeResult.AsT1;
@@ -51,7 +70,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         }
         if (request.FileTransferTimeToLive is not null)
         {
-            var updateFileTransferTimeToLiveResult = await UpdateFileTransferTimeToLive(resource, request.FileTransferTimeToLive, cancellationToken);
+            var updateFileTransferTimeToLiveResult = await UpdateFileTransferTimeToLive(existingResource, request.FileTransferTimeToLive, cancellationToken);
             if (updateFileTransferTimeToLiveResult.IsT1)
             {
                 return updateFileTransferTimeToLiveResult.AsT1;
@@ -59,15 +78,15 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IH
         }
         if (request.ExternalServiceCodeLegacy is not null)
         {
-            await resourceRepository.UpdateExternalServiceCodeLegacy(resource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+            await resourceRepository.UpdateExternalServiceCodeLegacy(existingResource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
         }
         if (request.ExternalServiceEditionCodeLegacy is not null)
         {
-            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(resource.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
+            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(existingResource.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
         }
         if (request.UseManifestFileShim is not null)
         {
-            var updateManifestFileShimResult = await UpdateUseManifestFileShim(resource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy, cancellationToken);   
+            var updateManifestFileShimResult = await UpdateUseManifestFileShim(existingResource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy, cancellationToken);   
             if (updateManifestFileShimResult.IsT1)
             {
                 return updateManifestFileShimResult.AsT1;

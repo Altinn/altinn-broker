@@ -495,6 +495,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task DownloadZipFile_WithManifestShimEnabled_ManifestIsAdded()
     {
         // Arrange
+        var configureResourceResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_MANIFEST_SHIM}", new ResourceExt
+        {
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "4192",
+            ExternalServiceEditionCodeLegacy = 270815
+        });
+        Assert.True(configureResourceResponse.IsSuccessStatusCode, await configureResourceResponse.Content.ReadAsStringAsync());
+        
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -520,6 +528,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task DownloadEmptyZipFile_WithManifestShimEnabled_ManifestIsAdded()
     {
         // Arrange
+        var configureResourceResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_MANIFEST_SHIM}", new ResourceExt
+        {
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "4192",
+            ExternalServiceEditionCodeLegacy = 270815
+        });
+        Assert.True(configureResourceResponse.IsSuccessStatusCode, await configureResourceResponse.Content.ReadAsStringAsync());
+        
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -545,6 +561,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task DownloadNotAZipFile_WithManifestShimEnabled_Exception()
     {
         // Arrange
+        var configureResourceResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_MANIFEST_SHIM}", new ResourceExt
+        {
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "4192",
+            ExternalServiceEditionCodeLegacy = 270815
+        });
+        Assert.True(configureResourceResponse.IsSuccessStatusCode, await configureResourceResponse.Content.ReadAsStringAsync());
+        
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -585,6 +609,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task ZipFile_WithManifestShimEnabled_NoManifestWithNonLegacyApi()
     {
         // Arrange
+        var configureResourceResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_MANIFEST_SHIM}", new ResourceExt
+        {
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "4192",
+            ExternalServiceEditionCodeLegacy = 270815
+        });
+        Assert.True(configureResourceResponse.IsSuccessStatusCode, await configureResourceResponse.Content.ReadAsStringAsync());
+        
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
@@ -607,6 +639,14 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     public async Task ConfirmNotDownloadedFile_PermittedInLegacyNotInA3()
     {
         // Arrange
+        var configureResourceResponse = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_MANIFEST_SHIM}", new ResourceExt
+        {
+            UseManifestFileShim = true,
+            ExternalServiceCodeLegacy = "4192",
+            ExternalServiceEditionCodeLegacy = 270815
+        });
+        Assert.True(configureResourceResponse.IsSuccessStatusCode, await configureResourceResponse.Content.ReadAsStringAsync());
+        
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_ManifestShim();
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());

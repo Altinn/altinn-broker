@@ -15,14 +15,12 @@ public class GetResourceHandler(IResourceRepository resourceRepository) : IHandl
         var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.NoAccessToResource;
-        }
-        var serviceOwner = user.GetCallerOrganizationId();
+            return Errors.ResourceHasNotBeenConfigured;
+        };
         if (resource.OrganizationNumber.WithoutPrefix() != user.GetCallerOrganizationId().WithoutPrefix())
         {
             return Errors.NoAccessToResource;
         }
-
         return resource;
     }
 }
