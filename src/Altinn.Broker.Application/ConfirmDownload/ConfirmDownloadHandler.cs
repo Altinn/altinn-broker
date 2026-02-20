@@ -92,15 +92,10 @@ public class ConfirmDownloadHandler(
                         FileTransferId = request.FileTransferId,
                         PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
                     }, null, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
-                    backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Old expiry job
                 }
             }
             return Task.CompletedTask;
         }, logger, cancellationToken);
-        if (hostEnvironment.IsDevelopment() && shouldConfirmAll && resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
-        {
-            backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction in unit tests to avoid issue with Hangfire distributed lock implementation
-        }
         return Task.CompletedTask;
     }
 }
