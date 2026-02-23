@@ -515,30 +515,20 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     public async Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         string commandString = @"
-            SELECT DISTINCT f.file_transfer_id_pk, f.created
+            SELECT f.file_transfer_id_pk, f.created
             FROM broker.file_transfer f
-            INNER JOIN LATERAL (
-                SELECT afs.actor_file_transfer_status_description_id_fk 
-                FROM broker.actor_file_transfer_status afs 
-                WHERE afs.file_transfer_id_fk = f.file_transfer_id_pk AND afs.actor_id_fk = @recipientId 
-                ORDER BY afs.actor_file_transfer_status_description_id_fk desc 
-                LIMIT 1
-            ) AS recipientfilestatus ON true
-            INNER JOIN LATERAL (
-                SELECT fs.file_transfer_status_description_id_fk 
-                FROM broker.file_transfer_status fs 
-                WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk 
-                ORDER BY fs.file_transfer_status_id_pk desc 
-                LIMIT 1 
-            ) AS filestatus ON true
-            WHERE actor_file_transfer_status_description_id_fk = @recipientFileStatus AND resource_id = @resourceId
+            INNER JOIN broker.actor_file_transfer_latest_status afls
+                ON afls.file_transfer_id_fk = f.file_transfer_id_pk
+            WHERE afls.actor_id_fk = @recipientId
+              AND afls.latest_actor_status_id = @recipientFileStatus
+              AND f.resource_id = @resourceId
             {0}
             {1}
-            ORDER BY created {2}
+            ORDER BY f.created {2}
             LIMIT 100;";
 
         string statusCondition = fileTransferSearch.Status.HasValue
-            ? "AND file_transfer_status_description_id_fk = @fileStatus"
+            ? "AND f.latest_file_status_id = @fileStatus"
             : "";
 
         string dateCondition = "";
