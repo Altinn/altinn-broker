@@ -156,8 +156,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
                         ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
                     },
-                    RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
-                    PropertyList = await GetMetadata(fileTransferId, cancellationToken),
+                    RecipientCurrentStatuses = [],
+                    PropertyList = new Dictionary<string, string>(),
                     UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
                 };
 
@@ -165,7 +165,15 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 EnrichLogs(fileTransfer);
             }
 
-            return fileTransferEntities;
+        for(var i = 0; i < fileTransferEntities.Count; i++)
+        {
+            var currentFileTransfer = fileTransferEntities[i];
+            currentFileTransfer.RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(currentFileTransfer.FileTransferId, cancellationToken);
+            currentFileTransfer.PropertyList = await GetMetadata(currentFileTransfer.FileTransferId, cancellationToken);
+            fileTransferEntities[i] = currentFileTransfer;
+        }
+
+        return fileTransferEntities;
     }
 
     public async Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
