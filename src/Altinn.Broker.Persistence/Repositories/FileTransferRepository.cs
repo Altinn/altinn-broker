@@ -57,6 +57,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                                     MAX(file_transfer_status_date) as max_date
                                 FROM 
                                     broker.file_transfer_status 
+                                WHERE 
+                                    file_transfer_id_fk IN (select unnest(@fileTransferIds))
                                 GROUP BY 
                                     file_transfer_id_fk
                             ) fs_max ON fs.file_transfer_id_fk = fs_max.file_transfer_id_fk AND fs.file_transfer_status_date = fs_max.max_date
@@ -127,8 +129,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         };
 
         command.Parameters.Add(parameter);
-            List<FileTransferEntity> fileTransferEntities = new List<FileTransferEntity>();
-            FileTransferEntity? fileTransfer = null;
+        List<FileTransferEntity> fileTransferEntities = new List<FileTransferEntity>();
+        FileTransferEntity? fileTransfer = null;
         logger.LogInformation("Now fetching file transfer overviews for {count} file transfers", fileTransferIds.Count);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -171,6 +173,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         for(var i = 0; i < fileTransferEntities.Count; i++)
         {
             var currentFileTransfer = fileTransferEntities[i];
+            logger.LogInformation("Fetching entities for {fileTransferId}", fileTransfer.FileTransferId);
             currentFileTransfer.RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(currentFileTransfer.FileTransferId, cancellationToken);
             currentFileTransfer.PropertyList = await GetMetadata(currentFileTransfer.FileTransferId, cancellationToken);
             logger.LogInformation("Fetched entities for {fileTransferId}", fileTransfer.FileTransferId);
