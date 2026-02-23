@@ -13,7 +13,7 @@ using Serilog.Context;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository, ExecuteDBCommandWithRetries commandExecutor) : IFileTransferRepository
+public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository) : IFileTransferRepository
 {
     #region constants
     const string overviewCommandMultiple = @"
@@ -124,13 +124,11 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         };
 
         command.Parameters.Add(parameter);
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
-        {
             List<FileTransferEntity> fileTransferEntities = new List<FileTransferEntity>();
             FileTransferEntity? fileTransfer = null;
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
             {
                 var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
                 fileTransfer = new FileTransferEntity
@@ -158,8 +156,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
                         ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
                     },
-                    RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, ct),
-                    PropertyList = await GetMetadata(fileTransferId, ct),
+                    RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
+                    PropertyList = await GetMetadata(fileTransferId, cancellationToken),
                     UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
                 };
 
@@ -168,7 +166,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             }
 
             return fileTransferEntities;
-        }, cancellationToken);
     }
 
     public async Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
@@ -177,49 +174,46 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        FileTransferEntity? fileTransfer = null;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        if (await reader.ReadAsync(cancellationToken))
         {
-            FileTransferEntity? fileTransfer = null;
-
-            await using var reader = await command.ExecuteReaderAsync(ct);
-
-            if (await reader.ReadAsync(ct))
+            fileTransfer = new FileTransferEntity
             {
-                fileTransfer = new FileTransferEntity
+                FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
+                ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                FileName = reader.GetString(reader.GetOrdinal("filename")),
+                Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                FileTransferStatusEntity = new FileTransferStatusEntity()
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
-                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
-                    FileName = reader.GetString(reader.GetOrdinal("filename")),
-                    Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
-                    SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                    HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
-                    FileTransferStatusEntity = new FileTransferStatusEntity()
-                    {
-                        FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
-                        Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                        Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                        DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
-                    },
-                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
-                    FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
-                    FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
-                    Sender = new ActorEntity()
-                    {
-                        ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
-                        ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
-                    },
-                    RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, ct),
-                    PropertyList = await GetMetadata(fileTransferId, ct),
-                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
-                };
+                    Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
+                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
+                },
+                FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                Sender = new ActorEntity()
+                {
+                    ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
+                    ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
+                },
+                RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, cancellationToken),
+                PropertyList = await GetMetadata(fileTransferId, cancellationToken),
+                UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
+            };
 
-                EnrichLogs(fileTransfer);
-            }
+            EnrichLogs(fileTransfer);
+        }
 
-            return fileTransfer;
-        }, cancellationToken);
+        return fileTransfer;
     }
 
     private static void EnrichLogs(FileTransferEntity fileTransferEntity)
@@ -249,28 +243,26 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        
+        var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
         {
-            var fileTransferStatuses = new List<ActorFileTransferStatusEntity>();
-            await using var reader = await command.ExecuteReaderAsync(ct);
-
-            while (await reader.ReadAsync(ct))
+            fileTransferStatuses.Add(new ActorFileTransferStatusEntity()
             {
-                fileTransferStatuses.Add(new ActorFileTransferStatusEntity()
+                FileTransferId = fileTransferId,
+                Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
+                Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
+                Actor = new ActorEntity()
                 {
-                    FileTransferId = fileTransferId,
-                    Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
-                    Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
-                    Actor = new ActorEntity()
-                    {
-                        ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                        ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
-                    }
-                });
-            }
+                    ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
+                    ActorExternalId = reader.GetString(reader.GetOrdinal("actor_external_id"))
+                }
+            });
+        }
 
-            return fileTransferStatuses;
-        }, cancellationToken);
+        return fileTransferStatuses;
     }
 
     public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, bool useVirusScan, CancellationToken cancellationToken = default)
@@ -307,7 +299,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.AddWithValue("@expirationTime", expirationTime);
         command.Parameters.AddWithValue("@useVirusScan", useVirusScan);
 
-        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
 
         await SetMetadata(fileTransferId, propertyList, cancellationToken);
         return fileTransferId;
@@ -384,49 +376,46 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
 
         commandString.AppendLine("ORDER BY f.created ASC;");
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        await using var command = dataSource.CreateCommand(commandString.ToString());
+
+        if (actorIds.Length > 1)
         {
-            await using var command = dataSource.CreateCommand(commandString.ToString());
-
-            if (actorIds.Length > 1)
+            command.Parameters.Add(new NpgsqlParameter("@actorIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
             {
-                command.Parameters.Add(new NpgsqlParameter("@actorIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
-                {
-                    Value = actorIds
-                });
-            }
-            else if (actorIds.Length == 1)
-            {
-                command.Parameters.AddWithValue("@actorId", actorIds[0]);
-            }
+                Value = actorIds
+            });
+        }
+        else if (actorIds.Length == 1)
+        {
+            command.Parameters.AddWithValue("@actorId", actorIds[0]);
+        }
 
-            if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
-            {
-                command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
-            }
+        if (!string.IsNullOrWhiteSpace(fileTransferSearch.ResourceId))
+        {
+            command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
+        }
 
-            if (fileTransferSearch.From.HasValue)
-                command.Parameters.AddWithValue("@from", fileTransferSearch.From);
-            if (fileTransferSearch.To.HasValue)
-                command.Parameters.AddWithValue("@to", fileTransferSearch.To);
-            if (fileTransferSearch.RecipientFileTransferStatus.HasValue &&
-                fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
-                command.Parameters.AddWithValue("@recipientFileTransferStatus",
-                    (int)fileTransferSearch.RecipientFileTransferStatus);
-            if (fileTransferSearch.FileTransferStatus.HasValue)
-                command.Parameters.AddWithValue("@fileTransferStatus",
-                    (int)fileTransferSearch.FileTransferStatus);
+        if (fileTransferSearch.From.HasValue)
+            command.Parameters.AddWithValue("@from", fileTransferSearch.From);
+        if (fileTransferSearch.To.HasValue)
+            command.Parameters.AddWithValue("@to", fileTransferSearch.To);
+        if (fileTransferSearch.RecipientFileTransferStatus.HasValue &&
+            fileTransferSearch.RecipientFileTransferStatus.Value != ActorFileTransferStatus.Initialized)
+            command.Parameters.AddWithValue("@recipientFileTransferStatus",
+                (int)fileTransferSearch.RecipientFileTransferStatus);
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+            command.Parameters.AddWithValue("@fileTransferStatus",
+                (int)fileTransferSearch.FileTransferStatus);
 
-            var fileTransfers = new List<Guid>();
+        var fileTransfers = new List<Guid>();
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(0);
-                fileTransfers.Add(fileTransferId);
-            }
-            return fileTransfers;
-        }, cancellationToken);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var fileTransferId = reader.GetGuid(0);
+            fileTransfers.Add(fileTransferId);
+        }
+        return fileTransfers;
     }
 
     public async Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
@@ -496,19 +485,16 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         if (fileTransferSearch.Status.HasValue)
             command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.Status);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        var files = new List<Guid>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            var files = new List<Guid>();
+            var fileTransferId = reader.GetGuid(0);
+            files.Add(fileTransferId);
+        }
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(0);
-                files.Add(fileTransferId);
-            }
-
-            return files;
-        }, cancellationToken);
+        return files;
     }
 
     public async Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
@@ -569,19 +555,16 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         if (fileTransferSearch.Status.HasValue)
             command.Parameters.AddWithValue("@fileStatus", (int)fileTransferSearch.Status);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        var files = new List<Guid>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            var files = new List<Guid>();
+            var fileTransferId = reader.GetGuid(0);
+            files.Add(fileTransferId);
+        }
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(0);
-                files.Add(fileTransferId);
-            }
-
-            return files;
-        }, cancellationToken);
+        return files;
     }
 
     public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
@@ -598,7 +581,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
             command.Parameters.AddWithValue("@filesize", filesize);
-            await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 
@@ -607,17 +590,14 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         await using var command = dataSource.CreateCommand("SELECT key, value FROM broker.file_transfer_property WHERE file_transfer_id_fk = @filetransferId");
         command.Parameters.AddWithValue("@filetransferId", fileTransferId);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
-        {
-            var metadata = new Dictionary<string, string>();
-            await using var reader = await command.ExecuteReaderAsync(ct);
+        var metadata = new Dictionary<string, string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-            while (await reader.ReadAsync(ct))
-            {
-                metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
-            }
-            return metadata;
-        }, cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            metadata.Add(reader.GetString(reader.GetOrdinal("key")), reader.GetString(reader.GetOrdinal("value")));
+        }
+        return metadata;
     }
 
     private async Task SetMetadata(Guid fileTransferId, Dictionary<string, string> property, CancellationToken cancellationToken)
@@ -665,7 +645,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         {
             command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
             command.Parameters.AddWithValue("@checksum", checksum);
-            await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
     public async Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken)
@@ -678,7 +658,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         {
             command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
             command.Parameters.AddWithValue("@hangfireJobId", hangfireJobId is null ? DBNull.Value : hangfireJobId);
-            await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 
@@ -716,88 +696,85 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
 
         await using var command = dataSource.CreateCommand(query);
         
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
-        {
-            var fileTransfersDict = new Dictionary<Guid, FileTransferEntity>();
-            var serviceOwnerIdsDict = new Dictionary<Guid, string>(); // Store service owner IDs from query
-            await using var reader = await command.ExecuteReaderAsync(ct);
+        var fileTransfersDict = new Dictionary<Guid, FileTransferEntity>();
+        var serviceOwnerIdsDict = new Dictionary<Guid, string>(); // Store service owner IDs from query
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
                 
-                // Get or create file transfer entity
-                if (!fileTransfersDict.TryGetValue(fileTransferId, out var fileTransfer))
+            // Get or create file transfer entity
+            if (!fileTransfersDict.TryGetValue(fileTransferId, out var fileTransfer))
+            {
+                var senderActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk"));
+                var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    
+                // Store service owner ID from query (if available)
+                if (!reader.IsDBNull(reader.GetOrdinal("service_owner_id")))
                 {
-                    var senderActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk"));
-                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    serviceOwnerIdsDict[fileTransferId] = reader.GetString(reader.GetOrdinal("service_owner_id"));
+                }
                     
-                    // Store service owner ID from query (if available)
-                    if (!reader.IsDBNull(reader.GetOrdinal("service_owner_id")))
+                fileTransfer = new FileTransferEntity
+                {
+                    FileTransferId = fileTransferId,
+                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                    FileName = reader.GetString(reader.GetOrdinal("filename")),
+                    Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                    Sender = new ActorEntity
                     {
-                        serviceOwnerIdsDict[fileTransferId] = reader.GetString(reader.GetOrdinal("service_owner_id"));
-                    }
-                    
-                    fileTransfer = new FileTransferEntity
+                        ActorId = senderActorId,
+                        ActorExternalId = senderActorExternalId
+                    },
+                    SendersFileTransferReference = reader.IsDBNull(reader.GetOrdinal("external_file_transfer_reference")) ? null : reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                    FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                    HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                    FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
+                    RecipientCurrentStatuses = new List<ActorFileTransferStatusEntity>(),
+                    FileTransferStatusEntity = new FileTransferStatusEntity
                     {
                         FileTransferId = fileTransferId,
-                        ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
-                        FileName = reader.GetString(reader.GetOrdinal("filename")),
-                        Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
-                        Sender = new ActorEntity
-                        {
-                            ActorId = senderActorId,
-                            ActorExternalId = senderActorExternalId
-                        },
-                        SendersFileTransferReference = reader.IsDBNull(reader.GetOrdinal("external_file_transfer_reference")) ? null : reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                        ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
-                        FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
-                        HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
-                        FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
-                        UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
-                        RecipientCurrentStatuses = new List<ActorFileTransferStatusEntity>(),
-                        FileTransferStatusEntity = new FileTransferStatusEntity
-                        {
-                            FileTransferId = fileTransferId,
-                            Status = FileTransferStatus.UploadStarted, // Default, actual status not needed for report
-                            Date = reader.GetDateTime(reader.GetOrdinal("created"))
-                        },
-                        FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("created")),
-                        PropertyList = new Dictionary<string, string>()
-                    };
+                        Status = FileTransferStatus.UploadStarted, // Default, actual status not needed for report
+                        Date = reader.GetDateTime(reader.GetOrdinal("created"))
+                    },
+                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("created")),
+                    PropertyList = new Dictionary<string, string>()
+                };
                     
-                    fileTransfersDict[fileTransferId] = fileTransfer;
-                }
+                fileTransfersDict[fileTransferId] = fileTransfer;
+            }
                 
-                // Add recipient if present (check for duplicates)
-                if (!reader.IsDBNull(reader.GetOrdinal("recipient_actor_id_pk")))
-                {
-                    var recipientActorId = reader.GetInt64(reader.GetOrdinal("recipient_actor_id_pk"));
-                    var recipientActorExternalId = reader.GetString(reader.GetOrdinal("recipient_actor_external_id"));
-                    var recipientStatus = reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk"));
-                    var recipientDate = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date"));
+            // Add recipient if present (check for duplicates)
+            if (!reader.IsDBNull(reader.GetOrdinal("recipient_actor_id_pk")))
+            {
+                var recipientActorId = reader.GetInt64(reader.GetOrdinal("recipient_actor_id_pk"));
+                var recipientActorExternalId = reader.GetString(reader.GetOrdinal("recipient_actor_external_id"));
+                var recipientStatus = reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk"));
+                var recipientDate = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date"));
                     
-                    // Check if this recipient already exists (avoid duplicates)
-                    if (!fileTransfer.RecipientCurrentStatuses.Any(r => r.Actor.ActorId == recipientActorId))
+                // Check if this recipient already exists (avoid duplicates)
+                if (!fileTransfer.RecipientCurrentStatuses.Any(r => r.Actor.ActorId == recipientActorId))
+                {
+                    fileTransfer.RecipientCurrentStatuses.Add(new ActorFileTransferStatusEntity
                     {
-                        fileTransfer.RecipientCurrentStatuses.Add(new ActorFileTransferStatusEntity
+                        FileTransferId = fileTransferId,
+                        Actor = new ActorEntity
                         {
-                            FileTransferId = fileTransferId,
-                            Actor = new ActorEntity
-                            {
-                                ActorId = recipientActorId,
-                                ActorExternalId = recipientActorExternalId
-                            },
-                            Status = (ActorFileTransferStatus)recipientStatus,
-                            Date = recipientDate
-                        });
-                    }
+                            ActorId = recipientActorId,
+                            ActorExternalId = recipientActorExternalId
+                        },
+                        Status = (ActorFileTransferStatus)recipientStatus,
+                        Date = recipientDate
+                    });
                 }
             }
+        }
             
-            return (fileTransfersDict.Values.ToList(), serviceOwnerIdsDict);
-        }, cancellationToken);
+        return (fileTransfersDict.Values.ToList(), serviceOwnerIdsDict);
     }
 
 
@@ -811,19 +788,16 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         command.Parameters.AddWithValue("@resourceId", resourceId);
         command.Parameters.AddWithValue("@minAge", minAge);
 
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        var fileTransferIds = new List<Guid>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            var fileTransferIds = new List<Guid>();
+            var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+            fileTransferIds.Add(fileTransferId);
+        }
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
-                fileTransferIds.Add(fileTransferId);
-            }
-
-            return fileTransferIds;
-        }, cancellationToken);
+        return fileTransferIds;
     }
 
     public async Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken)
@@ -847,7 +821,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             Value = idsArray
         });
 
-        return await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
@@ -911,38 +885,35 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         await using var command = dataSource.CreateCommand(query);
         command.CommandTimeout = 600;
         
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        var aggregatedData = new List<AggregatedDailySummaryData>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            
+        while (await reader.ReadAsync(cancellationToken))
         {
-            var aggregatedData = new List<AggregatedDailySummaryData>();
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            
-            while (await reader.ReadAsync(ct))
+            aggregatedData.Add(new AggregatedDailySummaryData
             {
-                aggregatedData.Add(new AggregatedDailySummaryData
-                {
-                    Date = reader.GetDateTime(reader.GetOrdinal("report_date")),
-                    Year = reader.GetInt32(reader.GetOrdinal("year")),
-                    Month = reader.GetInt32(reader.GetOrdinal("month")),
-                    Day = reader.GetInt32(reader.GetOrdinal("day")),
-                    ServiceOwnerId = reader.IsDBNull(reader.GetOrdinal("service_owner_id")) 
-                        ? "unknown" 
-                        : reader.GetString(reader.GetOrdinal("service_owner_id")),
-                    ResourceId = reader.IsDBNull(reader.GetOrdinal("resource_id")) 
-                        ? "unknown" 
-                        : reader.GetString(reader.GetOrdinal("resource_id")),
-                    RecipientId = reader.IsDBNull(reader.GetOrdinal("recipient_id")) 
-                        ? "unknown" 
-                        : reader.GetString(reader.GetOrdinal("recipient_id")),
-                    RecipientType = reader.GetInt32(reader.GetOrdinal("recipient_type")),
-                    AltinnVersion = reader.GetInt32(reader.GetOrdinal("altinn_version")),
-                    MessageCount = reader.GetInt32(reader.GetOrdinal("message_count")),
-                    DatabaseStorageBytes = reader.GetInt64(reader.GetOrdinal("database_storage_bytes")),
-                    AttachmentStorageBytes = reader.GetInt64(reader.GetOrdinal("attachment_storage_bytes"))
-                });
-            }
+                Date = reader.GetDateTime(reader.GetOrdinal("report_date")),
+                Year = reader.GetInt32(reader.GetOrdinal("year")),
+                Month = reader.GetInt32(reader.GetOrdinal("month")),
+                Day = reader.GetInt32(reader.GetOrdinal("day")),
+                ServiceOwnerId = reader.IsDBNull(reader.GetOrdinal("service_owner_id")) 
+                    ? "unknown" 
+                    : reader.GetString(reader.GetOrdinal("service_owner_id")),
+                ResourceId = reader.IsDBNull(reader.GetOrdinal("resource_id")) 
+                    ? "unknown" 
+                    : reader.GetString(reader.GetOrdinal("resource_id")),
+                RecipientId = reader.IsDBNull(reader.GetOrdinal("recipient_id")) 
+                    ? "unknown" 
+                    : reader.GetString(reader.GetOrdinal("recipient_id")),
+                RecipientType = reader.GetInt32(reader.GetOrdinal("recipient_type")),
+                AltinnVersion = reader.GetInt32(reader.GetOrdinal("altinn_version")),
+                MessageCount = reader.GetInt32(reader.GetOrdinal("message_count")),
+                DatabaseStorageBytes = reader.GetInt64(reader.GetOrdinal("database_storage_bytes")),
+                AttachmentStorageBytes = reader.GetInt64(reader.GetOrdinal("attachment_storage_bytes"))
+            });
+        }
             
-            return aggregatedData;
-        }, cancellationToken);
+        return aggregatedData;
     }
 }
 
