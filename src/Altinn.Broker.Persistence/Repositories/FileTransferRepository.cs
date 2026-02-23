@@ -5,15 +5,18 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Helpers;
 
+using Microsoft.Extensions.Logging;
+
 using Npgsql;
 
 using NpgsqlTypes;
 
 using Serilog.Context;
+using Serilog.Core;
 
 namespace Altinn.Broker.Persistence.Repositories;
 
-public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository) : IFileTransferRepository
+public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepository actorRepository, ILogger<IFileTransferRepository> logger) : IFileTransferRepository
 {
     #region constants
     const string overviewCommandMultiple = @"
@@ -126,41 +129,41 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.Add(parameter);
             List<FileTransferEntity> fileTransferEntities = new List<FileTransferEntity>();
             FileTransferEntity? fileTransfer = null;
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+        logger.LogInformation("Now fetching file transfer overviews for {count} file transfers", fileTransferIds.Count);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+            fileTransfer = new FileTransferEntity
             {
-                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
-                fileTransfer = new FileTransferEntity
+                FileTransferId = fileTransferId,
+                ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                FileName = reader.GetString(reader.GetOrdinal("filename")),
+                Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
+                FileTransferStatusEntity = new FileTransferStatusEntity()
                 {
                     FileTransferId = fileTransferId,
-                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
-                    FileName = reader.GetString(reader.GetOrdinal("filename")),
-                    Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
-                    SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                    HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
-                    FileTransferStatusEntity = new FileTransferStatusEntity()
-                    {
-                        FileTransferId = fileTransferId,
-                        Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                        Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                        DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
-                    },
-                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
-                    FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
-                    FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
-                    Sender = new ActorEntity()
-                    {
-                        ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
-                        ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
-                    },
-                    RecipientCurrentStatuses = [],
-                    PropertyList = new Dictionary<string, string>(),
-                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
-                };
-
+                    Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
+                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
+                },
+                FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
+                FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                Sender = new ActorEntity()
+                {
+                    ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
+                    ActorExternalId = reader.GetString(reader.GetOrdinal("senderActorExternalReference"))
+                },
+                RecipientCurrentStatuses = [],
+                PropertyList = new Dictionary<string, string>(),
+                UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
+            };
+            logger.LogInformation("Fetched {fileTransferId}", fileTransfer.FileTransferId);
                 fileTransferEntities.Add(fileTransfer);
                 EnrichLogs(fileTransfer);
             }
@@ -170,6 +173,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             var currentFileTransfer = fileTransferEntities[i];
             currentFileTransfer.RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(currentFileTransfer.FileTransferId, cancellationToken);
             currentFileTransfer.PropertyList = await GetMetadata(currentFileTransfer.FileTransferId, cancellationToken);
+            logger.LogInformation("Fetched entities for {fileTransferId}", fileTransfer.FileTransferId);
             fileTransferEntities[i] = currentFileTransfer;
         }
 
