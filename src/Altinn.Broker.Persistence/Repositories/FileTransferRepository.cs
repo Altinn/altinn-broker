@@ -436,11 +436,10 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     public async Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         string recipientSelect = @"
-            SELECT DISTINCT afs.file_transfer_id_fk as file_transfer_id, f.created
-            FROM broker.actor_file_transfer_status afs 
-            INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afs.file_transfer_id_fk
-            INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
-            WHERE afs.actor_id_fk = @actorId AND f.resource_id = @resourceId
+            SELECT DISTINCT afls.file_transfer_id_fk as file_transfer_id, f.created
+            FROM broker.actor_file_transfer_latest_status afls 
+            INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afls.file_transfer_id_fk
+            WHERE afls.actor_id_fk = @actorId AND f.resource_id = @resourceId
             {0}
             {1}";
 
@@ -448,7 +447,6 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             SELECT f.file_transfer_id_pk as file_transfer_id, f.created 
             FROM broker.file_transfer f 
             INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk 
-            INNER JOIN LATERAL (SELECT fs.file_transfer_status_description_id_fk FROM broker.file_transfer_status fs where fs.file_transfer_id_fk = f.file_transfer_id_pk ORDER BY fs.file_transfer_status_id_pk desc LIMIT 1 ) AS filetransferstatus ON true
             WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId
             {0}
             {1}";
@@ -458,7 +456,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
 
 
         string statusCondition = fileTransferSearch.Status.HasValue
-            ? "AND filetransferstatus.file_transfer_status_Description_id_fk = @fileTransferStatus"
+            ? "AND f.latest_file_status_id = @fileTransferStatus"
             : "";
 
         string dateCondition = "";
