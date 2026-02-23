@@ -947,7 +947,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.Null(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
         Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
         j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 

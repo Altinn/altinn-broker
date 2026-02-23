@@ -47,10 +47,7 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
     {
         var ids = request.FileTransferIds ?? [];
         logger.LogInformation("Retrieving file overview for {Transfers} file transfers. Legacy: {Legacy}", ids.Count, request.IsLegacy);
-        var fileTransfers = await TransactionWithRetriesPolicy.Execute(
-        async (cancellationToken) => await fileTransferRepository.GetFileTransfers(ids, cancellationToken),
-             logger,
-             cancellationToken);
+        var fileTransfers = await fileTransferRepository.GetFileTransfers(ids, cancellationToken);
         if (fileTransfers is null)
         {
             return Errors.FileTransferNotFound;
