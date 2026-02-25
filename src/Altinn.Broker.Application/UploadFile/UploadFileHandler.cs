@@ -80,26 +80,27 @@ public class UploadFileHandler(
             return Errors.FileSizeTooBig;
         }
 
-        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
+        var uploadStartedTimestamp = DateTime.UtcNow;  
+        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, cancellationToken: cancellationToken);
 
         try
         {
             var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
+            var finishedUploadTimestamp = DateTime.UtcNow;
             if (checksum is null)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", timestamp: finishedUploadTimestamp, cancellationToken);
                 return Errors.UploadFailed;
             }
             if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum) && !string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Checksum mismatch", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Checksum mismatch", timestamp: finishedUploadTimestamp, cancellationToken);
                 backgroundJobClient.Enqueue(() => brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
             await TransactionWithRetriesPolicy.Execute<Task>(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
                 if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
@@ -114,7 +115,7 @@ public class UploadFileHandler(
             logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", timestamp: DateTime.UtcNow, cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);
