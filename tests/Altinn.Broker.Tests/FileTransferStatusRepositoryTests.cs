@@ -98,6 +98,83 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         Assert.Equal((int)FileTransferStatus.Published, reader.GetInt32(reader.GetOrdinal("latest_file_status_id")));
     }
 
+    [Fact]
+    public async Task InsertFileTransferStatus_WithExplicitTimestamp_StoresGivenTimestamp()
+    {
+        // Arrange
+        var fileTransferId = await CreateFileTransferInDatabase();
+        var explicitTimestamp = new DateTimeOffset(2026, 01, 01, 12, 00, 00, TimeSpan.Zero);
+
+        // Act
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: explicitTimestamp, cancellationToken: default);
+
+        // Assert
+        var (statusId, statusDate) = await GetLatestDenormalizedStatus(fileTransferId);
+        Assert.Equal((int)FileTransferStatus.UploadStarted, statusId);
+        Assert.Equal(explicitTimestamp, statusDate);
+    }
+
+    [Fact]
+    public async Task InsertFileTransferStatus_WhenOlderStatusInsertedLater_DoesNotOverwriteDenormalizedLatest()
+    {
+        // Arrange
+        var fileTransferId = await CreateFileTransferInDatabase();
+        var newerTimestamp = new DateTimeOffset(2026, 01, 01, 12, 00, 10, TimeSpan.Zero);
+        var olderTimestamp = newerTimestamp.AddSeconds(-10);
+
+        // Act
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: newerTimestamp, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: olderTimestamp, cancellationToken: default);
+
+        // Assert
+        var (statusId, statusDate) = await GetLatestDenormalizedStatus(fileTransferId);
+        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusId);
+        Assert.Equal(newerTimestamp, statusDate);
+    }
+
+    [Fact]
+    public async Task InsertFileTransferStatus_WhenSameTimestamp_UsesStatusIdAsTieBreaker()
+    {
+        // Arrange
+        var fileTransferId = await CreateFileTransferInDatabase();
+        var sharedTimestamp = new DateTimeOffset(2026, 01, 01, 12, 30, 00, TimeSpan.Zero);
+
+        // Act
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: sharedTimestamp, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: sharedTimestamp, cancellationToken: default);
+
+        // Assert
+        var (statusIdAfterHigher, statusDateAfterHigher) = await GetLatestDenormalizedStatus(fileTransferId);
+        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusIdAfterHigher);
+        Assert.Equal(sharedTimestamp, statusDateAfterHigher);
+
+        // Act - lower status with same timestamp should not overwrite
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: sharedTimestamp, cancellationToken: default);
+
+        // Assert
+        var (statusIdAfterLower, statusDateAfterLower) = await GetLatestDenormalizedStatus(fileTransferId);
+        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusIdAfterLower);
+        Assert.Equal(sharedTimestamp, statusDateAfterLower);
+    }
+
+    private async Task<(int LatestStatusId, DateTimeOffset LatestStatusDate)> GetLatestDenormalizedStatus(Guid fileTransferId)
+    {
+        await using var command = _dataSource.CreateCommand(
+            "SELECT latest_file_status_id, latest_file_status_date FROM broker.file_transfer WHERE file_transfer_id_pk = @fileTransferId");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+
+        var latestStatusDate = reader.GetDateTime(reader.GetOrdinal("latest_file_status_date"));
+        var latestStatusDateUtc = DateTime.SpecifyKind(latestStatusDate, DateTimeKind.Utc);
+
+        return (
+            reader.GetInt32(reader.GetOrdinal("latest_file_status_id")),
+            new DateTimeOffset(latestStatusDateUtc)
+        );
+    }
+
     private async Task<Guid> CreateFileTransferInDatabase()
     {
         var fileTransferId = Guid.NewGuid();
