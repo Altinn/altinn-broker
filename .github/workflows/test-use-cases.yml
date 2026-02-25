@@ -43,6 +43,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run use case tests
+      id: usecase-test
       if: steps.check-enable.outputs.enabled == 'true'
       uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
       env:
@@ -56,14 +57,14 @@ jobs:
         filename: tests/Altinn.Broker.UseCaseTests/case_initialize.js
 
     - name: Build failure report
-      if: failure() && steps.check-enable.outputs.enabled == 'true'
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
       run: |
           report=":warning: Broker use case test failure :warning: \n"
           report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
           report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "stepreport=$report" >> $GITHUB_ENV
     - name: Report failure to Slack
-      if: failure() && steps.check-enable.outputs.enabled == 'true'
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
       id: slack
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
