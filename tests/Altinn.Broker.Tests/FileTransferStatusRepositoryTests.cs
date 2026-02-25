@@ -30,7 +30,7 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var fileTransferId = await CreateFileTransferInDatabase();
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
 
         // Assert
         await using var command = _dataSource.CreateCommand(
@@ -52,7 +52,7 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var detailedStatus = "Custom detailed status message";
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Failed, detailedStatus, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Failed, timestamp: DateTimeOffset.UtcNow, detailedStatus, cancellationToken: default);
 
         // Assert - Check both the status record and denormalized columns
         await using var statusCommand = _dataSource.CreateCommand(
@@ -80,13 +80,13 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var fileTransferId = await CreateFileTransferInDatabase();
 
         // Act - Insert multiple statuses in sequence
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
         await Task.Delay(50); // Small delay to ensure different timestamps
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
         await Task.Delay(50);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
         await Task.Delay(50);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Published, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Published, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
 
         // Assert - Should have the latest status
         await using var command = _dataSource.CreateCommand(

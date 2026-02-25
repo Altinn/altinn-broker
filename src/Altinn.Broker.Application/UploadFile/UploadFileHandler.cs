@@ -89,12 +89,12 @@ public class UploadFileHandler(
             var finishedUploadTimestamp = DateTime.UtcNow;
             if (checksum is null)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", timestamp: finishedUploadTimestamp, cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "File upload failed and was aborted", cancellationToken);
                 return Errors.UploadFailed;
             }
             if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum) && !string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Checksum mismatch", timestamp: finishedUploadTimestamp, cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "Checksum mismatch", cancellationToken);
                 backgroundJobClient.Enqueue(() => brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
@@ -115,7 +115,7 @@ public class UploadFileHandler(
             logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", timestamp: DateTime.UtcNow, cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, "Error occurred while uploading fileTransfer", cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);
