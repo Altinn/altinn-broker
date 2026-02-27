@@ -1084,4 +1084,39 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.NotNull(parsedResponse);
         Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
     }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRecipientNotInAccessList_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add("0192:999999999");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRecipientInAccessList_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add("0192:311764837");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
 }

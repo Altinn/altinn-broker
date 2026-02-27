@@ -155,7 +155,27 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     OrganizationNumber = "991825827",
                     RequiredParty = true
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_ACCESS_LIST,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                    AccessListEnabled = true
+                });
+            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<string>?)null);
+            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.Is("0192:311764837", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<string> { "gl908ae2-ci9f-481m-9700-1t7brok12345" });
             services.AddSingleton(altinnResourceRepository.Object);
+
+            var altinnRegisterService = new Mock<IAltinnRegisterService>();
+            altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string?)null);
+            altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.Is("gl908ae2-ci9f-481m-9700-1t7brok12345", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("0192:311764837");
+            services.AddSingleton(altinnRegisterService.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
             authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal>(), It.Is<string>(resource => resource == TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
