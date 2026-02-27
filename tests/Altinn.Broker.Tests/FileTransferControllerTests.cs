@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -411,6 +411,73 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Assert
         Assert.Contains(fileTransferId, contentstring);
+    }
+
+    [Fact]
+    public async Task Search_SearchFileTransferWith_Status_From_UsesStatusTimeline()
+    {
+        // Arrange:
+        // A is created before B, but B is published before A.
+        var fileTransferIdA = await InitializeAndAssertBasicFileTransfer();
+        await Task.Delay(1100);
+        var fileTransferIdB = await InitializeAndAssertBasicFileTransfer();
+
+        var fileAInitialized = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdA}", _responseSerializerOptions);
+        var fileBInitialized = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdB}", _responseSerializerOptions);
+        Assert.NotNull(fileAInitialized);
+        Assert.NotNull(fileBInitialized);
+        Assert.True(fileAInitialized.Created < fileBInitialized.Created, "Test setup failed: A must be created before B.");
+
+        await UploadDummyFileTransferAsync(fileTransferIdB);
+        await Task.Delay(1100);
+        await UploadDummyFileTransferAsync(fileTransferIdA);
+
+        var fileBAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdB}", _responseSerializerOptions);
+        var fileAAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdA}", _responseSerializerOptions);
+        Assert.NotNull(fileBAfterUpload);
+        Assert.NotNull(fileAAfterUpload);
+        Assert.Equal(FileTransferStatusExt.Published, fileBAfterUpload.FileTransferStatus);
+        Assert.Equal(FileTransferStatusExt.Published, fileAAfterUpload.FileTransferStatus);
+        Assert.True(fileBAfterUpload.FileTransferStatusChanged < fileAAfterUpload.FileTransferStatusChanged, "Test setup failed: B must be published before A.");
+        Assert.NotNull(fileAAfterUpload.Published);
+        Assert.NotNull(fileBAfterUpload.Published);
+
+        var fromBCreated = fileBInitialized.Created.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromACreated = fileAInitialized.Created.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromAPublished = fileAAfterUpload.Published!.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromBPublished = fileBAfterUpload.Published!.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+
+        // Act + Assert 1: Without status, from=B.created => only B.
+        var searchFromBCreatedWithoutStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&from={fromBCreated}");
+        Assert.True(searchFromBCreatedWithoutStatus.IsSuccessStatusCode, await searchFromBCreatedWithoutStatus.Content.ReadAsStringAsync());
+        var idsFromBCreatedWithoutStatus = await searchFromBCreatedWithoutStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromBCreatedWithoutStatus);
+        Assert.Contains(fileTransferIdB, idsFromBCreatedWithoutStatus);
+        Assert.DoesNotContain(fileTransferIdA, idsFromBCreatedWithoutStatus);
+
+        // Act + Assert 2: Without status, from=A.created => both A and B.
+        var searchFromACreatedWithoutStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&from={fromACreated}");
+        Assert.True(searchFromACreatedWithoutStatus.IsSuccessStatusCode, await searchFromACreatedWithoutStatus.Content.ReadAsStringAsync());
+        var idsFromACreatedWithoutStatus = await searchFromACreatedWithoutStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromACreatedWithoutStatus);
+        Assert.Contains(fileTransferIdA, idsFromACreatedWithoutStatus);
+        Assert.Contains(fileTransferIdB, idsFromACreatedWithoutStatus);
+
+        // Act + Assert 3: With publish status, from=A.published => only A.
+        var searchFromAPublishedWithStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&status=Published&from={fromAPublished}");
+        Assert.True(searchFromAPublishedWithStatus.IsSuccessStatusCode, await searchFromAPublishedWithStatus.Content.ReadAsStringAsync());
+        var idsFromAPublishedWithStatus = await searchFromAPublishedWithStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromAPublishedWithStatus);
+        Assert.Contains(fileTransferIdA, idsFromAPublishedWithStatus);
+        Assert.DoesNotContain(fileTransferIdB, idsFromAPublishedWithStatus);
+
+        // Act + Assert 4: With publish status, from=B.published => both A and B.
+        var searchFromBPublishedWithStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&status=Published&from={fromBPublished}");
+        Assert.True(searchFromBPublishedWithStatus.IsSuccessStatusCode, await searchFromBPublishedWithStatus.Content.ReadAsStringAsync());
+        var idsFromBPublishedWithStatus = await searchFromBPublishedWithStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromBPublishedWithStatus);
+        Assert.Contains(fileTransferIdA, idsFromBPublishedWithStatus);
+        Assert.Contains(fileTransferIdB, idsFromBPublishedWithStatus);
     }
 
     [Fact]
