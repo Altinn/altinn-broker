@@ -60,3 +60,20 @@ INSERT INTO broker.altinn_resource (
     true
 )
 ON CONFLICT (resource_id_pk) DO NOTHING;
+
+INSERT INTO broker.altinn_resource (
+    resource_id_pk,
+    created,
+    max_file_transfer_size,
+    file_transfer_time_to_live,
+    organization_number,
+    service_owner_id_fk
+) VALUES (
+    'ttd-broker-tilgangsliste',
+    NOW(),
+    null,
+    null,
+    '991825827',
+    '0192:991825827'
+)
+ON CONFLICT (resource_id_pk) DO NOTHING;

@@ -51,6 +51,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
                 Id = altinnResourceResponse.Identifier,
                 ServiceOwnerId = TTD_ORGNUMBER.WithPrefix(),
                 OrganizationNumber = TTD_ORGNUMBER,
+                AccessListEnabled = altinnResourceResponse.AccessListMode is "Enabled"
             };
         }
         return new ResourceEntity()
@@ -58,6 +59,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
             Id = altinnResourceResponse.Identifier,
             ServiceOwnerId = altinnResourceResponse.HasCompetentAuthority.Organization.WithPrefix(),
             OrganizationNumber = altinnResourceResponse.HasCompetentAuthority.Organization,
+            AccessListEnabled = altinnResourceResponse.AccessListMode is "Enabled"
         };
     }
 
@@ -83,6 +85,24 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         
         return GetNameOfResourceResponse(altinnResourceResponse);
     }
+
+    public async Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default)
+    {
+        var url = $"resourceregistry/api/v1/access-lists/memberships?resource=urn:altinn:resource:{resourceId}&party={party}";
+        var response = await _client.GetAsync(url, cancellationToken);
+        return response.StatusCode switch
+        {
+            HttpStatusCode.NotFound or HttpStatusCode.NoContent => null,
+            HttpStatusCode.OK => (await response.Content.ReadFromJsonAsync<AccessListMembershipResponse>(cancellationToken: cancellationToken))
+                ?.Data
+                ?.Select(m => m.Party?.Split(":").Last())
+                .OfType<string>()
+                .ToList(),
+            _ => throw new BadHttpRequestException("Failed to get access list from Altinn Resource Registry")
+        };
+    }
+
+    
 
     private string GetNameOfResourceResponse(GetResourceResponse resourceResponse)
     {
