@@ -1121,7 +1121,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task InitializeFileTranfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest()
+    public async Task InitializeFileTransfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest()
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();

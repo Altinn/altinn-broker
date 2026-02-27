@@ -182,7 +182,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string?)null);
             altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.Is("gl908ae2-ci9f-481m-9700-1t7brok12345", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
-                .ReturnsAsync("0192:311764837");
+                .ReturnsAsync("311764837");
             services.AddSingleton(altinnRegisterService.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
