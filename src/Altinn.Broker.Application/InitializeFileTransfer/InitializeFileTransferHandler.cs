@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
@@ -28,6 +29,7 @@ public class InitializeFileTransferHandler(
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
+    IAltinnRegisterService altinnRegisterService,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -83,14 +85,30 @@ public class InitializeFileTransferHandler(
         {
             return Errors.StorageProviderNotReady;
         }
+        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+        if (altinnResource is null)
+        {
+            return Errors.InvalidResourceDefinition;
+        }
+        if (altinnResource.AccessListEnabled)
+        {
+            foreach (var recipient in request.RecipientExternalIds)
+            {
+                var accessList = await altinnResourceRepository.GetAccessListOfResource(request.ResourceId, recipient, cancellationToken);
+                if (accessList is null || accessList.Count == 0)
+                {
+                    return Errors.RecipientNotInAccessList;
+                }
+                var recipientId = await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken);
+                if (recipientId is null || !recipientId.Contains(recipient.WithoutPrefix()))
+                {
+                    return Errors.RecipientNotInAccessList;
+                }
+            }
+        }
 
         if (resource.RequiredParty == true)
         {
-            var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
-            if (altinnResource is null)
-            {
-                return Errors.InvalidResourceDefinition;
-            }
             if (request.SenderExternalId.WithoutPrefix() == altinnResource.ServiceOwnerId.WithoutPrefix())
             {
             }
