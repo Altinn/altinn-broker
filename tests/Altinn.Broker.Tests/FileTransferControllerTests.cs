@@ -1119,4 +1119,22 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.NotNull(parsedResponse);
         Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
     }
+
+    [Fact]
+    public async Task InitializeFileTranfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add("0192:311764837");
+        file.Recipients.Add("0192:999999999");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
+    }
 }
