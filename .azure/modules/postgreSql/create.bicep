@@ -59,16 +59,15 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
       tenantId: tenantId
     }
     availabilityZone: environment == 'production' ? '3' : null
-    highAvailability: environment == 'production' ? {
-      mode: 'ZoneRedundant'
-      standbyAvailabilityZone: '1'
-    } : null
+    highAvailability: null
   }
   sku: {
     name: environment == 'test'
     ? 'Standard_B1ms'
-    : environment == 'production' ? 'Standard_D16ds_v5' : 'Standard_D8ds_v5'
-    tier: environment == 'test' ? 'Burstable' : 'GeneralPurpose'
+    : environment == 'production' ? 'Standard_E8ds_v5' : 'Standard_D2ds_v5'
+    tier: environment == 'test' 
+    ? 'Burstable' 
+    : environment == 'production' ? 'MemoryOptimized' : 'GeneralPurpose'
   }
 }
 

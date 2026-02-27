@@ -146,6 +146,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = "0192:991825827",
                     OrganizationNumber = "991825827",
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                    RequiredParty = true
+                });
             services.AddSingleton(altinnResourceRepository.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
