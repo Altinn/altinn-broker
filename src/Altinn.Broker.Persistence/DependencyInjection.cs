@@ -49,7 +49,6 @@ public static class DependencyInjection
             psqlServerTokenProvider.GetTokenAsync(tokenRequestContext).Result.Token, TimeSpan.FromMinutes(45), TimeSpan.FromSeconds(0)
         );
 
-        
         return dataSourceBuilder.Build();
     }
 }

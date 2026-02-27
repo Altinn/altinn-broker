@@ -8,7 +8,7 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IFileTransferStatusRepository
 {
-    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
+    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
     {
         // This query performs two operations atomically:
         // 1. Inserts a new file transfer status record into the history table
@@ -27,7 +27,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                     file_transfer_status_date, 
                     file_transfer_status_detailed_description
                 )
-                VALUES (@fileTransferId, @statusId, NOW(), @detailedFileTransferStatus)
+                VALUES (@fileTransferId, @statusId, @insertedStatusTimestamp, @detailedFileTransferStatus)
                 RETURNING file_transfer_status_id_pk, file_transfer_status_date, file_transfer_status_description_id_fk
             ),
             updated_file_transfer AS (
@@ -54,6 +54,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@statusId", (int)status);
+        command.Parameters.AddWithValue("@insertedStatusTimestamp", timestamp);
         command.Parameters.AddWithValue("@detailedFileTransferStatus", detailedFileTransferStatus is null ? DBNull.Value : detailedFileTransferStatus);
 
         var fileTransferStatusId = await commandExecutor.ExecuteWithRetry(command.ExecuteScalarAsync, cancellationToken);
