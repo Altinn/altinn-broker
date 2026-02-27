@@ -46,4 +46,21 @@ public class AltinnRegisterService : IAltinnRegisterService
         }
         return party.PartyId.ToString();
     }
+
+    public async Task<string?> LookupPartyByUuid(string partyUuid, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"register/api/v1/parties/byuuid/{partyUuid}", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Error when looking up party by uuid in Altinn Register. Statuscode was: {statusCode}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
+            return null;
+        }
+        var party = await response.Content.ReadFromJsonAsync<Party>();
+        if (party is null)
+        {
+            _logger.LogError("Unexpected json response when looking up party by uuid in Altinn Register");
+            return null;
+        }
+        return party.OrgNumber;
+    }
 }
