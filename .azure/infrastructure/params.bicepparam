@@ -3,6 +3,7 @@ using './main.bicep'
 param namePrefix = readEnvironmentVariable('NAME_PREFIX')
 param location = 'norwayeast'
 param environment = readEnvironmentVariable('ENVIRONMENT')
+param existingBackupPolicyName = readEnvironmentVariable('EXISTING_BACKUP_POLICY_NAME')
 
 // secrets
 param brokerPgAdminPassword = readEnvironmentVariable('BROKER_PG_ADMIN_PASSWORD')
