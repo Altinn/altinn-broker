@@ -48,9 +48,11 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             }
         }
 
+        var resourceForValidation = existingResource ?? altinnResourceToCreate;
+
         if (request.MaxFileTransferSize is not null)
         {
-            var error = ValidateMaxFileTransferSize(existingResource, request.MaxFileTransferSize.Value);
+            var error = ValidateMaxFileTransferSize(resourceForValidation, request.MaxFileTransferSize.Value);
             if (error is not null) return error;
         }
         if (request.FileTransferTimeToLive is not null)
@@ -65,7 +67,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         }
         if (request.UseManifestFileShim is not null)
         {
-            var error = ValidateUseManifestFileShim(existingResource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy);
+            var error = ValidateUseManifestFileShim(resourceForValidation, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy);
             if (error is not null) return error;
         }
 
