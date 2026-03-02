@@ -119,13 +119,6 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
         return;
     }
 
-    const legacyToken = await getLegacyMaskinportenToken();
-    check(legacyToken, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
-
-    const headers = {
-        Authorization: `Bearer ${legacyToken}`
-    }
-
     const maxRetries = 20;
     let published = false;
     let statusValue = null;
@@ -139,6 +132,12 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         sleep(30);
+        const legacyToken = await getLegacyMaskinportenToken();
+        check(legacyToken, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
+
+        const headers = {
+            Authorization: `Bearer ${legacyToken}`
+        }
         lastResponse = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
         if (lastResponse.status === 200) {
             try {

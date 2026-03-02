@@ -29,36 +29,50 @@ jobs:
     environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Check if use case tests are enabled
+      id: check-enable
+      run: |
+        if [ "${{ secrets.ENABLE_USE_CASE_TESTS }}" == "true" ]; then
+          echo "enabled=true" >> $GITHUB_OUTPUT
+          echo "Use case tests are enabled"
+        else
+          echo "enabled=false" >> $GITHUB_OUTPUT
+          echo "Use case tests are disabled. Set ENABLE_USE_CASE_TESTS secret to 'true' to enable."
+        fi
 
-      - name: Run use case tests
-        uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
-        env:
-          base_url: ${{ secrets.BROKER_BASE_URL }}
-          mp_client_id: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_CLIENT_ID }}
-          mp_kid: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_KID }}
-          mp_client_pem: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_PEM }}
-          recipient: ${{ secrets.BRUKSMONSTER_RECIPIENT }}
-          sender: ${{ secrets.BRUKSMONSTER_SENDER }}
-        with:
-          filename: tests/Altinn.Broker.UseCaseTests/legacy_case_initialize.js
+    - name: Checkout
+      if: steps.check-enable.outputs.enabled == 'true'
+      uses: actions/checkout@v4
 
-      - name: Build failure report
-        if: failure()
-        run: |
-            report=":warning: (LEGACY) Broker use case test failure :warning: \n"
-            report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
-            report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo "stepreport=$report" >> $GITHUB_ENV
-      - name: Report failure to Slack
-        if: failure()
-        id: slack
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook-type: incoming-webhook
-          webhook: ${{ secrets.BRUKSMONSTER_SLACK_URL || secrets.SLACK_URL }}
-          payload: |
-            {
-              "text": "${{ env.stepreport }}"
-            }
+    - name: Run use case tests
+      id: usecase-test
+      if: steps.check-enable.outputs.enabled == 'true'
+      uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
+      env:
+        base_url: ${{ secrets.BROKER_BASE_URL }}
+        mp_client_id: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_CLIENT_ID }}
+        mp_kid: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_KID }}
+        mp_client_pem: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_PEM }}
+        recipient: ${{ secrets.BRUKSMONSTER_RECIPIENT }}
+        sender: ${{ secrets.BRUKSMONSTER_SENDER }}
+      with:
+        filename: tests/Altinn.Broker.UseCaseTests/legacy_case_initialize.js
+
+    - name: Build failure report
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
+      run: |
+          report=":warning: (LEGACY) Broker use case test failure :warning: \n"
+          report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+          report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "stepreport=$report" >> $GITHUB_ENV
+    - name: Report failure to Slack
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
+      id: slack
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+      with:
+        webhook-type: incoming-webhook
+        webhook: ${{ secrets.BRUKSMONSTER_SLACK_URL || secrets.SLACK_URL }}
+        payload: |
+          {
+            "text": "${{ env.stepreport }}"
+          }

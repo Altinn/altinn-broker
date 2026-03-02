@@ -83,7 +83,7 @@ public class ConfirmDownloadHandler(
             if (shouldConfirmAll)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded, timestamp: DateTimeOffset.UtcNow, null, cancellationToken);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);
@@ -92,15 +92,10 @@ public class ConfirmDownloadHandler(
                         FileTransferId = request.FileTransferId,
                         PurgeTrigger = PurgeTrigger.AllConfirmedDownloaded
                     }, null, cancellationToken), DateTime.UtcNow.Add(gracePeriod));
-                    backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Old expiry job
                 }
             }
             return Task.CompletedTask;
         }, logger, cancellationToken);
-        if (hostEnvironment.IsDevelopment() && shouldConfirmAll && resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
-        {
-            backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction in unit tests to avoid issue with Hangfire distributed lock implementation
-        }
         return Task.CompletedTask;
     }
 }
