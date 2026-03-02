@@ -23,54 +23,56 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetFileTransfersByPropertyTag_ReturnsOnlyMatchingTaggedTransfers()
+	public async Task GetFileTransfersByResourceId_ReturnsOnlyTransfersOlderThanMinAgeForResource()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var testTagA3 = "unitTestsA3";
-		var testTagLegacy = "unitTestsLegacy";
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var otherResourceId = $"different-resource-{Guid.NewGuid()}";
 
-		var id1 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
-		var id2 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
-		var id3 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
-		var id4 = await InsertFileTransfer(resourceId);
+		var now = DateTimeOffset.UtcNow;
+		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
+		var newCreated = now.Subtract(TimeSpan.FromDays(1));
+		var minAge = now.Subtract(TimeSpan.FromDays(10));
+
+		var id1 = await InsertFileTransfer(resourceId, created: oldCreated);
+		var id2 = await InsertFileTransfer(resourceId, created: oldCreated);
+		var id3 = await InsertFileTransfer(resourceId, created: newCreated);
+		var id4 = await InsertFileTransfer(otherResourceId, created: oldCreated);
 
 		// Act
-		var resultA3 = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
-		var resultLegacy = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagLegacy, cancellationToken: default);
+		var result = await _repository.GetFileTransfersByResourceId(resourceId, minAge, cancellationToken: default);
 
-		// Assert - A3 tag
-		Assert.Contains(id1, resultA3);
-		Assert.Contains(id2, resultA3);
-		Assert.DoesNotContain(id3, resultA3);
-		Assert.DoesNotContain(id4, resultA3);
-
-		// Assert - Legacy tag
-		Assert.Contains(id3, resultLegacy);
-		Assert.DoesNotContain(id1, resultLegacy);
-		Assert.DoesNotContain(id2, resultLegacy);
-		Assert.DoesNotContain(id4, resultLegacy);
+		// Assert
+		Assert.Contains(id1, result);
+		Assert.Contains(id2, result);
+		Assert.DoesNotContain(id3, result); // Too new
+		Assert.DoesNotContain(id4, result); // Different resourceId
 	}
 
 	[Fact]
-	public async Task GetFileTransfersByPropertyTag_NoMatches_ReturnsEmptyList()
+	public async Task GetFileTransfersByResourceId_NoMatches_ReturnsEmptyList()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var id1 = await InsertFileTransferWithProperty(resourceId, "testTag", "someOtherTag");
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var now = DateTimeOffset.UtcNow;
+		var newCreated = now.Subtract(TimeSpan.FromDays(1));
+		var minAge = now.Subtract(TimeSpan.FromDays(10));
+
+		var id1 = await InsertFileTransfer(resourceId, created: newCreated);
 
 		// Act
-		var result = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", "nonExistentTag", cancellationToken: default);
+		var result = await _repository.GetFileTransfersByResourceId(resourceId, minAge, cancellationToken: default);
 
 		// Assert
 		Assert.Empty(result);
+		Assert.Equal(1, await CountFileTransfer(id1)); // Original file still exists
 	}
 
 	[Fact]
 	public async Task HardDeleteFileTransfersByIds_DeletesSpecifiedTransfers()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
 		var keepId = await InsertFileTransfer(resourceId);
 		var deleteId1 = await InsertFileTransfer(resourceId);
 		var deleteId2 = await InsertFileTransfer(resourceId);
@@ -93,7 +95,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	public async Task HardDeleteFileTransfersByIds_EmptyList_ReturnsZero()
 	{
 		// Arrange
-		var id = await InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
+		var id = await InsertFileTransfer($"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}");
 
 		// Act
 		var deletedCount = await _repository.HardDeleteFileTransfersByIds(Array.Empty<Guid>(), cancellationToken: default);
@@ -104,69 +106,48 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task DeleteTaggedFiles_OnlyDeletesFilesWithMatchingTag()
+	public async Task CleanupOldFilesByResourceId_OnlyDeletesOldFilesForResource()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var testTagA3 = "unitTestsA3";
-		var testTagLegacy = "unitTestsLegacy";
+		var resourceId = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var otherResourceId = $"different-resource-{Guid.NewGuid()}";
 
-		var a3Id1 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
-		var a3Id2 = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
-		var legacyId = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
-		var untaggedId = await InsertFileTransfer(resourceId);
+		var now = DateTimeOffset.UtcNow;
+		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
+		var newCreated = now.Subtract(TimeSpan.FromDays(1));
+		var minAge = now.Subtract(TimeSpan.FromDays(10));
 
-		// Act - Get and delete only A3 tagged files
-		var a3FileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
-		var deletedCount = await _repository.HardDeleteFileTransfersByIds(a3FileIds, cancellationToken: default);
+		var oldId1 = await InsertFileTransfer(resourceId, created: oldCreated);
+		var oldId2 = await InsertFileTransfer(resourceId, created: oldCreated);
+		var newId = await InsertFileTransfer(resourceId, created: newCreated);
+		var otherResourceOldId = await InsertFileTransfer(otherResourceId, created: oldCreated);
+
+		// Act - Get and delete only old files for the resource
+		var fileIdsToDelete = await _repository.GetFileTransfersByResourceId(resourceId, minAge, cancellationToken: default);
+		var deletedCount = await _repository.HardDeleteFileTransfersByIds(fileIdsToDelete, cancellationToken: default);
 
 		// Assert
 		Assert.Equal(2, deletedCount);
-		Assert.Equal(0, await CountFileTransfer(a3Id1));
-		Assert.Equal(0, await CountFileTransfer(a3Id2));
-		Assert.Equal(1, await CountFileTransfer(legacyId)); // Legacy still exists
-		Assert.Equal(1, await CountFileTransfer(untaggedId)); // Untagged still exists
+		Assert.Equal(0, await CountFileTransfer(oldId1));
+		Assert.Equal(0, await CountFileTransfer(oldId2));
+		Assert.Equal(1, await CountFileTransfer(newId)); // Too new, still exists
+		Assert.Equal(1, await CountFileTransfer(otherResourceOldId)); // Different resourceId, still exists
 	}
 
 	[Fact]
-	public async Task DeleteTaggedFiles_LegacyAndA3TagsAreIsolated()
+	public async Task GetFileTransfersByResourceId_DifferentResourceId_ReturnsEmpty()
 	{
 		// Arrange
-		var resourceId = TestConstants.RESOURCE_FOR_TEST;
-		var testTagA3 = "unitTestsA3";
-		var testTagLegacy = "unitTestsLegacy";
+		var resourceId1 = $"{TestConstants.RESOURCE_FOR_TEST}-{Guid.NewGuid()}";
+		var resourceId2 = $"different-resource-{Guid.NewGuid()}";
+		var now = DateTimeOffset.UtcNow;
+		var oldCreated = now.Subtract(TimeSpan.FromDays(20));
+		var minAge = now;
 
-		var a3Id = await InsertFileTransferWithProperty(resourceId, "testTag", testTagA3);
-		var legacyId = await InsertFileTransferWithProperty(resourceId, "testTag", testTagLegacy);
-
-		// Act - Delete legacy tagged files
-		var legacyFileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagLegacy, cancellationToken: default);
-		await _repository.HardDeleteFileTransfersByIds(legacyFileIds, cancellationToken: default);
-
-		// Assert - A3 files should NOT be deleted
-		Assert.Equal(1, await CountFileTransfer(a3Id));
-		Assert.Equal(0, await CountFileTransfer(legacyId));
-
-		// Act - Now delete A3 tagged files
-		var a3FileIds = await _repository.GetFileTransfersByPropertyTag(resourceId, "testTag", testTagA3, cancellationToken: default);
-		await _repository.HardDeleteFileTransfersByIds(a3FileIds, cancellationToken: default);
-
-		// Assert - Now A3 files are also deleted
-		Assert.Equal(0, await CountFileTransfer(a3Id));
-	}
-
-	[Fact]
-	public async Task GetFileTransfersByPropertyTag_DifferentResourceId_ReturnsEmpty()
-	{
-		// Arrange
-		var resourceId1 = TestConstants.RESOURCE_FOR_TEST;
-		var resourceId2 = "different-resource";
-		var testTag = "unitTestsA3";
-
-		var id1 = await InsertFileTransferWithProperty(resourceId1, "testTag", testTag);
+		var id1 = await InsertFileTransfer(resourceId1, created: oldCreated);
 
 		// Act - Query with different resourceId
-		var result = await _repository.GetFileTransfersByPropertyTag(resourceId2, "testTag", testTag, cancellationToken: default);
+		var result = await _repository.GetFileTransfersByResourceId(resourceId2, minAge, cancellationToken: default);
 
 		// Assert
 		Assert.Empty(result);
@@ -182,10 +163,11 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		return resultObj == null ? 0 : Convert.ToInt32(resultObj);
 	}
 
-	private async Task<Guid> InsertFileTransfer(string resourceId)
+	private async Task<Guid> InsertFileTransfer(string resourceId, DateTimeOffset? created = null)
 	{
 		var fileTransferId = Guid.NewGuid();
 		var senderExternalId = "0192:991825827";
+		var createdValue = created ?? DateTimeOffset.UtcNow;
 
 		// Get or create actor
 		await using var getActorCommand = _dataSource.CreateCommand(
@@ -236,14 +218,15 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		// Create file transfer
 		await using var insertFileTransferCommand = _dataSource.CreateCommand(
 			"INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
-			"VALUES (@fileTransferId, @resourceId, @fileName, NULL, NULL, @externalRef, @actorId, NOW(), @storageProviderId, @expirationTime, NULL, false)");
+			"VALUES (@fileTransferId, @resourceId, @fileName, NULL, NULL, @externalRef, @actorId, @created, @storageProviderId, @expirationTime, NULL, false)");
 		insertFileTransferCommand.Parameters.AddWithValue("@fileTransferId", fileTransferId);
 		insertFileTransferCommand.Parameters.AddWithValue("@resourceId", resourceId);
 		insertFileTransferCommand.Parameters.AddWithValue("@fileName", "test.txt");
 		insertFileTransferCommand.Parameters.AddWithValue("@externalRef", "test-ref");
 		insertFileTransferCommand.Parameters.AddWithValue("@actorId", actorId);
+		insertFileTransferCommand.Parameters.AddWithValue("@created", createdValue);
 		insertFileTransferCommand.Parameters.AddWithValue("@storageProviderId", storageProviderId);
-		insertFileTransferCommand.Parameters.AddWithValue("@expirationTime", DateTime.UtcNow.AddHours(1));
+		insertFileTransferCommand.Parameters.AddWithValue("@expirationTime", createdValue.UtcDateTime.AddHours(1));
 		await insertFileTransferCommand.ExecuteNonQueryAsync();
 
 		return fileTransferId;

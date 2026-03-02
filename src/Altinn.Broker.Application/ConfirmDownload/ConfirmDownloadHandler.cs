@@ -20,6 +20,7 @@ using Hangfire;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
+using Microsoft.Extensions.Hosting;
 
 public class ConfirmDownloadHandler(
     IFileTransferRepository fileTransferRepository,
@@ -28,6 +29,7 @@ public class ConfirmDownloadHandler(
     IResourceRepository resourceRepository,
     IAuthorizationService authorizationService,
     IBackgroundJobClient backgroundJobClient,
+    IHostEnvironment hostEnvironment,
     EventBusMiddleware eventBus,
     ILogger<ConfirmDownloadHandler> logger) : IHandler<ConfirmDownloadRequest, Task>
 {
@@ -81,7 +83,7 @@ public class ConfirmDownloadHandler(
             if (shouldConfirmAll)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded, timestamp: DateTimeOffset.UtcNow, null, cancellationToken);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);
@@ -94,10 +96,6 @@ public class ConfirmDownloadHandler(
             }
             return Task.CompletedTask;
         }, logger, cancellationToken);
-        if (shouldConfirmAll)
-        {
-            backgroundJobClient.Delete(fileTransfer.HangfireJobId); // Performed outside of transaction to avoid issue with Hangfire distributed lock implementation
-        }
         return Task.CompletedTask;
     }
 }

@@ -35,6 +35,29 @@ internal static class FileTransferInitializeExtTestFactory
         Sender = "0192:991825827",
         SendersFileTransferReference = "test-data"
     };
+
+    internal static FileTransferInitalizeExt BasicFileTransfer_RequiredParty_NotPartOfTransaction() => new FileTransferInitalizeExt()
+    {
+        ResourceId = TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY,
+        Checksum = null,
+        FileName = "input.txt",
+        PropertyList = [],
+        Recipients = new List<string> { "0192:986252932" },
+        Sender = "0192:312195771",
+        SendersFileTransferReference = "test-data"
+    };
+
+    internal static FileTransferInitalizeExt BasicFileTransfer_RequiredParty_SenderIsRequiredParty() => new FileTransferInitalizeExt()
+    {
+        ResourceId = TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY,
+        Checksum = null,
+        FileName = "input.txt",
+        PropertyList = [],
+        Recipients = new List<string> { "0192:986252932" },
+        Sender = "0192:991825827",
+        SendersFileTransferReference = "test-data"
+    };
+
     internal static FileTransferInitalizeExt BasicFileTransfer_ManifestShim() {
         var basicFileTransfer = BasicFileTransfer();
         basicFileTransfer.ResourceId = TestConstants.RESOURCE_WITH_MANIFEST_SHIM;

@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
+using Microsoft.AspNetCore.Mvc;
 
 using Xunit;
 
@@ -12,6 +14,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _serviceOwnerClient;
+    private readonly HttpClient _serviceOwnerClientNotConfigured;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
@@ -20,6 +23,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     {
         _factory = factory;
         _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
+        _serviceOwnerClientNotConfigured = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN_NOT_CONFIGURED);
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
 
@@ -126,5 +130,79 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
             PurgeFileTransferAfterAllRecipientsConfirmed = false
         });
         Assert.True(response2.IsSuccessStatusCode, await response2.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task GetResource_WithResourceNotConfigured_ReturnsBadRequest()
+    {
+        var response = await _serviceOwnerClient.GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_NOT_CONFIGURED}");
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+        
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ResourceHasNotBeenConfigured.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task GetResource_WithoutPermissions_ReturnsUnauthorized()
+    {
+        var response = await _serviceOwnerClientNotConfigured.GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}");
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task ConfigureResource_WithoutServiceOwnerConfiguration_ReturnsBadRequest()
+    {
+        var response = await _serviceOwnerClientNotConfigured.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER}", new ResourceExt
+        {
+            UseManifestFileShim = false
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+        
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.ServiceOwnerHasNotBeenConfigured.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task ConfigureResource_WithUnConfiguredResourceOfDifferentServiceOwner_ReturnsUnauthorized()
+    {
+        var response = await _serviceOwnerClientNotConfigured.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_WITH_CONFIGURED_SERVICEOWNER}", new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P30D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task ConfigureResource_WithConfiguredResourceOfDifferentServiceOwner_ReturnsUnauthorized()
+    {
+        var response = await _serviceOwnerClientNotConfigured.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P30D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task ConfigureResource_WithInvalidResourceDefinition_ReturnsForbidden()
+    {
+        var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/invalidresource", new ResourceExt
+        {
+            MaxFileTransferSize = 1000000,
+            FileTransferTimeToLive = "P30D"
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
     }
 }

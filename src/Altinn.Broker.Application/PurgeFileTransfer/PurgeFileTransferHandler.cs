@@ -26,7 +26,8 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
 
         if (fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.Purged)
         {
-            logger.LogInformation("FileTransfer has already been set to purged");
+            logger.LogWarning("FileTransfer has already been set to purged");
+            return Task.CompletedTask;
         }
         if (
             fileTransfer.FileTransferStatusEntity.Status == Core.Domain.Enums.FileTransferStatus.AllConfirmedDownloaded 
@@ -41,7 +42,7 @@ public class PurgeFileTransferHandler(IFileTransferRepository fileTransferReposi
         {
             await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, cancellationToken: cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransfer.FileTransferId, Core.Domain.Enums.FileTransferStatus.Purged, timestamp: DateTimeOffset.UtcNow, cancellationToken: cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FilePurged, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Task.CompletedTask;
             }, logger, cancellationToken);

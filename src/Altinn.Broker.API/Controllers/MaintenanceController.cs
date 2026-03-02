@@ -21,9 +21,9 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
     private readonly ILogger<MaintenanceController> _logger = logger;
 
     /// <summary>
-    /// Cleanup test data for a given testTag used by use case tests
+    /// Cleanup use case test data for the broker resource.
+    /// Optionally scopes cleanup to data older than a given age in days.
     /// </summary>
-    /// <param name="testTag">The test tag to identify which test's data to clean up (e.g., 'useCaseTestsA3' or 'useCaseTestsLegacy')</param>
     /// <response code="200">Returns a summary of deleted file transfers</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="403">Forbidden</response>
@@ -35,12 +35,18 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> CleanupUseCaseTestsData(
-        [FromQuery][Required] string testTag,
+        [FromQuery] int? minAgeDays,
         [FromServices] CleanupUseCaseTestsHandler handler,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Request to cleanup use case test data received for testTag: {TestTag}", testTag.SanitizeForLogs());
-        var result = await handler.Process(new CleanupUseCaseTestsRequest { TestTag = testTag }, HttpContext.User, cancellationToken);
+        _logger.LogInformation("Request to cleanup use case test data received");
+
+        var request = new CleanupUseCaseTestsRequest
+        {
+            MinAgeDays = minAgeDays
+        };
+
+        var result = await handler.Process(request, HttpContext.User, cancellationToken);
         return result.Match(
             Ok,
             Problem

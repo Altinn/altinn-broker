@@ -8,7 +8,7 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IFileTransferStatusRepository
 {
-    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
+    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
     {
         // This query performs two operations atomically:
         // 1. Inserts a new file transfer status record into the history table
@@ -27,7 +27,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                     file_transfer_status_date, 
                     file_transfer_status_detailed_description
                 )
-                VALUES (@fileTransferId, @statusId, NOW(), @detailedFileTransferStatus)
+                VALUES (@fileTransferId, @statusId, @insertedStatusTimestamp, @detailedFileTransferStatus)
                 RETURNING file_transfer_status_id_pk, file_transfer_status_date, file_transfer_status_description_id_fk
             ),
             updated_file_transfer AS (
@@ -54,6 +54,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@statusId", (int)status);
+        command.Parameters.AddWithValue("@insertedStatusTimestamp", timestamp);
         command.Parameters.AddWithValue("@detailedFileTransferStatus", detailedFileTransferStatus is null ? DBNull.Value : detailedFileTransferStatus);
 
         var fileTransferStatusId = await commandExecutor.ExecuteWithRetry(command.ExecuteScalarAsync, cancellationToken);
@@ -90,13 +91,13 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         }, cancellationToken);
     }
 
-    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(FileTransferStatus statusFilter, DateTime minStatusDate, CancellationToken cancellationToken)
+    public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(List<FileTransferStatus> statusFilters, DateTime minStatusDate, CancellationToken cancellationToken)
     {
         var query = @"
             SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, 
                 file_transfer_status_date, file_transfer_status_detailed_description
             FROM broker.file_transfer_status fis
-            WHERE fis.file_transfer_status_description_id_fk = @statusFilter
+            WHERE fis.file_transfer_status_description_id_fk = ANY(@statusFilters)
             AND fis.file_transfer_status_date < @minStatusDate
             AND fis.file_transfer_status_date = (
                 SELECT MAX(file_transfer_status_date)
@@ -105,7 +106,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
             )";
 
         await using var command = dataSource.CreateCommand(query);
-        command.Parameters.AddWithValue("@statusFilter", (int)statusFilter);
+        command.Parameters.AddWithValue("@statusFilters", statusFilters.Select(s => (int)s).ToArray());
         command.Parameters.AddWithValue("@minStatusDate", minStatusDate);
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>

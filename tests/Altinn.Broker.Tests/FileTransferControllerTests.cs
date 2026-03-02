@@ -29,6 +29,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
+    private readonly HttpClient _senderClient2;
     private readonly HttpClient _recipientClient;
     private readonly HttpClient _recipientClient2;
     private readonly HttpClient _serviceOwnerClient;
@@ -39,6 +40,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _senderClient2 = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN_2);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _recipientClient2 = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN_2);
         _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
@@ -256,7 +258,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidKeyLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidKeyLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -271,18 +273,19 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidValueLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidValueLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+        string input = new string('A', 3001);
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", input);
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList Value can not be longer than 300", parsedError.Extensions.First().Value.ToString());
+        Assert.Contains("PropertyList Value can not be longer than 3000", parsedError.Extensions.First().Value.ToString());
     }
 
     [Fact]
@@ -559,23 +562,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.NoAccessToResource.Message, parsedError.Detail);
-    }
-
-    [Fact]
-    public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
-    {
-        // Arrange
-        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
-
-        // Act
-        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
-
-        // Assert
-        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
     }
 
     [Fact]
@@ -962,7 +948,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.Null(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
         Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
         j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 
@@ -1014,4 +999,90 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             Assert.True(problem.TryGetProperty("code", out var codeProperty));
             Assert.False(string.IsNullOrWhiteSpace(codeProperty.GetString()));
         }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_PartOfFileTransfer_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_SenderIsRequiredParty();
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_NotPartOfFileTransfer_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RequiredPartyNotSpecified.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_MultipleRecipients_PartyInRecipients_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+        file.Recipients.Add("0192:991825827");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var content = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        Assert.False(string.IsNullOrEmpty(content), $"Response body is empty. Status code: {initializeFileTransferResponse.StatusCode}");
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RequiredPartyInvalidRecipientConfiguration.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_MultipleRecipients_PartyInSender_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_SenderIsRequiredParty();
+        file.Recipients.Add("0192:212517712");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_PartyAsOnlyRecipient_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+        file.Recipients.Clear();
+        file.Recipients.Add("0192:991825827");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
 }

@@ -4,4 +4,5 @@ public class GeneralSettings
 {
     public string SlackUrl { get; set; } = string.Empty;
     public string ApplicationInsightsConnectionString { get; set; } = string.Empty;
+    public bool SimulateMalwareScan { get; set; } = false;
 }

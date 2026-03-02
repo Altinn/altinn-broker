@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
+using Altinn.Broker.Application.CleanupUseCaseTests;
 
 BuildAndRun(args);
 
@@ -71,7 +72,11 @@ static void BuildAndRun(string[] args)
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
-    
+    recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
+        "Cleanup use case test data older than 1 day",
+        handler => handler.Process(new CleanupUseCaseTestsRequest { MinAgeDays = 1 }, null, CancellationToken.None), 
+        Cron.Daily());
+
     app.Run();
 }
 
@@ -97,6 +102,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
+    services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
