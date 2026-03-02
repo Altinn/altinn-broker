@@ -47,7 +47,7 @@ public class UploadFileHandler(
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
-        };
+        }
         if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSender(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
@@ -60,12 +60,12 @@ public class UploadFileHandler(
         if (resource is null)
         {
             return Errors.InvalidResourceDefinition;
-        };
+        }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
-        };
+        }
         var storageProvider = serviceOwner.GetStorageProvider(fileTransfer.UseVirusScan);
         if (storageProvider is null)
         {
@@ -80,44 +80,46 @@ public class UploadFileHandler(
             return Errors.FileSizeTooBig;
         }
 
-        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, cancellationToken: cancellationToken);
+        var uploadStartedTimestamp = DateTime.UtcNow;  
+        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, cancellationToken: cancellationToken);
 
         try
         {
             var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
+            var finishedUploadTimestamp = DateTime.UtcNow;
             if (checksum is null)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "File upload failed and was aborted", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "File upload failed and was aborted", cancellationToken);
                 return Errors.UploadFailed;
             }
-
-            if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
+            if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum) && !string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await fileTransferRepository.SetChecksum(request.FileTransferId, checksum, cancellationToken);
-            }
-            else if (!string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
-            {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Checksum mismatch", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "Checksum mismatch", cancellationToken);
                 backgroundJobClient.Enqueue(() => brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
+            await TransactionWithRetriesPolicy.Execute<Task>(async (cancellationToken) =>
+            {
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+                await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
+                if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
+                {
+                    await fileTransferRepository.SetChecksum(request.FileTransferId, checksum, cancellationToken);
+                }
+                return Task.CompletedTask;
+            }, logger, cancellationToken);
         }
         catch (Exception e)
         {
             logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, "Error occurred while uploading fileTransfer", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, "Error occurred while uploading fileTransfer", cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);
-        }        
-        
-        await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
-        
-            await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
-            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-        
+        }
 
         if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
         {
@@ -133,43 +135,43 @@ public class UploadFileHandler(
 
 
 
-        /// <summary>
-        /// Simulates a malware scan result for local development and tests by calling the MalwareScanResultHandler with fake ScanResultData.
-        /// </summary>
-        public async Task SimulateMalwareScanResult(Guid fileTransferId)
+    /// <summary>
+    /// Simulates a malware scan result for local development and tests by calling the MalwareScanResultHandler with fake ScanResultData.
+    /// </summary>
+    public async Task SimulateMalwareScanResult(Guid fileTransferId)
+    {
+        if (!hostEnvironment.IsDevelopment())
         {
-            if (!hostEnvironment.IsDevelopment())
-            {
-                logger.LogWarning("SimulateMalwareScanResult called outside development environment");
-                return;
-            }
-
-            logger.LogInformation("Simulating malware scan result for filetransfer {fileTransferId}", fileTransferId);
-
-            var simulatedScanResult = new ScanResultData
-            {
-                BlobUri = $"http://127.0.0.1:10000/devstoreaccount1/filetransfer/{fileTransferId}",
-                CorrelationId = Guid.NewGuid(),
-                ETag = "simulated-etag",
-                ScanFinishedTimeUtc = DateTime.UtcNow,
-                ScanResultDetails = new ScanResultDetails
-                {
-                    MalwareNamesFound = new List<string>(),
-                    Sha256 = "simulated-sha256"
-                },
-                ScanResultType = "No threats found"
-            };
-
-            var result = await malwareScanResultHandler.Process(simulatedScanResult, null, CancellationToken.None);
-
-            if (result.IsT0)
-            {
-                logger.LogInformation("Successfully simulated malware scan result for filetransfer {fileTransferId} using MalwareScanResultHandler", fileTransferId);
-            }
-            else
-            {
-                var error = result.AsT1;
-                logger.LogError("Error in simulated malware scan result for filetransfer {fileTransferId}: {Error}", fileTransferId, error.Message);
-            }
+            logger.LogWarning("SimulateMalwareScanResult called outside development environment");
+            return;
         }
+
+        logger.LogInformation("Simulating malware scan result for filetransfer {fileTransferId}", fileTransferId);
+
+        var simulatedScanResult = new ScanResultData
+        {
+            BlobUri = $"http://127.0.0.1:10000/devstoreaccount1/filetransfer/{fileTransferId}",
+            CorrelationId = Guid.NewGuid(),
+            ETag = "simulated-etag",
+            ScanFinishedTimeUtc = DateTime.UtcNow,
+            ScanResultDetails = new ScanResultDetails
+            {
+                MalwareNamesFound = new List<string>(),
+                Sha256 = "simulated-sha256"
+            },
+            ScanResultType = "No threats found"
+        };
+
+        var result = await malwareScanResultHandler.Process(simulatedScanResult, null, CancellationToken.None);
+
+        if (result.IsT0)
+        {
+            logger.LogInformation("Successfully simulated malware scan result for filetransfer {fileTransferId} using MalwareScanResultHandler", fileTransferId);
+        }
+        else
+        {
+            var error = result.AsT1;
+            logger.LogError("Error in simulated malware scan result for filetransfer {fileTransferId}: {Error}", fileTransferId, error.Message);
+        }
+    }
 }
