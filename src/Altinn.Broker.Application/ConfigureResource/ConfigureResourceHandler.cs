@@ -19,10 +19,10 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Processing request to configure resource {ResourceId}", request.ResourceId.SanitizeForLogs());
-        
-        
+
         ResourceEntity? existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
-        
+        ResourceEntity? altinnResourceToCreate = null;
+
         if (existingResource is null)
         {
             var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
@@ -34,95 +34,98 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             {
                 return Errors.NoAccessToResource;
             }
-            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is not null)
-            {
-                existingResource = await resourceRepository.CreateResource(altinnResource, cancellationToken);
-            }else 
+            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is null)
             {
                 return Errors.ServiceOwnerHasNotBeenConfigured;
             }
-        }else {
+            altinnResourceToCreate = altinnResource;
+        }
+        else
+        {
             if (existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
             {
                 return Errors.NoAccessToResource;
             }
         }
 
-        if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
-        {
-            await resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(existingResource.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
-        }
-        if (request.PurgeFileTransferGracePeriod is not null)
-        {
-            var updatePurgeFileTransferGracePeriodResult = await UpdatePurgeFileTransferGracePeriod(existingResource, request.PurgeFileTransferGracePeriod, cancellationToken);
-            if (updatePurgeFileTransferGracePeriodResult.IsT1)
-            {
-                return updatePurgeFileTransferGracePeriodResult.AsT1;
-            }
-        }
         if (request.MaxFileTransferSize is not null)
         {
-            var updateMaxFileTransferSizeResult = await UpdateMaxFileTransferSize(existingResource, request.MaxFileTransferSize.Value, cancellationToken);
-            if (updateMaxFileTransferSizeResult.IsT1)
-            {
-                return updateMaxFileTransferSizeResult.AsT1;
-            }
+            var error = ValidateMaxFileTransferSize(existingResource, request.MaxFileTransferSize.Value);
+            if (error is not null) return error;
         }
         if (request.FileTransferTimeToLive is not null)
         {
-            var updateFileTransferTimeToLiveResult = await UpdateFileTransferTimeToLive(existingResource, request.FileTransferTimeToLive, cancellationToken);
-            if (updateFileTransferTimeToLiveResult.IsT1)
-            {
-                return updateFileTransferTimeToLiveResult.AsT1;
-            }
+            var error = ValidateFileTransferTimeToLive(request.FileTransferTimeToLive);
+            if (error is not null) return error;
         }
-        if (request.ExternalServiceCodeLegacy is not null)
+        if (request.PurgeFileTransferGracePeriod is not null)
         {
-            await resourceRepository.UpdateExternalServiceCodeLegacy(existingResource.Id, request.ExternalServiceCodeLegacy, cancellationToken);
-        }
-        if (request.ExternalServiceEditionCodeLegacy is not null)
-        {
-            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(existingResource.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
+            var error = ValidatePurgeFileTransferGracePeriod(request.PurgeFileTransferGracePeriod);
+            if (error is not null) return error;
         }
         if (request.UseManifestFileShim is not null)
         {
-            var updateManifestFileShimResult = await UpdateUseManifestFileShim(existingResource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy, cancellationToken);   
-            if (updateManifestFileShimResult.IsT1)
-            {
-                return updateManifestFileShimResult.AsT1;
-            }
+            var error = ValidateUseManifestFileShim(existingResource, request.UseManifestFileShim.Value, request.ExternalServiceCodeLegacy, request.ExternalServiceEditionCodeLegacy);
+            if (error is not null) return error;
+        }
+
+        if (altinnResourceToCreate is not null)
+        {
+            existingResource = await resourceRepository.CreateResource(altinnResourceToCreate, cancellationToken);
+        }
+
+        if (request.PurgeFileTransferAfterAllRecipientsConfirmed is not null)
+        {
+            await resourceRepository.UpdatePurgeFileTransferAfterAllRecipientsConfirmed(existingResource!.Id, (bool)request.PurgeFileTransferAfterAllRecipientsConfirmed, cancellationToken);
+        }
+        if (request.PurgeFileTransferGracePeriod is not null)
+        {
+            await resourceRepository.UpdatePurgeFileTransferGracePeriod(existingResource!.Id, XmlConvert.ToTimeSpan(request.PurgeFileTransferGracePeriod), cancellationToken);
+        }
+        if (request.MaxFileTransferSize is not null)
+        {
+            await resourceRepository.UpdateMaxFileTransferSize(existingResource!.Id, request.MaxFileTransferSize.Value, cancellationToken);
+        }
+        if (request.FileTransferTimeToLive is not null)
+        {
+            await resourceRepository.UpdateFileRetention(existingResource!.Id, XmlConvert.ToTimeSpan(request.FileTransferTimeToLive), cancellationToken);
+        }
+        if (request.ExternalServiceCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceCodeLegacy(existingResource!.Id, request.ExternalServiceCodeLegacy, cancellationToken);
+        }
+        if (request.ExternalServiceEditionCodeLegacy is not null)
+        {
+            await resourceRepository.UpdateExternalServiceEditionCodeLegacy(existingResource!.Id, request.ExternalServiceEditionCodeLegacy.Value, cancellationToken);
+        }
+        if (request.UseManifestFileShim is not null)
+        {
+            logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}",
+                existingResource!.Id.SanitizeForLogs(), request.UseManifestFileShim.Value);
+            await resourceRepository.UpdateUseManifestFileShim(existingResource!.Id, request.UseManifestFileShim.Value, cancellationToken);
         }
         if (request.RequiredParty is not null)
         {
-            await resourceRepository.UpdateRequiredParty(existingResource.Id, request.RequiredParty.Value, cancellationToken);
+            await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty.Value, cancellationToken);
         }
         return Task.CompletedTask;
     }
 
-    private async Task<OneOf<Task, Error>> UpdateMaxFileTransferSize(ResourceEntity resource, long maxFileTransferSize, CancellationToken cancellationToken)
+    private Error? ValidateMaxFileTransferSize(ResourceEntity? resource, long maxFileTransferSize)
     {
-        if (maxFileTransferSize < 0)
-        {
-            return Errors.MaxUploadSizeCannotBeNegative;
-        }
-        if (maxFileTransferSize == 0)
-        {
-            return Errors.MaxUploadSizeCannotBeZero;
-        }
+        if (maxFileTransferSize < 0) return Errors.MaxUploadSizeCannotBeNegative;
+        if (maxFileTransferSize == 0) return Errors.MaxUploadSizeCannotBeZero;
         if (hostEnvironment.IsProduction()
-            && !resource.ApprovedForDisabledVirusScan
+            && !(resource?.ApprovedForDisabledVirusScan ?? false)
             && maxFileTransferSize > ApplicationConstants.MaxVirusScanUploadSize)
         {
             return Errors.MaxUploadSizeForVirusScan;
         }
-        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize)
-        {
-            return Errors.MaxUploadSizeOverGlobal;
-        }
-        await resourceRepository.UpdateMaxFileTransferSize(resource.Id, maxFileTransferSize, cancellationToken);
-        return Task.CompletedTask;
+        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize) return Errors.MaxUploadSizeOverGlobal;
+        return null;
     }
-    private async Task<OneOf<Task, Error>> UpdateFileTransferTimeToLive(ResourceEntity resource, string fileTransferTimeToLiveString, CancellationToken cancellationToken)
+
+    private static Error? ValidateFileTransferTimeToLive(string fileTransferTimeToLiveString)
     {
         TimeSpan fileTransferTimeToLive;
         try
@@ -133,43 +136,34 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         {
             return Errors.InvalidTimeToLiveFormat;
         }
-        if (fileTransferTimeToLive > TimeSpan.FromDays(365))
-        {
-            return Errors.TimeToLiveCannotExceed365Days;
-        }
-        await resourceRepository.UpdateFileRetention(resource.Id, fileTransferTimeToLive, cancellationToken);
-        return Task.CompletedTask;
+        if (fileTransferTimeToLive > TimeSpan.FromDays(365)) return Errors.TimeToLiveCannotExceed365Days;
+        return null;
     }
-    private async Task<OneOf<Task, Error>> UpdatePurgeFileTransferGracePeriod(ResourceEntity resource, string PurgeFileTransferGracePeriodString, CancellationToken cancellationToken)
+
+    private static Error? ValidatePurgeFileTransferGracePeriod(string purgeFileTransferGracePeriodString)
     {
-        TimeSpan PurgeFileTransferGracePeriod;
+        TimeSpan purgeFileTransferGracePeriod;
         try
         {
-            PurgeFileTransferGracePeriod = XmlConvert.ToTimeSpan(PurgeFileTransferGracePeriodString);
+            purgeFileTransferGracePeriod = XmlConvert.ToTimeSpan(purgeFileTransferGracePeriodString);
         }
         catch (FormatException)
         {
             return Errors.InvalidGracePeriodFormat;
         }
-        if (PurgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(ApplicationConstants.MaxGracePeriod))
-        {
-            return Errors.GracePeriodCannotExceed24Hours;
-        }
-        await resourceRepository.UpdatePurgeFileTransferGracePeriod(resource.Id, PurgeFileTransferGracePeriod, cancellationToken);
-        return Task.CompletedTask;
+        if (purgeFileTransferGracePeriod > XmlConvert.ToTimeSpan(ApplicationConstants.MaxGracePeriod)) return Errors.GracePeriodCannotExceed24Hours;
+        return null;
     }
 
-    private async Task<OneOf<Task, Error>> UpdateUseManifestFileShim(ResourceEntity resource, bool useManifestFileShim, string? externalServiceCode, int? externalServiceCodeEdition, CancellationToken cancellationToken)
+    private static Error? ValidateUseManifestFileShim(ResourceEntity? resource, bool useManifestFileShim, string? externalServiceCode, int? externalServiceCodeEdition)
     {
-        var actualExternalServiceCode = resource.ExternalServiceCodeLegacy ?? externalServiceCode;
-        var actualExternalServiceCodeEdition = resource.ExternalServiceEditionCodeLegacy ?? externalServiceCodeEdition;
+        if (!useManifestFileShim) return null;
+        var actualExternalServiceCode = resource?.ExternalServiceCodeLegacy ?? externalServiceCode;
+        var actualExternalServiceCodeEdition = resource?.ExternalServiceEditionCodeLegacy ?? externalServiceCodeEdition;
         if (actualExternalServiceCode is null || actualExternalServiceCodeEdition is null)
         {
             return Errors.NeedServiceCodeForManifestShim;
         }
-        logger.LogInformation("Updating manifest file shim setting for resource {ResourceId} to {UseManifestFileShim}", 
-            resource.Id.SanitizeForLogs(), useManifestFileShim);
-        await resourceRepository.UpdateUseManifestFileShim(resource.Id, useManifestFileShim, cancellationToken);
-        return Task.CompletedTask;
+        return null;
     }
 }
