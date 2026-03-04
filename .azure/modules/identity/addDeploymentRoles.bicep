@@ -27,7 +27,7 @@ var storageBlobDataContributorRoleDefinitionId = 'ba92f5b4-2d11-453d-a403-e96b00
 resource storageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(subscription().id, userAssignedIdentityPrincipalId, storageBlobDataContributorRoleDefinitionId)
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleDefinitionId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleDefinitionId)
     principalId: userAssignedIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }
