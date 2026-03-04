@@ -100,8 +100,20 @@ public class UploadFileHandler(
             }
             await TransactionWithRetriesPolicy.Execute<Task>(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+                if (storageProvider.Type == StorageProviderType.Altinn3Azure)
+                {
+                    await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+
+                }
+                else if (storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan) {
+                    await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+                    foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                    {
+                        backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
+                    }
+                }                 
                 await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
                 if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
                 {
