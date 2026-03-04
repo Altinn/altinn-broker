@@ -46,7 +46,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         {
             throw new InvalidOperationException("Storage account has not been deployed");
         }
-        return $"BlobEndpoint=https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
+        return $"https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
     }
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
