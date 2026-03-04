@@ -106,7 +106,7 @@ public class UploadFileHandler(
                     backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
 
                 }
-                else if (storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan) {
+                else if (storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan && !generalSettings.Value.SimulateMalwareScan) {
                     await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, timestamp: finishedUploadTimestamp, cancellationToken: cancellationToken);
                     backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                     foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
