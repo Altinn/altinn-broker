@@ -65,7 +65,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
-    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+    public async Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
                                       Stream stream, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
@@ -144,7 +144,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
+            return (BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant(), position);
         }
         catch (Exception ex)
         {
