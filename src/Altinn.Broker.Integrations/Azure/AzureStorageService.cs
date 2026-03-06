@@ -66,7 +66,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
     }
 
     public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
-                                      Stream stream, long streamLength, CancellationToken cancellationToken)
+                                      Stream stream, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -80,69 +80,65 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             long position = 0;
             using var blobMd5 = MD5.Create();
 
-            int blocksInBatch = 0;
             var uploadTasks = new List<Task>();
-            using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads); // Limit concurrent uploads
+            using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads);
 
-            while (position < streamLength)
+            async Task FlushAccumulationBuffer(bool isLast)
             {
-                int bytesRead = await stream.ReadAsync(networkReadBuffer, 0, networkReadBuffer.Length, cancellationToken);
-                if (bytesRead <= 0) break;
+                if (accumulationBuffer.Length == 0) return;
 
+                accumulationBuffer.Position = 0;
+                var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+                byte[] blockData = accumulationBuffer.ToArray();
+                blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
+                blockList.Add(blockId);
+                accumulationBuffer.SetLength(0);
+
+                await semaphore.WaitAsync(cancellationToken);
+                uploadTasks.Add(UploadBlockAsync(blockBlobClient, blockId, blockData, cancellationToken));
+
+                async Task UploadBlockAsync(BlockBlobClient client, string currentBlockId, byte[] currentBlockData, CancellationToken ct)
+                {
+                    try
+                    {
+                        await UploadBlock(client, currentBlockId, currentBlockData, ct);
+                        var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                        logger.LogInformation($"Uploaded block {blockList.Count}. Progress: " +
+                            $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }
+
+                if (isLast || uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
+                {
+                    await Task.WhenAll(uploadTasks);
+                    var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
+                    await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommit, null, cancellationToken);
+                    uploadTasks.Clear();
+                }
+            }
+
+            int bytesRead;
+            while ((bytesRead = await stream.ReadAsync(networkReadBuffer, 0, networkReadBuffer.Length, cancellationToken)) > 0)
+            {
                 accumulationBuffer.Write(networkReadBuffer, 0, bytesRead);
                 position += bytesRead;
 
-                bool isLastBlock = position >= streamLength;
-                if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize || isLastBlock)
+                if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize)
                 {
-                    accumulationBuffer.Position = 0;
-                    var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                    byte[] blockData = accumulationBuffer.ToArray();
-                    blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
-
-                    blockList.Add(blockId);
-                    blocksInBatch++;
-                    accumulationBuffer.SetLength(0); // Clear accumulation buffer for next block
-                    await semaphore.WaitAsync(cancellationToken);
-                    uploadTasks.Add(UploadBlockAsync(blockBlobClient, blockId, blockData, cancellationToken));
-                    async Task UploadBlockAsync(BlockBlobClient client, string currentBlockId, byte[] currentBlockData, CancellationToken cancellationToken)
-                    {
-                        try
-                        {
-                            await UploadBlock(client, currentBlockId, currentBlockData, cancellationToken);
-
-                            var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
-                            logger.LogInformation($"Uploaded block {blockList.Count}. Progress: " +
-                                $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    }
-
-                    if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
-                    {
-                        await Task.WhenAll(uploadTasks);
-
-                        // Commit the blocks we have so far without MD5 hash
-                        var blocksToCommit = blockList.ToList();
-                        var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
-                        await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
-
-                        uploadTasks.Clear();
-                    }
+                    await FlushAccumulationBuffer(isLast: false);
                 }
             }
-            await Task.WhenAll(uploadTasks);
 
-            // Calculate final MD5
+            // Flush whatever remains as the final block
+            await FlushAccumulationBuffer(isLast: true);
+
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
-            {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
-            }
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit, null, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +

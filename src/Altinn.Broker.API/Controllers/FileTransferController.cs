@@ -103,15 +103,11 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     {
         logger.LogInformation("Uploading file for file transfer {fileTransferId}", fileTransferId.ToString());
 
-        if (Request.ContentLength is null)
-        {
-            return Problem("Content-length header is required");
-        }
         var commandResult = await handler.Process(new UploadFileRequest()
         {
             FileTransferId = fileTransferId,
             UploadStream = Request.Body,
-            ContentLength = Request.ContentLength.Value
+            ContentLength = Request.ContentLength
         }, HttpContext.User, cancellationToken);
         return commandResult.Match(
             fileTransferId => Ok(new FileTransferUploadResponseExt()

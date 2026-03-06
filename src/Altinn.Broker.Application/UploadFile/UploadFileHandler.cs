@@ -85,7 +85,7 @@ public class UploadFileHandler(
 
         try
         {
-            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
+            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
             var finishedUploadTimestamp = DateTime.UtcNow;
             if (checksum is null)
             {
