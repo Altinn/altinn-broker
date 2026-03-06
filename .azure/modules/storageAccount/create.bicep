@@ -9,13 +9,14 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   tags: resourceGroup().tags
   kind: 'StorageV2'
   sku: {
-    name: 'Standard_LRS'
+    name: 'Standard_ZRS'
   }
   properties: {
     accessTier: 'Cool'
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
   }
 }
 

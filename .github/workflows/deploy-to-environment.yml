@@ -50,6 +50,7 @@ jobs:
     permissions: 
       id-token: write
       contents: read
+      packages: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -79,14 +80,12 @@ jobs:
     - name: Migrate database
       uses: ./.github/actions/migrate-database
       with:
-        region: norwayeast
-        environment: ${{ inputs.environment }}
         AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
         AZURE_ENVIRONMENT_KEY_VAULT_NAME: ${{ secrets.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        AZURE_MIGRATION_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_MIGRATION_STORAGE_ACCOUNT_NAME }}
+        MIGRATION_DOCKER_IMAGE_BASE_NAME: ghcr.io/altinn/altinn-broker-migration
 
     - name: Release version
       uses: ./.github/actions/release-version
