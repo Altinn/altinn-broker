@@ -638,7 +638,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var resource = new ResourceExt
         {
             MaxFileTransferSize = 1000000,
-            FileTransferTimeToLive = "P48H",
+            FileTransferTimeToLive = "P2D",
             PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = "PT24H"
         };
@@ -677,7 +677,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var resource = new ResourceExt
         {
             MaxFileTransferSize = 1000000,
-            FileTransferTimeToLive = "P48H",
+            FileTransferTimeToLive = "P2D",
             PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = "PT24H"
         };
