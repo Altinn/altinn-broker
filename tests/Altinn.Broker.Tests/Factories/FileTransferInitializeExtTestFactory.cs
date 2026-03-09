@@ -58,6 +58,16 @@ internal static class FileTransferInitializeExtTestFactory
         SendersFileTransferReference = "test-data"
     };
 
+    internal static FileTransferInitalizeExt BasicFileTransfer_With_AccessList_Resource_And_No_Recipients() => new FileTransferInitalizeExt()
+    {
+        ResourceId = TestConstants.RESOURCE_WITH_ACCESS_LIST,
+        Checksum = null,
+        FileName = "input.txt",
+        PropertyList = [],
+        Sender = "0192:991825827",
+        SendersFileTransferReference = "test-data"
+    };
+
     internal static FileTransferInitalizeExt BasicFileTransfer_ManifestShim() {
         var basicFileTransfer = BasicFileTransfer();
         basicFileTransfer.ResourceId = TestConstants.RESOURCE_WITH_MANIFEST_SHIM;
