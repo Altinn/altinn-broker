@@ -45,6 +45,12 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
     version: '16'
     administratorLogin: databaseUser
     administratorLoginPassword: administratorLoginPassword
+    maintenanceWindow: {
+      customWindow: 'Enabled'
+      dayOfWeek: 1
+      startHour: 3
+      startMinute: 0
+    }
     storage: {
       storageSizeGB: environment == 'production' ? 128 : 32
       tier: environment == 'test'
