@@ -140,12 +140,12 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             if (uploadTasks.Count > 0)
                 await Task.WhenAll(uploadTasks);
 
-            var isFirstAndOnlyCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
-            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstAndOnlyCommit, null, cancellationToken);
-
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
+
+            var isFirstAndOnlyCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
+            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstAndOnlyCommit, null, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
