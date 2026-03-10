@@ -83,7 +83,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             var uploadTasks = new List<Task>();
             using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads);
 
-            async Task FlushAccumulationBuffer(bool isLast)
+            async Task FlushAccumulationBuffer()
             {
                 if (accumulationBuffer.Length == 0) return;
 
@@ -112,7 +112,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                     }
                 }
 
-                if (isLast || uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
+                if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
                 {
                     await Task.WhenAll(uploadTasks);
                     var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
@@ -129,12 +129,19 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
 
                 if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize)
                 {
-                    await FlushAccumulationBuffer(isLast: false);
+                    await FlushAccumulationBuffer();
                 }
             }
 
-            // Flush whatever remains as the final block
-            await FlushAccumulationBuffer(isLast: true);
+            // Flush any remaining data in the buffer
+            await FlushAccumulationBuffer();
+
+            // Unconditional finalization — always await and commit remaining blocks
+            if (uploadTasks.Count > 0)
+                await Task.WhenAll(uploadTasks);
+
+            var isFirstAndOnlyCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
+            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstAndOnlyCommit, null, cancellationToken);
 
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
@@ -153,7 +160,6 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             throw;
         }
     }
-
     private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
         await BlobRetryPolicy.ExecuteAsync(logger, async () =>
