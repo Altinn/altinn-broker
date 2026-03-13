@@ -9,6 +9,7 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
+using Hangfire.Logging;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -33,6 +34,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
+        // Use a Hangfire log provider that does not depend on ASP.NET Core LoggerFactory.
+        LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
 
@@ -51,7 +55,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             logging.ClearProviders();
             logging.AddConsole();
             logging.AddDebug();
-            logging.SetMinimumLevel(LogLevel.Debug);
+            logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
         });
 
         // Overwrite registrations from Program.cs
