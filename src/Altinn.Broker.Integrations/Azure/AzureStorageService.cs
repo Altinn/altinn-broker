@@ -20,7 +20,7 @@ namespace Altinn.Broker.Integrations.Azure;
 
 public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
-    private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
+    protected virtual async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
         if (hostEnvironment.IsDevelopment())
         {
@@ -79,6 +79,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             var blockList = new List<string>();
             long position = 0;
             using var blobMd5 = MD5.Create();
+            var createdBlobByThisAttempt = false;
 
             var uploadTasks = new List<Task>();
             using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads);
@@ -115,8 +116,12 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
                 {
                     await Task.WhenAll(uploadTasks);
-                    var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
-                    await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommit, null, cancellationToken);
+                    var isFirstCommitForThisCall = !createdBlobByThisAttempt;
+                    await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForThisCall, null, cancellationToken);
+                    if (isFirstCommitForThisCall)
+                    {
+                        createdBlobByThisAttempt = true;
+                    }
                     uploadTasks.Clear();
                 }
             }
@@ -136,7 +141,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             // Flush any remaining data in the buffer
             await FlushAccumulationBuffer();
 
-            // Unconditional finalization — always await and commit remaining blocks
+            // Unconditional finalization ï¿½ always await and commit remaining blocks
             if (uploadTasks.Count > 0)
                 await Task.WhenAll(uploadTasks);
 
@@ -144,8 +149,8 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             if (blobMd5.Hash is null)
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
 
-            var isFirstAndOnlyCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
-            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstAndOnlyCommit, null, cancellationToken);
+            var isFirstCommitForFinalCall = !createdBlobByThisAttempt;
+            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForFinalCall, null, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
@@ -160,7 +165,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             throw;
         }
     }
-    private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
+    protected virtual async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
         await BlobRetryPolicy.ExecuteAsync(logger, async () =>
         {
@@ -182,7 +187,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         });
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
+    protected virtual async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
         CancellationToken cancellationToken)
     {
         await BlobRetryPolicy.ExecuteAsync(logger, async () =>
