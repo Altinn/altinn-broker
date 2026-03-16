@@ -9,6 +9,7 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
+using Hangfire.Logging;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -29,6 +30,12 @@ using Polly;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
    public virtual bool EnableMalwareScanSimulation => true;
+
+    static CustomWebApplicationFactory()
+    {
+        // Use a Hangfire log provider that does not depend on ASP.NET Core LoggerFactory.
+        LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+    }
 
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
@@ -51,7 +58,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             logging.ClearProviders();
             logging.AddConsole();
             logging.AddDebug();
-            logging.SetMinimumLevel(LogLevel.Debug);
+            logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
         });
 
         // Overwrite registrations from Program.cs

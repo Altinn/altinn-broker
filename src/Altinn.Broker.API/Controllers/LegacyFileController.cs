@@ -159,11 +159,11 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
         if (recipients?.Length > 0)
         {
             var recipientsString = string.Join(',', recipients);
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
+            logger.LogInformation("Getting files with status {status} from {from} to {to} for recipients {recipients}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), recipientsString.SanitizeForLogs());
         }
         else
         {
-            logger.LogInformation("Getting files with status {status} created {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer?.SanitizeForLogs());
+            logger.LogInformation("Getting files with status {status} from {from} to {to} for consumer {consumer}", recipientStatus?.ToString(), from?.ToString(), to?.ToString(), onBehalfOfConsumer?.SanitizeForLogs());
         }
 
         var queryResult = await handler.Process(new LegacyGetFilesRequest()
