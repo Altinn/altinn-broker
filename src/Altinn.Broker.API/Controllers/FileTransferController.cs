@@ -256,7 +256,10 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write <br/>
-    /// Result is limited to 100 files. If your query returns more than 100 files, you will only receive the 100 last created.
+    /// Date filtering behavior: <br/>
+    /// - If <c>status</c> is included, <c>from</c> and <c>to</c> filter on when the file transfer changed to that status. <br/>
+    /// - If <c>status</c> is not included, <c>from</c> and <c>to</c> filter on file transfer <c>created</c> time. <br/>
+    /// Result is limited to 100 files. If your query returns more than 100 files, only the 100 newest in the active timeline are returned.
     /// </remarks>
     /// <response code="200">Returns the list of file transfers</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
@@ -280,7 +283,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         [FromServices] GetFileTransfersHandler handler,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Getting fileTransfers with status {status} created {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
+        logger.LogInformation("Getting fileTransfers with status {status} from {from} to {to}", status?.ToString(), from?.ToString(), to?.ToString());
         var queryResult = await handler.Process(new GetFileTransfersRequest()
         {
             ResourceId = resourceId,
