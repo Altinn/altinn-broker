@@ -320,6 +320,9 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
     {
         StringBuilder commandString = new StringBuilder();
         long[] actorIds = fileTransferSearch.GetActorIds();
+        string timestampColumn = fileTransferSearch.FileTransferStatus.HasValue
+            ? "sst.status_date"
+            : "f.created";
 
         commandString.AppendLine(@"
 SELECT f.file_transfer_id_pk, f.created
@@ -331,6 +334,18 @@ FROM broker.file_transfer f");
             commandString.AppendLine(@"
 INNER JOIN broker.actor_file_transfer_latest_status afls
   ON afls.file_transfer_id_fk = f.file_transfer_id_pk");
+        }
+
+        // Join status timeline when filtering by file transfer status.
+        if (fileTransferSearch.FileTransferStatus.HasValue)
+        {
+            commandString.AppendLine(@"
+LEFT JOIN LATERAL (
+  SELECT MAX(fs.file_transfer_status_date) AS status_date
+  FROM broker.file_transfer_status fs
+  WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
+    AND fs.file_transfer_status_description_id_fk = @fileTransferStatus
+) sst ON TRUE");
         }
 
         commandString.AppendLine("WHERE 1=1");
@@ -367,15 +382,15 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         // Date range filtering
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("  AND f.created BETWEEN @from AND @to");
+            commandString.AppendLine($"  AND {timestampColumn} BETWEEN @from AND @to");
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            commandString.AppendLine("  AND f.created > @from");
+            commandString.AppendLine($"  AND {timestampColumn} > @from");
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            commandString.AppendLine("  AND f.created < @to");
+            commandString.AppendLine($"  AND {timestampColumn} < @to");
         }
 
         // Resource ID filtering
@@ -384,7 +399,7 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
             commandString.AppendLine("  AND f.resource_id = @resourceId");
         }
 
-        commandString.AppendLine("ORDER BY f.created ASC;");
+        commandString.AppendLine($"ORDER BY {timestampColumn} ASC;");
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
@@ -434,17 +449,19 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     public async Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         string recipientSelect = @"
-            SELECT DISTINCT afls.file_transfer_id_fk as file_transfer_id, f.created
+            SELECT DISTINCT afls.file_transfer_id_fk as file_transfer_id, {3} as sort_date
             FROM broker.actor_file_transfer_latest_status afls 
             INNER JOIN broker.file_transfer f on f.file_transfer_id_pk = afls.file_transfer_id_fk
+            {2}
             WHERE afls.actor_id_fk = @actorId AND f.resource_id = @resourceId
             {0}
             {1}";
 
         string senderSelect = @"
-            SELECT f.file_transfer_id_pk as file_transfer_id, f.created 
+            SELECT f.file_transfer_id_pk as file_transfer_id, {3} as sort_date
             FROM broker.file_transfer f 
             INNER JOIN broker.actor a on a.actor_id_pk = f.sender_actor_id_fk 
+            {2}
             WHERE a.actor_external_id = @actorExternalId AND resource_id = @resourceId
             {0}
             {1}";
@@ -456,19 +473,30 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
         string statusCondition = fileTransferSearch.Status.HasValue
             ? "AND f.latest_file_status_id = @fileTransferStatus"
             : "";
+        string statusTimestampJoin = fileTransferSearch.Status.HasValue
+            ? @"LEFT JOIN LATERAL (
+                    SELECT MAX(fs.file_transfer_status_date) AS status_date
+                    FROM broker.file_transfer_status fs
+                    WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
+                      AND fs.file_transfer_status_description_id_fk = @fileTransferStatus
+                ) sst ON TRUE"
+            : "";
+        string timestampColumn = fileTransferSearch.Status.HasValue
+            ? "sst.status_date"
+            : "f.created";
 
         string dateCondition = "";
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            dateCondition = "AND f.created between @from AND @to";
+            dateCondition = $"AND {timestampColumn} between @from AND @to";
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            dateCondition = "AND f.created > @from";
+            dateCondition = $"AND {timestampColumn} > @from";
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            dateCondition = "AND f.created < @to";
+            dateCondition = $"AND {timestampColumn} < @to";
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
@@ -479,10 +507,10 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
 
         string commandString = string.Join("\nUNION\n\n", selects) + @"
 
-            ORDER BY created {2}
+            ORDER BY sort_date {4}
             LIMIT 100;";
 
-        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
+        commandString = string.Format(commandString, statusCondition, dateCondition, statusTimestampJoin, timestampColumn, orderDirection);
 
 
         await using var command = dataSource.CreateCommand(commandString);
@@ -514,43 +542,55 @@ INNER JOIN broker.actor_file_transfer_latest_status afls
     public async Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         string commandString = @"
-            SELECT f.file_transfer_id_pk, f.created
+            SELECT f.file_transfer_id_pk, {3} as sort_date
             FROM broker.file_transfer f
             INNER JOIN broker.actor_file_transfer_latest_status afls
                 ON afls.file_transfer_id_fk = f.file_transfer_id_pk
+            {2}
             WHERE afls.actor_id_fk = @recipientId
               AND afls.latest_actor_status_id = @recipientFileStatus
               AND f.resource_id = @resourceId
             {0}
             {1}
-            ORDER BY f.created {2}
+            ORDER BY sort_date {4}
             LIMIT 100;";
 
         string statusCondition = fileTransferSearch.Status.HasValue
             ? "AND f.latest_file_status_id = @fileStatus"
             : "";
+        string statusTimestampJoin = fileTransferSearch.Status.HasValue
+            ? @"LEFT JOIN LATERAL (
+                    SELECT MAX(fs.file_transfer_status_date) AS status_date
+                    FROM broker.file_transfer_status fs
+                    WHERE fs.file_transfer_id_fk = f.file_transfer_id_pk
+                      AND fs.file_transfer_status_description_id_fk = @fileStatus
+                ) sst ON TRUE"
+            : "";
+        string timestampColumn = fileTransferSearch.Status.HasValue
+            ? "sst.status_date"
+            : "f.created";
 
         string dateCondition = "";
         if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
         {
-            dateCondition = "AND f.created BETWEEN @from AND @to";
+            dateCondition = $"AND {timestampColumn} BETWEEN @from AND @to";
         }
         else if (fileTransferSearch.From.HasValue)
         {
-            dateCondition = "AND f.created > @from";
+            dateCondition = $"AND {timestampColumn} > @from";
         }
         else if (fileTransferSearch.To.HasValue)
         {
-            dateCondition = "AND f.created < @to";
+            dateCondition = $"AND {timestampColumn} < @to";
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
-        commandString = string.Format(commandString, statusCondition, dateCondition, orderDirection);
+        commandString = string.Format(commandString, statusCondition, dateCondition, statusTimestampJoin, timestampColumn, orderDirection);
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@recipientId", fileTransferSearch.Actor.ActorId);
         command.Parameters.AddWithValue("@resourceId", fileTransferSearch.ResourceId);
-        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus);
+        command.Parameters.AddWithValue("@recipientFileStatus", (int)fileTransferSearch.RecipientStatus!.Value);
 
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);

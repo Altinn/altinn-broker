@@ -53,10 +53,7 @@ internal class GetResourceResponse
     public bool? EnterpriseUserEnabled { get; set; }
 
     [JsonPropertyName("resourceType")]
-    public string? ResourceType { get; set; }
-
-    [JsonPropertyName("accessListMode")]
-    public string? AccessListMode { get; set; }
+    public required string ResourceType { get; set; }
 }
 
 internal class HasCompetentAuthority
@@ -75,22 +72,4 @@ public class Keyword
 {
     public required string Word { get; set; }
     public required string Language { get; set; }
-}
-
-internal class AccessListMembershipResponse
-{
-    [JsonPropertyName("data")]
-    public List<AccessListMembership>? Data { get; set; }
-}
-
-internal class AccessListMembership
-{
-    [JsonPropertyName("party")]
-    public string? Party { get; set; }
-
-    [JsonPropertyName("resource")]
-    public string? Resource { get; set; }
-
-    [JsonPropertyName("since")]
-    public DateTimeOffset? Since { get; set; }
 }
