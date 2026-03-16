@@ -31,12 +31,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
    public virtual bool EnableMalwareScanSimulation => true;
 
-    protected override void ConfigureWebHost(
-        IWebHostBuilder builder)
+    static CustomWebApplicationFactory()
     {
         // Use a Hangfire log provider that does not depend on ASP.NET Core LoggerFactory.
         LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+    }
 
+    protected override void ConfigureWebHost(
+        IWebHostBuilder builder)
+    {
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
 
