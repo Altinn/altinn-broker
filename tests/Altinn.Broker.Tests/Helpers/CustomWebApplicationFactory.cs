@@ -29,17 +29,28 @@ using Polly;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-   public virtual bool EnableMalwareScanSimulation => true;
+    private static readonly object _hangfireLogProviderLock = new();
+    private static bool _hangfireLogProviderInitialized;
 
-    static CustomWebApplicationFactory()
-    {
-        // Use a Hangfire log provider that does not depend on ASP.NET Core LoggerFactory.
-        LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
-    }
+    public virtual bool EnableMalwareScanSimulation => true;
 
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
+        // Ensure Hangfire uses a test-safe log provider exactly once per test process,
+        // overriding any AspNetCoreLogProvider that depends on a scoped LoggerFactory.
+        if (!_hangfireLogProviderInitialized)
+        {
+            lock (_hangfireLogProviderLock)
+            {
+                if (!_hangfireLogProviderInitialized)
+                {
+                    LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+                    _hangfireLogProviderInitialized = true;
+                }
+            }
+        }
+
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
 
