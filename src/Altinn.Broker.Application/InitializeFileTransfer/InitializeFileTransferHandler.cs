@@ -46,16 +46,20 @@ public class InitializeFileTransferHandler(
             logger.LogInformation("Sender using legacy format: {sender}", request.SenderExternalId.SanitizeForLogs());
         }
 
+        List<string> mappedRecipients = new List<string>();
         // Log recipients format
         foreach (var recipient in request.RecipientExternalIds)
         {
             if (recipient.StartsWith("urn:altinn:organization:identifier-no:"))
             {
                 logger.LogInformation("Recipient using new URN format: {recipient}", recipient.SanitizeForLogs());
+                mappedRecipients.Add(recipient);
             }
             else if (recipient.StartsWith("0192:"))
             {
-                logger.LogInformation("Recipient using legacy format: {recipient}", recipient.SanitizeForLogs());
+                logger.LogInformation("Recipient using legacy format: {recipient}, mapping to URN", recipient.SanitizeForLogs());
+                var mappedRecipient = recipient.WithoutPrefix().WithUrnPrefix();
+                mappedRecipients.Add(mappedRecipient);
             }
         }
 
@@ -92,7 +96,7 @@ public class InitializeFileTransferHandler(
         }
         if (altinnResource.AccessListEnabled)
         {
-            foreach (var recipient in request.RecipientExternalIds)
+            foreach (var recipient in mappedRecipients)
             {
                 var accessList = await altinnResourceRepository.GetAccessListOfResource(request.ResourceId, recipient, cancellationToken);
                 if (accessList is null || accessList.Count == 0)
