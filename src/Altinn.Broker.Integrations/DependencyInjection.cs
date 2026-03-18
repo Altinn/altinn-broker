@@ -53,6 +53,10 @@ public static class DependencyInjection
             services.AddHttpClient<IAuthorizationService, AltinnAuthorizationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAuthorizationService>()
                     .AddStandardRetryPolicy();
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnResourceRepository).FullName, maskinportenSettings);
+            services.AddHttpClient<IAltinnResourceRepository, AltinnResourceRegistryRepository>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnResourceRepository>()
+                    .AddStandardRetryPolicy();
         }
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
