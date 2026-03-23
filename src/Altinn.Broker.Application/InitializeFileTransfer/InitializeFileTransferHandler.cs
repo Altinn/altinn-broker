@@ -94,7 +94,7 @@ public class InitializeFileTransferHandler(
         {
             foreach (var recipient in request.RecipientExternalIds)
             {
-                var accessList = await altinnResourceRepository.GetAccessListOfResource(request.ResourceId, recipient, cancellationToken);
+                var accessList = await altinnResourceRepository.GetAccessListOfResource(request.ResourceId, recipient.WithoutPrefix(), cancellationToken);
                 if (accessList is null || accessList.Count == 0)
                 {
                     return Errors.RecipientNotInAccessList;

@@ -88,7 +88,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 
     public async Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default)
     {
-        var url = $"resourceregistry/api/v1/access-lists/memberships?resource=urn:altinn:resource:{resourceId}&party={party}";
+        var url = $"resourceregistry/api/v1/access-lists/memberships?resource=urn:altinn:resource:{resourceId}&party=urn:altinn:organization:identifier-no:{party}";
         var response = await _client.GetAsync(url, cancellationToken);
         return response.StatusCode switch
         {
