@@ -9,6 +9,7 @@ using System.Xml;
 using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.PurgeFileTransfer;
+using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -1153,12 +1154,14 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
     }
 
-    [Fact]
-    public async Task InitializeFileTransfer_WithRecipientNotInAccessList_ReturnsBadRequest()
+    [Theory]
+    [InlineData("0192:999999999")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    public async Task InitializeFileTransfer_WithRecipientNotInAccessList_ReturnsBadRequest(string recipient)
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
-        file.Recipients.Add("0192:999999999");
+        file.Recipients.Add(recipient);
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
@@ -1170,12 +1173,14 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
     }
 
-    [Fact]
-    public async Task InitializeFileTransfer_WithRecipientInAccessList_Succeeds()
+    [Theory]
+    [InlineData("0192:311764837")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837")]
+    public async Task InitializeFileTransfer_WithRecipientInAccessList_Succeeds(string recipient)
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
-        file.Recipients.Add("0192:311764837");
+        file.Recipients.Add(recipient);
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
@@ -1188,13 +1193,15 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
     }
 
-    [Fact]
-    public async Task InitializeFileTransfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest()
+    [Theory]
+    [InlineData("0192:311764837", "0192:999999999")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837", UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    public async Task InitializeFileTransfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest(string recipientInAccessList, string recipientNotInAccessList)
     {
         // Arrange
         var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
-        file.Recipients.Add("0192:311764837");
-        file.Recipients.Add("0192:999999999");
+        file.Recipients.Add(recipientInAccessList);
+        file.Recipients.Add(recipientNotInAccessList);
 
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);

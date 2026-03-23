@@ -64,6 +64,7 @@ internal static class FileTransferInitializeExtTestFactory
         Checksum = null,
         FileName = "input.txt",
         PropertyList = [],
+        Recipients = new List<string>(),
         Sender = "0192:991825827",
         SendersFileTransferReference = "test-data"
     };

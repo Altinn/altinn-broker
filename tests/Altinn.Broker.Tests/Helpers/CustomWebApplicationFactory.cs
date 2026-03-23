@@ -175,7 +175,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 });
             altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((List<string>?)null);
-            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.Is("0192:311764837", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.Is("311764837", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<string> { "gl908ae2-ci9f-481m-9700-1t7brok12345" });
             services.AddSingleton(altinnResourceRepository.Object);
 
