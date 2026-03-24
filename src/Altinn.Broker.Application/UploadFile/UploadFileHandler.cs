@@ -120,7 +120,7 @@ public class UploadFileHandler(
             await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
         }
-        else if (!fileTransfer.UseVirusScan || (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan))
+        if (!fileTransfer.UseVirusScan || (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan))
         {
             if (hostEnvironment.IsDevelopment())
             {
