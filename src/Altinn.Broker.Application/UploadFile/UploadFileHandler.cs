@@ -120,18 +120,26 @@ public class UploadFileHandler(
             await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadProcessing, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
         }
-        if (!fileTransfer.UseVirusScan || (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan))
+        else if (!fileTransfer.UseVirusScan)
         {
-            if (hostEnvironment.IsDevelopment())
-            {
-                await SimulateMalwareScanResult(request.FileTransferId);
-            }
+            await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Published, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
             }
+            backgroundJobClient.Enqueue<IBrokerStorageService>((service) => service.SetContentHashForExistingBlob(serviceOwner, fileTransfer, cancellationToken));
         }
+
+        if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
+        {
+            await SimulateMalwareScanResult(request.FileTransferId);
+            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+            {
+                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
+            }
+        } 
         return fileTransfer.FileTransferId;
     }
 
