@@ -115,7 +115,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
                     Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("latest_file_status_id")),
                     Date = reader.GetDateTime(reader.GetOrdinal("latest_file_status_date")),
-                    DetailedStatus = reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
+                    DetailedStatus = reader.GetString(reader.GetOrdinal("file_transfer_status_description"))
                 });
             }
             return fileTransferStatuses;
