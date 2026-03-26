@@ -197,6 +197,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         if (string.IsNullOrEmpty(fileTransferEntity.Checksum))
         {
             logger.LogError("Did not set checksum content hash because checksum was not found on file transfer");
+            return;
         }
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
