@@ -95,7 +95,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         var query = @"
             SELECT ft.file_transfer_id_pk, ft.latest_file_status_id, ft.latest_file_status_date, ftsd.file_transfer_status_detailed_description
             FROM broker.file_transfer ft 
-			LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status_id 
+			LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status 
             WHERE ft.latest_file_status_id = ANY(@statusFilters)
             AND ft.latest_file_status_date < @minStatusDate
         ";
