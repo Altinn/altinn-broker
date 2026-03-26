@@ -99,7 +99,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
 			LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status_id 
             WHERE ft.latest_file_status_id = ANY(@statusFilters)
             AND ft.latest_file_status_date < @minStatusDate
-        )";
+        ";
 
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@statusFilters", statusFilters.Select(s => (int)s).ToArray());
