@@ -40,7 +40,7 @@ public class StuckFileTransferHandler(
             await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
                 logger.LogError("File transfer {fileTransferId} has been stuck in UploadStarted for more than {thresholdMinutes} minutes. Marking as failed.", fileTransferStatus.FileTransferId, _stuckInUploadStartingThresholdMinutes);
-                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken);
                 backgroundJobClient.Enqueue<IEventBus>((eventBus) => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender, CancellationToken.None));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
