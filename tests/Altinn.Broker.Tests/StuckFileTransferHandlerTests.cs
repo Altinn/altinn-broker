@@ -3,6 +3,8 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 
+using Hangfire;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +23,8 @@ public class StuckFileTransferHandlerTests
     {
         // Arrange
         var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var slackClient = new Mock<ISlackClient>();
         var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
         var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
@@ -28,7 +32,7 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, slackNotifier, monitorLogger.Object);
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         fileTransferStatusRepository.Setup(r => r
             .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<Core.Domain.Enums.FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
@@ -51,6 +55,8 @@ public class StuckFileTransferHandlerTests
     {
         // Arrange
         var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var slackClient = new Mock<ISlackClient>();
         var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
         var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
@@ -58,7 +64,7 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, slackNotifier, monitorLogger.Object);
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         var fileTransferId = Guid.NewGuid();
         var stuckfileTransferStatuses = new List<FileTransferStatusEntity>()
