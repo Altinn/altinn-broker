@@ -93,7 +93,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
     public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(List<FileTransferStatus> statusFilters, DateTime minStatusDate, CancellationToken cancellationToken)
     {
         var query = @"
-            SELECT ft.file_transfer_id_pk, ft.latest_file_status_id, ft.latest_file_status_date, ftsd.file_transfer_status_description
+            SELECT ft.file_transfer_id_pk, ft.latest_file_status_id, ft.latest_file_status_date, ftsd.file_transfer_status_detailed_description
             FROM broker.file_transfer ft 
 			LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status_id 
             WHERE ft.latest_file_status_id = ANY(@statusFilters)
