@@ -9,7 +9,6 @@ resource monitoringReaderRoleAssignment 'Microsoft.Authorization/roleAssignments
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringReaderRoleDefinitionId)
     principalId: grafanaPrincipalId
-    principalType: 'ServicePrincipal'
   }
 }
 
