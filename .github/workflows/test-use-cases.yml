@@ -39,7 +39,7 @@ jobs:
         fi
     
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Run use case tests
       id: usecase-test
@@ -64,7 +64,7 @@ jobs:
     - name: Report failure to Slack
       if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
       id: slack
-      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+      uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
       with:
         webhook-type: incoming-webhook
         webhook: ${{ secrets.BRUKSMONSTER_SLACK_URL || secrets.SLACK_URL }}
