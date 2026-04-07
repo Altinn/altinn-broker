@@ -111,6 +111,19 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     }
 
     [Fact]
+    public async Task DownloadMonthlyStatisticsCsv_YearAboveDateTimeRange_ReturnsBadRequest()
+    {
+        var response = await _serviceOwnerClient.GetAsync(
+            "broker/api/v1/statistics/monthly?year=10000&month=1");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(StatisticsErrors.InvalidMonthFormat.Message, parsedError.Detail);
+    }
+
+    [Fact]
     public async Task DownloadMonthlyStatisticsCsv_ForSenderToken_ReturnsForbidden()
     {
         var response = await _senderClient.GetAsync(

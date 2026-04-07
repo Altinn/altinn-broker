@@ -27,7 +27,7 @@ public class GenerateMonthlyStatisticsCsvHandler(
             request.Year,
             request.Month);
 
-        if (request.Year < 1 || request.Month < 1 || request.Month > 12)
+        if (request.Year < 1 || request.Year > 9999 || request.Month < 1 || request.Month > 12 || (request.Year == 9999 && request.Month == 12))
         {
             return StatisticsErrors.InvalidMonthFormat;
         }
