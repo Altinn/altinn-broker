@@ -19,7 +19,7 @@ export function buildInitializeFileTransferPayload(recipientOrgNo) {
             useCase: 'Use case tests',
             description: 'Test file transfer initialization for use case tests'
         },
-        disableVirusScan: false
+        disableVirusScan: true
     };
 }
 
@@ -37,6 +37,6 @@ export function buildLegacyInitializeFileTransferPayload(recipientOrgNo) {
             useCase: 'Use case tests',
             description: 'Test file transfer initialization for legacy use case tests'
         },
-        disableVirusScan: false
+        disableVirusScan: true
     };
 }

@@ -17,6 +17,8 @@ internal class TestConstants
     internal const string RESOURCE_FOR_TEST_REQUIREDPARTY = "ttd-brokertestressurs";
     internal const string RESOURCE_WITH_NO_ACCESS = "altinn-broker-test-resource-failed-access";
 
+    internal const string RESOURCE_WITH_ACCESS_LIST = "ttd-broker-tilgangsliste";
+
     internal const string RESOURCE_WITH_MANIFEST_SHIM = "manifest-shim-resource";
 
     internal const string RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER = "altinn-broker-test-resource-with-unconfigured-serviceowner";

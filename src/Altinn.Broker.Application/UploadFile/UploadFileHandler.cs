@@ -85,13 +85,14 @@ public class UploadFileHandler(
 
         try
         {
-            var checksum = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, request.ContentLength, cancellationToken);
+            var result = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
             var finishedUploadTimestamp = DateTime.UtcNow;
-            if (checksum is null)
+            if (result is null)
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "File upload failed and was aborted", cancellationToken);
                 return Errors.UploadFailed;
             }
+            var (checksum, uploadLength) = result.Value;
             if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum) && !string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
                 await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "Checksum mismatch", cancellationToken);
@@ -114,7 +115,7 @@ public class UploadFileHandler(
                         backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
                     }
                 }                 
-                await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), request.ContentLength, cancellationToken);
+                await fileTransferRepository.SetStorageDetails(request.FileTransferId, storageProvider.Id, request.FileTransferId.ToString(), uploadLength, cancellationToken);
                 if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
                 {
                     await fileTransferRepository.SetChecksum(request.FileTransferId, checksum, cancellationToken);
