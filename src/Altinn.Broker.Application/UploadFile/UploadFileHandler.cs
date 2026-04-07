@@ -134,15 +134,16 @@ public class UploadFileHandler(
             }, logger, cancellationToken);
         }
 
-        if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
-        {
-            await SimulateMalwareScanResult(request.FileTransferId);
-            backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-            {
-                backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
-            }
-        }
+        // Temporarily disabled to force real malware scanning during testing.
+        // if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
+        // {
+        //     await SimulateMalwareScanResult(request.FileTransferId);
+        //     backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
+        //     foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+        //     {
+        //         backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.Published, fileTransfer.ResourceId, request.FileTransferId.ToString(), recipient.Actor.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
+        //     }
+        // }
         return fileTransfer.FileTransferId;
     }
 
