@@ -3,6 +3,7 @@ using System.Text;
 
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Logging;
@@ -21,12 +22,6 @@ public class GenerateMonthlyStatisticsCsvHandler(
         ClaimsPrincipal? user,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation(
-            "Generating monthly statistics CSV for resource {ResourceId} for {Year}-{Month}",
-            request.ResourceId,
-            request.Year,
-            request.Month);
-
         if (request.Year < 1 || request.Year > 9999 || request.Month < 1 || request.Month > 12 || (request.Year == 9999 && request.Month == 12))
         {
             return StatisticsErrors.InvalidMonthFormat;
@@ -41,6 +36,12 @@ public class GenerateMonthlyStatisticsCsvHandler(
         {
             return Errors.NoAccessToResource;
         }
+
+        logger.LogInformation(
+            "Generating monthly statistics CSV for service owner {ServiceOwnerId} for {Year}-{Month}",
+            callerOrganizationId.SanitizeForLogs(),
+            request.Year,
+            request.Month);
 
         if (!string.IsNullOrWhiteSpace(request.ResourceId))
         {
