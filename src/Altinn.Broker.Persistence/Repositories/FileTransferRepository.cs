@@ -984,175 +984,114 @@ LEFT JOIN LATERAL (
         IReadOnlyList<string>? groupByPropertyKeys,
         CancellationToken cancellationToken)
     {
-        const string query = @"
-            WITH recipient_pairs AS (
-                SELECT DISTINCT
-                    afs.file_transfer_id_fk,
-                    afs.actor_id_fk
-                FROM broker.actor_file_transfer_status afs
-            ),
-            distinct_download_started AS (
-                SELECT DISTINCT ON (afs.file_transfer_id_fk, afs.actor_id_fk)
-                    afs.file_transfer_id_fk,
-                    afs.actor_id_fk,
-                    afs.actor_file_transfer_status_date
-                FROM broker.actor_file_transfer_status afs
-                WHERE afs.actor_file_transfer_status_description_id_fk = @downloadStartedStatus
-                ORDER BY afs.file_transfer_id_fk, afs.actor_id_fk, afs.actor_file_transfer_status_date ASC, afs.actor_file_transfer_status_id_pk ASC
-            ),
-            transfer_property_groups AS (
+        var hasGroupByPropertyKeys = groupByPropertyKeys is { Count: > 0 };
+        var groupedPropertiesCte = hasGroupByPropertyKeys
+            ? @",
+            grouped_properties AS (
+                SELECT
+                    fp.file_transfer_id_fk,
+                    jsonb_object_agg(fp.key, fp.value) AS grouped_property_values
+                FROM broker.file_transfer_property fp
+                INNER JOIN scoped_transfers st ON st.file_transfer_id_pk = fp.file_transfer_id_fk
+                WHERE fp.key = ANY(@groupByPropertyKeys)
+                GROUP BY fp.file_transfer_id_fk
+            )"
+            : string.Empty;
+        var groupedPropertiesSelect = hasGroupByPropertyKeys
+            ? "COALESCE(gp.grouped_property_values, '{}'::jsonb) AS grouped_property_values,"
+            : "'{}'::jsonb AS grouped_property_values,";
+        var groupedPropertiesJoin = hasGroupByPropertyKeys
+            ? "LEFT JOIN grouped_properties gp ON gp.file_transfer_id_fk = st.file_transfer_id_pk"
+            : string.Empty;
+
+        var query = $@"
+            WITH scoped_transfers AS (
                 SELECT
                     f.file_transfer_id_pk,
-                    COALESCE(
-                        (
-                            SELECT jsonb_object_agg(fp.key, fp.value)
-                            FROM broker.file_transfer_property fp
-                            WHERE fp.file_transfer_id_fk = f.file_transfer_id_pk
-                              AND fp.key = ANY(@groupByPropertyKeys)
-                        ),
-                        '{}'::jsonb
-                    ) AS grouped_property_values
+                    f.created,
+                    f.resource_id,
+                    sender.actor_external_id AS sender
                 FROM broker.file_transfer f
+                INNER JOIN broker.altinn_resource ar ON ar.resource_id_pk = f.resource_id
+                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+                WHERE ar.service_owner_id_fk = @serviceOwnerId
+                  AND (@resourceId IS NULL OR f.resource_id = @resourceId)
             ),
-            monthly_counts AS (
+            pair_metrics AS (
                 SELECT
-                    EXTRACT(YEAR FROM f.created)::int AS year,
-                    EXTRACT(MONTH FROM f.created)::int AS month,
-                    f.resource_id AS resource_id,
-                    sender.actor_external_id AS sender,
-                    recipient.actor_external_id AS recipient,
-                    tpg.grouped_property_values,
-                    COUNT(*)::int AS upload_count,
-                    0::int AS download_attempt_count,
-                    0::int AS download_started_count,
-                    0::int AS download_confirmed_count
-                FROM broker.file_transfer f
-                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
-                INNER JOIN recipient_pairs rp ON rp.file_transfer_id_fk = f.file_transfer_id_pk
-                INNER JOIN broker.actor recipient ON recipient.actor_id_pk = rp.actor_id_fk
-                INNER JOIN broker.altinn_resource ar ON ar.resource_id_pk = f.resource_id
-                INNER JOIN transfer_property_groups tpg ON tpg.file_transfer_id_pk = f.file_transfer_id_pk
-                WHERE ar.service_owner_id_fk = @serviceOwnerId
-                  AND f.created >= @fromInclusive
-                  AND f.created < @toExclusive
-                  AND (@resourceId IS NULL OR f.resource_id = @resourceId)
-                GROUP BY
-                    EXTRACT(YEAR FROM f.created),
-                    EXTRACT(MONTH FROM f.created),
-                    f.resource_id,
-                    sender.actor_external_id,
-                    recipient.actor_external_id,
-                    tpg.grouped_property_values
-
-                UNION ALL
-
-                SELECT
-                    EXTRACT(YEAR FROM afs.actor_file_transfer_status_date)::int AS year,
-                    EXTRACT(MONTH FROM afs.actor_file_transfer_status_date)::int AS month,
-                    f.resource_id AS resource_id,
-                    sender.actor_external_id AS sender,
-                    recipient.actor_external_id AS recipient,
-                    tpg.grouped_property_values,
-                    0::int AS upload_count,
-                    COUNT(*)::int AS download_attempt_count,
-                    0::int AS download_started_count,
-                    0::int AS download_confirmed_count
+                    afs.file_transfer_id_fk,
+                    afs.actor_id_fk,
+                    COUNT(*) FILTER (
+                        WHERE afs.actor_file_transfer_status_description_id_fk = @downloadStartedStatus
+                          AND afs.actor_file_transfer_status_date >= @fromInclusive
+                          AND afs.actor_file_transfer_status_date < @toExclusive
+                    )::int AS download_attempt_count,
+                    MIN(afs.actor_file_transfer_status_date) FILTER (
+                        WHERE afs.actor_file_transfer_status_description_id_fk = @downloadStartedStatus
+                    ) AS first_download_started_at,
+                    COUNT(*) FILTER (
+                        WHERE afs.actor_file_transfer_status_description_id_fk = @downloadConfirmedStatus
+                          AND afs.actor_file_transfer_status_date >= @fromInclusive
+                          AND afs.actor_file_transfer_status_date < @toExclusive
+                    )::int AS download_confirmed_count
                 FROM broker.actor_file_transfer_status afs
-                INNER JOIN broker.file_transfer f ON f.file_transfer_id_pk = afs.file_transfer_id_fk
-                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
-                INNER JOIN broker.actor recipient ON recipient.actor_id_pk = afs.actor_id_fk
-                INNER JOIN broker.altinn_resource ar ON ar.resource_id_pk = f.resource_id
-                INNER JOIN transfer_property_groups tpg ON tpg.file_transfer_id_pk = f.file_transfer_id_pk
-                WHERE ar.service_owner_id_fk = @serviceOwnerId
-                  AND afs.actor_file_transfer_status_description_id_fk = @downloadStartedStatus
-                  AND afs.actor_file_transfer_status_date >= @fromInclusive
-                  AND afs.actor_file_transfer_status_date < @toExclusive
-                  AND (@resourceId IS NULL OR f.resource_id = @resourceId)
-                GROUP BY
-                    EXTRACT(YEAR FROM afs.actor_file_transfer_status_date),
-                    EXTRACT(MONTH FROM afs.actor_file_transfer_status_date),
-                    f.resource_id,
-                    sender.actor_external_id,
-                    recipient.actor_external_id,
-                    tpg.grouped_property_values
-
-                UNION ALL
-
+                INNER JOIN scoped_transfers st ON st.file_transfer_id_pk = afs.file_transfer_id_fk
+                GROUP BY afs.file_transfer_id_fk, afs.actor_id_fk
+            ),
+            published_transfers AS (
+                SELECT DISTINCT
+                    fts.file_transfer_id_fk
+                FROM broker.file_transfer_status fts
+                INNER JOIN scoped_transfers st ON st.file_transfer_id_pk = fts.file_transfer_id_fk
+                WHERE fts.file_transfer_status_description_id_fk = @publishedStatus
+            ){groupedPropertiesCte},
+            scoped_pairs AS (
                 SELECT
-                    EXTRACT(YEAR FROM dds.actor_file_transfer_status_date)::int AS year,
-                    EXTRACT(MONTH FROM dds.actor_file_transfer_status_date)::int AS month,
-                    f.resource_id AS resource_id,
-                    sender.actor_external_id AS sender,
+                    st.created,
+                    st.resource_id,
+                    st.sender,
                     recipient.actor_external_id AS recipient,
-                    tpg.grouped_property_values,
-                    0::int AS upload_count,
-                    0::int AS download_attempt_count,
-                    COUNT(*)::int AS download_started_count,
-                    0::int AS download_confirmed_count
-                FROM distinct_download_started dds
-                INNER JOIN broker.file_transfer f ON f.file_transfer_id_pk = dds.file_transfer_id_fk
-                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
-                INNER JOIN broker.actor recipient ON recipient.actor_id_pk = dds.actor_id_fk
-                INNER JOIN broker.altinn_resource ar ON ar.resource_id_pk = f.resource_id
-                INNER JOIN transfer_property_groups tpg ON tpg.file_transfer_id_pk = f.file_transfer_id_pk
-                WHERE ar.service_owner_id_fk = @serviceOwnerId
-                  AND dds.actor_file_transfer_status_date >= @fromInclusive
-                  AND dds.actor_file_transfer_status_date < @toExclusive
-                  AND (@resourceId IS NULL OR f.resource_id = @resourceId)
-                GROUP BY
-                    EXTRACT(YEAR FROM dds.actor_file_transfer_status_date),
-                    EXTRACT(MONTH FROM dds.actor_file_transfer_status_date),
-                    f.resource_id,
-                    sender.actor_external_id,
-                    recipient.actor_external_id,
-                    tpg.grouped_property_values
-
-                UNION ALL
-
-                SELECT
-                    EXTRACT(YEAR FROM afs.actor_file_transfer_status_date)::int AS year,
-                    EXTRACT(MONTH FROM afs.actor_file_transfer_status_date)::int AS month,
-                    f.resource_id AS resource_id,
-                    sender.actor_external_id AS sender,
-                    recipient.actor_external_id AS recipient,
-                    tpg.grouped_property_values,
-                    0::int AS upload_count,
-                    0::int AS download_attempt_count,
-                    0::int AS download_started_count,
-                    COUNT(*)::int AS download_confirmed_count
-                FROM broker.actor_file_transfer_status afs
-                INNER JOIN broker.file_transfer f ON f.file_transfer_id_pk = afs.file_transfer_id_fk
-                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
-                INNER JOIN broker.actor recipient ON recipient.actor_id_pk = afs.actor_id_fk
-                INNER JOIN broker.altinn_resource ar ON ar.resource_id_pk = f.resource_id
-                INNER JOIN transfer_property_groups tpg ON tpg.file_transfer_id_pk = f.file_transfer_id_pk
-                WHERE ar.service_owner_id_fk = @serviceOwnerId
-                  AND afs.actor_file_transfer_status_description_id_fk = @downloadConfirmedStatus
-                  AND afs.actor_file_transfer_status_date >= @fromInclusive
-                  AND afs.actor_file_transfer_status_date < @toExclusive
-                  AND (@resourceId IS NULL OR f.resource_id = @resourceId)
-                GROUP BY
-                    EXTRACT(YEAR FROM afs.actor_file_transfer_status_date),
-                    EXTRACT(MONTH FROM afs.actor_file_transfer_status_date),
-                    f.resource_id,
-                    sender.actor_external_id,
-                    recipient.actor_external_id,
-                    tpg.grouped_property_values
+                    {groupedPropertiesSelect}
+                    (pt.file_transfer_id_fk IS NOT NULL) AS has_published,
+                    pm.download_attempt_count,
+                    pm.first_download_started_at,
+                    pm.download_confirmed_count
+                FROM scoped_transfers st
+                INNER JOIN pair_metrics pm ON pm.file_transfer_id_fk = st.file_transfer_id_pk
+                INNER JOIN broker.actor recipient ON recipient.actor_id_pk = pm.actor_id_fk
+                LEFT JOIN published_transfers pt ON pt.file_transfer_id_fk = st.file_transfer_id_pk
+                {groupedPropertiesJoin}
+                WHERE (
+                      (st.created >= @fromInclusive AND st.created < @toExclusive)
+                      OR pm.download_attempt_count > 0
+                      OR pm.download_confirmed_count > 0
+                      OR (pm.first_download_started_at >= @fromInclusive AND pm.first_download_started_at < @toExclusive)
+                  )
             )
             SELECT
-                year,
-                month,
+                EXTRACT(YEAR FROM @fromInclusive)::int AS year,
+                EXTRACT(MONTH FROM @fromInclusive)::int AS month,
                 resource_id,
                 sender,
                 recipient,
                 grouped_property_values::text AS grouped_property_values_json,
-                SUM(upload_count)::int AS upload_count,
+                SUM(CASE
+                    WHEN created >= @fromInclusive AND created < @toExclusive THEN 1
+                    ELSE 0
+                END)::int AS total_file_transfers,
+                SUM(CASE
+                    WHEN created >= @fromInclusive AND created < @toExclusive AND has_published THEN 1
+                    ELSE 0
+                END)::int AS upload_count,
                 SUM(download_attempt_count)::int AS download_attempt_count,
-                SUM(download_started_count)::int AS download_started_count_per_file_transfer,
+                SUM(CASE
+                    WHEN first_download_started_at >= @fromInclusive AND first_download_started_at < @toExclusive THEN 1
+                    ELSE 0
+                END)::int AS download_started_count_per_file_transfer,
                 SUM(download_confirmed_count)::int AS download_confirmed_count
-            FROM monthly_counts
-            GROUP BY year, month, resource_id, sender, recipient, grouped_property_values
-            ORDER BY year, month, resource_id, sender, recipient, grouped_property_values::text;";
+            FROM scoped_pairs
+            GROUP BY resource_id, sender, recipient, grouped_property_values
+            ORDER BY resource_id, sender, recipient, grouped_property_values::text;";
 
         await using var command = dataSource.CreateCommand(query);
         command.CommandTimeout = 600;
@@ -1169,6 +1108,7 @@ LEFT JOIN LATERAL (
         });
         command.Parameters.AddWithValue("@downloadStartedStatus", (int)ActorFileTransferStatus.DownloadStarted);
         command.Parameters.AddWithValue("@downloadConfirmedStatus", (int)ActorFileTransferStatus.DownloadConfirmed);
+        command.Parameters.AddWithValue("@publishedStatus", (int)FileTransferStatus.Published);
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
@@ -1185,6 +1125,7 @@ LEFT JOIN LATERAL (
                     Sender = reader.GetString(reader.GetOrdinal("sender")),
                     Recipient = reader.GetString(reader.GetOrdinal("recipient")),
                     GroupedPropertyValues = DeserializeGroupedPropertyValues(reader.GetString(reader.GetOrdinal("grouped_property_values_json"))),
+                    TotalFileTransfers = reader.GetInt32(reader.GetOrdinal("total_file_transfers")),
                     UploadCount = reader.GetInt32(reader.GetOrdinal("upload_count")),
                     DownloadStartedCount = reader.GetInt32(reader.GetOrdinal("download_attempt_count")),
                     UniqueDownloadStartedCount = reader.GetInt32(reader.GetOrdinal("download_started_count_per_file_transfer")),

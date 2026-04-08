@@ -78,7 +78,7 @@ public class GenerateMonthlyStatisticsCsvHandler(
     private static string BuildCsv(IEnumerable<MonthlyResourceStatisticsData> rows, IReadOnlyList<string> groupByPropertyKeys)
     {
         var builder = new StringBuilder();
-        builder.Append("year,month,resourceId,sender,recipient,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount");
+        builder.Append("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount");
         foreach (var propertyKey in groupByPropertyKeys)
         {
             builder.Append(',').Append(EscapeCsv(propertyKey));
@@ -94,6 +94,7 @@ public class GenerateMonthlyStatisticsCsvHandler(
                 .Append(EscapeCsv(row.ResourceId)).Append(',')
                 .Append(EscapeCsv(row.Sender)).Append(',')
                 .Append(EscapeCsv(row.Recipient)).Append(',')
+                .Append(row.TotalFileTransfers).Append(',')
                 .Append(row.UploadCount).Append(',')
                 .Append(row.DownloadStartedCount).Append(',')
                 .Append(row.UniqueDownloadStartedCount).Append(',')

@@ -41,12 +41,16 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
         var januaryTransfer = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
         var januaryTransfer2 = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+        var januaryTransferInitializedOnly = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 16, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
         await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 2, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
 
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 13, 10, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer2, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 14, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(januaryTransferInitializedOnly, "0192:986252932", ActorFileTransferStatus.Initialized, new DateTimeOffset(2026, 1, 16, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertFileTransferStatus(januaryTransfer, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertFileTransferStatus(januaryTransfer2, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 14, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.Zero));
@@ -60,9 +64,9 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         Assert.Contains("monthly_statistics_", response.Content.Headers.ContentDisposition?.FileName);
 
         var csv = await response.Content.ReadAsStringAsync();
-        Assert.Contains("year,month,resourceId,sender,recipient,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252932,2,3,2,2", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252933,1,1,1,1", csv);
+        Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252932,3,2,3,2,2", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252933,1,1,1,1,1", csv);
         Assert.DoesNotContain("2026,2,", csv);
     }
 
@@ -82,6 +86,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertProperty(transferA, "statusMessage", "accepted");
         await _dataHelper.InsertProperty(transferB, "messageType", "receipt");
 
+        await _dataHelper.InsertFileTransferStatus(transferA, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
@@ -92,9 +97,9 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
 
         var csv = await response.Content.ReadAsStringAsync();
-        Assert.Contains("year,month,resourceId,sender,recipient,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount,messageType,statusMessage", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,1,1,1,invoice,accepted", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,1,1,0,receipt,", csv);
+        Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount,messageType,statusMessage", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,1,1,1,1,invoice,accepted", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,0,1,1,0,receipt,", csv);
     }
 
     [Fact]
