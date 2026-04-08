@@ -46,12 +46,12 @@ public class GenerateMonthlyStatisticsCsvHandler(
         if (!string.IsNullOrWhiteSpace(request.ResourceId))
         {
             var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
-            if (resource is null)
+            if (resource is null || string.IsNullOrWhiteSpace(resource.OrganizationNumber))
             {
                 return Errors.ResourceHasNotBeenConfigured;
             }
 
-            if (resource.OrganizationNumber!.WithoutPrefix() != callerOrganizationId.WithoutPrefix())
+            if (resource.OrganizationNumber.WithoutPrefix() != callerOrganizationId.WithoutPrefix())
             {
                 return Errors.NoAccessToResource;
             }
