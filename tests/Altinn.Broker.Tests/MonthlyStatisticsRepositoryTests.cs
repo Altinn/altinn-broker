@@ -10,10 +10,12 @@ using Xunit;
 
 namespace Altinn.Broker.Tests;
 
-public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>
+public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
     private readonly IFileTransferRepository _repository;
     private readonly TestDataHelper _dataHelper;
+    private readonly HashSet<string> _createdResourceIds = [];
+    private readonly HashSet<string> _createdServiceOwnerIds = [];
 
     public MonthlyStatisticsRepositoryTests(CustomWebApplicationFactory factory)
     {
@@ -21,18 +23,31 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        await _dataHelper.DeleteTestData(_createdResourceIds, _createdServiceOwnerIds);
+    }
+
     [Fact]
     public async Task GetMonthlyResourceStatisticsData_AggregatesBySenderRecipientPairForSelectedMonth()
     {
-        var serviceOwnerId = "0192:991825827";
-        var otherServiceOwnerId = "0192:313301753";
+        var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
+        var otherServiceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
+        var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
+        var otherServiceOwnerId = $"0192:{otherServiceOwnerOrganizationNumber}";
         var resourceA = $"monthly-stats-a-{Guid.NewGuid():N}";
         var resourceB = $"monthly-stats-b-{Guid.NewGuid():N}";
         var otherResource = $"monthly-stats-other-{Guid.NewGuid():N}";
 
-        await _dataHelper.EnsureResource(resourceA, "991825827", serviceOwnerId);
-        await _dataHelper.EnsureResource(resourceB, "991825827", serviceOwnerId);
-        await _dataHelper.EnsureResource(otherResource, "313301753", otherServiceOwnerId);
+        RegisterCreatedTestData(serviceOwnerId, resourceA);
+        RegisterCreatedTestData(serviceOwnerId, resourceB);
+        RegisterCreatedTestData(otherServiceOwnerId, otherResource);
+
+        await _dataHelper.EnsureResource(resourceA, serviceOwnerOrganizationNumber, serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceB, serviceOwnerOrganizationNumber, serviceOwnerId);
+        await _dataHelper.EnsureResource(otherResource, otherServiceOwnerOrganizationNumber, otherServiceOwnerId);
 
         var senderA = "0192:991825827";
         var senderB = "0192:312195771";
@@ -86,12 +101,16 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
     [Fact]
     public async Task GetMonthlyResourceStatisticsData_ResourceFilterRestrictsRows()
     {
-        var serviceOwnerId = "0192:991825827";
+        var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
+        var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
         var resourceA = $"monthly-filter-a-{Guid.NewGuid():N}";
         var resourceB = $"monthly-filter-b-{Guid.NewGuid():N}";
 
-        await _dataHelper.EnsureResource(resourceA, "991825827", serviceOwnerId);
-        await _dataHelper.EnsureResource(resourceB, "991825827", serviceOwnerId);
+        RegisterCreatedTestData(serviceOwnerId, resourceA);
+        RegisterCreatedTestData(serviceOwnerId, resourceB);
+
+        await _dataHelper.EnsureResource(resourceA, serviceOwnerOrganizationNumber, serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceB, serviceOwnerOrganizationNumber, serviceOwnerId);
 
         var transferA = await _dataHelper.InsertFileTransfer(resourceA, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: "0192:991825827");
         var transferB = await _dataHelper.InsertFileTransfer(resourceB, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: "0192:312195771");
@@ -117,12 +136,15 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
     [Fact]
     public async Task GetMonthlyResourceStatisticsData_GroupBySelectedProperties_SplitsRowsByPropertyValues()
     {
-        var serviceOwnerId = "0192:991825827";
+        var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
+        var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
         var resourceId = $"monthly-grouping-{Guid.NewGuid():N}";
         var senderId = "0192:991825827";
         var recipientId = "0192:986252932";
 
-        await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
+        RegisterCreatedTestData(serviceOwnerId, resourceId);
+
+        await _dataHelper.EnsureResource(resourceId, serviceOwnerOrganizationNumber, serviceOwnerId);
 
         var transferA = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
         var transferB = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
@@ -158,6 +180,18 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         Assert.Equal(1, receiptRow.DownloadStartedCount);
         Assert.Equal(1, receiptRow.UniqueDownloadStartedCount);
         Assert.Equal(0, receiptRow.DownloadConfirmedCount);
+    }
+
+    private void RegisterCreatedTestData(string serviceOwnerId, string resourceId)
+    {
+        _createdServiceOwnerIds.Add(serviceOwnerId);
+        _createdResourceIds.Add(resourceId);
+    }
+
+    private static string CreateUniqueOrganizationNumber()
+    {
+        var value = BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(), 0) % 1_000_000_000;
+        return value.ToString("D9");
     }
 
 }
