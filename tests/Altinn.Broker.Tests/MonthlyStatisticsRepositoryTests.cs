@@ -13,12 +13,12 @@ namespace Altinn.Broker.Tests;
 public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly IFileTransferRepository _repository;
-    private readonly NpgsqlDataSource _dataSource;
+    private readonly TestDataHelper _dataHelper;
 
     public MonthlyStatisticsRepositoryTests(CustomWebApplicationFactory factory)
     {
         _repository = factory.Services.GetRequiredService<IFileTransferRepository>();
-        _dataSource = factory.Services.GetRequiredService<NpgsqlDataSource>();
+        _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
     [Fact]
@@ -30,29 +30,29 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var resourceB = $"monthly-stats-b-{Guid.NewGuid():N}";
         var otherResource = $"monthly-stats-other-{Guid.NewGuid():N}";
 
-        await EnsureResource(resourceA, "991825827", serviceOwnerId);
-        await EnsureResource(resourceB, "991825827", serviceOwnerId);
-        await EnsureResource(otherResource, "313301753", otherServiceOwnerId);
+        await _dataHelper.EnsureResource(resourceA, "991825827", serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceB, "991825827", serviceOwnerId);
+        await _dataHelper.EnsureResource(otherResource, "313301753", otherServiceOwnerId);
 
         var senderA = "0192:991825827";
         var senderB = "0192:312195771";
-        var transferA1 = await InsertFileTransfer(resourceA, serviceOwnerId, new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderA);
-        var transferA2 = await InsertFileTransfer(resourceA, serviceOwnerId, new DateTimeOffset(2026, 1, 20, 8, 0, 0, TimeSpan.Zero), senderA);
-        var transferB1 = await InsertFileTransfer(resourceB, serviceOwnerId, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero), senderB);
-        var transferOther = await InsertFileTransfer(otherResource, otherServiceOwnerId, new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero));
+        var transferA1 = await _dataHelper.InsertFileTransfer(resourceA, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderA);
+        var transferA2 = await _dataHelper.InsertFileTransfer(resourceA, serviceOwnerId, created: new DateTimeOffset(2026, 1, 20, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderA);
+        var transferB1 = await _dataHelper.InsertFileTransfer(resourceB, serviceOwnerId, created: new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderB);
+        var transferOther = await _dataHelper.InsertFileTransfer(otherResource, otherServiceOwnerId, created: new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero));
 
-        await InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA2, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 20, 11, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA1, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 10, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferB1, "0192:986252935", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 13, 8, 30, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferOther, "0192:986252936", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 5, 8, 30, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA2, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 20, 11, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA1, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB1, "0192:986252935", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 13, 8, 30, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferOther, "0192:986252936", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 5, 8, 30, 0, TimeSpan.Zero));
 
-        await InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA1, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 25, 9, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferB1, "0192:986252935", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 13, 9, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferOther, "0192:986252936", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 6, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA1, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA1, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 25, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB1, "0192:986252935", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 13, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferOther, "0192:986252936", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 6, 9, 0, 0, TimeSpan.Zero));
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
@@ -90,16 +90,16 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var resourceA = $"monthly-filter-a-{Guid.NewGuid():N}";
         var resourceB = $"monthly-filter-b-{Guid.NewGuid():N}";
 
-        await EnsureResource(resourceA, "991825827", serviceOwnerId);
-        await EnsureResource(resourceB, "991825827", serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceA, "991825827", serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceB, "991825827", serviceOwnerId);
 
-        var transferA = await InsertFileTransfer(resourceA, serviceOwnerId, new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), "0192:991825827");
-        var transferB = await InsertFileTransfer(resourceB, serviceOwnerId, new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), "0192:312195771");
+        var transferA = await _dataHelper.InsertFileTransfer(resourceA, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: "0192:991825827");
+        var transferB = await _dataHelper.InsertFileTransfer(resourceB, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: "0192:312195771");
 
-        await InsertActorStatus(transferA, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA, "0192:986252932", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
@@ -122,18 +122,18 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var senderId = "0192:991825827";
         var recipientId = "0192:986252932";
 
-        await EnsureResource(resourceId, "991825827", serviceOwnerId);
+        await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
 
-        var transferA = await InsertFileTransfer(resourceId, serviceOwnerId, new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderId);
-        var transferB = await InsertFileTransfer(resourceId, serviceOwnerId, new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderId);
+        var transferA = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+        var transferB = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
 
-        await InsertProperty(transferA, "messageType", "invoice");
-        await InsertProperty(transferA, "statusMessage", "accepted");
-        await InsertProperty(transferB, "messageType", "receipt");
+        await _dataHelper.InsertProperty(transferA, "messageType", "invoice");
+        await _dataHelper.InsertProperty(transferA, "statusMessage", "accepted");
+        await _dataHelper.InsertProperty(transferB, "messageType", "receipt");
 
-        await InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
-        await InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
@@ -160,121 +160,4 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         Assert.Equal(0, receiptRow.DownloadConfirmedCount);
     }
 
-    private async Task EnsureResource(string resourceId, string organizationNumber, string serviceOwnerId)
-    {
-        await EnsureStorageProvider(serviceOwnerId);
-
-        await using var command = _dataSource.CreateCommand(
-            @"INSERT INTO broker.altinn_resource (resource_id_pk, created, organization_number, service_owner_id_fk)
-              VALUES (@resourceId, NOW(), @organizationNumber, @serviceOwnerId)
-              ON CONFLICT (resource_id_pk) DO NOTHING");
-
-        command.Parameters.AddWithValue("@resourceId", resourceId);
-        command.Parameters.AddWithValue("@organizationNumber", organizationNumber);
-        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        await command.ExecuteNonQueryAsync();
-    }
-
-    private async Task<Guid> InsertFileTransfer(string resourceId, string serviceOwnerId, DateTimeOffset created, string senderExternalId = "0192:991825827")
-    {
-        var fileTransferId = Guid.NewGuid();
-        var senderActorId = await EnsureActor(senderExternalId);
-        var storageProviderId = await EnsureStorageProvider(serviceOwnerId);
-
-        await using var command = _dataSource.CreateCommand(
-            @"INSERT INTO broker.file_transfer (
-                    file_transfer_id_pk, resource_id, created, filename, checksum, file_transfer_size,
-                    sender_actor_id_fk, external_file_transfer_reference, expiration_time, storage_provider_id_fk, use_virus_scan)
-              VALUES (
-                    @fileTransferId, @resourceId, @created, @fileName, NULL, 0,
-                    @senderActorId, @externalReference, @expirationTime, @storageProviderId, false)");
-
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        command.Parameters.AddWithValue("@resourceId", resourceId);
-        command.Parameters.AddWithValue("@created", created.UtcDateTime);
-        command.Parameters.AddWithValue("@fileName", "stats.txt");
-        command.Parameters.AddWithValue("@senderActorId", senderActorId);
-        command.Parameters.AddWithValue("@externalReference", $"ref-{fileTransferId}");
-        command.Parameters.AddWithValue("@expirationTime", created.UtcDateTime.AddDays(1));
-        command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
-        await command.ExecuteNonQueryAsync();
-
-        return fileTransferId;
-    }
-
-    private async Task InsertActorStatus(Guid fileTransferId, string actorExternalId, ActorFileTransferStatus status, DateTimeOffset statusDate)
-    {
-        var actorId = await EnsureActor(actorExternalId);
-
-        await using var command = _dataSource.CreateCommand(
-            @"INSERT INTO broker.actor_file_transfer_status (
-                    actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date)
-              VALUES (@actorId, @fileTransferId, @status, @statusDate)");
-
-        command.Parameters.AddWithValue("@actorId", actorId);
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        command.Parameters.AddWithValue("@status", (int)status);
-        command.Parameters.AddWithValue("@statusDate", statusDate.UtcDateTime);
-        await command.ExecuteNonQueryAsync();
-    }
-
-    private async Task InsertProperty(Guid fileTransferId, string key, string value)
-    {
-        await using var command = _dataSource.CreateCommand(
-            @"INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value)
-              VALUES (@fileTransferId, @key, @value)");
-
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        command.Parameters.AddWithValue("@key", key);
-        command.Parameters.AddWithValue("@value", value);
-        await command.ExecuteNonQueryAsync();
-    }
-
-    private async Task<long> EnsureActor(string actorExternalId)
-    {
-        await using var selectCommand = _dataSource.CreateCommand(
-            "SELECT actor_id_pk FROM broker.actor WHERE actor_external_id = @actorExternalId");
-        selectCommand.Parameters.AddWithValue("@actorExternalId", actorExternalId);
-        var existingActorId = await selectCommand.ExecuteScalarAsync();
-        if (existingActorId is long actorId)
-        {
-            return actorId;
-        }
-
-        await using var insertCommand = _dataSource.CreateCommand(
-            "INSERT INTO broker.actor (actor_external_id) VALUES (@actorExternalId) RETURNING actor_id_pk");
-        insertCommand.Parameters.AddWithValue("@actorExternalId", actorExternalId);
-        return (long)(await insertCommand.ExecuteScalarAsync())!;
-    }
-
-    private async Task<long> EnsureStorageProvider(string serviceOwnerId)
-    {
-        await using var selectCommand = _dataSource.CreateCommand(
-            "SELECT storage_provider_id_pk FROM broker.storage_provider WHERE service_owner_id_fk = @serviceOwnerId LIMIT 1");
-        selectCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        var existingStorageProviderId = await selectCommand.ExecuteScalarAsync();
-        if (existingStorageProviderId is long storageProviderId)
-        {
-            return storageProviderId;
-        }
-
-        await using var insertServiceOwnerCommand = _dataSource.CreateCommand(
-            @"INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name)
-              VALUES (@serviceOwnerId, @serviceOwnerName)
-              ON CONFLICT DO NOTHING");
-        insertServiceOwnerCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        insertServiceOwnerCommand.Parameters.AddWithValue("@serviceOwnerName", $"Service owner {serviceOwnerId}");
-        await insertServiceOwnerCommand.ExecuteNonQueryAsync();
-
-        await using var insertStorageProviderCommand = _dataSource.CreateCommand(
-            @"INSERT INTO broker.storage_provider (
-                    service_owner_id_fk, created, storage_provider_type, resource_name, active)
-              VALUES (@serviceOwnerId, NOW(), @storageProviderType, @resourceName, true)
-              RETURNING storage_provider_id_pk");
-        insertStorageProviderCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        insertStorageProviderCommand.Parameters.AddWithValue("@storageProviderType", "Azurite");
-        insertStorageProviderCommand.Parameters.AddWithValue("@resourceName", $"stats-storage-{Guid.NewGuid():N}");
-
-        return (long)(await insertStorageProviderCommand.ExecuteScalarAsync())!;
-    }
 }
