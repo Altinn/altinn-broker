@@ -113,7 +113,9 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                     }
                 }
 
-                if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
+                // Use interim commits to prevent too many uncommitted blocks for very large files
+                // No interim commits with malware-scanned uploads as scan starts at first commit
+                if (!fileTransferEntity.UseVirusScan && uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
                 {
                     await Task.WhenAll(uploadTasks);
                     var isFirstCommitForThisCall = !createdBlobByThisAttempt;
