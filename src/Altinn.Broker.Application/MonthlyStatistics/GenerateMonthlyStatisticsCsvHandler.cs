@@ -13,7 +13,7 @@ using OneOf;
 namespace Altinn.Broker.Application.MonthlyStatistics;
 
 public class GenerateMonthlyStatisticsCsvHandler(
-    IFileTransferRepository fileTransferRepository,
+    IMonthlyStatisticsRepository monthlyStatisticsRepository,
     IResourceRepository resourceRepository,
     ILogger<GenerateMonthlyStatisticsCsvHandler> logger) : IHandler<GenerateMonthlyStatisticsReportRequest, GenerateMonthlyStatisticsCsvResponse>
 {
@@ -57,7 +57,7 @@ public class GenerateMonthlyStatisticsCsvHandler(
             }
         }
 
-        var rows = await fileTransferRepository.GetMonthlyResourceStatisticsData(
+        var rows = await monthlyStatisticsRepository.GetMonthlyResourceStatisticsData(
             serviceOwnerId: callerOrganizationId.WithPrefix(),
             fromInclusive: fromMonthStart,
             toExclusive: toExclusive,

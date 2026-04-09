@@ -22,7 +22,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     private readonly HttpClient _serviceOwnerClient;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _otherServiceOwnerClient;
-    private readonly IFileTransferRepository _fileTransferRepository;
+    private readonly IMonthlyStatisticsRepository _monthlyStatisticsRepository;
     private readonly TestDataHelper _dataHelper;
 
     public ServiceOwnerStatisticsControllerTests(CustomWebApplicationFactory factory)
@@ -30,7 +30,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         _serviceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _otherServiceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN_NOT_CONFIGURED);
-        _fileTransferRepository = factory.Services.GetRequiredService<IFileTransferRepository>();
+        _monthlyStatisticsRepository = factory.Services.GetRequiredService<IMonthlyStatisticsRepository>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -58,7 +58,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 14, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.Zero));
 
-        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+        await _monthlyStatisticsRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
 
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1");
@@ -96,7 +96,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
 
-        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+        await _monthlyStatisticsRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
 
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1&groupByPropertyKeys=messageType&groupByPropertyKeys=statusMessage");
@@ -131,7 +131,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
 
-        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+        await _monthlyStatisticsRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
 
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1&groupByPropertyKeys=messageType");

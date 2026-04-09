@@ -5,13 +5,13 @@ using Microsoft.Extensions.Logging;
 namespace Altinn.Broker.Application.MonthlyStatistics;
 
 public class RefreshMonthlyStatisticsRollupHandler(
-    IFileTransferRepository fileTransferRepository,
+    IMonthlyStatisticsRepository monthlyStatisticsRepository,
     ILogger<RefreshMonthlyStatisticsRollupHandler> logger)
 {
     public async Task RefreshRollup(CancellationToken cancellationToken)
     {
         logger.LogInformation("Starting monthly statistics rollup refresh");
-        await fileTransferRepository.RefreshMonthlyStatisticsRollup(cancellationToken);
+        await monthlyStatisticsRepository.RefreshMonthlyStatisticsRollup(cancellationToken);
         logger.LogInformation("Completed monthly statistics rollup refresh");
     }
 }

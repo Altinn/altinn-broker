@@ -35,14 +35,6 @@ public interface IFileTransferRepository
     Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken);
     Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken);
     Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken);
-    Task<List<MonthlyResourceStatisticsData>> GetMonthlyResourceStatisticsData(
-        string serviceOwnerId,
-        DateTime fromInclusive,
-        DateTime toExclusive,
-        string? resourceId,
-        IReadOnlyList<string>? groupByPropertyKeys,
-        CancellationToken cancellationToken);
-    Task RefreshMonthlyStatisticsRollup(CancellationToken cancellationToken);
 }
 
 public class AggregatedDailySummaryData
@@ -59,19 +51,4 @@ public class AggregatedDailySummaryData
     public int MessageCount { get; set; }
     public long DatabaseStorageBytes { get; set; }
     public long AttachmentStorageBytes { get; set; }
-}
-
-public class MonthlyResourceStatisticsData
-{
-    public int Year { get; set; }
-    public int Month { get; set; }
-    public string ResourceId { get; set; } = string.Empty;
-    public string Sender { get; set; } = string.Empty;
-    public string Recipient { get; set; } = string.Empty;
-    public int TotalFileTransfers { get; set; }
-    public int UploadCount { get; set; }
-    public int DownloadStartedCount { get; set; }
-    public int UniqueDownloadStartedCount { get; set; }
-    public int DownloadConfirmedCount { get; set; }
-    public Dictionary<string, string> GroupedPropertyValues { get; set; } = new();
 }

@@ -12,14 +12,14 @@ namespace Altinn.Broker.Tests;
 
 public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
-    private readonly IFileTransferRepository _repository;
+    private readonly IMonthlyStatisticsRepository _repository;
     private readonly TestDataHelper _dataHelper;
     private readonly HashSet<string> _createdResourceIds = [];
     private readonly HashSet<string> _createdServiceOwnerIds = [];
 
     public MonthlyStatisticsRepositoryTests(CustomWebApplicationFactory factory)
     {
-        _repository = factory.Services.GetRequiredService<IFileTransferRepository>();
+        _repository = factory.Services.GetRequiredService<IMonthlyStatisticsRepository>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -262,5 +262,4 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var value = BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(), 0) % 1_000_000_000;
         return value.ToString("D9");
     }
-
 }
