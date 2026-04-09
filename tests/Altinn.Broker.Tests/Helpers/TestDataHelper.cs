@@ -157,6 +157,15 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
     {
         if (resourceIds.Count > 0)
         {
+            await using var deleteRollupByResourceCommand = dataSource.CreateCommand(
+                @"DELETE FROM broker.monthly_statistics_monthly_rollup
+                  WHERE resource_id = ANY(@resourceIds)");
+            deleteRollupByResourceCommand.Parameters.Add(new NpgsqlParameter("@resourceIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = resourceIds.ToArray()
+            });
+            await deleteRollupByResourceCommand.ExecuteNonQueryAsync();
+
             await using var deleteFileTransfersCommand = dataSource.CreateCommand(
                 @"DELETE FROM broker.file_transfer
                   WHERE resource_id = ANY(@resourceIds)");
@@ -178,6 +187,15 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
 
         if (serviceOwnerIds.Count > 0)
         {
+            await using var deleteRollupByServiceOwnerCommand = dataSource.CreateCommand(
+                @"DELETE FROM broker.monthly_statistics_monthly_rollup
+                  WHERE service_owner_id = ANY(@serviceOwnerIds)");
+            deleteRollupByServiceOwnerCommand.Parameters.Add(new NpgsqlParameter("@serviceOwnerIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = serviceOwnerIds.ToArray()
+            });
+            await deleteRollupByServiceOwnerCommand.ExecuteNonQueryAsync();
+
             await using var deleteStorageProvidersCommand = dataSource.CreateCommand(
                 @"DELETE FROM broker.storage_provider
                   WHERE service_owner_id_fk = ANY(@serviceOwnerIds)");

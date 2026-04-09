@@ -42,6 +42,7 @@ public interface IFileTransferRepository
         string? resourceId,
         IReadOnlyList<string>? groupByPropertyKeys,
         CancellationToken cancellationToken);
+    Task RefreshMonthlyStatisticsRollup(CancellationToken cancellationToken);
 }
 
 public class AggregatedDailySummaryData

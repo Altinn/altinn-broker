@@ -5,6 +5,7 @@ using System.Text.Json;
 
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     private readonly HttpClient _serviceOwnerClient;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _otherServiceOwnerClient;
+    private readonly IFileTransferRepository _fileTransferRepository;
     private readonly TestDataHelper _dataHelper;
 
     public ServiceOwnerStatisticsControllerTests(CustomWebApplicationFactory factory)
@@ -28,6 +30,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         _serviceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _otherServiceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN_NOT_CONFIGURED);
+        _fileTransferRepository = factory.Services.GetRequiredService<IFileTransferRepository>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -54,6 +57,8 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 14, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.Zero));
+
+        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
 
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1");
@@ -91,6 +96,8 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
 
+        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1&groupByPropertyKeys=messageType&groupByPropertyKeys=statusMessage");
 
@@ -100,6 +107,40 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount,messageType,statusMessage", csv);
         Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,1,1,1,1,invoice,accepted", csv);
         Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},1,0,1,1,0,receipt,", csv);
+    }
+
+    [Fact]
+    public async Task DownloadMonthlyStatisticsCsv_WithSubsetOfGroupByPropertyKeys_SumsAcrossUnselectedProperties()
+    {
+        var serviceOwnerId = "0192:991825827";
+        var resourceId = $"monthly-api-grouped-subset-{Guid.NewGuid():N}";
+        var senderId = "0192:991825827";
+        var recipientId = "0192:986252932";
+
+        await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
+        var transferA = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+        var transferB = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+
+        await _dataHelper.InsertProperty(transferA, "messageType", "invoice");
+        await _dataHelper.InsertProperty(transferA, "statusMessage", "accepted");
+        await _dataHelper.InsertProperty(transferB, "messageType", "invoice");
+        await _dataHelper.InsertProperty(transferB, "statusMessage", "rejected");
+
+        await _dataHelper.InsertFileTransferStatus(transferA, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertFileTransferStatus(transferB, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
+
+        await _fileTransferRepository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+
+        var response = await _serviceOwnerClient.GetAsync(
+            $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1&groupByPropertyKeys=messageType");
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount,messageType", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},{recipientId},2,2,2,2,0,invoice", csv);
     }
 
     [Fact]

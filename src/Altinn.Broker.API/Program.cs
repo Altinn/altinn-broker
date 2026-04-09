@@ -7,6 +7,7 @@ using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
+using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
@@ -51,7 +52,7 @@ static void BuildAndRun(string[] args)
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
     var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
     bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
-    builder.Services.ConfigureOpenTelemetry(generalSettings.ApplicationInsightsConnectionString);
+    builder.Services.ConfigureOpenTelemetry(generalSettings?.ApplicationInsightsConnectionString ?? string.Empty);
 
     var app = builder.Build();
     app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -72,6 +73,10 @@ static void BuildAndRun(string[] args)
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
+    recurringJobManager.AddOrUpdate<RefreshMonthlyStatisticsRollupHandler>(
+        "Refresh monthly statistics rollup",
+        handler => handler.RefreshRollup(CancellationToken.None),
+        Cron.Minutely());
     recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
         "Cleanup use case test data older than 1 day",
         handler => handler.Process(new CleanupUseCaseTestsRequest { MinAgeDays = 1 }, null, CancellationToken.None), 
