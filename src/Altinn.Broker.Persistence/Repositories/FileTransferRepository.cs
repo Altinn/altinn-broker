@@ -1,5 +1,4 @@
 using System.Text;
-
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -974,5 +973,6 @@ LEFT JOIN LATERAL (
             return aggregatedData;
         }, cancellationToken);
     }
+
 }
 

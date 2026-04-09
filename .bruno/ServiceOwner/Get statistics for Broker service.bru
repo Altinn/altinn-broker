@@ -1,0 +1,28 @@
+meta {
+  name: Get statistics for Broker service
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{broker_base_url}}/broker/api/v1/statistics/monthly?year=9999&month=11&resourceId={{resource_id}}&groupByPropertyKeys=etc&groupByPropertyKeys=caseNumber
+  body: none
+  auth: bearer
+}
+
+params:query {
+  year: 9999
+  month: 11
+  resourceId: {{resource_id}}
+  groupByPropertyKeys: etc
+  groupByPropertyKeys: caseNumber
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
