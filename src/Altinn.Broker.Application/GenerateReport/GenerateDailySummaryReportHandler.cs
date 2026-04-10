@@ -229,7 +229,6 @@ public class GenerateDailySummaryReportHandler(
         try
         {
             var resourceIdFilter = ParseResourceIdFilter(reportFilterOptions.Value.ReportResourceIdFilter);
-            logger.LogInformation("Using resource ID filter for report generation: {filter}", resourceIdFilter != null ? string.Join(", ", resourceIdFilter) : "None");
             var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken, resourceIdFilter);
             
             if (!aggregatedData.Any())
