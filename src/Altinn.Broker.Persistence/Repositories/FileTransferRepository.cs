@@ -888,8 +888,8 @@ LEFT JOIN LATERAL (
             ? @"WHERE NOT EXISTS (
                 SELECT 1 FROM broker.file_transfer_property ftp
                 WHERE ftp.file_transfer_id_fk = f.file_transfer_id_pk
-                  AND ftp.key = 'statusMessage'
-                  AND ftp.value = 'true'
+                  AND LOWER(ftp.key) = 'statusmessage'
+                  AND LOWER(ftp.value) = 'true'
                   AND f.resource_id = ANY(@resourceIds)
             )"
             : "";
