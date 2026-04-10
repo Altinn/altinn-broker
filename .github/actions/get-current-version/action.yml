@@ -17,7 +17,7 @@ runs:
   using: "composite"
   steps:
     - name: Checkout GitHub Action"
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set current version
       id: set-current-version
