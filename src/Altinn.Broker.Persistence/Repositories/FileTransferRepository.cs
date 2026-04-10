@@ -882,7 +882,7 @@ LEFT JOIN LATERAL (
 
     public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken, string[]? resourceIdFilter = null)
     {
-        bool hasResourceFilter = resourceIdFilter is { Length: > 0 };
+        bool hasResourceFilter = resourceIdFilter != null && resourceIdFilter.Length > 0;
 
         string statusMessageFilterClause = hasResourceFilter
             ? @"WHERE NOT EXISTS (

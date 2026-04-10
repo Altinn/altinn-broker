@@ -274,12 +274,12 @@ public class GenerateDailySummaryReportHandler(
     private static string[]? ParseResourceIdFilter(string? csv)
     {
         if (string.IsNullOrWhiteSpace(csv))
-            return null;
+            return [];
 
         var ids = csv
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        return ids.Length > 0 ? ids : null;
+        return ids.Length > 0 ? ids : [];
     }
 }
 
