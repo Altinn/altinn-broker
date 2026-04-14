@@ -15,6 +15,13 @@ public class RefreshMonthlyStatisticsRollupHandler(
         await RefreshRollup(now.Year, now.Month, cancellationToken);
     }
 
+    public async Task RefreshPreviousMonthRollup(CancellationToken cancellationToken)
+    {
+        var previousMonth = DateTime.UtcNow.AddMonths(-1);
+
+        await RefreshRollup(previousMonth.Year, previousMonth.Month, cancellationToken);
+    }
+
     public async Task RefreshRollup(int year, int month, CancellationToken cancellationToken)
     {
         logger.LogInformation(

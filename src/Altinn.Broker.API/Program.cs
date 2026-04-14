@@ -74,9 +74,13 @@ static void BuildAndRun(string[] args)
     recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
     recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
     recurringJobManager.AddOrUpdate<RefreshMonthlyStatisticsRollupHandler>(
-        "Refresh monthly statistics rollup",
+        "Refresh current month statistics rollup",
         handler => handler.RefreshRollup(CancellationToken.None),
-        Cron.Minutely());
+        Cron.Weekly(DayOfWeek.Monday, 3));
+    recurringJobManager.AddOrUpdate<RefreshMonthlyStatisticsRollupHandler>(
+        "Finalize previous month statistics rollup",
+        handler => handler.RefreshPreviousMonthRollup(CancellationToken.None),
+        "0 4 2 * *");
     recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
         "Cleanup use case test data older than 1 day",
         handler => handler.Process(new CleanupUseCaseTestsRequest { MinAgeDays = 1 }, null, CancellationToken.None), 
