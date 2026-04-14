@@ -1,5 +1,4 @@
 using Altinn.Broker.Core.Domain.Enums;
-using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
@@ -14,7 +13,6 @@ namespace Altinn.Broker.Tests;
 public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
     private readonly IMonthlyStatisticsRepository _repository;
-    private readonly RefreshMonthlyStatisticsRollupHandler _refreshHandler;
     private readonly TestDataHelper _dataHelper;
     private readonly HashSet<string> _createdResourceIds = [];
     private readonly HashSet<string> _createdServiceOwnerIds = [];
@@ -22,7 +20,6 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
     public MonthlyStatisticsRepositoryTests(CustomWebApplicationFactory factory)
     {
         _repository = factory.Services.GetRequiredService<IMonthlyStatisticsRepository>();
-        _refreshHandler = factory.Services.GetRequiredService<RefreshMonthlyStatisticsRollupHandler>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -297,7 +294,7 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         await _dataHelper.InsertActorStatus(firstTransfer, recipientId, ActorFileTransferStatus.DownloadStarted, monthDate.AddMinutes(10));
         await _dataHelper.InsertActorStatus(secondTransfer, recipientId, ActorFileTransferStatus.DownloadStarted, monthDate.AddDays(1).AddMinutes(10));
 
-        await _refreshHandler.RefreshRollup(2026, 3, CancellationToken.None);
+        await RefreshMonthlyStatisticsRollupAsync(2026, 3);
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
@@ -320,7 +317,7 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
     }
 
     private Task RefreshMonthlyStatisticsRollupAsync(int year, int month)
-        => _refreshHandler.RefreshRollup(year, month, CancellationToken.None);
+        => _repository.RebuildMonthlyStatisticsRollupForMonth(year, month, CancellationToken.None);
 
     private static string CreateUniqueOrganizationNumber()
     {

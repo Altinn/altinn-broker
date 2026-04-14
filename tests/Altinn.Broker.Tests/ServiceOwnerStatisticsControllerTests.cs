@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +20,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     private readonly HttpClient _serviceOwnerClient;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _otherServiceOwnerClient;
-    private readonly RefreshMonthlyStatisticsRollupHandler _refreshHandler;
+    private readonly IMonthlyStatisticsRepository _repository;
     private readonly TestDataHelper _dataHelper;
 
     public ServiceOwnerStatisticsControllerTests(CustomWebApplicationFactory factory)
@@ -28,7 +28,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         _serviceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
         _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _otherServiceOwnerClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN_NOT_CONFIGURED);
-        _refreshHandler = factory.Services.GetRequiredService<RefreshMonthlyStatisticsRollupHandler>();
+        _repository = factory.Services.GetRequiredService<IMonthlyStatisticsRepository>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -56,7 +56,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         await _dataHelper.InsertActorStatus(januaryTransfer, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 14, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(januaryTransfer2, "0192:986252932", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.Zero));
 
-        await _refreshHandler.RefreshRollup(2026, 1, CancellationToken.None);
+        await _repository.RebuildMonthlyStatisticsRollupForMonth(2026, 1, CancellationToken.None);
 
         var response = await _serviceOwnerClient.GetAsync(
             $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1");
