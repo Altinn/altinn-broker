@@ -36,15 +36,17 @@ public class GenerateMonthlyStatisticsCsvHandler(
             return Errors.NoAccessToResource;
         }
 
+        var resourceId = string.IsNullOrWhiteSpace(request.ResourceId) ? null : request.ResourceId.Trim();
+
         logger.LogInformation(
             "Generating monthly statistics CSV for service owner {ServiceOwnerId} for {Year}-{Month}",
             callerOrganizationId.SanitizeForLogs(),
             request.Year,
             request.Month);
 
-        if (!string.IsNullOrWhiteSpace(request.ResourceId))
+        if (resourceId is not null)
         {
-            var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+            var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
             if (resource is null || string.IsNullOrWhiteSpace(resource.OrganizationNumber))
             {
                 return Errors.ResourceHasNotBeenConfigured;
@@ -60,13 +62,13 @@ public class GenerateMonthlyStatisticsCsvHandler(
             serviceOwnerId: callerOrganizationId.WithPrefix(),
             fromInclusive: fromMonthStart,
             toExclusive: toExclusive,
-            resourceId: request.ResourceId,
+            resourceId: resourceId,
             cancellationToken: cancellationToken);
 
         var response = new GenerateMonthlyStatisticsCsvResponse
         {
             Content = Encoding.UTF8.GetBytes(BuildCsv(rows)),
-            FileName = BuildFileName(request.ResourceId, fromMonthStart),
+            FileName = BuildFileName(resourceId, fromMonthStart),
             RowCount = rows.Count
         };
 
