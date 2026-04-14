@@ -15,6 +15,7 @@ using Xunit;
 
 namespace Altinn.Broker.Tests;
 
+[Collection("MonthlyStatistics")]
 public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _serviceOwnerClient;
@@ -68,7 +69,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
 
         var csv = await response.Content.ReadAsStringAsync();
         Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252932,3,2,2,2", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252932,3,2,3,2", csv);
         Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252933,1,1,1,1", csv);
         Assert.DoesNotContain("2026,2,", csv);
     }

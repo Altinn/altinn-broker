@@ -10,6 +10,7 @@ using Xunit;
 
 namespace Altinn.Broker.Tests;
 
+[Collection("MonthlyStatistics")]
 public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
     private readonly IMonthlyStatisticsRepository _repository;
@@ -90,7 +91,7 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var pairRowA1 = Assert.Single(rows, row => row.ResourceId == resourceA && row.Sender == senderA && row.Recipient == "0192:986252932");
         Assert.Equal(3, pairRowA1.TotalFileTransfers);
         Assert.Equal(2, pairRowA1.UploadCount);
-        Assert.Equal(2, pairRowA1.TotalTransferDownloadAttempts);
+        Assert.Equal(3, pairRowA1.TotalTransferDownloadAttempts);
         Assert.Equal(2, pairRowA1.TransfersWithDownloadConfirmed);
 
         var pairRowA2 = Assert.Single(rows, row => row.ResourceId == resourceA && row.Sender == senderA && row.Recipient == "0192:986252933");

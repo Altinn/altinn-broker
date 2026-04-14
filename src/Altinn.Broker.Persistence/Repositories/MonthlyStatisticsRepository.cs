@@ -95,30 +95,47 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                 GROUP BY afs.file_transfer_id_fk, afs.actor_id_fk
             ),
 
-            pair_context AS (
-                SELECT
-                    aa.file_transfer_id_fk,
-                    aa.actor_id_fk,
-                    ar.service_owner_id_fk AS service_owner_id,
-                    f.resource_id,
-                    f.created,
-                    sender.actor_external_id AS sender,
-                    recipient.actor_external_id AS recipient,
-                    aa.total_transfer_download_attempts_delta,
-                    aa.transfers_with_download_confirmed_delta
-                FROM actor_activity aa
-                JOIN broker.file_transfer f        ON f.file_transfer_id_pk  = aa.file_transfer_id_fk
-                JOIN broker.altinn_resource ar     ON ar.resource_id_pk      = f.resource_id
-                JOIN broker.actor sender           ON sender.actor_id_pk     = f.sender_actor_id_fk
-                JOIN broker.actor recipient        ON recipient.actor_id_pk  = aa.actor_id_fk
-            ),
-
             published_in_month AS (
                 SELECT DISTINCT file_transfer_id_fk
                 FROM broker.file_transfer_status
                 WHERE file_transfer_status_description_id_fk = @publishedStatus
                 AND file_transfer_status_date >= @fromInclusive
                 AND file_transfer_status_date < @toExclusive
+            ),
+
+            published_pairs AS (
+                SELECT pim.file_transfer_id_fk, afs.actor_id_fk
+                FROM published_in_month pim
+                JOIN broker.actor_file_transfer_status afs
+                    ON afs.file_transfer_id_fk = pim.file_transfer_id_fk
+                    AND afs.actor_file_transfer_status_description_id_fk = @initializedStatus
+            ),
+
+            all_pairs AS (
+                SELECT file_transfer_id_fk, actor_id_fk FROM actor_activity
+                UNION
+                SELECT file_transfer_id_fk, actor_id_fk FROM published_pairs
+            ),
+
+            pair_context AS (
+                SELECT
+                    ap.file_transfer_id_fk,
+                    ap.actor_id_fk,
+                    ar.service_owner_id_fk AS service_owner_id,
+                    f.resource_id,
+                    f.created,
+                    sender.actor_external_id AS sender,
+                    recipient.actor_external_id AS recipient,
+                    COALESCE(aa.total_transfer_download_attempts_delta, 0) AS total_transfer_download_attempts_delta,
+                    COALESCE(aa.transfers_with_download_confirmed_delta, 0) AS transfers_with_download_confirmed_delta
+                FROM all_pairs ap
+                JOIN broker.file_transfer f        ON f.file_transfer_id_pk  = ap.file_transfer_id_fk
+                JOIN broker.altinn_resource ar     ON ar.resource_id_pk      = f.resource_id
+                JOIN broker.actor sender           ON sender.actor_id_pk     = f.sender_actor_id_fk
+                JOIN broker.actor recipient        ON recipient.actor_id_pk  = ap.actor_id_fk
+                LEFT JOIN actor_activity aa
+                    ON aa.file_transfer_id_fk = ap.file_transfer_id_fk
+                    AND aa.actor_id_fk        = ap.actor_id_fk
             ),
 
             month_summary AS (
@@ -130,8 +147,8 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                     SUM(CASE WHEN pc.created >= @fromInclusive
                                 AND pc.created < @toExclusive         THEN 1 ELSE 0 END)::int AS total_file_transfers,
                     SUM(CASE WHEN pim.file_transfer_id_fk IS NOT NULL   THEN 1 ELSE 0 END)::int AS upload_count,
-                    SUM(COALESCE(pc.total_transfer_download_attempts_delta, 0))::int             AS total_transfer_download_attempts,
-                    SUM(COALESCE(pc.transfers_with_download_confirmed_delta, 0))::int            AS transfers_with_download_confirmed
+                    SUM(pc.total_transfer_download_attempts_delta)::int                          AS total_transfer_download_attempts,
+                    SUM(pc.transfers_with_download_confirmed_delta)::int                         AS transfers_with_download_confirmed
                 FROM pair_context pc
                 LEFT JOIN published_in_month pim
                     ON pim.file_transfer_id_fk = pc.file_transfer_id_fk
@@ -164,6 +181,7 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
             command.Parameters.AddWithValue("@fromInclusive", fromInclusive);
             command.Parameters.AddWithValue("@toExclusive", toExclusive);
             command.Parameters.AddWithValue("@publishedStatus", (int)FileTransferStatus.Published);
+            command.Parameters.AddWithValue("@initializedStatus", (int)ActorFileTransferStatus.Initialized);
             command.Parameters.AddWithValue("@downloadStartedStatus", (int)ActorFileTransferStatus.DownloadStarted);
             command.Parameters.AddWithValue("@downloadConfirmedStatus", (int)ActorFileTransferStatus.DownloadConfirmed);
 

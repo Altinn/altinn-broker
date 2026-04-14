@@ -30,3 +30,11 @@ ON broker.actor_file_transfer_status (
     actor_id_fk
 )
 INCLUDE (actor_file_transfer_status_description_id_fk);
+
+-- Covers published_pairs CTE: find recipients (Initialized status) per published transfer
+CREATE INDEX idx_actor_file_transfer_status_initialized_pair
+ON broker.actor_file_transfer_status (
+    file_transfer_id_fk,
+    actor_id_fk
+)
+WHERE actor_file_transfer_status_description_id_fk = 0;
