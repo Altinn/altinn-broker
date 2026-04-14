@@ -93,18 +93,6 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         await command.ExecuteNonQueryAsync();
     }
 
-    public async Task InsertProperty(Guid fileTransferId, string key, string value)
-    {
-        await using var command = dataSource.CreateCommand(
-            @"INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value)
-              VALUES (@fileTransferId, @key, @value)");
-
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-        command.Parameters.AddWithValue("@key", key);
-        command.Parameters.AddWithValue("@value", value);
-        await command.ExecuteNonQueryAsync();
-    }
-
     private async Task<long> EnsureActor(string actorExternalId)
     {
         await using var selectCommand = dataSource.CreateCommand(
@@ -124,15 +112,6 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
 
     public async Task<long> EnsureStorageProvider(string serviceOwnerId = DefaultServiceOwnerId)
     {
-        await using var selectCommand = dataSource.CreateCommand(
-            "SELECT storage_provider_id_pk FROM broker.storage_provider WHERE service_owner_id_fk = @serviceOwnerId LIMIT 1");
-        selectCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        var existingStorageProviderId = await selectCommand.ExecuteScalarAsync();
-        if (existingStorageProviderId is long storageProviderId)
-        {
-            return storageProviderId;
-        }
-
         await using var insertServiceOwnerCommand = dataSource.CreateCommand(
             @"INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name)
               VALUES (@serviceOwnerId, @serviceOwnerName)
@@ -141,16 +120,18 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         insertServiceOwnerCommand.Parameters.AddWithValue("@serviceOwnerName", $"Service owner {serviceOwnerId}");
         await insertServiceOwnerCommand.ExecuteNonQueryAsync();
 
-        await using var insertStorageProviderCommand = dataSource.CreateCommand(
+        await using var upsertStorageProviderCommand = dataSource.CreateCommand(
             @"INSERT INTO broker.storage_provider (
                     service_owner_id_fk, created, storage_provider_type, resource_name, active)
               VALUES (@serviceOwnerId, NOW(), @storageProviderType, @resourceName, true)
+              ON CONFLICT ON CONSTRAINT storage_provider_owner_type_unique
+              DO UPDATE SET active = true
               RETURNING storage_provider_id_pk");
-        insertStorageProviderCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
-        insertStorageProviderCommand.Parameters.AddWithValue("@storageProviderType", "Altinn3Azure");
-        insertStorageProviderCommand.Parameters.AddWithValue("@resourceName", $"stats-storage-{Guid.NewGuid():N}");
+        upsertStorageProviderCommand.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
+        upsertStorageProviderCommand.Parameters.AddWithValue("@storageProviderType", "Altinn3Azure");
+        upsertStorageProviderCommand.Parameters.AddWithValue("@resourceName", $"stats-storage-{Guid.NewGuid():N}");
 
-        return (long)(await insertStorageProviderCommand.ExecuteScalarAsync())!;
+        return (long)(await upsertStorageProviderCommand.ExecuteScalarAsync())!;
     }
 
     public async Task DeleteTestData(IReadOnlyCollection<string> resourceIds, IReadOnlyCollection<string> serviceOwnerIds)
