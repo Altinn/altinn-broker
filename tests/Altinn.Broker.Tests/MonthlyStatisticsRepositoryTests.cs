@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
@@ -13,6 +14,7 @@ namespace Altinn.Broker.Tests;
 public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
     private readonly IMonthlyStatisticsRepository _repository;
+    private readonly RefreshMonthlyStatisticsRollupHandler _refreshHandler;
     private readonly TestDataHelper _dataHelper;
     private readonly HashSet<string> _createdResourceIds = [];
     private readonly HashSet<string> _createdServiceOwnerIds = [];
@@ -20,6 +22,7 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
     public MonthlyStatisticsRepositoryTests(CustomWebApplicationFactory factory)
     {
         _repository = factory.Services.GetRequiredService<IMonthlyStatisticsRepository>();
+        _refreshHandler = factory.Services.GetRequiredService<RefreshMonthlyStatisticsRollupHandler>();
         _dataHelper = new TestDataHelper(factory.Services.GetRequiredService<NpgsqlDataSource>());
     }
 
@@ -76,13 +79,12 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         await _dataHelper.InsertActorStatus(transferB1, "0192:986252935", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 13, 9, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferOther, "0192:986252936", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 6, 9, 0, 0, TimeSpan.Zero));
 
-        await RefreshMonthlyStatisticsRollupAsync();
+        await RefreshMonthlyStatisticsRollupAsync(2026, 1);
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
             new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
-            null,
             null,
             CancellationToken.None);
 
@@ -91,23 +93,20 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         var pairRowA1 = Assert.Single(rows, row => row.ResourceId == resourceA && row.Sender == senderA && row.Recipient == "0192:986252932");
         Assert.Equal(3, pairRowA1.TotalFileTransfers);
         Assert.Equal(2, pairRowA1.UploadCount);
-        Assert.Equal(3, pairRowA1.DownloadStartedCount);
-        Assert.Equal(2, pairRowA1.UniqueDownloadStartedCount);
-        Assert.Equal(2, pairRowA1.DownloadConfirmedCount);
+        Assert.Equal(2, pairRowA1.TotalTransferDownloadAttempts);
+        Assert.Equal(2, pairRowA1.TransfersWithDownloadConfirmed);
 
         var pairRowA2 = Assert.Single(rows, row => row.ResourceId == resourceA && row.Sender == senderA && row.Recipient == "0192:986252933");
         Assert.Equal(1, pairRowA2.TotalFileTransfers);
         Assert.Equal(1, pairRowA2.UploadCount);
-        Assert.Equal(1, pairRowA2.DownloadStartedCount);
-        Assert.Equal(1, pairRowA2.UniqueDownloadStartedCount);
-        Assert.Equal(0, pairRowA2.DownloadConfirmedCount);
+        Assert.Equal(1, pairRowA2.TotalTransferDownloadAttempts);
+        Assert.Equal(0, pairRowA2.TransfersWithDownloadConfirmed);
 
         var pairRowB = Assert.Single(rows, row => row.ResourceId == resourceB && row.Sender == senderB && row.Recipient == "0192:986252935");
         Assert.Equal(1, pairRowB.TotalFileTransfers);
         Assert.Equal(1, pairRowB.UploadCount);
-        Assert.Equal(1, pairRowB.DownloadStartedCount);
-        Assert.Equal(1, pairRowB.UniqueDownloadStartedCount);
-        Assert.Equal(1, pairRowB.DownloadConfirmedCount);
+        Assert.Equal(1, pairRowB.TotalTransferDownloadAttempts);
+        Assert.Equal(1, pairRowB.TransfersWithDownloadConfirmed);
     }
 
     [Fact]
@@ -134,27 +133,26 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         await _dataHelper.InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero));
         await _dataHelper.InsertActorStatus(transferB, "0192:986252933", ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 12, 9, 0, 0, TimeSpan.Zero));
 
-        await RefreshMonthlyStatisticsRollupAsync();
+        await RefreshMonthlyStatisticsRollupAsync(2026, 1);
 
         var rows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
             new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
             resourceA,
-            null,
             CancellationToken.None);
 
         Assert.Single(rows);
         Assert.All(rows, row => Assert.Equal(resourceA, row.ResourceId));
-        Assert.Contains(rows, row => row.Sender == "0192:991825827" && row.Recipient == "0192:986252932" && row.TotalFileTransfers == 1 && row.UploadCount == 1 && row.DownloadStartedCount == 1 && row.UniqueDownloadStartedCount == 1 && row.DownloadConfirmedCount == 1);
+        Assert.Contains(rows, row => row.Sender == "0192:991825827" && row.Recipient == "0192:986252932" && row.TotalFileTransfers == 1 && row.UploadCount == 1 && row.TotalTransferDownloadAttempts == 1 && row.TransfersWithDownloadConfirmed == 1);
     }
 
     [Fact]
-    public async Task GetMonthlyResourceStatisticsData_GroupBySelectedProperties_SplitsRowsByPropertyValues()
+    public async Task GetMonthlyResourceStatisticsData_UsesStatusCreatedMonthForUploadCount()
     {
         var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
         var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
-        var resourceId = $"monthly-grouping-{Guid.NewGuid():N}";
+        var resourceId = $"monthly-upload-month-{Guid.NewGuid():N}";
         var senderId = "0192:991825827";
         var recipientId = "0192:986252932";
 
@@ -162,53 +160,58 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
 
         await _dataHelper.EnsureResource(resourceId, serviceOwnerOrganizationNumber, serviceOwnerId);
 
-        var transferA = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
-        var transferB = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+        var transfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            senderExternalId: senderId);
 
-        await _dataHelper.InsertProperty(transferA, "messageType", "invoice");
-        await _dataHelper.InsertProperty(transferA, "statusMessage", "accepted");
-        await _dataHelper.InsertProperty(transferB, "messageType", "receipt");
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.Initialized,
+            new DateTimeOffset(2026, 1, 10, 8, 30, 0, TimeSpan.Zero));
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Published,
+            new DateTimeOffset(2026, 2, 2, 9, 0, 0, TimeSpan.Zero));
 
-        await _dataHelper.InsertFileTransferStatus(transferA, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadConfirmed, new DateTimeOffset(2026, 1, 10, 11, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
+        await RefreshMonthlyStatisticsRollupAsync(2026, 1);
+        await RefreshMonthlyStatisticsRollupAsync(2026, 2);
 
-        await RefreshMonthlyStatisticsRollupAsync();
-
-        var rows = await _repository.GetMonthlyResourceStatisticsData(
+        var januaryRows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
             new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
             resourceId,
-            ["messageType", "statusMessage"],
             CancellationToken.None);
 
-        Assert.Equal(2, rows.Count);
+        var februaryRows = await _repository.GetMonthlyResourceStatisticsData(
+            serviceOwnerId,
+            new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            resourceId,
+            CancellationToken.None);
 
-        var invoiceRow = Assert.Single(rows, row => row.GroupedPropertyValues.TryGetValue("messageType", out var value) && value == "invoice");
-        Assert.Equal("accepted", invoiceRow.GroupedPropertyValues["statusMessage"]);
-        Assert.Equal(1, invoiceRow.UploadCount);
-        Assert.Equal(1, invoiceRow.TotalFileTransfers);
-        Assert.Equal(1, invoiceRow.DownloadStartedCount);
-        Assert.Equal(1, invoiceRow.UniqueDownloadStartedCount);
-        Assert.Equal(1, invoiceRow.DownloadConfirmedCount);
+        var januaryRow = Assert.Single(januaryRows);
+        Assert.Equal(1, januaryRow.TotalFileTransfers);
+        Assert.Equal(0, januaryRow.UploadCount);
+        Assert.Equal(0, januaryRow.TotalTransferDownloadAttempts);
+        Assert.Equal(0, januaryRow.TransfersWithDownloadConfirmed);
 
-        var receiptRow = Assert.Single(rows, row => row.GroupedPropertyValues.TryGetValue("messageType", out var value) && value == "receipt");
-        Assert.False(receiptRow.GroupedPropertyValues.ContainsKey("statusMessage"));
-        Assert.Equal(1, receiptRow.TotalFileTransfers);
-        Assert.Equal(0, receiptRow.UploadCount);
-        Assert.Equal(1, receiptRow.DownloadStartedCount);
-        Assert.Equal(1, receiptRow.UniqueDownloadStartedCount);
-        Assert.Equal(0, receiptRow.DownloadConfirmedCount);
+        var februaryRow = Assert.Single(februaryRows);
+        Assert.Equal(0, februaryRow.TotalFileTransfers);
+        Assert.Equal(1, februaryRow.UploadCount);
+        Assert.Equal(0, februaryRow.TotalTransferDownloadAttempts);
+        Assert.Equal(0, februaryRow.TransfersWithDownloadConfirmed);
     }
 
     [Fact]
-    public async Task GetMonthlyResourceStatisticsData_GroupBySubsetOfProperties_SumsAcrossUnselectedProperties()
+    public async Task RebuildMonthlyStatisticsRollup_DownloadAttemptsCountedPerActivityMonth()
     {
         var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
         var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
-        var resourceId = $"monthly-grouping-subset-{Guid.NewGuid():N}";
+        var resourceId = $"monthly-first-attempt-{Guid.NewGuid():N}";
         var senderId = "0192:991825827";
         var recipientId = "0192:986252932";
 
@@ -216,36 +219,98 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
 
         await _dataHelper.EnsureResource(resourceId, serviceOwnerOrganizationNumber, serviceOwnerId);
 
-        var transferA = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
-        var transferB = await _dataHelper.InsertFileTransfer(resourceId, serviceOwnerId, created: new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero), senderExternalId: senderId);
+        var transfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero),
+            senderExternalId: senderId);
 
-        await _dataHelper.InsertProperty(transferA, "messageType", "invoice");
-        await _dataHelper.InsertProperty(transferA, "statusMessage", "accepted");
-        await _dataHelper.InsertProperty(transferB, "messageType", "invoice");
-        await _dataHelper.InsertProperty(transferB, "statusMessage", "rejected");
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Published,
+            new DateTimeOffset(2026, 1, 5, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.DownloadStarted,
+            new DateTimeOffset(2026, 1, 6, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.DownloadStarted,
+            new DateTimeOffset(2026, 2, 10, 9, 0, 0, TimeSpan.Zero));
 
-        await _dataHelper.InsertFileTransferStatus(transferA, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertFileTransferStatus(transferB, FileTransferStatus.Published, new DateTimeOffset(2026, 1, 11, 9, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertActorStatus(transferA, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 10, 10, 0, 0, TimeSpan.Zero));
-        await _dataHelper.InsertActorStatus(transferB, recipientId, ActorFileTransferStatus.DownloadStarted, new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero));
+        await RefreshMonthlyStatisticsRollupAsync(2026, 1);
+        await RefreshMonthlyStatisticsRollupAsync(2026, 2);
 
-        await RefreshMonthlyStatisticsRollupAsync();
-
-        var rows = await _repository.GetMonthlyResourceStatisticsData(
+        var januaryRows = await _repository.GetMonthlyResourceStatisticsData(
             serviceOwnerId,
             new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
             resourceId,
-            ["messageType"],
             CancellationToken.None);
 
-        var invoiceRow = Assert.Single(rows);
-        Assert.Equal("invoice", invoiceRow.GroupedPropertyValues["messageType"]);
-        Assert.Equal(2, invoiceRow.TotalFileTransfers);
-        Assert.Equal(2, invoiceRow.UploadCount);
-        Assert.Equal(2, invoiceRow.DownloadStartedCount);
-        Assert.Equal(2, invoiceRow.UniqueDownloadStartedCount);
-        Assert.Equal(0, invoiceRow.DownloadConfirmedCount);
+        var februaryRows = await _repository.GetMonthlyResourceStatisticsData(
+            serviceOwnerId,
+            new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            resourceId,
+            CancellationToken.None);
+
+        var januaryRow = Assert.Single(januaryRows);
+        Assert.Equal(1, januaryRow.TotalTransferDownloadAttempts);
+
+        var februaryRow = Assert.Single(februaryRows);
+        Assert.Equal(0, februaryRow.TotalFileTransfers);
+        Assert.Equal(0, februaryRow.UploadCount);
+        Assert.Equal(1, februaryRow.TotalTransferDownloadAttempts);
+        Assert.Equal(0, februaryRow.TransfersWithDownloadConfirmed);
+    }
+
+    [Fact]
+    public async Task RefreshMonthlyStatisticsRollup_RebuildsOneMonth()
+    {
+        var serviceOwnerOrganizationNumber = CreateUniqueOrganizationNumber();
+        var serviceOwnerId = $"0192:{serviceOwnerOrganizationNumber}";
+        var resourceId = $"monthly-batched-{Guid.NewGuid():N}";
+        var senderId = "0192:991825827";
+        var recipientId = "0192:986252932";
+        var monthDate = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero);
+
+        RegisterCreatedTestData(serviceOwnerId, resourceId);
+
+        await _dataHelper.EnsureResource(resourceId, serviceOwnerOrganizationNumber, serviceOwnerId);
+
+        var firstTransfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: monthDate,
+            senderExternalId: senderId);
+        var secondTransfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: monthDate.AddDays(1),
+            senderExternalId: senderId);
+
+        await _dataHelper.InsertFileTransferStatus(firstTransfer, FileTransferStatus.Published, monthDate.AddMinutes(5));
+        await _dataHelper.InsertFileTransferStatus(secondTransfer, FileTransferStatus.Published, monthDate.AddDays(1).AddMinutes(5));
+        await _dataHelper.InsertActorStatus(firstTransfer, recipientId, ActorFileTransferStatus.DownloadStarted, monthDate.AddMinutes(10));
+        await _dataHelper.InsertActorStatus(secondTransfer, recipientId, ActorFileTransferStatus.DownloadStarted, monthDate.AddDays(1).AddMinutes(10));
+
+        await _refreshHandler.RefreshRollup(2026, 3, CancellationToken.None);
+
+        var rows = await _repository.GetMonthlyResourceStatisticsData(
+            serviceOwnerId,
+            new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+            resourceId,
+            CancellationToken.None);
+
+        var row = Assert.Single(rows);
+        Assert.Equal(2, row.TotalFileTransfers);
+        Assert.Equal(2, row.UploadCount);
+        Assert.Equal(2, row.TotalTransferDownloadAttempts);
+        Assert.Equal(0, row.TransfersWithDownloadConfirmed);
     }
 
     private void RegisterCreatedTestData(string serviceOwnerId, string resourceId)
@@ -254,8 +319,8 @@ public class MonthlyStatisticsRepositoryTests : IClassFixture<CustomWebApplicati
         _createdResourceIds.Add(resourceId);
     }
 
-    private Task RefreshMonthlyStatisticsRollupAsync()
-        => _repository.RefreshMonthlyStatisticsRollup(CancellationToken.None);
+    private Task RefreshMonthlyStatisticsRollupAsync(int year, int month)
+        => _refreshHandler.RefreshRollup(year, month, CancellationToken.None);
 
     private static string CreateUniqueOrganizationNumber()
     {

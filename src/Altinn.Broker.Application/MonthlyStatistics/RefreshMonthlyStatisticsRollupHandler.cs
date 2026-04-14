@@ -10,8 +10,26 @@ public class RefreshMonthlyStatisticsRollupHandler(
 {
     public async Task RefreshRollup(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Starting monthly statistics rollup refresh");
-        await monthlyStatisticsRepository.RefreshMonthlyStatisticsRollup(cancellationToken);
-        logger.LogInformation("Completed monthly statistics rollup refresh");
+        var now = DateTime.UtcNow;
+
+        await RefreshRollup(now.Year, now.Month, cancellationToken);
+    }
+
+    public async Task RefreshRollup(int year, int month, CancellationToken cancellationToken)
+    {
+        logger.LogInformation(
+            "Starting monthly statistics rollup refresh for {Year}-{Month}",
+            year,
+            month);
+
+        await monthlyStatisticsRepository.RebuildMonthlyStatisticsRollupForMonth(
+            year,
+            month,
+            cancellationToken);
+
+        logger.LogInformation(
+            "Completed monthly statistics rollup refresh for {Year}-{Month}",
+            year,
+            month);
     }
 }

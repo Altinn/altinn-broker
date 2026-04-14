@@ -158,7 +158,7 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         if (resourceIds.Count > 0)
         {
             await using var deleteRollupByResourceCommand = dataSource.CreateCommand(
-                @"DELETE FROM broker.monthly_statistics_monthly_rollup
+                @"DELETE FROM broker.monthly_statistics_rollup
                   WHERE resource_id = ANY(@resourceIds)");
             deleteRollupByResourceCommand.Parameters.Add(new NpgsqlParameter("@resourceIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
             {
@@ -188,7 +188,7 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         if (serviceOwnerIds.Count > 0)
         {
             await using var deleteRollupByServiceOwnerCommand = dataSource.CreateCommand(
-                @"DELETE FROM broker.monthly_statistics_monthly_rollup
+                @"DELETE FROM broker.monthly_statistics_rollup
                   WHERE service_owner_id = ANY(@serviceOwnerIds)");
             deleteRollupByServiceOwnerCommand.Parameters.Add(new NpgsqlParameter("@serviceOwnerIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
             {

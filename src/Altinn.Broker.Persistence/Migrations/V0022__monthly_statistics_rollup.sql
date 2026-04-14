@@ -1,34 +1,32 @@
-CREATE TABLE broker.monthly_statistics_monthly_rollup (
-    monthly_statistics_monthly_rollup_id_pk bigserial PRIMARY KEY,
+CREATE TABLE broker.monthly_statistics_rollup (
+    monthly_statistics_rollup_id_pk bigserial PRIMARY KEY,
     service_owner_id character varying(50) NOT NULL,
     year integer NOT NULL,
     month integer NOT NULL,
     resource_id character varying(100) NOT NULL,
     sender character varying(100) NOT NULL,
     recipient character varying(100) NOT NULL,
-    groupable_property_values jsonb NOT NULL DEFAULT '{}'::jsonb,
     total_file_transfers integer NOT NULL,
     upload_count integer NOT NULL,
-    download_attempt_count integer NOT NULL,
-    unique_download_started_count integer NOT NULL,
-    download_confirmed_count integer NOT NULL,
-    refreshed_at timestamp without time zone NOT NULL DEFAULT NOW()
+    total_transfer_download_attempts integer NOT NULL,
+    transfers_with_download_confirmed integer NOT NULL,
+    refreshed_at timestamp with time zone NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_monthly_statistics_rollup_key UNIQUE (service_owner_id, year, month, resource_id, sender, recipient)
 );
 
-CREATE INDEX idx_monthly_statistics_rollup_service_owner_month_resource
-ON broker.monthly_statistics_monthly_rollup (
-    service_owner_id,
-    year,
-    month,
-    resource_id
+-- Covers published_in_month CTE: index-only scan on (status, date) returning file_transfer_id
+CREATE INDEX idx_file_transfer_status_description_date_transfer
+ON broker.file_transfer_status (
+    file_transfer_status_description_id_fk,
+    file_transfer_status_date,
+    file_transfer_id_fk
 );
 
-CREATE INDEX idx_monthly_statistics_rollup_service_owner_month_participants
-ON broker.monthly_statistics_monthly_rollup (
-    service_owner_id,
-    year,
-    month,
-    resource_id,
-    sender,
-    recipient
-);
+-- Covers actor_activity CTE: date-range scan → GROUP BY (file_transfer_id, actor_id) with status for CASE
+CREATE INDEX idx_actor_file_transfer_status_date_pair
+ON broker.actor_file_transfer_status (
+    actor_file_transfer_status_date,
+    file_transfer_id_fk,
+    actor_id_fk
+)
+INCLUDE (actor_file_transfer_status_description_id_fk);

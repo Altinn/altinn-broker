@@ -29,7 +29,6 @@ public class GenerateMonthlyStatisticsCsvHandler(
 
         var fromMonthStart = new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var toExclusive = fromMonthStart.AddMonths(1);
-        var groupByPropertyKeys = NormalizeGroupByPropertyKeys(request.GroupByPropertyKeys);
 
         var callerOrganizationId = user?.GetCallerOrganizationId();
         if (string.IsNullOrWhiteSpace(callerOrganizationId))
@@ -62,12 +61,11 @@ public class GenerateMonthlyStatisticsCsvHandler(
             fromInclusive: fromMonthStart,
             toExclusive: toExclusive,
             resourceId: request.ResourceId,
-            groupByPropertyKeys: groupByPropertyKeys,
             cancellationToken: cancellationToken);
 
         var response = new GenerateMonthlyStatisticsCsvResponse
         {
-            Content = Encoding.UTF8.GetBytes(BuildCsv(rows, groupByPropertyKeys)),
+            Content = Encoding.UTF8.GetBytes(BuildCsv(rows)),
             FileName = BuildFileName(request.ResourceId, fromMonthStart),
             RowCount = rows.Count
         };
@@ -75,15 +73,10 @@ public class GenerateMonthlyStatisticsCsvHandler(
         return response;
     }
 
-    private static string BuildCsv(IEnumerable<MonthlyResourceStatisticsData> rows, IReadOnlyList<string> groupByPropertyKeys)
+    private static string BuildCsv(IEnumerable<MonthlyResourceStatisticsData> rows)
     {
         var builder = new StringBuilder();
-        builder.Append("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,downloadStartedCount,uniqueDownloadStartedCount,downloadConfirmedCount");
-        foreach (var propertyKey in groupByPropertyKeys)
-        {
-            builder.Append(',').Append(EscapeCsv(propertyKey));
-        }
-
+        builder.Append("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed");
         builder.AppendLine();
 
         foreach (var row in rows)
@@ -96,15 +89,8 @@ public class GenerateMonthlyStatisticsCsvHandler(
                 .Append(EscapeCsv(row.Recipient)).Append(',')
                 .Append(row.TotalFileTransfers).Append(',')
                 .Append(row.UploadCount).Append(',')
-                .Append(row.DownloadStartedCount).Append(',')
-                .Append(row.UniqueDownloadStartedCount).Append(',')
-                .Append(row.DownloadConfirmedCount);
-
-            foreach (var propertyKey in groupByPropertyKeys)
-            {
-                row.GroupedPropertyValues.TryGetValue(propertyKey, out var propertyValue);
-                builder.Append(',').Append(EscapeCsv(propertyValue ?? string.Empty));
-            }
+                .Append(row.TotalTransferDownloadAttempts).Append(',')
+                .Append(row.TransfersWithDownloadConfirmed);
 
             builder.AppendLine();
         }
@@ -129,18 +115,5 @@ public class GenerateMonthlyStatisticsCsvHandler(
             : string.Join("_", resourceId.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
 
         return $"monthly_statistics_{resourceSegment}_{reportMonthStart:yyyy-MM}.csv";
-    }
-
-    private static List<string> NormalizeGroupByPropertyKeys(IEnumerable<string>? groupByPropertyKeys)
-    {
-        if (groupByPropertyKeys is null)
-        {
-            return [];
-        }
-        return groupByPropertyKeys
-            .Where(static key => !string.IsNullOrWhiteSpace(key))
-            .Select(static key => key.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
     }
 }
