@@ -35,7 +35,7 @@ public static class DependencyInjection
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();
-        services.AddScoped<GenerateMonthlyStatisticsCsvHandler>();
+        services.AddScoped<GetMonthlyStatisticsCsvHandler>();
         services.AddScoped<RefreshMonthlyStatisticsRollupHandler>();
         services.AddScoped<CleanupUseCaseTestsHandler>();
     }

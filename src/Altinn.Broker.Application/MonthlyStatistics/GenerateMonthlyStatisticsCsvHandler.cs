@@ -12,13 +12,13 @@ using OneOf;
 
 namespace Altinn.Broker.Application.MonthlyStatistics;
 
-public class GenerateMonthlyStatisticsCsvHandler(
+public class GetMonthlyStatisticsCsvHandler(
     IMonthlyStatisticsRepository monthlyStatisticsRepository,
     IResourceRepository resourceRepository,
-    ILogger<GenerateMonthlyStatisticsCsvHandler> logger) : IHandler<GenerateMonthlyStatisticsReportRequest, GenerateMonthlyStatisticsCsvResponse>
+    ILogger<GetMonthlyStatisticsCsvHandler> logger) : IHandler<GetMonthlyStatisticsReportRequest, GetMonthlyStatisticsCsvResponse>
 {
-    public async Task<OneOf<GenerateMonthlyStatisticsCsvResponse, Error>> Process(
-        GenerateMonthlyStatisticsReportRequest request,
+    public async Task<OneOf<GetMonthlyStatisticsCsvResponse, Error>> Process(
+        GetMonthlyStatisticsReportRequest request,
         ClaimsPrincipal? user,
         CancellationToken cancellationToken)
     {
@@ -65,7 +65,7 @@ public class GenerateMonthlyStatisticsCsvHandler(
             resourceId: resourceId,
             cancellationToken: cancellationToken);
 
-        var response = new GenerateMonthlyStatisticsCsvResponse
+        var response = new GetMonthlyStatisticsCsvResponse
         {
             Content = Encoding.UTF8.GetBytes(BuildCsv(rows)),
             FileName = BuildFileName(resourceId, fromMonthStart),

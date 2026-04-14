@@ -1,6 +1,6 @@
 namespace Altinn.Broker.Application.MonthlyStatistics;
 
-public class GenerateMonthlyStatisticsReportRequest
+public class GetMonthlyStatisticsReportRequest
 {
     public string? ResourceId { get; set; }
     public int Year { get; set; }

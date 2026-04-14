@@ -37,8 +37,8 @@ public class ServiceOwnerStatisticsController : Controller
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> DownloadMonthlyStatisticsCsv(
-        [FromQuery] GenerateMonthlyStatisticsReportRequest request,
-        [FromServices] GenerateMonthlyStatisticsCsvHandler handler,
+        [FromQuery] GetMonthlyStatisticsReportRequest request,
+        [FromServices] GetMonthlyStatisticsCsvHandler handler,
         CancellationToken cancellationToken)
     {
         var result = await handler.Process(request, HttpContext.User, cancellationToken);
