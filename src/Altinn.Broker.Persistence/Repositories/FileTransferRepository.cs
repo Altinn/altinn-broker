@@ -879,9 +879,21 @@ LEFT JOIN LATERAL (
         return await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
-    public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
+    public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken, string[]? resourceIdFilter = null)
     {
-        const string query = @"
+        bool hasResourceFilter = resourceIdFilter != null && resourceIdFilter.Length > 0;
+
+        string statusMessageFilterClause = hasResourceFilter
+            ? @"WHERE NOT EXISTS (
+                SELECT 1 FROM broker.file_transfer_property ftp
+                WHERE ftp.file_transfer_id_fk = f.file_transfer_id_pk
+                  AND LOWER(ftp.key) = 'statusmessage'
+                  AND LOWER(ftp.value) = 'true'
+                  AND f.resource_id = ANY(@resourceIds)
+            )"
+            : "";
+
+        string query = $@"
             WITH latest_recipient_status AS (
                 SELECT DISTINCT ON (afs.file_transfer_id_fk, afs.actor_id_fk)
                     afs.file_transfer_id_fk,
@@ -915,6 +927,7 @@ LEFT JOIN LATERAL (
             LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
             LEFT JOIN latest_recipient_status lrs ON lrs.file_transfer_id_fk = f.file_transfer_id_pk
             LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = lrs.actor_id_fk
+            {statusMessageFilterClause}
             GROUP BY 
                 DATE(f.created),
                 EXTRACT(YEAR FROM f.created),
@@ -939,6 +952,13 @@ LEFT JOIN LATERAL (
 
         await using var command = dataSource.CreateCommand(query);
         command.CommandTimeout = 600;
+        if (hasResourceFilter)
+        {
+            command.Parameters.Add(new NpgsqlParameter("@resourceIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = resourceIdFilter
+            });
+        }
         
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
