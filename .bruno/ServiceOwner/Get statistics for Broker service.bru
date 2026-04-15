@@ -1,0 +1,26 @@
+meta {
+  name: Get statistics for Broker service
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{broker_base_url}}/broker/api/v1/statistics/monthly?year=2026&month=4&resourceId={{resource_id}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  year: 2026
+  month: 4
+  resourceId: {{resource_id}}
+}
+
+auth:bearer {
+  token: {{systemprovider_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
