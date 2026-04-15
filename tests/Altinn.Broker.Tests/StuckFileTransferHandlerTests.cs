@@ -1,7 +1,10 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+
+using Hangfire;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,8 @@ public class StuckFileTransferHandlerTests
     {
         // Arrange
         var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var slackClient = new Mock<ISlackClient>();
         var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
         var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
@@ -28,7 +33,7 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, slackNotifier, monitorLogger.Object);
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         fileTransferStatusRepository.Setup(r => r
             .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<Core.Domain.Enums.FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
@@ -41,7 +46,7 @@ public class StuckFileTransferHandlerTests
         monitorLogger.Verify(l => l.Log(
             LogLevel.Information,
             It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, t) => v.ToString() == "Checking for file transfers stuck in upload processing or upload started"),
+            It.Is<It.IsAnyType>((v, t) => v.ToString() == "Checking for file transfers stuck in upload started"),
             It.IsAny<Exception>(),
             (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
     }
@@ -51,6 +56,8 @@ public class StuckFileTransferHandlerTests
     {
         // Arrange
         var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var slackClient = new Mock<ISlackClient>();
         var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
         var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
@@ -58,7 +65,7 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, slackNotifier, monitorLogger.Object);
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         var fileTransferId = Guid.NewGuid();
         var stuckfileTransferStatuses = new List<FileTransferStatusEntity>()
@@ -71,8 +78,29 @@ public class StuckFileTransferHandlerTests
             }
         };
         fileTransferStatusRepository.Setup(r => r
-            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<Core.Domain.Enums.FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
             .ReturnsAsync(stuckfileTransferStatuses);
+        fileTransferRepository.Setup(r => r.GetFileTransfer(fileTransferId, cancellationToken)).ReturnsAsync(new FileTransferEntity()
+        {
+            FileTransferId = fileTransferId,
+            ResourceId = "test-resource",
+            Sender = new ActorEntity() { ActorExternalId = "0192:123456789" },
+            Created = DateTime.UtcNow.AddHours(-1),
+            ExpirationTime = DateTime.UtcNow,
+            FileName = "testfile.txt",
+            FileTransferStatusEntity = stuckfileTransferStatuses.First(),
+            RecipientCurrentStatuses = new List<ActorFileTransferStatusEntity>()
+            {
+                new ActorFileTransferStatusEntity()
+                {
+                    Actor = new ActorEntity() {
+                        ActorExternalId = "0192:987654321"
+                    },
+                    Status = ActorFileTransferStatus.Initialized,
+                    Date = DateTime.UtcNow.AddMinutes(-16)
+                }
+            }
+        });
 
         // Act
         await handler.CheckForStuckFileTransfers(cancellationToken);
