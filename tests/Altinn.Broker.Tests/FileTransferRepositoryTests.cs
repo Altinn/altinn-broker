@@ -14,12 +14,14 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	private readonly CustomWebApplicationFactory _factory;
 	private readonly IFileTransferRepository _repository;
 	private readonly NpgsqlDataSource _dataSource;
+	private readonly TestDataHelper _dataHelper;
 
 	public FileTransferRepositoryTests(CustomWebApplicationFactory factory)
 	{
 		_factory = factory;
 		_repository = factory.Services.GetRequiredService<IFileTransferRepository>();
 		_dataSource = factory.Services.GetRequiredService<NpgsqlDataSource>();
+		_dataHelper = new TestDataHelper(_dataSource);
 	}
 
 	[Fact]
@@ -165,86 +167,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 
 	private async Task<Guid> InsertFileTransfer(string resourceId, DateTimeOffset? created = null)
 	{
-		var fileTransferId = Guid.NewGuid();
-		var senderExternalId = "0192:991825827";
-		var createdValue = created ?? DateTimeOffset.UtcNow;
-
-		// Get or create actor
-		await using var getActorCommand = _dataSource.CreateCommand(
-			"SELECT actor_id_pk FROM broker.actor WHERE actor_external_id = @externalId");
-		getActorCommand.Parameters.AddWithValue("@externalId", senderExternalId);
-		var actorIdObj = await getActorCommand.ExecuteScalarAsync();
-
-		long actorId;
-		if (actorIdObj == null)
-		{
-			await using var insertActorCommand = _dataSource.CreateCommand(
-				"INSERT INTO broker.actor (actor_external_id) VALUES (@externalId) RETURNING actor_id_pk");
-			insertActorCommand.Parameters.AddWithValue("@externalId", senderExternalId);
-			actorId = (long)(await insertActorCommand.ExecuteScalarAsync())!;
-		}
-		else
-		{
-			actorId = (long)actorIdObj;
-		}
-
-		// Get storage provider (assuming one exists from test setup)
-		await using var getStorageCommand = _dataSource.CreateCommand(
-			"SELECT storage_provider_id_pk FROM broker.storage_provider LIMIT 1");
-		var storageProviderIdObj = await getStorageCommand.ExecuteScalarAsync();
-
-		long storageProviderId;
-		if (storageProviderIdObj == null)
-		{
-			// Create a service owner and storage provider if they don't exist
-			await using var insertServiceOwnerCommand = _dataSource.CreateCommand(
-				"INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name) VALUES (@id, @name) ON CONFLICT DO NOTHING");
-			insertServiceOwnerCommand.Parameters.AddWithValue("@id", "0192:991825827");
-			insertServiceOwnerCommand.Parameters.AddWithValue("@name", "Test Service Owner");
-			await insertServiceOwnerCommand.ExecuteNonQueryAsync();
-
-			await using var insertStorageCommand = _dataSource.CreateCommand(
-				"INSERT INTO broker.storage_provider (service_owner_id_fk, created, storage_provider_type, resource_name, active) VALUES (@serviceOwnerId, NOW(), @type, @resourceName, true) RETURNING storage_provider_id_pk");
-			insertStorageCommand.Parameters.AddWithValue("@serviceOwnerId", "0192:991825827");
-			insertStorageCommand.Parameters.AddWithValue("@type", "Azurite");
-			insertStorageCommand.Parameters.AddWithValue("@resourceName", "test-storage");
-			storageProviderId = (long)(await insertStorageCommand.ExecuteScalarAsync())!;
-		}
-		else
-		{
-			storageProviderId = (long)storageProviderIdObj;
-		}
-
-		// Create file transfer
-		await using var insertFileTransferCommand = _dataSource.CreateCommand(
-			"INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
-			"VALUES (@fileTransferId, @resourceId, @fileName, NULL, NULL, @externalRef, @actorId, @created, @storageProviderId, @expirationTime, NULL, false)");
-		insertFileTransferCommand.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-		insertFileTransferCommand.Parameters.AddWithValue("@resourceId", resourceId);
-		insertFileTransferCommand.Parameters.AddWithValue("@fileName", "test.txt");
-		insertFileTransferCommand.Parameters.AddWithValue("@externalRef", "test-ref");
-		insertFileTransferCommand.Parameters.AddWithValue("@actorId", actorId);
-		insertFileTransferCommand.Parameters.AddWithValue("@created", createdValue);
-		insertFileTransferCommand.Parameters.AddWithValue("@storageProviderId", storageProviderId);
-		insertFileTransferCommand.Parameters.AddWithValue("@expirationTime", createdValue.UtcDateTime.AddHours(1));
-		await insertFileTransferCommand.ExecuteNonQueryAsync();
-
-		return fileTransferId;
-	}
-
-	private async Task<Guid> InsertFileTransferWithProperty(string resourceId, string propertyKey, string propertyValue)
-	{
-		var fileTransferId = await InsertFileTransfer(resourceId);
-
-		// Insert property
-		await using var insertPropertyCommand = _dataSource.CreateCommand(
-			"INSERT INTO broker.file_transfer_property (file_transfer_id_fk, key, value) VALUES (@fileTransferId, @key, @value)");
-		insertPropertyCommand.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-		insertPropertyCommand.Parameters.AddWithValue("@key", propertyKey);
-		insertPropertyCommand.Parameters.AddWithValue("@value", propertyValue);
-		await insertPropertyCommand.ExecuteNonQueryAsync();
-
-		return fileTransferId;
+		return await _dataHelper.InsertFileTransfer(resourceId, created: created);
 	}
 }
 
