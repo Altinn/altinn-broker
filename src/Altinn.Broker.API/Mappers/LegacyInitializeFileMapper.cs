@@ -17,7 +17,7 @@ internal static class LegacyInitializeFileMapper
             RecipientExternalIds = fileInitializeExt.Recipients,
             Checksum = fileInitializeExt.Checksum,
             IsLegacy = true,
-            DisableVirusScan = fileInitializeExt.DisableVirusScan
+            DisableVirusScan = fileInitializeExt.DisableVirusScan ?? false
         };
     }
 }
