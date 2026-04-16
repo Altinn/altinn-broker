@@ -35,7 +35,8 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
                     UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
                     ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
                     ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy")),
-                    RequiredParty = reader.IsDBNull(reader.GetOrdinal("required_party")) ? null : reader.GetBoolean(reader.GetOrdinal("required_party"))
+                    RequiredParty = reader.IsDBNull(reader.GetOrdinal("required_party")) ? null : reader.GetBoolean(reader.GetOrdinal("required_party")),
+                    ApprovedForDisabledVirusScan = reader.GetBoolean(reader.GetOrdinal("approved_for_disabled_virus_scan"))
                 };
             }
         }
