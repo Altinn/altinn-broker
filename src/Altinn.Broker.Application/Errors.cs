@@ -40,4 +40,6 @@ public static class StatisticsErrors
 {
     public static Error NoFileTransfersFound = new Error(6001, "No file transfers found for report generation", HttpStatusCode.NotFound);
     public static Error ReportGenerationFailed = new Error(6002, "Failed to generate statistics report", HttpStatusCode.InternalServerError);
+    public static Error InvalidMonthFormat = new Error(6003, "Invalid year or month. Provide a valid year and a month between 1 and 12.", HttpStatusCode.BadRequest);
+    public static Error InvalidMonthRange = new Error(6004, "The requested report month is invalid.", HttpStatusCode.BadRequest);
 }
