@@ -14,4 +14,6 @@ public class ResourceEntity
     public string? ExternalServiceCodeLegacy { get; set; }
     public int? ExternalServiceEditionCodeLegacy { get; set; }
     public bool ApprovedForDisabledVirusScan { get; set; } = false;
+    public bool? RequiredParty { get; set; }
+    public bool AccessListEnabled { get; set; } = false;
 }

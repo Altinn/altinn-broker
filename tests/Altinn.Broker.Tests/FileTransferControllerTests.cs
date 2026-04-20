@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,6 +9,7 @@ using System.Xml;
 using Altinn.Broker.API.Models;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.PurgeFileTransfer;
+using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Models;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
@@ -29,6 +30,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
+    private readonly HttpClient _senderClient2;
     private readonly HttpClient _recipientClient;
     private readonly HttpClient _recipientClient2;
     private readonly HttpClient _serviceOwnerClient;
@@ -39,6 +41,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     {
         _factory = factory;
         _senderClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _senderClient2 = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN_2);
         _recipientClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _recipientClient2 = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN_2);
         _serviceOwnerClient = _factory.CreateClientWithAuthorization(TestConstants.DUMMY_SERVICE_OWNER_TOKEN);
@@ -256,7 +259,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidKeyLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidKeyLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -271,18 +274,19 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task Initialize_WitPropertiesInvalidValueLength_ValidationFailure()
+    public async Task Initialize_WithPropertiesInvalidValueLength_ValidationFailure()
     {
         // Initialize
         var initializeRequestBody = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        initializeRequestBody.PropertyList.Add("actuallyAValidKey", "thisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvaluethisisanextremelylongvalue315");
+        string input = new string('A', 3001);
+        initializeRequestBody.PropertyList.Add("actuallyAValidKey", input);
 
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
 
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList Value can not be longer than 300", parsedError.Extensions.First().Value.ToString());
+        Assert.Contains("PropertyList Value can not be longer than 3000", parsedError.Extensions.First().Value.ToString());
     }
 
     [Fact]
@@ -408,6 +412,73 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         // Assert
         Assert.Contains(fileTransferId, contentstring);
+    }
+
+    [Fact]
+    public async Task Search_SearchFileTransferWith_Status_From_UsesStatusTimeline()
+    {
+        // Arrange:
+        // A is created before B, but B is published before A.
+        var fileTransferIdA = await InitializeAndAssertBasicFileTransfer();
+        await Task.Delay(1100);
+        var fileTransferIdB = await InitializeAndAssertBasicFileTransfer();
+
+        var fileAInitialized = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdA}", _responseSerializerOptions);
+        var fileBInitialized = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdB}", _responseSerializerOptions);
+        Assert.NotNull(fileAInitialized);
+        Assert.NotNull(fileBInitialized);
+        Assert.True(fileAInitialized.Created < fileBInitialized.Created, "Test setup failed: A must be created before B.");
+
+        await UploadDummyFileTransferAsync(fileTransferIdB);
+        await Task.Delay(1100);
+        await UploadDummyFileTransferAsync(fileTransferIdA);
+
+        var fileBAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdB}", _responseSerializerOptions);
+        var fileAAfterUpload = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferIdA}", _responseSerializerOptions);
+        Assert.NotNull(fileBAfterUpload);
+        Assert.NotNull(fileAAfterUpload);
+        Assert.Equal(FileTransferStatusExt.Published, fileBAfterUpload.FileTransferStatus);
+        Assert.Equal(FileTransferStatusExt.Published, fileAAfterUpload.FileTransferStatus);
+        Assert.True(fileBAfterUpload.FileTransferStatusChanged < fileAAfterUpload.FileTransferStatusChanged, "Test setup failed: B must be published before A.");
+        Assert.NotNull(fileAAfterUpload.Published);
+        Assert.NotNull(fileBAfterUpload.Published);
+
+        var fromBCreated = fileBInitialized.Created.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromACreated = fileAInitialized.Created.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromAPublished = fileAAfterUpload.Published!.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+        var fromBPublished = fileBAfterUpload.Published!.Value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture.DateTimeFormat);
+
+        // Act + Assert 1: Without status, from=B.created => only B.
+        var searchFromBCreatedWithoutStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&from={fromBCreated}");
+        Assert.True(searchFromBCreatedWithoutStatus.IsSuccessStatusCode, await searchFromBCreatedWithoutStatus.Content.ReadAsStringAsync());
+        var idsFromBCreatedWithoutStatus = await searchFromBCreatedWithoutStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromBCreatedWithoutStatus);
+        Assert.Contains(fileTransferIdB, idsFromBCreatedWithoutStatus);
+        Assert.DoesNotContain(fileTransferIdA, idsFromBCreatedWithoutStatus);
+
+        // Act + Assert 2: Without status, from=A.created => both A and B.
+        var searchFromACreatedWithoutStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&from={fromACreated}");
+        Assert.True(searchFromACreatedWithoutStatus.IsSuccessStatusCode, await searchFromACreatedWithoutStatus.Content.ReadAsStringAsync());
+        var idsFromACreatedWithoutStatus = await searchFromACreatedWithoutStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromACreatedWithoutStatus);
+        Assert.Contains(fileTransferIdA, idsFromACreatedWithoutStatus);
+        Assert.Contains(fileTransferIdB, idsFromACreatedWithoutStatus);
+
+        // Act + Assert 3: With publish status, from=A.published => only A.
+        var searchFromAPublishedWithStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&status=Published&from={fromAPublished}");
+        Assert.True(searchFromAPublishedWithStatus.IsSuccessStatusCode, await searchFromAPublishedWithStatus.Content.ReadAsStringAsync());
+        var idsFromAPublishedWithStatus = await searchFromAPublishedWithStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromAPublishedWithStatus);
+        Assert.Contains(fileTransferIdA, idsFromAPublishedWithStatus);
+        Assert.DoesNotContain(fileTransferIdB, idsFromAPublishedWithStatus);
+
+        // Act + Assert 4: With publish status, from=B.published => both A and B.
+        var searchFromBPublishedWithStatus = await _senderClient.GetAsync($"broker/api/v1/filetransfer?resourceId={fileAInitialized.ResourceId}&status=Published&from={fromBPublished}");
+        Assert.True(searchFromBPublishedWithStatus.IsSuccessStatusCode, await searchFromBPublishedWithStatus.Content.ReadAsStringAsync());
+        var idsFromBPublishedWithStatus = await searchFromBPublishedWithStatus.Content.ReadFromJsonAsync<List<string>>(_responseSerializerOptions);
+        Assert.NotNull(idsFromBPublishedWithStatus);
+        Assert.Contains(fileTransferIdA, idsFromBPublishedWithStatus);
+        Assert.Contains(fileTransferIdB, idsFromBPublishedWithStatus);
     }
 
     [Fact]
@@ -562,23 +633,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SendFileTransfer_ResourceWithBlankServiceOwner_Fails()
-    {
-        // Arrange
-        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-        file.ResourceId = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER;
-
-        // Act
-        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
-
-        // Assert
-        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
-        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.NotNull(parsedError);
-        Assert.Equal(Errors.InvalidResourceDefinition.Message, parsedError.Detail);
-    }
-
-    [Fact]
     public async Task Graceful_purge_changes_purge_time()
     {
         await Test_Graceful_purge_changes_purge_time("PT12H");
@@ -652,7 +706,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var resource = new ResourceExt
         {
             MaxFileTransferSize = 1000000,
-            FileTransferTimeToLive = "P48H",
+            FileTransferTimeToLive = "P2D",
             PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = "PT24H"
         };
@@ -691,7 +745,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var resource = new ResourceExt
         {
             MaxFileTransferSize = 1000000,
-            FileTransferTimeToLive = "P48H",
+            FileTransferTimeToLive = "P2D",
             PurgeFileTransferAfterAllRecipientsConfirmed = true,
             PurgeFileTransferGracePeriod = "PT24H"
         };
@@ -962,7 +1016,6 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.Null(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
         Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
         j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 
@@ -1014,4 +1067,149 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
             Assert.True(problem.TryGetProperty("code", out var codeProperty));
             Assert.False(string.IsNullOrWhiteSpace(codeProperty.GetString()));
         }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_PartOfFileTransfer_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_SenderIsRequiredParty();
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_NotPartOfFileTransfer_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RequiredPartyNotSpecified.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_MultipleRecipients_PartyInRecipients_ReturnsBadRequest()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+        file.Recipients.Add("0192:991825827");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var content = await initializeFileTransferResponse.Content.ReadAsStringAsync();
+        Assert.False(string.IsNullOrEmpty(content), $"Response body is empty. Status code: {initializeFileTransferResponse.StatusCode}");
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RequiredPartyInvalidRecipientConfiguration.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_MultipleRecipients_PartyInSender_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_SenderIsRequiredParty();
+        file.Recipients.Add("0192:212517712");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Fact]
+    public async Task InitializeFileTransfer_WithRequiredParty_PartyAsOnlyRecipient_Succeeds()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_RequiredParty_NotPartOfTransaction();
+        file.Recipients.Clear();
+        file.Recipients.Add("0192:991825827");
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient2.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Theory]
+    [InlineData("0192:999999999")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    public async Task InitializeFileTransfer_WithRecipientNotInAccessList_ReturnsBadRequest(string recipient)
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add(recipient);
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
+    }
+
+    [Theory]
+    [InlineData("0192:311764837")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837")]
+    public async Task InitializeFileTransfer_WithRecipientInAccessList_Succeeds(string recipient)
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add(recipient);
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+
+        Assert.True(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferOverviewExt>();
+        Assert.NotNull(parsedResponse);
+        Assert.Equal(FileTransferStatusExt.Initialized, parsedResponse.FileTransferStatus);
+    }
+
+    [Theory]
+    [InlineData("0192:311764837", "0192:999999999")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837", UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    public async Task InitializeFileTransfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest(string recipientInAccessList, string recipientNotInAccessList)
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add(recipientInAccessList);
+        file.Recipients.Add(recipientNotInAccessList);
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
+    }
 }

@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
@@ -19,6 +20,7 @@ using OneOf;
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
     IResourceRepository resourceRepository,
+    IAltinnResourceRepository altinnResourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
@@ -27,6 +29,7 @@ public class InitializeFileTransferHandler(
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
+    IAltinnRegisterService altinnRegisterService,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -64,7 +67,7 @@ public class InitializeFileTransferHandler(
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.InvalidResourceDefinition;
+            return Errors.ResourceHasNotBeenConfigured;
         }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
@@ -82,6 +85,48 @@ public class InitializeFileTransferHandler(
         {
             return Errors.StorageProviderNotReady;
         }
+        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+        if (altinnResource is null)
+        {
+            return Errors.InvalidResourceDefinition;
+        }
+        if (altinnResource.AccessListEnabled)
+        {
+            foreach (var recipient in request.RecipientExternalIds)
+            {
+                var accessList = await altinnResourceRepository.GetAccessListOfResource(request.ResourceId, recipient.WithoutPrefix(), cancellationToken);
+                if (accessList is null || accessList.Count == 0)
+                {
+                    return Errors.RecipientNotInAccessList;
+                }
+                var recipientId = await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken);
+                if (recipientId is null || recipientId != recipient.WithoutPrefix())
+                {
+                    return Errors.RecipientNotInAccessList;
+                }
+            }
+        }
+
+        if (resource.RequiredParty == true)
+        {
+            if (request.SenderExternalId.WithoutPrefix() == altinnResource.ServiceOwnerId.WithoutPrefix())
+            {
+            }
+            else
+            {
+                if (request.RecipientExternalIds.Count > 1)
+                {
+                    return Errors.RequiredPartyInvalidRecipientConfiguration;
+                }
+                
+                if (request.RecipientExternalIds.Count == 0 || 
+                    request.RecipientExternalIds[0].WithoutPrefix() != altinnResource.ServiceOwnerId.WithoutPrefix())
+                {
+                    return Errors.RequiredPartyNotSpecified;
+                }
+            }
+        }
+
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
@@ -103,7 +148,7 @@ public class InitializeFileTransferHandler(
         await fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: cancellationToken);
+            await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             return fileTransferId;
         }, logger, cancellationToken);

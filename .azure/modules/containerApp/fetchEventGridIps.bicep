@@ -6,6 +6,7 @@ param principal_id string
 resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'fetchAzureEventGridIpsScript'
   location: location
+  tags: resourceGroup().tags
   kind: 'AzurePowerShell'
   identity: {
     type: 'UserAssigned'

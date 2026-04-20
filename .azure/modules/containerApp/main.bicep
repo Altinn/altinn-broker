@@ -66,6 +66,7 @@ var containerAppEnvVars = [
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
+  { name: 'ReportResourceIdFilter', secretRef: 'report-resource-id-filter' }
   { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
 ]
 
@@ -89,6 +90,7 @@ var ipSecurityRestrictions = concat(apimIpRestrictions, EventGridIpRestrictions)
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-app'
   location: location
+  tags: resourceGroup().tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -143,6 +145,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/storage-connection-string'
           name: 'storage-connection-string'
+        }
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/report-resource-id-filter'
+          name: 'report-resource-id-filter'
         }
       ]
     }
@@ -204,6 +211,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 resource eventgrid_topic 'Microsoft.EventGrid/topics@2022-06-15' = {
   name: '${namePrefix}-malware-scan-event-topic'
   location: location
+  tags: resourceGroup().tags
 }
 
 resource eventgrid_event_subscription 'Microsoft.EventGrid/topics/eventSubscriptions@2022-06-15' = {

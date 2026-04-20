@@ -1,5 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Altinn.Broker.Application.CleanupUseCaseTests;
 public class CleanupUseCaseTestsRequest
 {
-    public required string TestTag { get; set; }
+    [Range(0, 365)]
+    public int? MinAgeDays { get; set; }
 }

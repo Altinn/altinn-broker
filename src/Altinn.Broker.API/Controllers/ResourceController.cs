@@ -28,7 +28,7 @@ public class ResourceController : Controller
     /// <li>Grace period cannot exceed 24 hours</li>
     /// <li>Max file transfer size cannot be negative</li>
     /// <li>Max file transfer size cannot be zero</li>
-    /// <li>Max file transfer size cannot be set higher than the 2GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack</li>
+    /// <li>Max file transfer size cannot be set higher than 50GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack</li>
     /// <li>Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it</li>
     /// <li>Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days</li>
     /// <li>Time to live cannot exceed 365 days</li>
@@ -54,7 +54,8 @@ public class ResourceController : Controller
             PurgeFileTransferGracePeriod = resourceExt.PurgeFileTransferGracePeriod,
             UseManifestFileShim = resourceExt.UseManifestFileShim,
             ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
-            ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy
+            ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy,
+            RequiredParty = resourceExt.RequiredParty
         }, HttpContext.User, cancellationToken);
 
         return result.Match(
@@ -93,7 +94,8 @@ public class ResourceController : Controller
                 MaxFileTransferSize = resource.MaxFileTransferSize,
                 PurgeFileTransferAfterAllRecipientsConfirmed = resource.PurgeFileTransferAfterAllRecipientsConfirmed,
                 PurgeFileTransferGracePeriod = resource.PurgeFileTransferGracePeriod.HasValue ? resource.PurgeFileTransferGracePeriod.Value.ToString() : null,
-                UseManifestFileShim = resource.UseManifestFileShim
+                UseManifestFileShim = resource.UseManifestFileShim,
+                RequiredParty = resource.RequiredParty
             }),
             Problem
         );

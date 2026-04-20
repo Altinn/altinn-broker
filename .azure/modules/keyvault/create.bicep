@@ -12,6 +12,7 @@ param sku Sku
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: vaultName
   location: location
+  tags: resourceGroup().tags
   properties: {
     enabledForTemplateDeployment: true
     enabledForDiskEncryption: true

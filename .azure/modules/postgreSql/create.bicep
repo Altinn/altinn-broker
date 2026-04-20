@@ -40,10 +40,17 @@ module saveMigrationConnectionString '../keyvault/upsertSecret.bicep' = {
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
   name: '${namePrefix}-dbserver'
   location: location
+  tags: resourceGroup().tags
   properties: {
     version: '16'
     administratorLogin: databaseUser
     administratorLoginPassword: administratorLoginPassword
+    maintenanceWindow: {
+      customWindow: 'Enabled'
+      dayOfWeek: 1
+      startHour: 3
+      startMinute: 0
+    }
     storage: {
       storageSizeGB: environment == 'production' ? 128 : 32
       tier: environment == 'test'
@@ -58,16 +65,15 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
       tenantId: tenantId
     }
     availabilityZone: environment == 'production' ? '3' : null
-    highAvailability: environment == 'production' ? {
-      mode: 'ZoneRedundant'
-      standbyAvailabilityZone: '1'
-    } : null
+    highAvailability: null
   }
   sku: {
     name: environment == 'test'
     ? 'Standard_B1ms'
-    : environment == 'production' ? 'Standard_D16ds_v5' : 'Standard_D8ds_v5'
-    tier: environment == 'test' ? 'Burstable' : 'GeneralPurpose'
+    : environment == 'production' ? 'Standard_E8ds_v5' : 'Standard_D2ds_v5'
+    tier: environment == 'test' 
+    ? 'Burstable' 
+    : environment == 'production' ? 'MemoryOptimized' : 'GeneralPurpose'
   }
 }
 
@@ -130,10 +136,30 @@ resource maxPreparedTransactions 'Microsoft.DBforPostgreSQL/flexibleServers/conf
   }
 }
 
+resource metricsCollectorDatabaseActivity 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'metrics.collector_database_activity'
+  parent: postgres
+  dependsOn: [database, maxPreparedTransactions]
+  properties: {
+    value: 'on'
+    source: 'user-override'
+  }
+}
+
+resource metricsAutovacuumDiagnostics 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'metrics.autovacuum_diagnostics'
+  parent: postgres
+  dependsOn: [database, metricsCollectorDatabaseActivity]
+  properties: {
+    value: 'on'
+    source: 'user-override'
+  }
+}
+
 resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
   name: 'azure-access'
   parent: postgres
-  dependsOn: [maxPreparedTransactions] // Needs to depend on database to avoid updating at the same time
+  dependsOn: [database, metricsAutovacuumDiagnostics] // Needs to depend on database to avoid updating at the same time
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'

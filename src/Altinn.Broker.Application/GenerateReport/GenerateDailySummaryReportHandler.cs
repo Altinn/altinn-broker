@@ -1,16 +1,16 @@
-using Altinn.Broker.Common;
-using Altinn.Broker.Core.Domain;
+using System.Security.Cryptography;
+
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services;
-using Azure.Storage.Blobs;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using OneOf;
+
 using Parquet.Serialization;
-using System.Security.Cryptography;
 
 namespace Altinn.Broker.Application.GenerateReport;
 
@@ -19,7 +19,8 @@ public class GenerateDailySummaryReportHandler(
     IServiceOwnerRepository serviceOwnerRepository,
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
-    IOptions<ReportStorageOptions> reportStorageOptions,
+    IOptions<ReportFilterOptions> reportFilterOptions,
+    IBrokerStorageService brokerStorageService,
     ILogger<GenerateDailySummaryReportHandler> logger,
     IHostEnvironment hostEnvironment)
 {
@@ -31,7 +32,8 @@ public class GenerateDailySummaryReportHandler(
         {
             logger.LogInformation("Starting daily summary report generation with Altinn2Included={altinn2Included}", request.Altinn2Included);
 
-            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
+            var resourceIdFilter = ParseResourceIdFilter(reportFilterOptions.Value.ReportResourceIdFilter);
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken, resourceIdFilter);
             logger.LogInformation("Retrieved {count} aggregated records for daily summary report", aggregatedData.Count);
 
             if (aggregatedData.Count == 0)
@@ -68,7 +70,7 @@ public class GenerateDailySummaryReportHandler(
     }
 
     private async Task<List<DailySummaryData>> EnrichAggregatedDataAsync(
-        List<Core.Repositories.AggregatedDailySummaryData> aggregatedData,
+        List<AggregatedDailySummaryData> aggregatedData,
         CancellationToken cancellationToken)
     {
         var uniqueServiceOwnerIds = aggregatedData
@@ -129,45 +131,6 @@ public class GenerateDailySummaryReportHandler(
         }).ToList();
     }
 
-    private async Task<string> GetServiceOwnerIdAsync(FileTransferEntity fileTransfer, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
-            return resource?.ServiceOwnerId ?? "unknown";
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to get service owner ID for resource: {ResourceId}", fileTransfer.ResourceId);
-            return "unknown";
-        }
-    }
-
-    private RecipientType GetRecipientType(string recipient)
-    {
-        if (string.IsNullOrEmpty(recipient) || recipient == "unknown")
-        {
-            return RecipientType.Unknown;
-        }
-
-        string recipientWithoutPrefix = recipient.WithoutPrefix();
-        bool isOrganization = recipientWithoutPrefix.IsOrganizationNumber();
-        bool isPerson = recipientWithoutPrefix.IsSocialSecurityNumber();
-
-        if (isOrganization)
-        {
-            return RecipientType.Organization;
-        }
-        else if (isPerson)
-        {
-            return RecipientType.Person;
-        }
-        else
-        {
-            return RecipientType.Unknown;
-        }
-    }
-
     private async Task<string> GetServiceOwnerNameAsync(string? serviceOwnerId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(serviceOwnerId) || serviceOwnerId == "unknown")
@@ -206,16 +169,6 @@ public class GenerateDailySummaryReportHandler(
         }
     }
 
-    private long CalculateDatabaseStorage(List<FileTransferEntity> fileTransfers)
-    {
-        return 0;
-    }
-
-    private long CalculateAttachmentStorage(List<FileTransferEntity> fileTransfers)
-    {
-        return fileTransfers.Sum(ft => ft.FileTransferSize);
-    }
-
     private async Task<(string blobUrl, string fileHash, long fileSize)> GenerateAndUploadParquetFile(List<DailySummaryData> summaryData, bool altinn2Included, CancellationToken cancellationToken)
     {
         var altinnVersionIndicator = "A3";
@@ -225,40 +178,11 @@ public class GenerateDailySummaryReportHandler(
 
         var (parquetStream, fileHash, fileSize) = await GenerateParquetFileStream(summaryData, altinn2Included, cancellationToken);
 
-        var blobUrl = await UploadReportFileToStorage(fileName, parquetStream, cancellationToken);
+        var blobUrl = await brokerStorageService.UploadReportFileToStorage(fileName, parquetStream, cancellationToken);
 
         logger.LogInformation("Successfully generated and uploaded daily summary parquet file to blob storage: {blobUrl}", blobUrl);
 
         return (blobUrl, fileHash, fileSize);
-    }
-
-    private async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var connectionString = reportStorageOptions.Value.ConnectionString;
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new InvalidOperationException("ReportStorageOptions.ConnectionString is not configured");
-            }
-            
-            var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(connectionString);
-            var blobContainerClient = blobServiceClient.GetBlobContainerClient("reports");
-            
-            await blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-            
-            var blobClient = blobContainerClient.GetBlobClient(fileName);
-            
-            await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
-            
-            logger.LogInformation("Successfully uploaded report file to blob storage: {fileName}", fileName);
-            return blobClient.Uri.ToString();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to upload report file to blob storage: {fileName}", fileName);
-            throw;
-        }
     }
 
     private async Task<(Stream parquetStream, string fileHash, long fileSize)> GenerateParquetFileStream(List<DailySummaryData> summaryData, bool altinn2Included, CancellationToken cancellationToken)
@@ -304,7 +228,8 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
+            var resourceIdFilter = ParseResourceIdFilter(reportFilterOptions.Value.ReportResourceIdFilter);
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken, resourceIdFilter);
             
             if (!aggregatedData.Any())
             {
@@ -344,6 +269,17 @@ public class GenerateDailySummaryReportHandler(
             logger.LogError(ex, "Failed to generate daily summary report for download");
             return StatisticsErrors.ReportGenerationFailed;
         }
+    }
+
+    private static string[]? ParseResourceIdFilter(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+            return [];
+
+        var ids = csv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return ids.Length > 0 ? ids : [];
     }
 }
 

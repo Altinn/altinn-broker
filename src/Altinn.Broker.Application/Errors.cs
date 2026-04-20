@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 
 namespace Altinn.Broker.Application;
 
@@ -18,7 +18,7 @@ public static class Errors
     public static Error FileTransferNotPublished = new Error(10, "A file transfer can only be confirmed to be downloaded when it is published. See file transfer status.", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeNegative = new Error(11, "Max file transfer size cannot be negative", HttpStatusCode.BadRequest);
     public static Error MaxUploadSizeCannotBeZero = new Error(12, "Max file transfer size cannot be zero", HttpStatusCode.BadRequest);
-    public static Error MaxUploadSizeForVirusScan = new Error(13, "Max file transfer size cannot be set higher than the 2GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack.", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeForVirusScan = new Error(13, "Max file transfer size cannot be set higher than 50GB in production unless the resource has been pre-approved for disabled virus scan. Contact us @ Slack.", HttpStatusCode.BadRequest);
     public static Error InvalidTimeToLiveFormat = new Error(14, "Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days.", HttpStatusCode.BadRequest);
     public static Error TimeToLiveCannotExceed365Days = new Error(15, "Time to live cannot exceed 365 days", HttpStatusCode.BadRequest);
     public static Error FileSizeTooBig = new Error(16, "File size exceeds maximum", HttpStatusCode.BadRequest);
@@ -29,10 +29,17 @@ public static class Errors
     public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
     public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it.", HttpStatusCode.BadRequest);
     public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
+    public static Error ServiceOwnerHasNotBeenConfigured = new Error(24, "The service owner associated with the resource has not been configured.", HttpStatusCode.BadRequest);
+    public static Error ResourceHasNotBeenConfigured = new Error(25, "The resource has not been configured.", HttpStatusCode.BadRequest);
+    public static Error RequiredPartyNotSpecified = new Error(26, "The resource requires the service owner party to be present as part of the transaction.", HttpStatusCode.BadRequest);
+    public static Error RequiredPartyInvalidRecipientConfiguration = new Error(27, "When required party is specified and the required party is not the sender, the number of recipients can only be one.", HttpStatusCode.BadRequest);
+    public static Error RecipientNotInAccessList = new Error(28, "All recipients need to be in the access list of the resource.", HttpStatusCode.BadRequest);
 }
 
 public static class StatisticsErrors
 {
     public static Error NoFileTransfersFound = new Error(6001, "No file transfers found for report generation", HttpStatusCode.NotFound);
     public static Error ReportGenerationFailed = new Error(6002, "Failed to generate statistics report", HttpStatusCode.InternalServerError);
+    public static Error InvalidMonthFormat = new Error(6003, "Invalid year or month. Provide a valid year and a month between 1 and 12.", HttpStatusCode.BadRequest);
+    public static Error InvalidMonthRange = new Error(6004, "The requested report month is invalid.", HttpStatusCode.BadRequest);
 }

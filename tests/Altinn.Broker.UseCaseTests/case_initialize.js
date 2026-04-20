@@ -1,13 +1,11 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
-import { buildInitializeFileTransferPayload, TEST_TAG_A3 } from './helpers/brokerPayloadBuilder.js';
-import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
+import { buildInitializeFileTransferPayload } from './helpers/brokerPayloadBuilder.js';
 import { getSenderAltinnToken, getRecipientAltinnToken } from './helpers/altinnTokenService.js';
 
 const baseUrl = __ENV.base_url;
 const resourceId = 'bruksmonster-broker';
-const sender = __ENV.sender;
 const recipient = __ENV.recipient;
 
 export const options = {
@@ -35,7 +33,6 @@ const fixture2Bytes = open('./fixtures/usecase-broker-test-file2.txt', 'b');
  * TC7: Verify updated status
  * TC8: Initialize and upload
  * TC9: Get file transfers 
- * Cleanup: Remove test data created during the test
  */
 
 export default async function () {
@@ -43,26 +40,20 @@ export default async function () {
     let initializeAndUploadFileTransferId = null;
 
     try {
-    ({ filetransferId } = await TC1_InitializeFileTransfer());
-    await TC2_UploadFileTransfer(filetransferId);
-    await TC3_PollAndVerifyUpload(filetransferId);
-    await TC4_SearchFileAsRecipient(filetransferId);
-    await TC5_DownloadAndVerifyBytes(filetransferId);
-    await TC6_ConfirmDownload(filetransferId);
-    await TC7_VerifyUpdatedStatus(filetransferId);
-    ({ initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload());
-    await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
+        ({ filetransferId } = await TC1_InitializeFileTransfer());
+        await TC2_UploadFileTransfer(filetransferId);
+        await TC3_PollAndVerifyUpload(filetransferId);
+        await TC4_SearchFileAsRecipient(filetransferId);
+        await TC5_DownloadAndVerifyBytes(filetransferId);
+        await TC6_ConfirmDownload(filetransferId);
+        await TC7_VerifyUpdatedStatus(filetransferId);
+        ({ initializeAndUploadFileTransferId } = await TC8_InitializeAndUpload());
+        await TC9_GetFileTransfers(filetransferId, initializeAndUploadFileTransferId);
     } catch (e) {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
     }
-    finally 
-    {
-        await cleanupUseCaseTestData(TEST_TAG_A3);
-    }
 }
-
-
 
 async function TC1_InitializeFileTransfer() {
     const token = await getSenderAltinnToken();

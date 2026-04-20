@@ -9,12 +9,14 @@ using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
+using Hangfire.Logging;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -27,11 +29,22 @@ using Polly;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    public virtual bool EnableMalwareScanSimulation => true;
+
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
     {
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
+
+        // Configure malware scan simulation based on EnableMalwareScanSimulation property
+        builder.ConfigureAppConfiguration((context, configBuilder) =>
+        {
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "GeneralSettings:SimulateMalwareScan", EnableMalwareScanSimulation.ToString().ToLower() }
+            });
+        });
 
         // Configure logging to output to console and debug for test visibility
         builder.ConfigureLogging(logging =>
@@ -39,7 +52,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             logging.ClearProviders();
             logging.AddConsole();
             logging.AddDebug();
-            logging.SetMinimumLevel(LogLevel.Debug);
+            logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
         });
 
         // Overwrite registrations from Program.cs
@@ -98,14 +111,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     ServiceOwnerId = $"0192:991825827",
                     OrganizationNumber = "991825827",
                 });
-            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(() => new ResourceEntity
-                {
-                    Id = TestConstants.RESOURCE_WITH_NO_SERVICE_OWNER,
-                    Created = DateTime.UtcNow,
-                    ServiceOwnerId = "",
-                    OrganizationNumber = "",
-                });
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_GRACEFUL_PURGE, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
                 {
@@ -118,7 +123,68 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     PurgeFileTransferAfterAllRecipientsConfirmed = true,
                     PurgeFileTransferGracePeriod = TimeSpan.FromHours(24)
                 });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_UNCONFIGURED_SERVICEOWNER,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:313301753",
+                    OrganizationNumber = "313301753",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_CONFIGURED_SERVICEOWNER, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_CONFIGURED_SERVICEOWNER,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = $"0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_NOT_CONFIGURED, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_NOT_CONFIGURED,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_MANIFEST_SHIM, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_MANIFEST_SHIM,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_FOR_TEST_REQUIREDPARTY,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                    RequiredParty = true
+                });
+            altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => new ResourceEntity
+                {
+                    Id = TestConstants.RESOURCE_WITH_ACCESS_LIST,
+                    Created = DateTime.UtcNow,
+                    ServiceOwnerId = "0192:991825827",
+                    OrganizationNumber = "991825827",
+                    AccessListEnabled = true
+                });
+            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<string>?)null);
+            altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.Is("311764837", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<string> { "gl908ae2-ci9f-481m-9700-1t7brok12345" });
             services.AddSingleton(altinnResourceRepository.Object);
+
+            var altinnRegisterService = new Mock<IAltinnRegisterService>();
+            altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string?)null);
+            altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.Is("gl908ae2-ci9f-481m-9700-1t7brok12345", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("311764837");
+            services.AddSingleton(altinnRegisterService.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
             authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal>(), It.Is<string>(resource => resource == TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -130,15 +196,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
-            var sp = services.BuildServiceProvider();
-            var _backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
-            var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
-            var result = policy.ExecuteAndCapture(() => _backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
 
-            services.AddHangfire(services =>
-            {
-                services.UseMemoryStorage();
-            });
+            // Ensure Hangfire for tests uses in-memory storage and a test-safe log provider,
+            // overriding any AspNetCoreLogProvider that depends on a scoped LoggerFactory.
+            services.AddHangfire(config => config.UseMemoryStorage());
+
+            var sp = services.BuildServiceProvider();
+            var backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
+            var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
+            var result = policy.ExecuteAndCapture(() => backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
+
+            LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+
             services.RemoveAll<IRecurringJobManager>();
             services.AddSingleton(new Mock<IRecurringJobManager>().Object);
             if (result.Outcome == OutcomeType.Failure)

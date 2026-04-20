@@ -92,7 +92,6 @@ runs:
         fi
 
         echo "EXISTING_BACKUP_POLICY_NAME=" >> "$GITHUB_ENV"
-
     - name: Generate postgresql password
       id: pwd-generator
       shell: pwsh

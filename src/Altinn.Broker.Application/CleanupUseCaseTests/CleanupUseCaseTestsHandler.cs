@@ -16,21 +16,26 @@ public class CleanupUseCaseTestsHandler(
 ) : IHandler<CleanupUseCaseTestsRequest, CleanupUseCaseTestsResponse>
 {
     private const string ResourceId = "bruksmonster-broker";
-    private const string TestTagPropertyKey = "testTag";
 
     public async Task<OneOf<CleanupUseCaseTestsResponse, Error>> Process(CleanupUseCaseTestsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Starting cleanup of use case test data for testTag: {TestTag}", request.TestTag.SanitizeForLogs());
-        var fileTransferIds = await fileTransferRepository.GetFileTransfersByPropertyTag(ResourceId, TestTagPropertyKey, request.TestTag, cancellationToken);
-        return await TransactionWithRetriesPolicy.Execute<CleanupUseCaseTestsResponse>(async (ct) =>
+        logger.LogInformation("Starting cleanup of use case test data");
+        var minAge = DateTimeOffset.UtcNow;
+        if (request.MinAgeDays.HasValue)
         {
-            var deleteFileTransfersJobId = backgroundJobClient.Enqueue<CleanupUseCaseTestsHandler>(h => h.DeleteFileTransfers(fileTransferIds, ResourceId, request.TestTag, CancellationToken.None));
+            minAge = minAge.Subtract(TimeSpan.FromDays(request.MinAgeDays.Value));
+        }
+
+        var fileTransferIds = await fileTransferRepository.GetFileTransfersByResourceId(ResourceId, minAge, cancellationToken);
+        
+        return await TransactionWithRetriesPolicy.Execute(async (ct) =>
+        {
+            var deleteFileTransfersJobId = backgroundJobClient.Enqueue<CleanupUseCaseTestsHandler>(h => h.DeleteFileTransfers(fileTransferIds, ResourceId, CancellationToken.None));
             await Task.CompletedTask;
 
             var response = new CleanupUseCaseTestsResponse
             {
                 ResourceId = ResourceId,
-                TestTag = request.TestTag,
                 FileTransfersFound = fileTransferIds.Count,
                 DeleteFileTransfersJobId = deleteFileTransfersJobId
             };
@@ -39,12 +44,12 @@ public class CleanupUseCaseTestsHandler(
     }
 
 
-	public async Task DeleteFileTransfers(List<Guid> fileTransferIds, string resourceId, string testTag, CancellationToken cancellationToken)
+	public async Task DeleteFileTransfers(List<Guid> fileTransferIds, string resourceId, CancellationToken cancellationToken)
     {
-        await TransactionWithRetriesPolicy.Execute<Task>(async (ct) =>
+        await TransactionWithRetriesPolicy.Execute(async (ct) =>
         {
             int deletedFileTransfers = await fileTransferRepository.HardDeleteFileTransfersByIds(fileTransferIds, cancellationToken);
-            logger.LogInformation("Deleted {deletedFileTransfers} file transfers for resourceId {resourceId} with testTag {testTag}", deletedFileTransfers, resourceId, testTag.SanitizeForLogs());
+            logger.LogInformation("Deleted {deletedFileTransfers} file transfers for resourceId {resourceId}", deletedFileTransfers, resourceId);
 			
             return Task.CompletedTask;
         }, logger, cancellationToken);

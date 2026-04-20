@@ -1,8 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
-import { buildLegacyInitializeFileTransferPayload, TEST_TAG_LEGACY } from './helpers/brokerPayloadBuilder.js';
-import { cleanupUseCaseTestData } from './helpers/cleanupUseCaseTestsData.js';
+import { buildLegacyInitializeFileTransferPayload } from './helpers/brokerPayloadBuilder.js';
 import { getLegacyMaskinportenToken } from './helpers/maskinportenTokenService.js';
 
 const baseUrl = __ENV.base_url;
@@ -33,7 +32,6 @@ const fixtureHash = crypto.sha256(fixtureBytes, 'hex');
  * TC7: Verify updated status
  * TC8: Get file overviews
  * TC9: Get files
- * Cleanup: Remove test data created during the test
  */
 
 export default async function () {
@@ -41,21 +39,18 @@ export default async function () {
     let filetransferId2 = null;
 
     try {
-    ({ filetransferId } = await TC1_InitializeLegacyFileTransfer());
-    await TC2_UploadLegacyFileTransfer(filetransferId);
-    await TC3_LegacyPollAndVerifyUpload(filetransferId);
-    await TC4_SearchLegacyFileAsRecipient(filetransferId);
-    await TC5_LegacyDownloadAndVerifyBytes(filetransferId);
-    await TC6_LegacyConfirmDownload(filetransferId);
-    await TC7_LegacyVerifyUpdatedStatus(filetransferId);
-    ({ filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId));
-    await TC9_LegacyGetFiles(filetransferId, filetransferId2);
+        ({ filetransferId } = await TC1_InitializeLegacyFileTransfer());
+        await TC2_UploadLegacyFileTransfer(filetransferId);
+        await TC3_LegacyPollAndVerifyUpload(filetransferId);
+        await TC4_SearchLegacyFileAsRecipient(filetransferId);
+        await TC5_LegacyDownloadAndVerifyBytes(filetransferId);
+        await TC6_LegacyConfirmDownload(filetransferId);
+        await TC7_LegacyVerifyUpdatedStatus(filetransferId);
+        ({ filetransferId2 } = await TC8_LegacyGetFileOverviews(filetransferId));
+        await TC9_LegacyGetFiles(filetransferId, filetransferId2);
     } catch (e) {
         check(false, { 'No exceptions in test execution': () => false });
         throw e;
-    } 
-    finally {
-        await cleanupUseCaseTestData(TEST_TAG_LEGACY);
     }
 }
 
@@ -124,13 +119,6 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
         return;
     }
 
-    const legacyToken = await getLegacyMaskinportenToken();
-    check(legacyToken, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
-
-    const headers = {
-        Authorization: `Bearer ${legacyToken}`
-    }
-
     const maxRetries = 20;
     let published = false;
     let statusValue = null;
@@ -144,6 +132,12 @@ async function TC3_LegacyPollAndVerifyUpload(filetransferId) {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         sleep(30);
+        const legacyToken = await getLegacyMaskinportenToken();
+        check(legacyToken, { 'Legacy token obtained': t => typeof t === 'string' && t.length > 0 });
+
+        const headers = {
+            Authorization: `Bearer ${legacyToken}`
+        }
         lastResponse = http.get(`${baseUrl}/broker/api/v1/legacy/file/${filetransferId}?onBehalfOfConsumer=${encodeURIComponent(onBehalfOfConsumerSender)}`, { headers });
         if (lastResponse.status === 200) {
             try {

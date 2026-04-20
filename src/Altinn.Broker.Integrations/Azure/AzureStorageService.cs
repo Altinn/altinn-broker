@@ -5,10 +5,12 @@ using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 
 using Azure;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -16,15 +18,35 @@ using Polly;
 
 namespace Altinn.Broker.Integrations.Azure;
 
-public class AzureStorageService(IResourceManager resourceManager, IOptions<AzureStorageOptions> azureStorageOptions, ILogger<AzureStorageService> logger) : IBrokerStorageService
+public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptions, IOptions<ReportStorageOptions> reportStorageOptions, IHostEnvironment hostEnvironment, ILogger<AzureStorageService> logger) : IBrokerStorageService
 {
-    private async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
+    protected virtual async Task<BlobContainerClient> GetBlobContainerClient(FileTransferEntity fileTransferEntity, ServiceOwnerEntity serviceOwnerEntity)
     {
+        if (hostEnvironment.IsDevelopment())
+        {
+            return new BlobServiceClient(AzureConstants.AzuriteUrl).GetBlobContainerClient("brokerfiles");
+        }
         var storageProvider = serviceOwnerEntity.GetStorageProvider(fileTransferEntity.UseVirusScan);
-        var connectionString = await resourceManager.GetStorageConnectionString(storageProvider);
-        var blobServiceClient = new BlobServiceClient(connectionString);
+        var connectionString = GetStorageConnectionString(storageProvider);
+        var storageUri = new Uri(connectionString);
+        var blobServiceClient = new BlobServiceClient(storageUri, new DefaultAzureCredential(), new BlobClientOptions()
+        {
+            Retry =
+                {
+                    NetworkTimeout = TimeSpan.FromHours(1),
+                }
+        });
         var containerClient = blobServiceClient.GetBlobContainerClient("brokerfiles");
         return containerClient;
+    }
+
+    private string GetStorageConnectionString(StorageProviderEntity? storageProviderEntity)
+    {
+        if (storageProviderEntity?.ResourceName == null)
+        {
+            throw new InvalidOperationException("Storage account has not been deployed");
+        }
+        return $"https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
     }
 
     public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
@@ -43,8 +65,8 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         }
     }
 
-    public async Task<string?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
-                                      Stream stream, long streamLength, CancellationToken cancellationToken)
+    public async Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+                                      Stream stream, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -57,76 +79,86 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             var blockList = new List<string>();
             long position = 0;
             using var blobMd5 = MD5.Create();
+            var createdBlobByThisAttempt = false;
 
-            int blocksInBatch = 0;
             var uploadTasks = new List<Task>();
-            using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads); // Limit concurrent uploads
+            using var semaphore = new SemaphoreSlim(azureStorageOptions.Value.ConcurrentUploadThreads);
 
-            while (position < streamLength)
+            async Task FlushAccumulationBuffer()
             {
-                int bytesRead = await stream.ReadAsync(networkReadBuffer, 0, networkReadBuffer.Length, cancellationToken);
-                if (bytesRead <= 0) break;
+                if (accumulationBuffer.Length == 0) return;
 
+                accumulationBuffer.Position = 0;
+                var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+                byte[] blockData = accumulationBuffer.ToArray();
+                blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
+                blockList.Add(blockId);
+                accumulationBuffer.SetLength(0);
+
+                await semaphore.WaitAsync(cancellationToken);
+                uploadTasks.Add(UploadBlockAsync(blockBlobClient, blockId, blockData, cancellationToken));
+
+                async Task UploadBlockAsync(BlockBlobClient client, string currentBlockId, byte[] currentBlockData, CancellationToken ct)
+                {
+                    try
+                    {
+                        await UploadBlock(client, currentBlockId, currentBlockData, ct);
+                        var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
+                        logger.LogInformation($"Uploaded block {blockList.Count}. Progress: " +
+                            $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }
+
+                // Use interim commits to prevent too many uncommitted blocks for very large files
+                // No interim commits with malware-scanned uploads as scan starts at first commit
+                if (!fileTransferEntity.UseVirusScan && uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
+                {
+                    await Task.WhenAll(uploadTasks);
+                    var isFirstCommitForThisCall = !createdBlobByThisAttempt;
+                    await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForThisCall, null, cancellationToken);
+                    if (isFirstCommitForThisCall)
+                    {
+                        createdBlobByThisAttempt = true;
+                    }
+                    uploadTasks.Clear();
+                }
+            }
+
+            int bytesRead;
+            while ((bytesRead = await stream.ReadAsync(networkReadBuffer, 0, networkReadBuffer.Length, cancellationToken)) > 0)
+            {
                 accumulationBuffer.Write(networkReadBuffer, 0, bytesRead);
                 position += bytesRead;
 
-                bool isLastBlock = position >= streamLength;
-                if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize || isLastBlock)
+                if (accumulationBuffer.Length >= azureStorageOptions.Value.BlockSize)
                 {
-                    accumulationBuffer.Position = 0;
-                    var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                    byte[] blockData = accumulationBuffer.ToArray();
-                    blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
-
-                    blockList.Add(blockId);
-                    blocksInBatch++;
-                    accumulationBuffer.SetLength(0); // Clear accumulation buffer for next block
-                    await semaphore.WaitAsync(cancellationToken);
-                    uploadTasks.Add(UploadBlockAsync(blockBlobClient, blockId, blockData, cancellationToken));
-                    async Task UploadBlockAsync(BlockBlobClient client, string currentBlockId, byte[] currentBlockData, CancellationToken cancellationToken)
-                    {
-                        try
-                        {
-                            await UploadBlock(client, currentBlockId, currentBlockData, cancellationToken);
-
-                            var uploadSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
-                            logger.LogInformation($"Uploaded block {blockList.Count}. Progress: " +
-                                $"{position / (1024.0 * 1024.0 * 1024.0):N2} GiB ({uploadSpeedMBps:N2} MB/s)");
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    }
-
-                    if (uploadTasks.Count >= azureStorageOptions.Value.BlocksBeforeCommit)
-                    {
-                        await Task.WhenAll(uploadTasks);
-
-                        // Commit the blocks we have so far without MD5 hash
-                        var blocksToCommit = blockList.ToList();
-                        var isFirstCommit = blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit;
-                        await CommitBlocks(blockBlobClient, blocksToCommit, firstCommit: isFirstCommit, null, cancellationToken);
-
-                        uploadTasks.Clear();
-                    }
+                    await FlushAccumulationBuffer();
                 }
             }
-            await Task.WhenAll(uploadTasks);
 
-            // Calculate final MD5
+            // Flush any remaining data in the buffer
+            await FlushAccumulationBuffer();
+
+            // Unconditional finalization � always await and commit remaining blocks
+            if (uploadTasks.Count > 0)
+                await Task.WhenAll(uploadTasks);
+
             blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (blobMd5.Hash is null)
-            {
                 throw new Exception("Failed to calculate MD5 hash of uploaded file");
-            }
-            await CommitBlocks(blockBlobClient, blockList, firstCommit: blockList.Count <= azureStorageOptions.Value.BlocksBeforeCommit, null, cancellationToken);
+
+            var isFirstCommitForFinalCall = !createdBlobByThisAttempt;
+            await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForFinalCall, null, cancellationToken);
 
             double finalSpeedMBps = position / (1024.0 * 1024) / (stopwatch.ElapsedMilliseconds / 1000.0);
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            return BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant();
+            return (BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant(), position);
         }
         catch (Exception ex)
         {
@@ -135,8 +167,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             throw;
         }
     }
-
-    private async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
+    protected virtual async Task UploadBlock(BlockBlobClient client, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
         await BlobRetryPolicy.ExecuteAsync(logger, async () =>
         {
@@ -158,7 +189,7 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
         });
     }
 
-    private async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
+    protected virtual async Task CommitBlocks(BlockBlobClient client, List<string> blockList, bool firstCommit, byte[]? finalMd5,
         CancellationToken cancellationToken)
     {
         await BlobRetryPolicy.ExecuteAsync(logger, async () =>
@@ -192,6 +223,58 @@ public class AzureStorageService(IResourceManager resourceManager, IOptions<Azur
             throw;
         }
     }
+        public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connectionString = reportStorageOptions.Value.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("ReportStorageOptions.ConnectionString is not configured");
+            }
+            var blobServiceClient = GetOrCreateBlobServiceClient(connectionString);
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient("reports");
+            await blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            var blobClient = blobContainerClient.GetBlobClient(fileName);
+
+            await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
+
+            logger.LogInformation("Successfully uploaded report file to blob storage: {fileName}", fileName);
+            return blobClient.Uri.ToString();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload report file to blob storage: {fileName}", fileName);
+            throw;
+        }
+    }
+
+    private BlobServiceClient GetOrCreateBlobServiceClient(string connectionString)
+    {
+        var connectionStringParts = connectionString.Split(';');
+        if (connectionStringParts.Any(connectionStringPart => connectionStringPart.StartsWith("AccountName="))) // Using Broker's storage account
+        {
+            var storageResourceName = GetAccountNameFromConnectionString(connectionString) ?? throw new Exception("Failed to extract AccountName from connection string");
+            var storageUri = new Uri($"https://{storageResourceName}.blob.core.windows.net");
+            return new BlobServiceClient(storageUri, new DefaultAzureCredential());
+        }
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        return blobServiceClient;
+    }
+
+    public static string? GetAccountNameFromConnectionString(string connectionString)
+    {
+        var parts = connectionString.Split(';');
+        foreach (var part in parts)
+        {
+            if (part.StartsWith("AccountName="))
+            {
+                return part.Substring("AccountName=".Length);
+            }
+        }
+        return null;
+    }
+
     public async Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(fileTransferEntity.Checksum))

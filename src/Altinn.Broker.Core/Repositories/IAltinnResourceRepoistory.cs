@@ -10,4 +10,6 @@ public interface IAltinnResourceRepository
     /// This returns the name from HasCompetentAuthority.Name (e.g., "Digitaliseringsdirektoratet", "NAV", etc.)
     /// </summary>
     Task<string?> GetServiceOwnerNameOfResource(string resourceId, CancellationToken cancellationToken = default);
+
+    Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default);
 }
