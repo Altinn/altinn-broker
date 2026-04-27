@@ -26,14 +26,14 @@ runs:
   using: "composite"
   steps:
     - name: "Checkout repository"
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Get version
       id: get-version
       uses: ./.github/actions/get-current-version
 
     - name: OIDC Login to Azure Public Cloud
-      uses: azure/login@v2
+      uses: azure/login@v3
       with:
         client-id: ${{ inputs.AZURE_CLIENT_ID }}
         tenant-id: ${{ inputs.AZURE_TENANT_ID }}
@@ -71,14 +71,14 @@ runs:
         parameters: ./.azure/applications/migration/params.bicepparam
 
     - name: Start migration job
-      uses: azure/CLI@v2
+      uses: azure/CLI@v3
       with:
         azcliversion: 2.72.0
         inlineScript: |
           az containerapp job start -n ${{ steps.migration-job.outputs.name }} -g ${{ inputs.AZURE_NAME_PREFIX }}-rg
 
     - name: Verify migration
-      uses: azure/CLI@v2
+      uses: azure/CLI@v3
       id: verify-migration
       with:
         azcliversion: 2.72.0
