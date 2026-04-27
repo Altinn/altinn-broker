@@ -44,6 +44,7 @@ public class AggregatedDailySummaryData
     public int Month { get; set; }
     public int Day { get; set; }
     public string ServiceOwnerId { get; set; } = string.Empty;
+    public string SenderId { get; set; } = string.Empty;
     public string ResourceId { get; set; } = string.Empty;
     public string RecipientId { get; set; } = string.Empty;
     public int RecipientType { get; set; }
