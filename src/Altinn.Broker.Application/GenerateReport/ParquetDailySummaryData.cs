@@ -45,7 +45,13 @@ public class ParquetDailySummaryData
     /// </summary>
     [JsonPropertyName("service_owner_name")]
     public string ServiceOwnerName { get; set; } = string.Empty;
-    
+
+    /// <summary>
+    /// File sender (organization number)
+    /// </summary>
+    [JsonPropertyName("file_sender_id")]
+    public string FileSenderId { get; set; } = string.Empty;
+
     /// <summary>
     /// Resource ID
     /// Source: file_transfer.resource_id
