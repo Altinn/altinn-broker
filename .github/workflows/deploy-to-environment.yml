@@ -76,6 +76,10 @@ jobs:
         MASKINPORTEN_ENVIRONMENT: ${{ secrets.MASKINPORTEN_ENVIRONMENT }}
         STATISTICS_API_KEY: ${{ secrets.STATISTICS_API_KEY }}
         GRAFANA_MONITORING_PRINCIPAL_ID: ${{ secrets.GRAFANA_MONITORING_PRINCIPAL_ID }}
+        BROKER_DB_READ_AD_GROUP_ID: ${{ secrets.BROKER_DB_READ_AD_GROUP_ID }}
+        BROKER_DB_READ_AD_GROUP_NAME: ${{ secrets.BROKER_DB_READ_AD_GROUP_NAME }}
+        BROKER_DB_WRITE_AD_GROUP_ID: ${{ secrets.BROKER_DB_WRITE_AD_GROUP_ID }}
+        BROKER_DB_WRITE_AD_GROUP_NAME: ${{ secrets.BROKER_DB_WRITE_AD_GROUP_NAME }}
 
     - name: Migrate database
       uses: ./.github/actions/migrate-database

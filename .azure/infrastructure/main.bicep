@@ -2,8 +2,6 @@ targetScope = 'subscription'
 @minLength(3)
 param location string
 @secure()
-param brokerPgAdminPassword string
-@secure()
 param sourceKeyVaultName string
 @secure()
 param tenantId string
@@ -32,11 +30,18 @@ param slackUrl string
 param statisticsApiKey string
 @secure()
 param grafanaMonitoringPrincipalId string
+@secure()
+param brokerDbReadAdGroupId string
+@secure()
+param brokerDbReadAdGroupName string
+@secure()
+param brokerDbWriteAdGroupId string
+@secure()
+param brokerDbWriteAdGroupName string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
 
-var resourceGroupName = '${namePrefix}-rg'
 var standardTags = {
   finops_environment: environment
   finops_product: 'formidling'
@@ -80,6 +85,22 @@ var secrets = [
     name: 'statistics-api-key'
     value: statisticsApiKey
   }
+  {
+    name: 'broker-db-read-ad-group-id'
+    value: brokerDbReadAdGroupId
+  }
+  {
+    name: 'broker-db-read-ad-group-name'
+    value: brokerDbReadAdGroupName
+  }
+  {
+    name: 'broker-db-write-ad-group-id'
+    value: brokerDbWriteAdGroupId
+  }
+  {
+    name: 'broker-db-write-ad-group-name'
+    value: brokerDbWriteAdGroupName
+  }
 ]
 
 // Create resource groups
@@ -113,13 +134,6 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
 // Create resources with dependencies to other resources
 // #####################################################
 
-var srcKeyVault = {
-  name: sourceKeyVaultName
-  subscriptionId: subscription().subscriptionId
-  resourceGroupName: resourceGroupName
-}
-
-var brokerAdminPasswordSecretName = 'broker-admin-password'
 module postgresql '../modules/postgreSql/create.bicep' = {
   scope: resourceGroup
   name: 'postgresql'
@@ -130,11 +144,9 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     namePrefix: namePrefix
     location: location
     environmentKeyVaultName: sourceKeyVaultName
-    srcKeyVault: srcKeyVault
-    srcSecretName: brokerAdminPasswordSecretName
-    administratorLoginPassword: brokerPgAdminPassword
     tenantId: tenantId
     environment: environment
+    auditLogAnalyticsWorkspaceId: containerAppEnv.outputs.auditLogAnalyticsWorkspaceId
   }
 }
 
