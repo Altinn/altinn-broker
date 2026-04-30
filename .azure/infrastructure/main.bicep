@@ -135,6 +135,7 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     administratorLoginPassword: brokerPgAdminPassword
     tenantId: tenantId
     environment: environment
+    auditLogAnalyticsWorkspaceId: containerAppEnv.outputs.auditLogAnalyticsWorkspaceId
   }
 }
 

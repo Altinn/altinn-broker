@@ -17,6 +17,18 @@ resource log_analytics_workspace 'Microsoft.OperationalInsights/workspaces@2023-
   }
 }
 
+resource audit_log_analytics_workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: '${namePrefix}-audit-logs'
+  location: location
+  tags: resourceGroup().tags
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 90
+  }
+}
+
 resource application_insights 'Microsoft.Insights/components@2020-02-02' = {
   name: '${namePrefix}-ai'
   location: location
@@ -86,3 +98,4 @@ module storageAccountConnectionStringSecret '../keyvault/upsertSecret.bicep' = {
 }
 
 output containerAppEnvironmentId string = containerAppEnvironment.id
+output auditLogAnalyticsWorkspaceId string = audit_log_analytics_workspace.id

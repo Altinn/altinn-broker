@@ -10,6 +10,7 @@ param srcKeyVault object
 param administratorLoginPassword string
 @secure()
 param tenantId string
+param auditLogAnalyticsWorkspaceId string = ''
 
 var prodLikeEnvironment = environment != 'test'
 var databaseName = 'brokerdb'
@@ -91,7 +92,7 @@ resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   parent: postgres
   dependsOn: [database]
   properties: {
-    value: 'UUID-OSSP,PG_CRON'
+    value: 'UUID-OSSP,PG_CRON,PGAUDIT'
     source: 'user-override'
   }
 }
@@ -176,12 +177,76 @@ resource cronDatabaseName 'Microsoft.DBforPostgreSQL/flexibleServers/configurati
   }
 }
 
+resource sharedPreloadLibraries 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'shared_preload_libraries'
+  parent: postgres
+  dependsOn: [database, cronDatabaseName]
+  properties: {
+    value: 'pg_cron,pgaudit'
+    source: 'user-override'
+  }
+}
+
+resource logConnections 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_connections'
+  parent: postgres
+  dependsOn: [database, sharedPreloadLibraries]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource logDisconnections 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_disconnections'
+  parent: postgres
+  dependsOn: [database, logConnections]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource pgauditLogCatalog 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'pgaudit.log_catalog'
+  parent: postgres
+  dependsOn: [database, logDisconnections]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource logLinePrefix 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_line_prefix'
+  parent: postgres
+  dependsOn: [database, pgauditLogCatalog]
+  properties: {
+    value: 't=%m u=%u db=%d pid=[%p]:'
+    source: 'user-override'
+  }
+}
+
 module adoConnectionString '../keyvault/upsertSecret.bicep' = {
   name: 'adoConnectionString'
   params: {
     destKeyVaultName: environmentKeyVaultName
     secretName: 'broker-ado-connection-string'
     secretValue: 'Host=${postgres.properties.fullyQualifiedDomainName};Database=${databaseName};Port=5432;Username=${namePrefix}-app-identity;Ssl Mode=Require;Trust Server Certificate=True;Maximum Pool Size=${poolSize};options=-c role=azure_pg_admin;'
+  }
+}
+
+resource postgreSqlAuditDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (auditLogAnalyticsWorkspaceId != '') {
+  name: 'PostgreSQLAuditLogs'
+  scope: postgres
+  properties: {
+    workspaceId: auditLogAnalyticsWorkspaceId
+    logs: [
+      {
+        category: 'PostgreSQLLogs'
+        enabled: true
+      }
+    ]
   }
 }
 
