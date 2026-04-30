@@ -2,50 +2,31 @@ param namePrefix string
 param location string
 @secure()
 param environmentKeyVaultName string
-param srcSecretName string
 param environment string
-@secure()
-param srcKeyVault object
-@secure()
-param administratorLoginPassword string
 @secure()
 param tenantId string
 param auditLogAnalyticsWorkspaceId string = ''
 
 var prodLikeEnvironment = environment != 'test'
 var databaseName = 'brokerdb'
-var databaseUser = 'adminuser'
 var poolSize = environment == 'test' ? 25 : 50
-
-module saveAdmPassword '../keyvault/upsertSecret.bicep' = {
-  name: 'Save_${srcSecretName}'
-  scope: resourceGroup(srcKeyVault.subscriptionId, srcKeyVault.resourceGroupName)
-  params: {
-    destKeyVaultName: srcKeyVault.name
-    secretName: srcSecretName
-    secretValue: administratorLoginPassword
-  }
-}
 
 var migrationConnectionStringName = 'broker-migration-connection-string'
 module saveMigrationConnectionString '../keyvault/upsertSecret.bicep' = {
   name: 'Save_${migrationConnectionStringName}'
-  scope: resourceGroup(srcKeyVault.subscriptionId, srcKeyVault.resourceGroupName)
   params: {
-    destKeyVaultName: srcKeyVault.name
+    destKeyVaultName: environmentKeyVaultName
     secretName: migrationConnectionStringName
-    secretValue: 'jdbc:postgresql://${postgres.name}.postgres.database.azure.com/brokerdb?user=${databaseUser}&password=${administratorLoginPassword}'
+    secretValue: 'jdbc:postgresql://${postgres.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
   }
 }
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: '${namePrefix}-dbserver'
   location: location
   tags: resourceGroup().tags
   properties: {
     version: '16'
-    administratorLogin: databaseUser
-    administratorLoginPassword: administratorLoginPassword
     maintenanceWindow: {
       customWindow: 'Enabled'
       dayOfWeek: 1
@@ -62,7 +43,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
     backup: { backupRetentionDays: 35 }
     authConfig: {
       activeDirectoryAuth: 'Enabled'
-      passwordAuth: 'Enabled'
+      passwordAuth: 'Disabled'
       tenantId: tenantId
     }
     availabilityZone: environment == 'production' ? '3' : null
@@ -78,7 +59,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
   }
 }
 
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
   name: databaseName
   parent: postgres
   properties: {
@@ -87,7 +68,7 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-0
   }
 }
 
-resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
   name: 'azure.extensions'
   parent: postgres
   dependsOn: [database]
@@ -157,7 +138,7 @@ resource metricsAutovacuumDiagnostics 'Microsoft.DBforPostgreSQL/flexibleServers
   }
 }
 
-resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
   name: 'azure-access'
   parent: postgres
   dependsOn: [database, metricsAutovacuumDiagnostics] // Needs to depend on database to avoid updating at the same time

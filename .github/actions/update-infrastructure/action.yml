@@ -54,6 +54,18 @@ inputs:
   GRAFANA_MONITORING_PRINCIPAL_ID:
     description: "Principal ID for Grafana monitoring service principal"
     required: true
+  BROKER_DB_READ_AD_GROUP_ID:
+    description: "Object ID for the Broker database read access Entra group"
+    required: true
+  BROKER_DB_READ_AD_GROUP_NAME:
+    description: "Display name for the Broker database read access Entra group"
+    required: true
+  BROKER_DB_WRITE_AD_GROUP_ID:
+    description: "Object ID for the Broker database write access Entra group"
+    required: true
+  BROKER_DB_WRITE_AD_GROUP_NAME:
+    description: "Display name for the Broker database write access Entra group"
+    required: true
 
 
 runs:
@@ -92,21 +104,11 @@ runs:
         fi
 
         echo "EXISTING_BACKUP_POLICY_NAME=" >> "$GITHUB_ENV"
-    - name: Generate postgresql password
-      id: pwd-generator
-      shell: pwsh
-      run: |
-        Import-module "./.github/tools/pwdGenerator.ps1" -Force
-        $password = (GeneratePassword -length 30).Password
-        echo "::add-mask::$password"
-        echo "::set-output name=postgresqlPassword::$password"
-
     - name: Deploy to Azure
       uses: azure/arm-deploy@v2
       id: deploy
       env:
         ENVIRONMENT: ${{ inputs.environment }}
-        BROKER_PG_ADMIN_PASSWORD: ${{ steps.pwd-generator.outputs.postgresqlPassword }}
         AZURE_NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         SOURCE_KEY_VAULT_NAME: ${{ inputs.AZURE_ENVIRONMENT_KEY_VAULT_NAME }}
         TENANT_ID: ${{ inputs.AZURE_TENANT_ID }}
@@ -123,6 +125,10 @@ runs:
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         STATISTICS_API_KEY: ${{ inputs.STATISTICS_API_KEY }}
         GRAFANA_MONITORING_PRINCIPAL_ID: ${{ inputs.GRAFANA_MONITORING_PRINCIPAL_ID }}
+        BROKER_DB_READ_AD_GROUP_ID: ${{ inputs.BROKER_DB_READ_AD_GROUP_ID }}
+        BROKER_DB_READ_AD_GROUP_NAME: ${{ inputs.BROKER_DB_READ_AD_GROUP_NAME }}
+        BROKER_DB_WRITE_AD_GROUP_ID: ${{ inputs.BROKER_DB_WRITE_AD_GROUP_ID }}
+        BROKER_DB_WRITE_AD_GROUP_NAME: ${{ inputs.BROKER_DB_WRITE_AD_GROUP_NAME }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep

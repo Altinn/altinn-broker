@@ -1,53 +1,60 @@
 # Infrastructure
+
 Infrastructure-as-code (IaC) for Altinn Broker (formidlingstjenesten)
 
-# Environments
+## Environments
 
-* Test (https://altinn-dev-api.azure-api.net) - Used for testing during development and performance tests.
-* Staging (https://platform.tt02.altinn.no) - Used for external testers and for final manual tests before putting into production.
-* Production (https://platform.altinn.no) - Should run the latest image from the main branch of altinn-broker repo.
+- Test (<https://altinn-dev-api.azure-api.net>) - Used for testing during development and performance tests.
+- Staging (<https://platform.tt02.altinn.no>) - Used for external testers and for final manual tests before putting into production.
+- Production (<https://platform.altinn.no>) - Should run the latest image from the main branch of altinn-broker repo.
 
-# Versioning
+## Versioning
 
 Versioning is handled with a route parameter. Changes made should generally be backwards compatible, and bumping version should only be necessary when making breaking changes after we have gone live in production.
 
-# Development workflow
-1. Code repo action produces a docker image as an artifact and places it into Github packages
+## Development workflow
+
+1. Code repo action produces a docker image as an artifact and places it into Github packages.
 2. Infrastructure is deployed using a Github action. The deployment uses the last Github build from code repo.
 
-## Github action
+### Github action
 
-* The Github Action uses a service principal in order to authenticate to manage Azure resources, as when deploying resources. To create a service principal, do
-```
+- The Github Action uses a service principal in order to authenticate to manage Azure resources, as when deploying resources. To create a service principal, do:
+
+```bash
 az login
 az ad sp create-for-rbac --name broker_sp --role Owner --scopes /subscriptions/<subscription_id>
 ```
 
-* The service principal should be set up as Contributor and User Access Administrator (without constraint on delegating User Access Administrator to others) in the subscription you deploy to.
+- The service principal should be set up as Contributor and User Access Administrator (without constraint on delegating User Access Administrator to others) in the subscription you deploy to.
 
-* Federated credentials are used to authorize the pipeline based on the repo and branch. This is the reason why we do not need client secret in the pipeline. Because of this, we need one federated credential for each environment. I.E, for test the subject should be repo:Altinn/altinn-broker:environment:test.
+- Federated credentials are used to authorize the pipeline based on the repo and branch. This is the reason why we do not need client secret in the pipeline. Because of this, we need one federated credential for each environment. I.E, for test the subject should be repo:Altinn/altinn-broker:environment:test.
 
-# FAQ
+## FAQ
 
-## How to get access to deployed database
+### How to get access to deployed database
 
-The database uses IP blocking for security reasons so to get access you need to add a firewall rule on the database server for your IP. You also need to set yourself as an AD administrator with access to the database.
+The database uses IP blocking for security reasons. To get access, first add a firewall rule on the database server for your IP. Database access for developers is handled through Privileged Identity Management (PIM) groups in Microsoft Entra ID. Activate the read or write group before connecting.
 
-1. Go to the database server in the Azure Portal (name ends in "-dbserver")
-2. Go Settings > Networking and click "Add current client IP address"
-3. Go Security > Authentication and use "Add Microsoft Entra Admins" to add yourself.
-4. After you have added yourself, you will see your AD user in the list of admins. Use the username from here and use an Azure Access token for password that can be generated using the CLI:
-```
+1. Go to the database server in the Azure Portal (name ends in "-dbserver").
+2. Go Settings > Networking and click "Add current client IP address".
+3. Activate the relevant Broker database PIM group in Microsoft Entra ID.
+4. Use the Entra group display name as the database username. Use an Azure access token as password. Generate the token with the CLI:
+
+```bash
 az account get-access-token --resource=https://ossrdbms-aad.database.windows.net/.default --query accessToken --output tsv
 ```
 
-* Note: There is some time delay (~3 min) from when your IP address is added successfully to the firewall and when it actually has access.
+The read group has `SELECT` access to the `broker` schema. The write group has `SELECT`, `INSERT`, `UPDATE` and `DELETE` access to the `broker` schema. Both roles are configured with pgAudit logging.
 
-## Where/how is APIM configured?
+- Note: There is some time delay (~3 min) from when your IP address or PIM activation is added successfully and when it actually has access.
 
-We run on Platform's shared APIM. It is configured in [Azure Devops/altinn-studio-ops](https://dev.azure.com/brreg/altinn-studio-ops/_git/altinn-studio-ops) See:
+### Where/how is APIM configured?
 
-https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
+We run on Platform's shared APIM. It is configured in [Azure Devops/altinn-studio-ops](https://dev.azure.com/brreg/altinn-studio-ops/_git/altinn-studio-ops). See:
 
-## Create release notes
-If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 
+<https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/>
+
+### Create release notes
+
+If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed.
