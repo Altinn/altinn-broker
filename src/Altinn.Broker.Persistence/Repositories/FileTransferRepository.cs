@@ -1,5 +1,4 @@
 using System.Text;
-
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -880,9 +879,21 @@ LEFT JOIN LATERAL (
         return await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
-    public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken)
+    public async Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken, string[]? resourceIdFilter = null)
     {
-        const string query = @"
+        bool hasResourceFilter = resourceIdFilter != null && resourceIdFilter.Length > 0;
+
+        string statusMessageFilterClause = hasResourceFilter
+            ? @"WHERE NOT EXISTS (
+                SELECT 1 FROM broker.file_transfer_property ftp
+                WHERE ftp.file_transfer_id_fk = f.file_transfer_id_pk
+                  AND LOWER(ftp.key) = 'statusmessage'
+                  AND LOWER(ftp.value) = 'true'
+                  AND f.resource_id = ANY(@resourceIds)
+            )"
+            : "";
+
+        string query = $@"
             WITH latest_recipient_status AS (
                 SELECT DISTINCT ON (afs.file_transfer_id_fk, afs.actor_id_fk)
                     afs.file_transfer_id_fk,
@@ -898,6 +909,7 @@ LEFT JOIN LATERAL (
                 EXTRACT(MONTH FROM f.created)::int as month,
                 EXTRACT(DAY FROM f.created)::int as day,
                 COALESCE(r.service_owner_id_fk, 'unknown') as service_owner_id,
+                COALESCE(SPLIT_PART(sender.actor_external_id, ':', -1), 'unknown') as sender_id,
                 COALESCE(f.resource_id, 'unknown') as resource_id,
                 COALESCE(recipient.actor_external_id, 'unknown') as recipient_id,
                 CASE 
@@ -916,12 +928,14 @@ LEFT JOIN LATERAL (
             LEFT JOIN broker.altinn_resource r ON r.resource_id_pk = f.resource_id
             LEFT JOIN latest_recipient_status lrs ON lrs.file_transfer_id_fk = f.file_transfer_id_pk
             LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = lrs.actor_id_fk
+            {statusMessageFilterClause}
             GROUP BY 
                 DATE(f.created),
                 EXTRACT(YEAR FROM f.created),
                 EXTRACT(MONTH FROM f.created),
                 EXTRACT(DAY FROM f.created),
                 COALESCE(r.service_owner_id_fk, 'unknown'),
+                COALESCE(SPLIT_PART(sender.actor_external_id, ':', -1), 'unknown'),
                 COALESCE(f.resource_id, 'unknown'),
                 COALESCE(recipient.actor_external_id, 'unknown'),
                 CASE 
@@ -934,12 +948,20 @@ LEFT JOIN LATERAL (
             ORDER BY 
                 report_date,
                 service_owner_id,
+                sender_id,
                 resource_id,
                 recipient_type,
                 altinn_version";
 
         await using var command = dataSource.CreateCommand(query);
         command.CommandTimeout = 600;
+        if (hasResourceFilter)
+        {
+            command.Parameters.Add(new NpgsqlParameter("@resourceIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = resourceIdFilter
+            });
+        }
         
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
@@ -957,6 +979,9 @@ LEFT JOIN LATERAL (
                     ServiceOwnerId = reader.IsDBNull(reader.GetOrdinal("service_owner_id")) 
                         ? "unknown" 
                         : reader.GetString(reader.GetOrdinal("service_owner_id")),
+                    SenderId = reader.IsDBNull(reader.GetOrdinal("sender_id"))
+                        ? "unknown"
+                        : reader.GetString(reader.GetOrdinal("sender_id")),
                     ResourceId = reader.IsDBNull(reader.GetOrdinal("resource_id")) 
                         ? "unknown" 
                         : reader.GetString(reader.GetOrdinal("resource_id")),
@@ -974,5 +999,6 @@ LEFT JOIN LATERAL (
             return aggregatedData;
         }, cancellationToken);
     }
+
 }
 

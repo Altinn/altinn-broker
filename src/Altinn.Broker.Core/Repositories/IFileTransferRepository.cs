@@ -34,7 +34,7 @@ public interface IFileTransferRepository
 
     Task<List<Guid>> GetFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken);
     Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken);
-    Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken);
+    Task<List<AggregatedDailySummaryData>> GetAggregatedDailySummaryData(CancellationToken cancellationToken, string[]? resourceIdFilter = null);
 }
 
 public class AggregatedDailySummaryData
@@ -44,6 +44,7 @@ public class AggregatedDailySummaryData
     public int Month { get; set; }
     public int Day { get; set; }
     public string ServiceOwnerId { get; set; } = string.Empty;
+    public string SenderId { get; set; } = string.Empty;
     public string ResourceId { get; set; } = string.Empty;
     public string RecipientId { get; set; } = string.Empty;
     public int RecipientType { get; set; }

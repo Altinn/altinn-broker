@@ -64,4 +64,10 @@ public class LegacyFileInitalizeExt
     [JsonPropertyName("checksum")]
     [MD5Checksum]
     public string? Checksum { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Disable virus scan. Requires special permission in production.
+    /// </summary>
+    [JsonPropertyName("disableVirusScan")]
+    public bool? DisableVirusScan { get; set; } = false;
 }

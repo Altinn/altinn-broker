@@ -19,7 +19,7 @@ public class GenerateDailySummaryReportHandler(
     IServiceOwnerRepository serviceOwnerRepository,
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
-    IOptions<ReportStorageOptions> reportStorageOptions,
+    IOptions<ReportFilterOptions> reportFilterOptions,
     IBrokerStorageService brokerStorageService,
     ILogger<GenerateDailySummaryReportHandler> logger,
     IHostEnvironment hostEnvironment)
@@ -32,7 +32,8 @@ public class GenerateDailySummaryReportHandler(
         {
             logger.LogInformation("Starting daily summary report generation with Altinn2Included={altinn2Included}", request.Altinn2Included);
 
-            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
+            var resourceIdFilter = ParseResourceIdFilter(reportFilterOptions.Value.ReportResourceIdFilter);
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken, resourceIdFilter);
             logger.LogInformation("Retrieved {count} aggregated records for daily summary report", aggregatedData.Count);
 
             if (aggregatedData.Count == 0)
@@ -120,6 +121,7 @@ public class GenerateDailySummaryReportHandler(
             Day = d.Day,
             ServiceOwnerId = d.ServiceOwnerId,
             ServiceOwnerName = serviceOwnerNames.GetValueOrDefault(d.ServiceOwnerId, "Unknown"),
+            FileSenderId = d.SenderId,
             ResourceId = d.ResourceId,
             ResourceTitle = resourceTitles.GetValueOrDefault(d.ResourceId, "Unknown"),
             RecipientType = (RecipientType)d.RecipientType,
@@ -196,6 +198,7 @@ public class GenerateDailySummaryReportHandler(
             Day = d.Day,
             ServiceOwnerId = d.ServiceOwnerId,
             ServiceOwnerName = d.ServiceOwnerName,
+            FileSenderId = d.FileSenderId,
             ResourceId = d.ResourceId,
             ResourceTitle = d.ResourceTitle,
             RecipientType = d.RecipientType.ToString(),
@@ -227,7 +230,8 @@ public class GenerateDailySummaryReportHandler(
 
         try
         {
-            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken);
+            var resourceIdFilter = ParseResourceIdFilter(reportFilterOptions.Value.ReportResourceIdFilter);
+            var aggregatedData = await fileTransferRepository.GetAggregatedDailySummaryData(cancellationToken, resourceIdFilter);
             
             if (!aggregatedData.Any())
             {
@@ -267,6 +271,17 @@ public class GenerateDailySummaryReportHandler(
             logger.LogError(ex, "Failed to generate daily summary report for download");
             return StatisticsErrors.ReportGenerationFailed;
         }
+    }
+
+    private static string[]? ParseResourceIdFilter(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+            return [];
+
+        var ids = csv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return ids.Length > 0 ? ids : [];
     }
 }
 
