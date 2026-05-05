@@ -94,16 +94,12 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
     public async Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(List<FileTransferStatus> statusFilters, DateTime minStatusDate, CancellationToken cancellationToken)
     {
         var query = @"
-            SELECT file_transfer_id_fk, file_transfer_status_description_id_fk, 
-                file_transfer_status_date, file_transfer_status_detailed_description
-            FROM broker.file_transfer_status fis
-            WHERE fis.file_transfer_status_description_id_fk = ANY(@statusFilters)
-            AND fis.file_transfer_status_date < @minStatusDate
-            AND fis.file_transfer_status_date = (
-                SELECT MAX(file_transfer_status_date)
-                FROM broker.file_transfer_status
-                WHERE file_transfer_id_fk = fis.file_transfer_id_fk
-            )";
+            SELECT ft.file_transfer_id_pk, ft.latest_file_status_id, ft.latest_file_status_date, ftsd.file_transfer_status_description
+            FROM broker.file_transfer ft 
+			LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status_id 
+            WHERE ft.latest_file_status_id = ANY(@statusFilters)
+            AND ft.latest_file_status_date < @minStatusDate
+        ";
 
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@statusFilters", statusFilters.Select(s => (int)s).ToArray());
@@ -117,12 +113,10 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
             {
                 fileTransferStatuses.Add(new FileTransferStatusEntity()
                 {
-                    FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
-                    Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                    DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) 
-                        ? null 
-                        : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
+                    FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
+                    Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("latest_file_status_id")),
+                    Date = reader.GetDateTime(reader.GetOrdinal("latest_file_status_date")),
+                    DetailedStatus = reader.GetString(reader.GetOrdinal("file_transfer_status_description"))
                 });
             }
             return fileTransferStatuses;
