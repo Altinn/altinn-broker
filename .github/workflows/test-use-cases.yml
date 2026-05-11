@@ -61,6 +61,7 @@ jobs:
           report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
           report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "stepreport=$report" >> $GITHUB_ENV
+
     - name: Report failure to Slack
       if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
       id: slack
@@ -72,3 +73,34 @@ jobs:
           {
             "text": "${{ env.stepreport }}"
           }
+
+    - name: Report failure to Opsgenie
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure' && env.OPSGENIE_API_KEY != ''
+      env:
+        OPSGENIE_API_URL: https://api.eu.opsgenie.com
+      run: |
+        payload=$(cat <<EOF
+        {
+          "message": "Broker use case test failed (${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }})",
+          "description": "${{ env.stepreport }}",
+          "alias": "broker-usecase-${{ github.run_id }}-${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}",
+          "priority": "P1",
+          "source": "github-actions",
+          "tags": ["broker", "use-case-test", "github-actions"],
+          "details": {
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "run_id": "${{ github.run_id }}",
+            "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "environment": "${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+          }
+        }
+        EOF
+        )
+
+        curl --fail-with-body --show-error --silent \
+          --request POST \
+          --url "${OPSGENIE_API_URL}/v2/alerts" \
+          --header "Authorization: GenieKey ${OPSGENIE_API_KEY}" \
+          --header "Content-Type: application/json" \
+          --data "${payload}"
