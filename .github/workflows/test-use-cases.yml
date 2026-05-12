@@ -79,20 +79,49 @@ jobs:
       env:
         OPSGENIE_API_URL: https://api.eu.opsgenie.com
       run: |
+        ENV="${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+        NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%7NZ)"
+        ALERT_ID="$(cat /proc/sys/kernel/random/uuid)"
+
         payload=$(cat <<EOF
         {
-          "message": "Broker use case test failed (${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }})",
-          "description": "${{ env.stepreport }}",
-          "alias": "broker-usecase-${{ github.run_id }}-${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}",
-          "priority": "P1",
-          "source": "github-actions",
-          "tags": ["broker", "use-case-test", "github-actions"],
-          "details": {
-            "repository": "${{ github.repository }}",
-            "workflow": "${{ github.workflow }}",
-            "run_id": "${{ github.run_id }}",
-            "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "environment": "${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+          "schemaId": "azureMonitorCommonAlertSchema",
+          "data": {
+            "essentials": {
+              "alertId": "${ALERT_ID}",
+              "alertRule": "Broker Use Case Test",
+              "severity": "Sev1",
+              "signalType": "Metric",
+              "monitorCondition": "Fired",
+              "monitoringService": "Platform",
+              "alertTargetIDs": ["/broker/${ENV}"],
+              "firedDateTime": "${NOW}",
+              "description": "Broker use case test failed (${ENV}) - ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "essentialsVersion": "1.0",
+              "alertContextVersion": "1.0"
+            },
+            "alertContext": {
+              "properties": {
+                "repository": "${{ github.repository }}",
+                "workflow": "${{ github.workflow }}",
+                "run_id": "${{ github.run_id }}",
+                "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                "environment": "${ENV}"
+              },
+              "conditionType": "SingleResourceMultipleMetricCriteria",
+              "condition": {
+                "windowSize": "PT5M",
+                "allOf": [
+                  {
+                    "metricName": "UseCaseTestFailure",
+                    "operator": "GreaterThan",
+                    "threshold": "0",
+                    "timeAggregation": "Count",
+                    "metricValue": 1
+                  }
+                ]
+              }
+            }
           }
         }
         EOF
@@ -100,7 +129,6 @@ jobs:
 
         curl --fail-with-body --show-error --silent \
           --request POST \
-          --url "${OPSGENIE_API_URL}/v2/alerts" \
-          --header "Authorization: GenieKey ${OPSGENIE_API_KEY}" \
+          --url "${OPSGENIE_API_URL}/v1/json/azure?apiKey=${OPSGENIE_API_KEY}" \
           --header "Content-Type: application/json" \
           --data "${payload}"
