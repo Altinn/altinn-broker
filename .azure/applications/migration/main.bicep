@@ -14,7 +14,7 @@ var brokerDbReadAdGroupIdSecretName = 'broker-db-read-ad-group-id'
 var brokerDbReadAdGroupNameSecretName = 'broker-db-read-ad-group-name'
 var brokerDbWriteAdGroupIdSecretName = 'broker-db-write-ad-group-id'
 var brokerDbWriteAdGroupNameSecretName = 'broker-db-write-ad-group-name'
-var postgresTokenResource = 'https://ossrdbms-aad.${environment().suffixes.sqlServerHostname}'
+var postgresTokenResource = 'https://ossrdbms-aad${environment().suffixes.sqlServerHostname}'
 
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-migration-identity'
