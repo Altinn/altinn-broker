@@ -58,7 +58,8 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
             await ((ManifestDownloadStream)downloadStream).AddManifestFile(fileTransfer, resource);
         }
         var caller = request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId();
-        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller.WithPrefix(), cancellationToken);
+        var systemVendor = user?.GetCallerSystemVendorId()?.WithPrefix();
+        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadStarted, caller.WithPrefix(), systemVendor, cancellationToken);
         return new DownloadFileResponse()
         {
             FileName = fileTransfer.FileName,

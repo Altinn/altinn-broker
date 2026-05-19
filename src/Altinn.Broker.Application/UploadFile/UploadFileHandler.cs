@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
@@ -80,8 +81,9 @@ public class UploadFileHandler(
             return Errors.FileSizeTooBig;
         }
 
-        var uploadStartedTimestamp = DateTime.UtcNow;  
-        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, cancellationToken: cancellationToken);
+        var uploadStartedTimestamp = DateTime.UtcNow;
+        var uploaderSystemVendor = user?.GetCallerSystemVendorId()?.WithPrefix();
+        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, systemVendor: uploaderSystemVendor, cancellationToken: cancellationToken);
 
         try
         {
@@ -89,13 +91,13 @@ public class UploadFileHandler(
             var finishedUploadTimestamp = DateTime.UtcNow;
             if (result is null)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "File upload failed and was aborted", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, detailedFileTransferStatus: "File upload failed and was aborted", cancellationToken: cancellationToken);
                 return Errors.UploadFailed;
             }
             var (checksum, uploadLength) = result.Value;
             if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum) && !string.Equals(checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, "Checksum mismatch", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: finishedUploadTimestamp, detailedFileTransferStatus: "Checksum mismatch", cancellationToken: cancellationToken);
                 backgroundJobClient.Enqueue(() => brokerStorageService.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
                 return Errors.ChecksumMismatch;
             }
@@ -128,7 +130,7 @@ public class UploadFileHandler(
             logger.LogError("Unexpected error occurred while uploading file: {errorMessage} \nStack trace: {stackTrace}", e.Message, e.StackTrace);
             return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, "Error occurred while uploading fileTransfer", cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, detailedFileTransferStatus: "Error occurred while uploading fileTransfer", cancellationToken: cancellationToken);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, request.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
                 return Errors.UploadFailed;
             }, logger, cancellationToken);

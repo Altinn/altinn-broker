@@ -7,7 +7,8 @@ public interface IActorFileTransferStatusRepository
         Guid fileTransferId,
         Domain.Enums.ActorFileTransferStatus status,
         string actorExternalReference,
-        CancellationToken cancellationToken
+        string? systemVendor = null,
+        CancellationToken cancellationToken = default
     );
     Task<List<ActorFileTransferStatusEntity>> GetActorEvents(Guid fileTransferId, CancellationToken cancellationToken);
 }

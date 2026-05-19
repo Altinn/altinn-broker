@@ -44,4 +44,31 @@ public static class ClaimsPrincipalExtensions
         return null;
     }
 
+    public static string? GetCallerSystemVendorId(this ClaimsPrincipal user)
+    {
+        var systemUserClaim = user.Claims.FirstOrDefault(c => c.Type == "authorization_details");
+        if (systemUserClaim is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            _ = JsonSerializer.Deserialize<SystemUserAuthorizationDetails>(systemUserClaim.Value);
+
+            var consumerClaim = user.Claims.FirstOrDefault(c => c.Type == "consumer");
+            if (consumerClaim is null)
+            {
+                return null;
+            }
+
+            var consumer = JsonSerializer.Deserialize<TokenConsumer>(consumerClaim.Value);
+            var systemVendorId = consumer?.ID?.WithoutPrefix();
+            return string.IsNullOrWhiteSpace(systemVendorId) ? null : systemVendorId;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }

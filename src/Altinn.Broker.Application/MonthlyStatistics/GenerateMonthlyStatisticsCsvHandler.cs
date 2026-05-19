@@ -27,6 +27,11 @@ public class GetMonthlyStatisticsCsvHandler(
             return StatisticsErrors.InvalidMonthFormat;
         }
 
+        if (!request.IncludeEndUser && !request.IncludeVendor)
+        {
+            return StatisticsErrors.EndUserAndVendorBothExcluded;
+        }
+
         var fromMonthStart = new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var toExclusive = fromMonthStart.AddMonths(1);
 
@@ -39,10 +44,12 @@ public class GetMonthlyStatisticsCsvHandler(
         var resourceId = string.IsNullOrWhiteSpace(request.ResourceId) ? null : request.ResourceId.Trim();
 
         logger.LogInformation(
-            "Generating monthly statistics CSV for service owner {ServiceOwnerId} for {Year}-{Month}",
+            "Generating monthly statistics CSV for service owner {ServiceOwnerId} for {Year}-{Month} (includeEndUser={IncludeEndUser}, includeVendor={IncludeVendor})",
             callerOrganizationId.SanitizeForLogs(),
             request.Year,
-            request.Month);
+            request.Month,
+            request.IncludeEndUser,
+            request.IncludeVendor);
 
         if (resourceId is not null)
         {
@@ -65,20 +72,60 @@ public class GetMonthlyStatisticsCsvHandler(
             resourceId: resourceId,
             cancellationToken: cancellationToken);
 
+        var projected = Project(rows, request.IncludeEndUser, request.IncludeVendor);
+
         var response = new GetMonthlyStatisticsCsvResponse
         {
-            Content = Encoding.UTF8.GetBytes(BuildCsv(rows)),
+            Content = Encoding.UTF8.GetBytes(BuildCsv(projected)),
             FileName = BuildFileName(resourceId, fromMonthStart),
-            RowCount = rows.Count
+            RowCount = projected.Count
         };
 
         return response;
     }
 
+    private static List<MonthlyResourceStatisticsData> Project(
+        IReadOnlyList<MonthlyResourceStatisticsData> rows,
+        bool includeEndUser,
+        bool includeVendor)
+    {
+        return rows
+            .GroupBy(row => new
+            {
+                row.Year,
+                row.Month,
+                row.ResourceId,
+                Sender = includeEndUser ? row.Sender : string.Empty,
+                Recipient = includeEndUser ? row.Recipient : string.Empty,
+                SenderSystemVendor = includeVendor ? row.SenderSystemVendor : string.Empty,
+                RecipientSystemVendor = includeVendor ? row.RecipientSystemVendor : string.Empty
+            })
+            .Select(group => new MonthlyResourceStatisticsData
+            {
+                Year = group.Key.Year,
+                Month = group.Key.Month,
+                ResourceId = group.Key.ResourceId,
+                Sender = group.Key.Sender,
+                Recipient = group.Key.Recipient,
+                SenderSystemVendor = group.Key.SenderSystemVendor,
+                RecipientSystemVendor = group.Key.RecipientSystemVendor,
+                TotalFileTransfers = group.Sum(row => row.TotalFileTransfers),
+                UploadCount = group.Sum(row => row.UploadCount),
+                TotalTransferDownloadAttempts = group.Sum(row => row.TotalTransferDownloadAttempts),
+                TransfersWithDownloadConfirmed = group.Sum(row => row.TransfersWithDownloadConfirmed)
+            })
+            .OrderBy(row => row.ResourceId, StringComparer.Ordinal)
+            .ThenBy(row => row.Sender, StringComparer.Ordinal)
+            .ThenBy(row => row.SenderSystemVendor, StringComparer.Ordinal)
+            .ThenBy(row => row.Recipient, StringComparer.Ordinal)
+            .ThenBy(row => row.RecipientSystemVendor, StringComparer.Ordinal)
+            .ToList();
+    }
+
     private static string BuildCsv(IEnumerable<MonthlyResourceStatisticsData> rows)
     {
         var builder = new StringBuilder();
-        builder.Append("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed");
+        builder.Append("year,month,resourceId,senderVendor,recipientVendor,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed");
         builder.AppendLine();
 
         foreach (var row in rows)
@@ -87,6 +134,8 @@ public class GetMonthlyStatisticsCsvHandler(
                 .Append(row.Year).Append(',')
                 .Append(row.Month).Append(',')
                 .Append(EscapeCsv(row.ResourceId)).Append(',')
+                .Append(EscapeCsv(row.SenderSystemVendor)).Append(',')
+                .Append(EscapeCsv(row.RecipientSystemVendor)).Append(',')
                 .Append(EscapeCsv(row.Sender)).Append(',')
                 .Append(EscapeCsv(row.Recipient)).Append(',')
                 .Append(row.TotalFileTransfers).Append(',')

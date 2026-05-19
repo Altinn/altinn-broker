@@ -25,6 +25,8 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                 resource_id,
                 sender,
                 recipient,
+                sender_system_vendor,
+                recipient_system_vendor,
                 total_file_transfers,
                 upload_count,
                 total_transfer_download_attempts,
@@ -34,7 +36,7 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
               AND ms.year = @year
               AND ms.month = @month
               AND (@resourceId IS NULL OR ms.resource_id = @resourceId)
-            ORDER BY resource_id, sender, recipient;";
+            ORDER BY resource_id, sender, recipient, sender_system_vendor, recipient_system_vendor;";
 
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
@@ -59,6 +61,8 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                     ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
                     Sender = reader.GetString(reader.GetOrdinal("sender")),
                     Recipient = reader.GetString(reader.GetOrdinal("recipient")),
+                    SenderSystemVendor = reader.GetString(reader.GetOrdinal("sender_system_vendor")),
+                    RecipientSystemVendor = reader.GetString(reader.GetOrdinal("recipient_system_vendor")),
                     TotalFileTransfers = reader.GetInt32(reader.GetOrdinal("total_file_transfers")),
                     UploadCount = reader.GetInt32(reader.GetOrdinal("upload_count")),
                     TotalTransferDownloadAttempts = reader.GetInt32(reader.GetOrdinal("total_transfer_download_attempts")),
@@ -126,6 +130,8 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                     f.created,
                     sender.actor_external_id AS sender,
                     recipient.actor_external_id AS recipient,
+                    COALESCE(svt.system_vendor, '') AS sender_system_vendor,
+                    COALESCE(asv.system_vendor, '') AS recipient_system_vendor,
                     COALESCE(aa.total_transfer_download_attempts_delta, 0) AS total_transfer_download_attempts_delta,
                     COALESCE(aa.transfers_with_download_confirmed_delta, 0) AS transfers_with_download_confirmed_delta
                 FROM all_pairs ap
@@ -136,6 +142,25 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                 LEFT JOIN actor_activity aa
                     ON aa.file_transfer_id_fk = ap.file_transfer_id_fk
                     AND aa.actor_id_fk        = ap.actor_id_fk
+                LEFT JOIN LATERAL (
+                    SELECT fs.system_vendor
+                    FROM broker.file_transfer_status fs
+                    WHERE fs.file_transfer_id_fk = ap.file_transfer_id_fk
+                      AND fs.file_transfer_status_description_id_fk = @initializedFileStatus
+                    ORDER BY fs.file_transfer_status_date ASC, fs.file_transfer_status_id_pk ASC
+                    LIMIT 1
+                ) svt ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT afs.system_vendor
+                    FROM broker.actor_file_transfer_status afs
+                    WHERE afs.file_transfer_id_fk = ap.file_transfer_id_fk
+                      AND afs.actor_id_fk        = ap.actor_id_fk
+                      AND afs.actor_file_transfer_status_date >= @fromInclusive
+                      AND afs.actor_file_transfer_status_date <  @toExclusive
+                      AND afs.system_vendor IS NOT NULL
+                    ORDER BY afs.actor_file_transfer_status_date DESC, afs.actor_file_transfer_status_id_pk DESC
+                    LIMIT 1
+                ) asv ON TRUE
             ),
 
             month_summary AS (
@@ -144,6 +169,8 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                     pc.resource_id,
                     pc.sender,
                     pc.recipient,
+                    pc.sender_system_vendor,
+                    pc.recipient_system_vendor,
                     SUM(CASE WHEN pc.created >= @fromInclusive
                                 AND pc.created < @toExclusive         THEN 1 ELSE 0 END)::int AS total_file_transfers,
                     SUM(CASE WHEN pim.file_transfer_id_fk IS NOT NULL   THEN 1 ELSE 0 END)::int AS upload_count,
@@ -156,17 +183,21 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
                     pc.service_owner_id,
                     pc.resource_id,
                     pc.sender,
-                    pc.recipient
+                    pc.recipient,
+                    pc.sender_system_vendor,
+                    pc.recipient_system_vendor
             )
 
             INSERT INTO broker.monthly_statistics_rollup (
                 service_owner_id, year, month, resource_id, sender, recipient,
+                sender_system_vendor, recipient_system_vendor,
                 total_file_transfers, upload_count,
                 total_transfer_download_attempts, transfers_with_download_confirmed,
                 refreshed_at
             )
             SELECT
                 ms.service_owner_id, @year, @month, ms.resource_id, ms.sender, ms.recipient,
+                ms.sender_system_vendor, ms.recipient_system_vendor,
                 ms.total_file_transfers, ms.upload_count,
                 ms.total_transfer_download_attempts, ms.transfers_with_download_confirmed,
                 NOW()
@@ -181,6 +212,7 @@ public class MonthlyStatisticsRepository(NpgsqlDataSource dataSource, ExecuteDBC
             command.Parameters.AddWithValue("@fromInclusive", fromInclusive);
             command.Parameters.AddWithValue("@toExclusive", toExclusive);
             command.Parameters.AddWithValue("@publishedStatus", (int)FileTransferStatus.Published);
+            command.Parameters.AddWithValue("@initializedFileStatus", (int)FileTransferStatus.Initialized);
             command.Parameters.AddWithValue("@initializedStatus", (int)ActorFileTransferStatus.Initialized);
             command.Parameters.AddWithValue("@downloadStartedStatus", (int)ActorFileTransferStatus.DownloadStarted);
             command.Parameters.AddWithValue("@downloadConfirmedStatus", (int)ActorFileTransferStatus.DownloadConfirmed);

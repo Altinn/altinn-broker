@@ -8,7 +8,7 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IFileTransferStatusRepository
 {
-    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, CancellationToken cancellationToken = default)
+    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, string? systemVendor = null, CancellationToken cancellationToken = default)
     {
         // This query performs two operations atomically:
         // 1. Inserts a new file transfer status record into the history table
@@ -22,12 +22,13 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.file_transfer_status (
-                    file_transfer_id_fk, 
-                    file_transfer_status_description_id_fk, 
-                    file_transfer_status_date, 
-                    file_transfer_status_detailed_description
+                    file_transfer_id_fk,
+                    file_transfer_status_description_id_fk,
+                    file_transfer_status_date,
+                    file_transfer_status_detailed_description,
+                    system_vendor
                 )
-                VALUES (@fileTransferId, @statusId, @insertedStatusTimestamp, @detailedFileTransferStatus)
+                VALUES (@fileTransferId, @statusId, @insertedStatusTimestamp, @detailedFileTransferStatus, @systemVendor)
                 RETURNING file_transfer_status_id_pk, file_transfer_status_date, file_transfer_status_description_id_fk
             ),
             updated_file_transfer AS (
@@ -56,6 +57,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         command.Parameters.AddWithValue("@statusId", (int)status);
         command.Parameters.AddWithValue("@insertedStatusTimestamp", timestamp);
         command.Parameters.AddWithValue("@detailedFileTransferStatus", detailedFileTransferStatus is null ? DBNull.Value : detailedFileTransferStatus);
+        command.Parameters.AddWithValue("@systemVendor", (object?)systemVendor ?? DBNull.Value);
 
         var fileTransferStatusId = await commandExecutor.ExecuteWithRetry(command.ExecuteScalarAsync, cancellationToken);
             
