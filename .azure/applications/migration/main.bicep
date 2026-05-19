@@ -142,9 +142,15 @@ module containerAppJob '../../modules/migrationJob/main.bicep' = {
       '-c'
       '''
         set -euo pipefail
-        FLYWAY_PASSWORD=$(curl -sS -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" --get "$IDENTITY_ENDPOINT" --data-urlencode "resource=$POSTGRES_TOKEN_RESOURCE" --data-urlencode "client_id=$AZURE_CLIENT_ID" --data-urlencode "api-version=2019-08-01" | jq -r '.access_token')
+        if [ -z "${IDENTITY_ENDPOINT:-}" ] || [ -z "${IDENTITY_HEADER:-}" ]; then
+          echo "Managed identity endpoint not available in container (IDENTITY_ENDPOINT or IDENTITY_HEADER missing)"
+          exit 1
+        fi
+        token_response=$(curl -sS -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" --get "$IDENTITY_ENDPOINT" --data-urlencode "resource=$POSTGRES_TOKEN_RESOURCE" --data-urlencode "client_id=$AZURE_CLIENT_ID" --data-urlencode "api-version=2019-08-01")
+        FLYWAY_PASSWORD=$(echo "$token_response" | jq -r '.access_token')
         if [ -z "$FLYWAY_PASSWORD" ] || [ "$FLYWAY_PASSWORD" = "null" ]; then
           echo "Failed to acquire PostgreSQL access token for migration identity"
+          echo "Token response: $token_response"
           exit 1
         fi
         export FLYWAY_PASSWORD
