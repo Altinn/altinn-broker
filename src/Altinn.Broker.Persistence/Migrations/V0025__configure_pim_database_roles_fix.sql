@@ -11,16 +11,16 @@ BEGIN
         RAISE NOTICE 'Broker read AD group name or object id is empty, skipping read role configuration';
     ELSE
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = read_role_name) THEN
-            PERFORM pg_catalog.pgaadauth_create_principal(read_role_name, false, false);
-            RAISE NOTICE 'Created Broker read Entra principal %', read_role_name;
-        ELSE
-            EXECUTE FORMAT(
-                'SECURITY LABEL FOR pgaadauth ON ROLE %I IS %L',
-                read_role_name,
-                'aadauth,oid=' || read_role_oid || ',type=group'
-            );
-            RAISE NOTICE 'Updated Broker read Entra mapping for %', read_role_name;
+            EXECUTE FORMAT('CREATE ROLE %I WITH LOGIN', read_role_name);
+            RAISE NOTICE 'Created Broker read role %', read_role_name;
         END IF;
+
+        EXECUTE FORMAT(
+            'SECURITY LABEL FOR pgaadauth ON ROLE %I IS %L',
+            read_role_name,
+            'aadauth,oid=' || read_role_oid || ',type=group'
+        );
+        RAISE NOTICE 'Configured Broker read Entra mapping for %', read_role_name;
 
         EXECUTE FORMAT('GRANT CONNECT ON DATABASE %I TO %I', CURRENT_DATABASE(), read_role_name);
         EXECUTE FORMAT('GRANT USAGE ON SCHEMA broker TO %I', read_role_name);
@@ -42,16 +42,16 @@ BEGIN
         RAISE NOTICE 'Broker write AD group name or object id is empty, skipping write role configuration';
     ELSE
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = write_role_name) THEN
-            PERFORM pg_catalog.pgaadauth_create_principal(write_role_name, false, false);
-            RAISE NOTICE 'Created Broker write Entra principal %', write_role_name;
-        ELSE
-            EXECUTE FORMAT(
-                'SECURITY LABEL FOR pgaadauth ON ROLE %I IS %L',
-                write_role_name,
-                'aadauth,oid=' || write_role_oid || ',type=group'
-            );
-            RAISE NOTICE 'Updated Broker write Entra mapping for %', write_role_name;
+            EXECUTE FORMAT('CREATE ROLE %I WITH LOGIN', write_role_name);
+            RAISE NOTICE 'Created Broker write role %', write_role_name;
         END IF;
+
+        EXECUTE FORMAT(
+            'SECURITY LABEL FOR pgaadauth ON ROLE %I IS %L',
+            write_role_name,
+            'aadauth,oid=' || write_role_oid || ',type=group'
+        );
+        RAISE NOTICE 'Configured Broker write Entra mapping for %', write_role_name;
 
         EXECUTE FORMAT('GRANT CONNECT ON DATABASE %I TO %I', CURRENT_DATABASE(), write_role_name);
         EXECUTE FORMAT('GRANT USAGE ON SCHEMA broker TO %I', write_role_name);
