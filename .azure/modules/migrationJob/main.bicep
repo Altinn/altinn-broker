@@ -27,7 +27,7 @@ resource job 'Microsoft.App/jobs@2024-03-01' = {
         replicaCompletionCount: 1
       }
       replicaRetryLimit: 1
-      replicaTimeout: 120
+      replicaTimeout: 300
       triggerType: 'Manual'
     }
     environmentId: containerAppEnvId

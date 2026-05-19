@@ -148,12 +148,19 @@ module containerAppJob '../../modules/migrationJob/main.bicep' = {
           exit 1
         fi
         export FLYWAY_PASSWORD
-        flyway \
-          -placeholders.brokerDbReadAdGroupId="$BROKER_DB_READ_AD_GROUP_ID" \
-          -placeholders.brokerDbReadAdGroupName="$BROKER_DB_READ_AD_GROUP_NAME" \
-          -placeholders.brokerDbWriteAdGroupId="$BROKER_DB_WRITE_AD_GROUP_ID" \
-          -placeholders.brokerDbWriteAdGroupName="$BROKER_DB_WRITE_AD_GROUP_NAME" \
-          migrate
+        flyway_args=(
+          -placeholders.brokerDbReadAdGroupId="$BROKER_DB_READ_AD_GROUP_ID"
+          -placeholders.brokerDbReadAdGroupName="$BROKER_DB_READ_AD_GROUP_NAME"
+          -placeholders.brokerDbWriteAdGroupId="$BROKER_DB_WRITE_AD_GROUP_ID"
+          -placeholders.brokerDbWriteAdGroupName="$BROKER_DB_WRITE_AD_GROUP_NAME"
+        )
+        echo "PIM read group name set: $([ -n "${BROKER_DB_READ_AD_GROUP_NAME:-}" ] && echo yes || echo no)"
+        echo "PIM write group name set: $([ -n "${BROKER_DB_WRITE_AD_GROUP_NAME:-}" ] && echo yes || echo no)"
+        if ! flyway "${flyway_args[@]}" migrate; then
+          echo "Flyway migrate failed. Current migration state:"
+          flyway "${flyway_args[@]}" info || true
+          exit 1
+        fi
       '''
     ]
     image: migrationImage
