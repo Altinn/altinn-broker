@@ -175,6 +175,7 @@ public class StuckFileTransferHandlerTests
                 FileTransferStatus.Failed,
                 It.IsAny<DateTimeOffset>(),
                 It.Is<string>(d => d.Contains("UploadStarted")),
+                It.IsAny<string?>(),
                 cancellationToken))
             .Returns(Task.CompletedTask);
         var fileTransferEntity = new FileTransferEntity
@@ -203,6 +204,7 @@ public class StuckFileTransferHandlerTests
             FileTransferStatus.Failed,
             It.IsAny<DateTimeOffset>(),
             It.Is<string>(d => d.Contains("UploadStarted")),
+            It.IsAny<string?>(),
             cancellationToken), Times.Once);
         backgroundJobClient.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
         Assert.NotNull(capturedJob);
