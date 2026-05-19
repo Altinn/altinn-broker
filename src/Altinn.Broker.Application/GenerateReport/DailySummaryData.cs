@@ -4,7 +4,7 @@ namespace Altinn.Broker.Application.GenerateReport;
 
 /// <summary>
 /// Aggregated daily summary data for cost allocation and reporting.
-/// Each row represents one day's usage for one service owner.
+/// Each row represents one day's usage for one sender per resource.
 /// </summary>
 public class DailySummaryData
 {
@@ -37,6 +37,11 @@ public class DailySummaryData
     /// Service Owner Name (for readability)
     /// </summary>
     public string ServiceOwnerName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// File sender (organization number)
+    /// </summary>
+    public string FileSenderId { get; set; } = string.Empty;
     
     /// <summary>
     /// Resource ID

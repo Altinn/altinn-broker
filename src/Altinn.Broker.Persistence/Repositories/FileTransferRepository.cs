@@ -909,6 +909,7 @@ LEFT JOIN LATERAL (
                 EXTRACT(MONTH FROM f.created)::int as month,
                 EXTRACT(DAY FROM f.created)::int as day,
                 COALESCE(r.service_owner_id_fk, 'unknown') as service_owner_id,
+                COALESCE(SPLIT_PART(sender.actor_external_id, ':', -1), 'unknown') as sender_id,
                 COALESCE(f.resource_id, 'unknown') as resource_id,
                 COALESCE(recipient.actor_external_id, 'unknown') as recipient_id,
                 CASE 
@@ -934,6 +935,7 @@ LEFT JOIN LATERAL (
                 EXTRACT(MONTH FROM f.created),
                 EXTRACT(DAY FROM f.created),
                 COALESCE(r.service_owner_id_fk, 'unknown'),
+                COALESCE(SPLIT_PART(sender.actor_external_id, ':', -1), 'unknown'),
                 COALESCE(f.resource_id, 'unknown'),
                 COALESCE(recipient.actor_external_id, 'unknown'),
                 CASE 
@@ -946,6 +948,7 @@ LEFT JOIN LATERAL (
             ORDER BY 
                 report_date,
                 service_owner_id,
+                sender_id,
                 resource_id,
                 recipient_type,
                 altinn_version";
@@ -976,6 +979,9 @@ LEFT JOIN LATERAL (
                     ServiceOwnerId = reader.IsDBNull(reader.GetOrdinal("service_owner_id")) 
                         ? "unknown" 
                         : reader.GetString(reader.GetOrdinal("service_owner_id")),
+                    SenderId = reader.IsDBNull(reader.GetOrdinal("sender_id"))
+                        ? "unknown"
+                        : reader.GetString(reader.GetOrdinal("sender_id")),
                     ResourceId = reader.IsDBNull(reader.GetOrdinal("resource_id")) 
                         ? "unknown" 
                         : reader.GetString(reader.GetOrdinal("resource_id")),
