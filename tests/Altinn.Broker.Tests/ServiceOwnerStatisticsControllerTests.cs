@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 
 using Altinn.Broker.Application;
@@ -95,7 +95,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
             transfer,
             FileTransferStatus.Initialized,
             new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
-            systemVendor: senderVendor);
+            vendor: senderVendor);
         await _dataHelper.InsertFileTransferStatus(
             transfer,
             FileTransferStatus.Published,
@@ -105,13 +105,13 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
             recipientId,
             ActorFileTransferStatus.DownloadStarted,
             new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero),
-            systemVendor: recipientVendor);
+            vendor: recipientVendor);
         await _dataHelper.InsertActorStatus(
             transfer,
             recipientId,
             ActorFileTransferStatus.DownloadConfirmed,
             new DateTimeOffset(2026, 1, 11, 11, 0, 0, TimeSpan.Zero),
-            systemVendor: recipientVendor);
+            vendor: recipientVendor);
 
         await _repository.RebuildMonthlyStatisticsRollupForMonth(2026, 1, CancellationToken.None);
 
@@ -146,7 +146,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
             transfer,
             FileTransferStatus.Initialized,
             new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
-            systemVendor: senderVendor);
+            vendor: senderVendor);
         await _dataHelper.InsertFileTransferStatus(
             transfer,
             FileTransferStatus.Published,
@@ -156,7 +156,7 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
             recipientId,
             ActorFileTransferStatus.DownloadConfirmed,
             new DateTimeOffset(2026, 1, 11, 11, 0, 0, TimeSpan.Zero),
-            systemVendor: recipientVendor);
+            vendor: recipientVendor);
 
         await _repository.RebuildMonthlyStatisticsRollupForMonth(2026, 1, CancellationToken.None);
 
@@ -238,3 +238,4 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     }
 
 }
+

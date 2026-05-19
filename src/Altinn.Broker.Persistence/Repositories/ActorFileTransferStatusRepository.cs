@@ -39,7 +39,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         }, cancellationToken);
     }
 
-    public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, string? systemVendor, CancellationToken cancellationToken)
+    public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, string? vendor, CancellationToken cancellationToken)
     {
         var actor = await actorRepository.GetActorAsync(actorExternalReference, cancellationToken);
         long actorId;
@@ -74,9 +74,9 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                     file_transfer_id_fk,
                     actor_file_transfer_status_description_id_fk,
                     actor_file_transfer_status_date,
-                    system_vendor
+                    vendor
                 )
-                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW(), @systemVendor)
+                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW(), @vendor)
                 RETURNING actor_file_transfer_status_id_pk, actor_file_transfer_status_date, actor_file_transfer_status_description_id_fk, actor_id_fk, file_transfer_id_fk
             )
             INSERT INTO broker.actor_file_transfer_latest_status (
@@ -107,7 +107,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@actorFileTransferStatusId", (int)status);
-        command.Parameters.AddWithValue("@systemVendor", (object?)systemVendor ?? DBNull.Value);
+        command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }

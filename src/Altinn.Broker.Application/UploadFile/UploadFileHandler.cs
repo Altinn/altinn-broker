@@ -82,8 +82,8 @@ public class UploadFileHandler(
         }
 
         var uploadStartedTimestamp = DateTime.UtcNow;
-        var uploaderSystemVendor = user?.GetCallerSystemVendorId()?.WithPrefix();
-        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, systemVendor: uploaderSystemVendor, cancellationToken: cancellationToken);
+        var uploaderVendor = user?.GetCallerVendorId()?.WithPrefix();
+        await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.UploadStarted, timestamp: uploadStartedTimestamp, vendor: uploaderVendor, cancellationToken: cancellationToken);
 
         try
         {

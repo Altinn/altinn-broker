@@ -1,26 +1,26 @@
--- Track the system vendor that owns the system a Maskinporten system user authenticates through.
--- Captured per status transition that is caused by an actor's API call:
+-- Track the vendor that authenticated to Maskinporten.
+-- For system-user flows this is the org that owns the registered system; for direct flows it is the
+-- caller themselves. Captured per status transition that is caused by an actor's API call:
 --   * file_transfer_status: sender-side actions (Initialized, UploadStarted, Cancelled).
---     System-caused transitions (UploadProcessing, Published, AllConfirmedDownloaded, Purged, Failed) leave system_vendor NULL.
+--     System-caused transitions (UploadProcessing, Published, AllConfirmedDownloaded, Purged, Failed) leave vendor NULL.
 --   * actor_file_transfer_status: recipient-side actions (DownloadStarted, DownloadConfirmed).
---     Initialized rows are placeholders written by the sender, so they leave system_vendor NULL.
 
 ALTER TABLE broker.file_transfer_status
-    ADD COLUMN system_vendor character varying(100) NULL;
+    ADD COLUMN vendor character varying(100) NULL;
 
 ALTER TABLE broker.actor_file_transfer_status
-    ADD COLUMN system_vendor character varying(100) NULL;
+    ADD COLUMN vendor character varying(100) NULL;
 
 ALTER TABLE broker.monthly_statistics_rollup
-    ADD COLUMN sender_system_vendor character varying(100) NOT NULL DEFAULT '',
-    ADD COLUMN recipient_system_vendor character varying(100) NOT NULL DEFAULT '';
+    ADD COLUMN sender_vendor character varying(100) NOT NULL DEFAULT '',
+    ADD COLUMN recipient_vendor character varying(100) NOT NULL DEFAULT '';
 
 ALTER TABLE broker.monthly_statistics_rollup
     DROP CONSTRAINT uq_monthly_statistics_rollup_key;
 
 ALTER TABLE broker.monthly_statistics_rollup
     ADD CONSTRAINT uq_monthly_statistics_rollup_key UNIQUE (
-        service_owner_id, year, month, resource_id, sender, recipient, sender_system_vendor, recipient_system_vendor
+        service_owner_id, year, month, resource_id, sender, recipient, sender_vendor, recipient_vendor
     );
 
 -- Supports the per-month DELETE in RebuildMonthlyStatisticsRollupForMonth, which filters on (year, month)
@@ -28,11 +28,11 @@ ALTER TABLE broker.monthly_statistics_rollup
 CREATE INDEX idx_monthly_statistics_rollup_year_month
 ON broker.monthly_statistics_rollup (year, month);
 
--- Sender vendor lookup in the monthly rollup: per-transfer seek for the Initialized row's system_vendor.
+-- Sender vendor lookup in the monthly rollup: per-transfer seek for the Initialized row's vendor.
 -- Partial index keeps it small (one Initialized row per transfer) and enables index-only scans.
 CREATE INDEX idx_file_transfer_status_initialized_vendor
 ON broker.file_transfer_status (file_transfer_id_fk)
-INCLUDE (system_vendor, file_transfer_status_date, file_transfer_status_id_pk)
+INCLUDE (vendor, file_transfer_status_date, file_transfer_status_id_pk)
 WHERE file_transfer_status_description_id_fk = 0;
 
 -- Recipient vendor lookup in the monthly rollup: latest-vendor lookup per (transfer, actor).
@@ -44,5 +44,5 @@ ON broker.actor_file_transfer_status (
     actor_file_transfer_status_date DESC,
     actor_file_transfer_status_id_pk DESC
 )
-INCLUDE (system_vendor)
-WHERE system_vendor IS NOT NULL;
+INCLUDE (vendor)
+WHERE vendor IS NOT NULL;

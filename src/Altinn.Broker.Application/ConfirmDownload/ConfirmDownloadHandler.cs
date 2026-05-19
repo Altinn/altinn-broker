@@ -79,8 +79,8 @@ public class ConfirmDownloadHandler(
         {
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-            var systemVendor = user?.GetCallerSystemVendorId()?.WithPrefix();
-            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, systemVendor, cancellationToken);
+            var vendor = user?.GetCallerVendorId()?.WithPrefix();
+            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, vendor, cancellationToken);
             if (shouldConfirmAll)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));

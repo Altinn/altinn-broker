@@ -97,8 +97,8 @@ public class GetMonthlyStatisticsCsvHandler(
                 row.ResourceId,
                 Sender = includeEndUser ? row.Sender : string.Empty,
                 Recipient = includeEndUser ? row.Recipient : string.Empty,
-                SenderSystemVendor = includeVendor ? row.SenderSystemVendor : string.Empty,
-                RecipientSystemVendor = includeVendor ? row.RecipientSystemVendor : string.Empty
+                SenderVendor = includeVendor ? row.SenderVendor : string.Empty,
+                RecipientVendor = includeVendor ? row.RecipientVendor : string.Empty
             })
             .Select(group => new MonthlyResourceStatisticsData
             {
@@ -107,8 +107,8 @@ public class GetMonthlyStatisticsCsvHandler(
                 ResourceId = group.Key.ResourceId,
                 Sender = group.Key.Sender,
                 Recipient = group.Key.Recipient,
-                SenderSystemVendor = group.Key.SenderSystemVendor,
-                RecipientSystemVendor = group.Key.RecipientSystemVendor,
+                SenderVendor = group.Key.SenderVendor,
+                RecipientVendor = group.Key.RecipientVendor,
                 TotalFileTransfers = group.Sum(row => row.TotalFileTransfers),
                 UploadCount = group.Sum(row => row.UploadCount),
                 TotalTransferDownloadAttempts = group.Sum(row => row.TotalTransferDownloadAttempts),
@@ -116,9 +116,9 @@ public class GetMonthlyStatisticsCsvHandler(
             })
             .OrderBy(row => row.ResourceId, StringComparer.Ordinal)
             .ThenBy(row => row.Sender, StringComparer.Ordinal)
-            .ThenBy(row => row.SenderSystemVendor, StringComparer.Ordinal)
+            .ThenBy(row => row.SenderVendor, StringComparer.Ordinal)
             .ThenBy(row => row.Recipient, StringComparer.Ordinal)
-            .ThenBy(row => row.RecipientSystemVendor, StringComparer.Ordinal)
+            .ThenBy(row => row.RecipientVendor, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -134,8 +134,8 @@ public class GetMonthlyStatisticsCsvHandler(
                 .Append(row.Year).Append(',')
                 .Append(row.Month).Append(',')
                 .Append(EscapeCsv(row.ResourceId)).Append(',')
-                .Append(EscapeCsv(row.SenderSystemVendor)).Append(',')
-                .Append(EscapeCsv(row.RecipientSystemVendor)).Append(',')
+                .Append(EscapeCsv(row.SenderVendor)).Append(',')
+                .Append(EscapeCsv(row.RecipientVendor)).Append(',')
                 .Append(EscapeCsv(row.Sender)).Append(',')
                 .Append(EscapeCsv(row.Recipient)).Append(',')
                 .Append(row.TotalFileTransfers).Append(',')

@@ -63,35 +63,35 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         return fileTransferId;
     }
 
-    public async Task InsertActorStatus(Guid fileTransferId, string actorExternalId, ActorFileTransferStatus status, DateTimeOffset statusDate, string? systemVendor = null)
+    public async Task InsertActorStatus(Guid fileTransferId, string actorExternalId, ActorFileTransferStatus status, DateTimeOffset statusDate, string? vendor = null)
     {
         var actorId = await EnsureActor(actorExternalId);
 
         await using var command = dataSource.CreateCommand(
             @"INSERT INTO broker.actor_file_transfer_status (
-                    actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date, system_vendor)
-              VALUES (@actorId, @fileTransferId, @status, @statusDate, @systemVendor)");
+                    actor_id_fk, file_transfer_id_fk, actor_file_transfer_status_description_id_fk, actor_file_transfer_status_date, vendor)
+              VALUES (@actorId, @fileTransferId, @status, @statusDate, @vendor)");
 
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@status", (int)status);
         command.Parameters.AddWithValue("@statusDate", statusDate.UtcDateTime);
-        command.Parameters.AddWithValue("@systemVendor", (object?)systemVendor ?? DBNull.Value);
+        command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
         await command.ExecuteNonQueryAsync();
     }
 
-    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset statusDate, string? detailedStatus = null, string? systemVendor = null)
+    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset statusDate, string? detailedStatus = null, string? vendor = null)
     {
         await using var command = dataSource.CreateCommand(
             @"INSERT INTO broker.file_transfer_status (
-                    file_transfer_id_fk, file_transfer_status_description_id_fk, file_transfer_status_date, file_transfer_status_detailed_description, system_vendor)
-              VALUES (@fileTransferId, @status, @statusDate, @detailedStatus, @systemVendor)");
+                    file_transfer_id_fk, file_transfer_status_description_id_fk, file_transfer_status_date, file_transfer_status_detailed_description, vendor)
+              VALUES (@fileTransferId, @status, @statusDate, @detailedStatus, @vendor)");
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@status", (int)status);
         command.Parameters.AddWithValue("@statusDate", statusDate.UtcDateTime);
         command.Parameters.AddWithValue("@detailedStatus", (object?)detailedStatus ?? DBNull.Value);
-        command.Parameters.AddWithValue("@systemVendor", (object?)systemVendor ?? DBNull.Value);
+        command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
         await command.ExecuteNonQueryAsync();
     }
 
