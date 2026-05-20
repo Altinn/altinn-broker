@@ -79,11 +79,12 @@ public class ConfirmDownloadHandler(
         {
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), caller, Guid.NewGuid(), AltinnEventSubjectRole.Recipient));
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.DownloadConfirmed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, cancellationToken);
+            var vendor = user?.GetCallerVendorId()?.WithPrefix();
+            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(request.FileTransferId, ActorFileTransferStatus.DownloadConfirmed, caller, vendor, cancellationToken);
             if (shouldConfirmAll)
             {
                 backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.AllConfirmedDownloaded, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
-                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded, timestamp: DateTimeOffset.UtcNow, null, cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(request.FileTransferId, FileTransferStatus.AllConfirmedDownloaded, timestamp: DateTimeOffset.UtcNow, detailedFileTransferStatus: null, cancellationToken: cancellationToken);
                 if (resource!.PurgeFileTransferAfterAllRecipientsConfirmed)
                 {
                     var gracePeriod = resource.PurgeFileTransferGracePeriod ?? XmlConvert.ToTimeSpan(ApplicationConstants.DefaultGracePeriod);

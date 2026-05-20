@@ -44,4 +44,29 @@ public static class ClaimsPrincipalExtensions
         return null;
     }
 
+    /// <summary>
+    /// Returns the vendor that authenticated to Maskinporten,
+    /// taken from the consumer claim. Differs from <see cref="GetCallerOrganizationId"/> for
+    /// system-user tokens where a vendor authenticates on behalf of an end-user org; equal to it
+    /// for self-acting flows. Returns null when no consumer claim is present.
+    /// </summary>
+    public static string? GetCallerVendorId(this ClaimsPrincipal user)
+    {
+        var consumerClaim = user.Claims.FirstOrDefault(c => c.Type == "consumer");
+        if (consumerClaim is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var consumer = JsonSerializer.Deserialize<TokenConsumer>(consumerClaim.Value);
+            var vendorId = consumer?.ID?.WithoutPrefix();
+            return string.IsNullOrWhiteSpace(vendorId) ? null : vendorId;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }

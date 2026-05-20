@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 
 using Altinn.Broker.Application;
@@ -68,10 +68,122 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
         Assert.Contains("monthly_statistics_", response.Content.Headers.ContentDisposition?.FileName);
 
         var csv = await response.Content.ReadAsStringAsync();
-        Assert.Contains("year,month,resourceId,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252932,3,2,3,2", csv);
-        Assert.Contains($"2026,1,{resourceId},{senderId},0192:986252933,1,1,1,1", csv);
+        Assert.Contains("year,month,resourceId,senderVendor,recipientVendor,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed", csv);
+        Assert.Contains($"2026,1,{resourceId},,,{senderId},0192:986252932,3,2,3,2", csv);
+        Assert.Contains($"2026,1,{resourceId},,,{senderId},0192:986252933,1,1,1,1", csv);
         Assert.DoesNotContain("2026,2,", csv);
+    }
+
+    [Fact]
+    public async Task DownloadMonthlyStatisticsCsv_WithIncludeVendor_PopulatesVendorColumns()
+    {
+        var serviceOwnerId = "0192:991825827";
+        var resourceId = $"monthly-vendor-{Guid.NewGuid():N}";
+        var senderId = "0192:991825827";
+        var recipientId = "0192:986252932";
+        var senderVendor = "0192:111111111";
+        var recipientVendor = "0192:222222222";
+
+        await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
+        var transfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            senderExternalId: senderId);
+
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Initialized,
+            new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            vendor: senderVendor);
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Published,
+            new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.DownloadStarted,
+            new DateTimeOffset(2026, 1, 11, 10, 0, 0, TimeSpan.Zero),
+            vendor: recipientVendor);
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.DownloadConfirmed,
+            new DateTimeOffset(2026, 1, 11, 11, 0, 0, TimeSpan.Zero),
+            vendor: recipientVendor);
+
+        await _repository.RebuildMonthlyStatisticsRollupForMonth(2026, 1, CancellationToken.None);
+
+        var response = await _serviceOwnerClient.GetAsync(
+            $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1&includeVendor=true");
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains("year,month,resourceId,senderVendor,recipientVendor,sender,recipient,totalFileTransfers,uploadCount,totalTransferDownloadAttempts,transfersWithDownloadConfirmed", csv);
+        Assert.Contains($"2026,1,{resourceId},{senderVendor},{recipientVendor},{senderId},{recipientId},1,1,1,1", csv);
+    }
+
+    [Fact]
+    public async Task DownloadMonthlyStatisticsCsv_IncludeVendorFalse_VendorColumnsBlankEvenWhenStored()
+    {
+        var serviceOwnerId = "0192:991825827";
+        var resourceId = $"monthly-vendor-off-{Guid.NewGuid():N}";
+        var senderId = "0192:991825827";
+        var recipientId = "0192:986252932";
+        var senderVendor = "0192:111111111";
+        var recipientVendor = "0192:222222222";
+
+        await _dataHelper.EnsureResource(resourceId, "991825827", serviceOwnerId);
+        var transfer = await _dataHelper.InsertFileTransfer(
+            resourceId,
+            serviceOwnerId,
+            created: new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            senderExternalId: senderId);
+
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Initialized,
+            new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            vendor: senderVendor);
+        await _dataHelper.InsertFileTransferStatus(
+            transfer,
+            FileTransferStatus.Published,
+            new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
+        await _dataHelper.InsertActorStatus(
+            transfer,
+            recipientId,
+            ActorFileTransferStatus.DownloadConfirmed,
+            new DateTimeOffset(2026, 1, 11, 11, 0, 0, TimeSpan.Zero),
+            vendor: recipientVendor);
+
+        await _repository.RebuildMonthlyStatisticsRollupForMonth(2026, 1, CancellationToken.None);
+
+        // Default includeVendor=false should collapse vendor dimensions in the CSV even though
+        // the rollup row has them stored.
+        var response = await _serviceOwnerClient.GetAsync(
+            $"broker/api/v1/statistics/monthly?resourceId={resourceId}&year=2026&month=1");
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains($"2026,1,{resourceId},,,{senderId},{recipientId},1,1,0,1", csv);
+        Assert.DoesNotContain(senderVendor, csv);
+        Assert.DoesNotContain(recipientVendor, csv);
+    }
+
+    [Fact]
+    public async Task DownloadMonthlyStatisticsCsv_BothIncludeFlagsFalse_ReturnsBadRequest()
+    {
+        var response = await _serviceOwnerClient.GetAsync(
+            "broker/api/v1/statistics/monthly?year=2026&month=1&includeEndUser=false&includeVendor=false");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(StatisticsErrors.EndUserAndVendorBothExcluded.Message, parsedError.Detail);
     }
 
     [Fact]
@@ -126,3 +238,4 @@ public class ServiceOwnerStatisticsControllerTests : IClassFixture<CustomWebAppl
     }
 
 }
+
