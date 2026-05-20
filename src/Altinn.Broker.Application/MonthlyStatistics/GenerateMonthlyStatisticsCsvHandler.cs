@@ -95,10 +95,10 @@ public class GetMonthlyStatisticsCsvHandler(
                 row.Year,
                 row.Month,
                 row.ResourceId,
-                Sender = includeEndUser ? row.Sender : string.Empty,
-                Recipient = includeEndUser ? row.Recipient : string.Empty,
-                SenderVendor = includeVendor ? row.SenderVendor : string.Empty,
-                RecipientVendor = includeVendor ? row.RecipientVendor : string.Empty
+                Sender = includeEndUser ? NormalizeOrg(row.Sender) : string.Empty,
+                Recipient = includeEndUser ? NormalizeOrg(row.Recipient) : string.Empty,
+                SenderVendor = includeVendor ? NormalizeOrg(row.SenderVendor) : string.Empty,
+                RecipientVendor = includeVendor ? NormalizeOrg(row.RecipientVendor) : string.Empty
             })
             .Select(group => new MonthlyResourceStatisticsData
             {
@@ -148,6 +148,9 @@ public class GetMonthlyStatisticsCsvHandler(
 
         return builder.ToString();
     }
+
+    private static string NormalizeOrg(string value)
+        => string.IsNullOrWhiteSpace(value) ? value : value.WithoutPrefix().WithPrefix();
 
     private static string EscapeCsv(string value)
     {
