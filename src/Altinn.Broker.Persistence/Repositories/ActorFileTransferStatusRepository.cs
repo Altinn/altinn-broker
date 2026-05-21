@@ -39,7 +39,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         }, cancellationToken);
     }
 
-    public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, CancellationToken cancellationToken)
+    public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, string? vendor, CancellationToken cancellationToken)
     {
         var actor = await actorRepository.GetActorAsync(actorExternalReference, cancellationToken);
         long actorId;
@@ -54,7 +54,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         {
             actorId = actor.ActorId;
         }
-        
+
         // This query performs two operations atomically:
         // 1. Inserts a new actor file transfer status record into the history table
         // 2. Updates the denormalized latest_status table to keep the most recent status per (file_transfer, actor) pair
@@ -70,12 +70,13 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.actor_file_transfer_status (
-                    actor_id_fk, 
-                    file_transfer_id_fk, 
-                    actor_file_transfer_status_description_id_fk, 
-                    actor_file_transfer_status_date
+                    actor_id_fk,
+                    file_transfer_id_fk,
+                    actor_file_transfer_status_description_id_fk,
+                    actor_file_transfer_status_date,
+                    vendor
                 )
-                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW())
+                VALUES (@actorId, @fileTransferId, @actorFileTransferStatusId, NOW(), @vendor)
                 RETURNING actor_file_transfer_status_id_pk, actor_file_transfer_status_date, actor_file_transfer_status_description_id_fk, actor_id_fk, file_transfer_id_fk
             )
             INSERT INTO broker.actor_file_transfer_latest_status (
@@ -84,20 +85,20 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                 latest_actor_status_id,
                 latest_actor_status_date
             )
-            SELECT 
+            SELECT
                 inserted_status.file_transfer_id_fk,
                 inserted_status.actor_id_fk,
                 inserted_status.actor_file_transfer_status_description_id_fk,
                 inserted_status.actor_file_transfer_status_date
             FROM inserted_status
-            ON CONFLICT (file_transfer_id_fk, actor_id_fk) 
+            ON CONFLICT (file_transfer_id_fk, actor_id_fk)
             DO UPDATE SET
                 latest_actor_status_id = EXCLUDED.latest_actor_status_id,
                 latest_actor_status_date = EXCLUDED.latest_actor_status_date
-            WHERE 
+            WHERE
                 -- Update if new status has a newer timestamp
                 EXCLUDED.latest_actor_status_date > actor_file_transfer_latest_status.latest_actor_status_date
-                OR 
+                OR
                 -- Or if same timestamp, update only if new status has higher ID (tie-breaker for simultaneous inserts)
                 (EXCLUDED.latest_actor_status_date = actor_file_transfer_latest_status.latest_actor_status_date
                     AND EXCLUDED.latest_actor_status_id > actor_file_transfer_latest_status.latest_actor_status_id);";
@@ -106,7 +107,8 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
         command.Parameters.AddWithValue("@actorId", actorId);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@actorFileTransferStatusId", (int)status);
-        
+        command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
+
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 }

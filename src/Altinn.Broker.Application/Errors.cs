@@ -42,4 +42,5 @@ public static class StatisticsErrors
     public static Error ReportGenerationFailed = new Error(6002, "Failed to generate statistics report", HttpStatusCode.InternalServerError);
     public static Error InvalidMonthFormat = new Error(6003, "Invalid year or month. Provide a valid year and a month between 1 and 12.", HttpStatusCode.BadRequest);
     public static Error InvalidMonthRange = new Error(6004, "The requested report month is invalid.", HttpStatusCode.BadRequest);
+    public static Error EndUserAndVendorBothExcluded = new Error(6005, "At least one of includeEndUser or includeVendor must be true.", HttpStatusCode.BadRequest);
 }
