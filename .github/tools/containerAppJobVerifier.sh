@@ -43,7 +43,18 @@ verify_job_succeeded() {
   if [[ $current_job_execution_status == "Succeeded" ]]; then
     return 0  # OK!
   elif [[ $current_job_execution_status == "Failed" ]]; then
-    echo "Job execution failed. Exiting script." 
+    echo "Job execution failed. Fetching logs from $current_job_execution_name ..."
+    echo " "
+    echo "----------- Container logs -----------"
+    az containerapp job logs show \
+      -n "$job_name" \
+      -g "$resource_group" \
+      --container "$job_name" \
+      --execution "$current_job_execution_name" \
+      --tail 200 \
+      --follow false 2>&1 || echo "(failed to fetch logs via 'az containerapp job logs show')"
+    echo "--------------------------------------"
+    echo "Exiting script."
     exit 1
   else
     return 1  # Not OK!
