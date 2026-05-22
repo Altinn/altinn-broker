@@ -97,7 +97,11 @@ module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bic
 module containerApp '../../modules/containerApp/main.bicep' = {
   name: containerAppName
   scope: resourceGroup
-  dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
+  dependsOn: [
+    keyvaultAddReaderRolesAppIdentity
+    keyvaultAddSecretsOfficerRoleAppIdentity
+    databaseAccess
+  ]
   params: {
     eventGridIps: fetchEventGridIpsScript.outputs.eventGridIps!
     namePrefix: namePrefix
