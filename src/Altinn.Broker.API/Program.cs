@@ -6,8 +6,6 @@ using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
-using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
@@ -17,7 +15,6 @@ using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
 using Altinn.Broker.API.Swagger;
-
 using Hangfire;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,7 +22,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.IdentityModel.Tokens;
-using Altinn.Broker.Application.CleanupUseCaseTests;
 
 BuildAndRun(args);
 
@@ -70,21 +66,7 @@ static void BuildAndRun(string[] args)
 
     app.UseHangfireDashboard();
 
-    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-    recurringJobManager.AddOrUpdate<IpSecurityRestrictionUpdater>("Update IP restrictions to apimIp and current EventGrid IPs", handler => handler.UpdateIpRestrictions(), Cron.Daily());
-    recurringJobManager.AddOrUpdate<StuckFileTransferHandler>("Check for files stuck in UploadProcessing", handler => handler.CheckForStuckFileTransfers(CancellationToken.None), "*/30 * * * *");
-    recurringJobManager.AddOrUpdate<RefreshMonthlyStatisticsRollupHandler>(
-        "Refresh current month statistics rollup",
-        handler => handler.RefreshRollup(CancellationToken.None),
-        Cron.Weekly(DayOfWeek.Monday, 3));
-    recurringJobManager.AddOrUpdate<RefreshMonthlyStatisticsRollupHandler>(
-        "Finalize previous month statistics rollup",
-        handler => handler.RefreshPreviousMonthRollup(CancellationToken.None),
-        "0 4 2 * *");
-    recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
-        "Cleanup use case test data older than 1 day",
-        handler => handler.Process(new CleanupUseCaseTestsRequest { MinAgeDays = 1 }, null, CancellationToken.None), 
-        Cron.Daily());
+    RecurringJobRegistration.Register(app.Services, app.Configuration, app.Logger);
 
     app.Run();
 }
@@ -92,6 +74,7 @@ static void BuildAndRun(string[] args)
 static void ConfigureServices(IServiceCollection services, IConfiguration config, IHostEnvironment hostEnvironment)
 {
     services.AddHttpContextAccessor();
+    services.AddSingleton(TimeProvider.System);
     services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -109,6 +92,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AzureResourceManagerOptions>(config.GetSection(key: nameof(AzureResourceManagerOptions)));
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
+    services.Configure<MaskinportenJwkRotationSettings>(config.GetSection(key: nameof(MaskinportenJwkRotationSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
