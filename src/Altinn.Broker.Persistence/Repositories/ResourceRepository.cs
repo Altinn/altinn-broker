@@ -22,6 +22,18 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         {
             while (await reader.ReadAsync(cancellationToken))
             {
+                string? requiredParty = null;
+                var requiredPartyValue = reader.GetValue(reader.GetOrdinal("required_party"));
+                if (requiredPartyValue is string requiredPartyFromDb)
+                {
+                    requiredParty = requiredPartyFromDb;
+                }
+                else if (requiredPartyValue is bool requiredPartyEnabled && requiredPartyEnabled)
+                {
+                    // Backward compatibility for environments where required_party is still BOOLEAN.
+                    requiredParty = reader.GetString(reader.GetOrdinal("service_owner_id_fk"));
+                }
+
                 resource = new ResourceEntity
                 {
                     Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
@@ -35,7 +47,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
                     UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
                     ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
                     ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy")),
-                    RequiredParty = reader.IsDBNull(reader.GetOrdinal("required_party")) ? null : reader.GetString(reader.GetOrdinal("required_party")),
+                    RequiredParty = requiredParty,
                     ApprovedForDisabledVirusScan = reader.GetBoolean(reader.GetOrdinal("approved_for_disabled_virus_scan"))
                 };
             }
