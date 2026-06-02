@@ -80,7 +80,7 @@ jobs:
         OPSGENIE_API_URL: https://api.eu.opsgenie.com
       run: |
         ENV="${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
-        NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%7NZ)"
+        NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%6N)Z"
         ALERT_ID="$(cat /proc/sys/kernel/random/uuid)"
 
         payload=$(cat <<EOF
@@ -127,7 +127,7 @@ jobs:
         EOF
         )
 
-        curl --fail-with-body --show-error --silent \
+        curl --fail-with-body -v --show-error --silent \
           --request POST \
           --url "${OPSGENIE_API_URL}/v1/json/azure?apiKey=${OPSGENIE_API_KEY}" \
           --header "Content-Type: application/json" \
