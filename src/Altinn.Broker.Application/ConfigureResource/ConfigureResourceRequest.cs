@@ -9,5 +9,5 @@ public class ConfigureResourceRequest
     public bool? UseManifestFileShim { get; set; }
     public string? ExternalServiceCodeLegacy { get; set; }
     public int? ExternalServiceEditionCodeLegacy { get; set; }
-    public bool? RequiredParty { get; set; }
+    public string? RequiredParty { get; set; }
 }

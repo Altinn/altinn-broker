@@ -107,9 +107,10 @@ public class InitializeFileTransferHandler(
             }
         }
 
-        if (resource.RequiredParty == true)
+        if (!string.IsNullOrWhiteSpace(resource.RequiredParty))
         {
-            if (request.SenderExternalId.WithoutPrefix() == altinnResource.ServiceOwnerId.WithoutPrefix())
+            var requiredParty = resource.RequiredParty.WithoutPrefix();
+            if (request.SenderExternalId.WithoutPrefix() == requiredParty)
             {
             }
             else
@@ -120,7 +121,7 @@ public class InitializeFileTransferHandler(
                 }
                 
                 if (request.RecipientExternalIds.Count == 0 || 
-                    request.RecipientExternalIds[0].WithoutPrefix() != altinnResource.ServiceOwnerId.WithoutPrefix())
+                    request.RecipientExternalIds[0].WithoutPrefix() != requiredParty)
                 {
                     return Errors.RequiredPartyNotSpecified;
                 }

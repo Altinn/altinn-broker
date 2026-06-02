@@ -35,7 +35,7 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
                     UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
                     ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
                     ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy")),
-                    RequiredParty = reader.IsDBNull(reader.GetOrdinal("required_party")) ? null : reader.GetBoolean(reader.GetOrdinal("required_party")),
+                    RequiredParty = reader.IsDBNull(reader.GetOrdinal("required_party")) ? null : reader.GetString(reader.GetOrdinal("required_party")),
                     ApprovedForDisabledVirusScan = reader.GetBoolean(reader.GetOrdinal("approved_for_disabled_virus_scan"))
                 };
             }
@@ -142,14 +142,14 @@ public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepo
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
-    public async Task UpdateRequiredParty(string resourceId, bool requiredParty, CancellationToken cancellationToken = default)
+    public async Task UpdateRequiredParty(string resourceId, string? requiredParty, CancellationToken cancellationToken = default)
     {
         await using var command = dataSource.CreateCommand(
             "UPDATE broker.altinn_resource " +
             "SET required_party = @requiredParty " +
             "WHERE resource_id_pk = @resourceId");
         command.Parameters.AddWithValue("@resourceId", resourceId);
-        command.Parameters.AddWithValue("@requiredParty", requiredParty);
+        command.Parameters.AddWithValue("@requiredParty", (object?)requiredParty ?? DBNull.Value);
         
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }

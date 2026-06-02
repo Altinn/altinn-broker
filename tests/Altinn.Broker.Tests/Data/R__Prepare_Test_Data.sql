@@ -38,7 +38,7 @@ INSERT INTO broker.altinn_resource (
     null,
     '991825827',
     '0192:991825827',
-    true
+    '991825827'
 )
 ON CONFLICT (resource_id_pk) DO NOTHING;
 

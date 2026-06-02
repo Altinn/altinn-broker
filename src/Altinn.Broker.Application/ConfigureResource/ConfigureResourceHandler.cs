@@ -108,7 +108,7 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         }
         if (request.RequiredParty is not null)
         {
-            await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty.Value, cancellationToken);
+            await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty, cancellationToken);
         }
         return Task.CompletedTask;
     }
