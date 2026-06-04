@@ -9,6 +9,7 @@ using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
+using Altinn.Broker.Integrations.Maskinporten;
 using Altinn.Broker.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,12 @@ public static class DependencyInjection
         services.AddScoped<IAltinnResourceRepository, AltinnResourceRegistryRepository>();
         services.AddScoped<IResourceRepository, ResourceRepository>();
         services.AddSingleton<IIdempotencyEventRepository, IdempotencyEventRepository>();
+        services.AddSingleton<IKeyVaultSecretStore, KeyVaultSecretStore>();
+        services.AddSingleton<IContainerAppRefreshService, AzureContainerAppRefreshService>();
+        services.AddSingleton<IMaskinportenJwkGenerator, MaskinportenJwkGenerator>();
+        services.AddScoped<IMaskinportenTokenService, MaskinportenTokenService>();
+        services.AddScoped<IDigdirMaskinportenAdminService, DigdirMaskinportenAdminService>();
+        services.AddScoped<IMaskinportenJwkRotationService, MaskinportenJwkRotationService>();
 
         var maskinportenSettings = new MaskinportenSettings();
         configuration.GetSection(nameof(MaskinportenSettings)).Bind(maskinportenSettings);

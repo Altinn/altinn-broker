@@ -20,6 +20,15 @@ param containerAppEnvId string
 @secure()
 param apimIp string
 
+var rotationLeaderEnvironments = [
+  'test'
+  'staging'
+  'production'
+]
+var rotationEnabled = contains(rotationLeaderEnvironments, environment)
+var containerAppName = '${namePrefix}-app'
+var containerAppResourceId = resourceId('Microsoft.App/containerApps', containerAppName)
+
 var probes = [
   {
     httpGet: {
@@ -30,7 +39,17 @@ var probes = [
   }
 ]
 
-var containerAppEnvVars = [
+var rotationContainerAppEnvVars = rotationEnabled ? [
+  { name: 'MaskinportenJwkRotationSettings__Enabled', value: string(rotationEnabled) }
+  { name: 'MaskinportenJwkRotationSettings__KeyVaultUrl', value: keyVaultUrl }
+  { name: 'MaskinportenJwkRotationSettings__ContainerAppResourceId', value: containerAppResourceId }
+  { name: 'MaskinportenJwkRotationSettings__AdminClientId', secretRef: 'maskinporten-admin-client-id' }
+  { name: 'MaskinportenJwkRotationSettings__AdminEncodedJwk', secretRef: 'maskinporten-admin-jwk' }
+] : [
+  { name: 'MaskinportenJwkRotationSettings__Enabled', value: string(rotationEnabled) }
+]
+
+var containerAppEnvVars = concat([
   { name: 'ASPNETCORE_ENVIRONMENT', value: environment }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'application-insights-connection-string' }
   { name: 'DatabaseOptions__ConnectionString', secretRef: 'broker-ado-connection-string' }
@@ -68,7 +87,7 @@ var containerAppEnvVars = [
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
   { name: 'ReportResourceIdFilter', secretRef: 'report-resource-id-filter' }
   { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
-]
+], rotationContainerAppEnvVars)
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
@@ -87,8 +106,21 @@ var apimIpRestrictions = empty(apimIp)
     ]
 var ipSecurityRestrictions = concat(apimIpRestrictions, EventGridIpRestrictions)
 
+var rotationKeyvaultSecrets = rotationEnabled ? [
+  {
+    identity: principal_id
+    keyVaultUrl: '${keyVaultUrl}/secrets/maskinporten-admin-client-id'
+    name: 'maskinporten-admin-client-id'
+  }
+  {
+    identity: principal_id
+    keyVaultUrl: '${keyVaultUrl}/secrets/maskinporten-admin-jwk'
+    name: 'maskinporten-admin-jwk'
+  }
+] : []
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: '${namePrefix}-app'
+  name: containerAppName
   location: location
   tags: resourceGroup().tags
   identity: {
@@ -105,7 +137,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'Auto'
         ipSecurityRestrictions: ipSecurityRestrictions
       }
-      secrets: [
+      secrets: concat([
         {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/platform-subscription-key'
@@ -151,7 +183,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUrl}/secrets/report-resource-id-filter'
           name: 'report-resource-id-filter'
         }
-      ]
+      ], rotationKeyvaultSecrets)
     }
 
     environmentId: containerAppEnvId
