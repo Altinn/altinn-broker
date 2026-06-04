@@ -23,6 +23,7 @@ param apimIp string
 var rotationLeaderEnvironments = [
   'test'
   'staging'
+  'production'
 ]
 var rotationEnabled = contains(rotationLeaderEnvironments, environment)
 var containerAppName = '${namePrefix}-app'
