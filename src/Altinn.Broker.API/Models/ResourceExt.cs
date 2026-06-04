@@ -55,8 +55,8 @@ public class ResourceExt
     public int? ExternalServiceEditionCodeLegacy { get; set; }
 
     /// <summary>
-    /// If the resource requires the service owner party to be subject of the file transfer.
+    /// The party that is required to be subject of the file transfer.
     /// </summary>
     [JsonPropertyName("requiredParty")]
-    public bool? RequiredParty { get; set; }
+    public string? RequiredParty { get; set; }
 }
