@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.API.Helpers;
+using Altinn.Broker.Application.MaskinportenJwkRotation;
+using Hangfire;
 
 using System.ComponentModel.DataAnnotations;
 
@@ -53,5 +55,46 @@ public class MaintenanceController(ILogger<MaintenanceController> logger) : Cont
         );
     }
 
+    [HttpPost]
+    [Route("maskinporten-jwk-rotation")]
+    [Authorize(Policy = AuthorizationConstants.Maintenance)]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult TriggerMaskinportenJwkRotation(
+        [FromServices] IBackgroundJobClient backgroundJobClient,
+        [FromBody] TriggerMaskinportenJwkRotationRequest request)
+    {
+        const string expectedConfirmation = "rotate-maskinporten-jwk";
+        if (!string.Equals(request.Confirmation, expectedConfirmation, StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                message = $"Confirmation must be '{expectedConfirmation}' to trigger Maskinporten JWK rotation."
+            });
+        }
+
+        var jobId = backgroundJobClient.Enqueue<MaskinportenJwkRotationHandler>(
+            handler => handler.Process(CancellationToken.None));
+
+        _logger.LogWarning(
+            "Manual Maskinporten JWK rotation job {JobId} was enqueued by {User}.",
+            jobId,
+            HttpContext.User.Identity?.Name ?? "unknown");
+
+        return Ok(new
+        {
+            jobId,
+            message = "Maskinporten JWK rotation was enqueued."
+        });
+    }
+
     private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
+}
+
+public class TriggerMaskinportenJwkRotationRequest
+{
+    public string Confirmation { get; set; } = string.Empty;
 }

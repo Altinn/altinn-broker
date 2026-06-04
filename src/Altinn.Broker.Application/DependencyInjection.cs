@@ -9,6 +9,8 @@ using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.MonthlyStatistics;
+using Altinn.Broker.Application.MaskinportenJwkRotation;
+using Altinn.Broker.Application.SendSlackNotification;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 
@@ -38,5 +40,7 @@ public static class DependencyInjection
         services.AddScoped<GetMonthlyStatisticsCsvHandler>();
         services.AddScoped<RefreshMonthlyStatisticsRollupHandler>();
         services.AddScoped<CleanupUseCaseTestsHandler>();
+        services.AddScoped<MaskinportenJwkRotationHandler>();
+        services.AddScoped<SendSlackNotificationHandler>();
     }
 }

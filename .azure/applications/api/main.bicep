@@ -55,6 +55,16 @@ module keyvaultAddReaderRolesAppIdentity '../../modules/keyvault/addReaderRoles.
   }
 }
 
+module keyvaultAddSecretsOfficerRoleAppIdentity '../../modules/keyvault/addSecretsOfficerRole.bicep' = if (contains(['test', 'staging'], environment)) {
+  name: 'kv-secrets-officer-${namePrefix}-app'
+  scope: resourceGroup
+  params: {
+    keyvaultName: sourceKeyVaultName
+    principalObjectId: appIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' = {
   name: 'databaseAccess'
   scope: resourceGroup
@@ -87,7 +97,11 @@ module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bic
 module containerApp '../../modules/containerApp/main.bicep' = {
   name: containerAppName
   scope: resourceGroup
-  dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
+  dependsOn: [
+    keyvaultAddReaderRolesAppIdentity
+    keyvaultAddSecretsOfficerRoleAppIdentity
+    databaseAccess
+  ]
   params: {
     eventGridIps: fetchEventGridIpsScript.outputs.eventGridIps!
     namePrefix: namePrefix
