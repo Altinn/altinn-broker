@@ -17,10 +17,6 @@ param platformSubscriptionKey = readEnvironmentVariable('PLATFORM_SUBSCRIPTION_K
 param slackUrl = readEnvironmentVariable('SLACK_URL')
 param statisticsApiKey = readEnvironmentVariable('STATISTICS_API_KEY')
 param grafanaMonitoringPrincipalId = readEnvironmentVariable('GRAFANA_MONITORING_PRINCIPAL_ID')
-param brokerDbReadAdGroupId = readEnvironmentVariable('BROKER_DB_READ_AD_GROUP_ID')
-param brokerDbReadAdGroupName = readEnvironmentVariable('BROKER_DB_READ_AD_GROUP_NAME')
-param brokerDbWriteAdGroupId = readEnvironmentVariable('BROKER_DB_WRITE_AD_GROUP_ID')
-param brokerDbWriteAdGroupName = readEnvironmentVariable('BROKER_DB_WRITE_AD_GROUP_NAME')
 
 // SKUs
 param keyVaultSku = {

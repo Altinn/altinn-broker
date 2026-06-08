@@ -54,18 +54,6 @@ inputs:
   GRAFANA_MONITORING_PRINCIPAL_ID:
     description: "Principal ID for Grafana monitoring service principal"
     required: true
-  BROKER_DB_READ_AD_GROUP_ID:
-    description: "Object ID for the Broker database read access Entra group"
-    required: true
-  BROKER_DB_READ_AD_GROUP_NAME:
-    description: "Display name for the Broker database read access Entra group"
-    required: true
-  BROKER_DB_WRITE_AD_GROUP_ID:
-    description: "Object ID for the Broker database write access Entra group"
-    required: true
-  BROKER_DB_WRITE_AD_GROUP_NAME:
-    description: "Display name for the Broker database write access Entra group"
-    required: true
 
 
 runs:
@@ -125,10 +113,6 @@ runs:
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         STATISTICS_API_KEY: ${{ inputs.STATISTICS_API_KEY }}
         GRAFANA_MONITORING_PRINCIPAL_ID: ${{ inputs.GRAFANA_MONITORING_PRINCIPAL_ID }}
-        BROKER_DB_READ_AD_GROUP_ID: ${{ inputs.BROKER_DB_READ_AD_GROUP_ID }}
-        BROKER_DB_READ_AD_GROUP_NAME: ${{ inputs.BROKER_DB_READ_AD_GROUP_NAME }}
-        BROKER_DB_WRITE_AD_GROUP_ID: ${{ inputs.BROKER_DB_WRITE_AD_GROUP_ID }}
-        BROKER_DB_WRITE_AD_GROUP_NAME: ${{ inputs.BROKER_DB_WRITE_AD_GROUP_NAME }}
       with:
         scope: subscription
         template: ./.azure/infrastructure/main.bicep

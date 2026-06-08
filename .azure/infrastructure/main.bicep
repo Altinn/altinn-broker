@@ -30,14 +30,6 @@ param slackUrl string
 param statisticsApiKey string
 @secure()
 param grafanaMonitoringPrincipalId string
-@secure()
-param brokerDbReadAdGroupId string
-@secure()
-param brokerDbReadAdGroupName string
-@secure()
-param brokerDbWriteAdGroupId string
-@secure()
-param brokerDbWriteAdGroupName string
 
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
@@ -84,22 +76,6 @@ var secrets = [
   {
     name: 'statistics-api-key'
     value: statisticsApiKey
-  }
-  {
-    name: 'broker-db-read-ad-group-id'
-    value: brokerDbReadAdGroupId
-  }
-  {
-    name: 'broker-db-read-ad-group-name'
-    value: brokerDbReadAdGroupName
-  }
-  {
-    name: 'broker-db-write-ad-group-id'
-    value: brokerDbWriteAdGroupId
-  }
-  {
-    name: 'broker-db-write-ad-group-name'
-    value: brokerDbWriteAdGroupName
   }
 ]
 

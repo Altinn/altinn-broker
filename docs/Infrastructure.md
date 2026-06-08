@@ -34,18 +34,18 @@ az ad sp create-for-rbac --name broker_sp --role Owner --scopes /subscriptions/<
 
 ### How to get access to deployed database
 
-The database uses IP blocking for security reasons. To get access, first add a firewall rule on the database server for your IP. Database access for developers is handled through Privileged Identity Management (PIM) groups in Microsoft Entra ID. Activate the read or write group before connecting.
+The database uses IP blocking for security reasons. To get access, first add a firewall rule on the database server for your IP. Production database access for developers is handled through Privileged Identity Management (PIM) groups in Microsoft Entra ID. Activate the relevant group before connecting.
 
 1. Go to the database server in the Azure Portal (name ends in "-dbserver").
 2. Go Settings > Networking and click "Add current client IP address".
-3. Activate the relevant Broker database PIM group in Microsoft Entra ID.
+3. Activate the relevant Broker production database PIM group in Microsoft Entra ID.
 4. Use the Entra group display name as the database username. Use an Azure access token as password. Generate the token with the CLI:
 
 ```bash
 az account get-access-token --resource=https://ossrdbms-aad.database.windows.net/.default --query accessToken --output tsv
 ```
 
-The read group has `SELECT` access to the `broker` schema. The write group has `SELECT`, `INSERT`, `UPDATE` and `DELETE` access to the `broker` schema. Both roles are configured with pgAudit logging.
+Broker configures pgAudit for the existing Broker developer roles and routes PostgreSQL logs to the audit Log Analytics workspace. Production read/write PIM groups and their database grants are managed outside this repository, matching the Correspondence setup.
 
 - Note: There is some time delay (~3 min) from when your IP address or PIM activation is added successfully and when it actually has access.
 
