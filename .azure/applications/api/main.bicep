@@ -23,6 +23,12 @@ param apimIp string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
+var rotationLeaderEnvironments = [
+  'test'
+  'staging'
+  'production'
+]
+var rotationEnabled = contains(rotationLeaderEnvironments, environment)
 
 var resourceGroupName = '${namePrefix}-rg'
 
@@ -52,6 +58,16 @@ module keyvaultAddReaderRolesAppIdentity '../../modules/keyvault/addReaderRoles.
   params: {
     keyvaultName: sourceKeyVaultName
     principals: [{objectId: appIdentity.outputs.principalId, principalType: 'ServicePrincipal'}]
+  }
+}
+
+module keyvaultAddSecretsOfficerRoleAppIdentity '../../modules/keyvault/addSecretsOfficerRole.bicep' = if (rotationEnabled) {
+  name: 'kv-secrets-officer-${namePrefix}-app'
+  scope: resourceGroup
+  params: {
+    keyvaultName: sourceKeyVaultName
+    principalObjectId: appIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -88,7 +104,11 @@ module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bic
 module containerApp '../../modules/containerApp/main.bicep' = {
   name: containerAppName
   scope: resourceGroup
-  dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
+  dependsOn: [
+    keyvaultAddReaderRolesAppIdentity
+    keyvaultAddSecretsOfficerRoleAppIdentity
+    databaseAccess
+  ]
   params: {
     eventGridIps: fetchEventGridIpsScript.outputs.eventGridIps!
     namePrefix: namePrefix

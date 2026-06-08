@@ -162,7 +162,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     Created = DateTime.UtcNow,
                     ServiceOwnerId = "0192:991825827",
                     OrganizationNumber = "991825827",
-                    RequiredParty = true
+                    RequiredParty = "991825827"
                 });
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => new ResourceEntity
