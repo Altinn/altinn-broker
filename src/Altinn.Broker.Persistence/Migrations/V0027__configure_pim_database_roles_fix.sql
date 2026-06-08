@@ -1,5 +1,5 @@
--- Re-applies PIM role configuration when V0024 already ran with empty placeholders.
--- Idempotent; safe to run after the updated V0024 as well.
+-- Re-applies PIM role configuration when V0026 already ran with empty placeholders.
+-- Idempotent; safe to run after the updated V0026 as well.
 DO $do$
 DECLARE
     read_role_name TEXT := '${brokerDbReadAdGroupName}';
