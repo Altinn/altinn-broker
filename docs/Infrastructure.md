@@ -31,17 +31,19 @@ az ad sp create-for-rbac --name broker_sp --role Owner --scopes /subscriptions/<
 
 ## How to get access to deployed database
 
-The database uses IP blocking for security reasons so to get access you need to add a firewall rule on the database server for your IP. You also need to set yourself as an AD administrator with access to the database.
+The database uses IP blocking for security reasons so to get access you need to add a firewall rule on the database server for your IP. Database access is handled through Microsoft Entra ID.
 
 1. Go to the database server in the Azure Portal (name ends in "-dbserver")
 2. Go Settings > Networking and click "Add current client IP address"
-3. Go Security > Authentication and use "Add Microsoft Entra Admins" to add yourself.
-4. After you have added yourself, you will see your AD user in the list of admins. Use the username from here and use an Azure Access token for password that can be generated using the CLI:
+3. Use the approved Microsoft Entra access for the environment.
+4. Use the Microsoft Entra user or group name as username and use an Azure Access token for password that can be generated using the CLI:
 ```
 az account get-access-token --resource=https://ossrdbms-aad.database.windows.net/.default --query accessToken --output tsv
 ```
 
-* Note: There is some time delay (~3 min) from when your IP address is added successfully to the firewall and when it actually has access.
+* Note: Database access groups and grants are managed outside this repository.
+
+* Note: There is some time delay (~3 min) from when your IP address or access change is added successfully and when it actually has access.
 
 ## Where/how is APIM configured?
 
@@ -50,4 +52,4 @@ We run on Platform's shared APIM. It is configured in [Azure Devops/altinn-studi
 https://pedia.altinn.cloud/altinn-3/ops/release-and-deploy/api-management/
 
 ## Create release notes
-If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed. 
+If the version in version.txt is bumped, a new release in github will automaticly be created the next time the production environment is deployed.

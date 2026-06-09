@@ -10,6 +10,7 @@ param keyVaultName string
 var containerAppJobName = '${namePrefix}-migration'
 var containerAppEnvName = '${namePrefix}-env'
 var migrationConnectionStringName = 'broker-migration-connection-string'
+var postgresTokenResource = 'https://ossrdbms-aad${environment().suffixes.sqlServerHostname}'
 
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-migration-identity'
@@ -27,6 +28,20 @@ module keyvaultAddReaderRolesMigrationIdentity '../../modules/keyvault/addReader
   }
 }
 
+module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' = {
+  name: 'databaseAccess'
+  dependsOn: [
+    keyvaultAddReaderRolesMigrationIdentity // Timing issue
+  ]
+  params: {
+    tenantId: userAssignedIdentity.properties.tenantId
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    appName: userAssignedIdentity.name
+    namePrefix: namePrefix
+  }
+}
+
 var secrets = [
   {
     name: migrationConnectionStringName
@@ -41,6 +56,10 @@ var containerAppEnvVars = [
     secretRef: migrationConnectionStringName
   }
   {
+    name: 'FLYWAY_USER'
+    value: '${namePrefix}-migration-identity'
+  }
+  {
     name: 'FLYWAY_CONNECT_RETRIES'
     value: '3'
   }
@@ -52,6 +71,14 @@ var containerAppEnvVars = [
     name: 'APP_VERSION'
     value: appVersion
   }
+  {
+    name: 'AZURE_CLIENT_ID'
+    value: userAssignedIdentity.properties.clientId
+  }
+  {
+    name: 'POSTGRES_TOKEN_RESOURCE'
+    value: postgresTokenResource
+  }
 ]
 
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
@@ -62,6 +89,7 @@ module containerAppJob '../../modules/migrationJob/main.bicep' = {
   name: containerAppJobName
   dependsOn: [
     keyvaultAddReaderRolesMigrationIdentity
+    databaseAccess
   ]
   params: {
     name: containerAppJobName
@@ -69,7 +97,30 @@ module containerAppJob '../../modules/migrationJob/main.bicep' = {
     containerAppEnvId: containerAppEnv.id
     environmentVariables: containerAppEnvVars
     secrets: secrets
-    command: ['/bin/bash', '-c', 'flyway migrate;']
+    command: [
+      '/bin/bash'
+      '-c'
+      '''
+        set -euo pipefail
+        if [ -z "${IDENTITY_ENDPOINT:-}" ] || [ -z "${IDENTITY_HEADER:-}" ]; then
+          echo "Managed identity endpoint not available in container (IDENTITY_ENDPOINT or IDENTITY_HEADER missing)"
+          exit 1
+        fi
+        token_response=$(curl -sS -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" --get "$IDENTITY_ENDPOINT" --data-urlencode "resource=$POSTGRES_TOKEN_RESOURCE" --data-urlencode "client_id=$AZURE_CLIENT_ID" --data-urlencode "api-version=2019-08-01")
+        FLYWAY_PASSWORD=$(echo "$token_response" | jq -r '.access_token')
+        if [ -z "$FLYWAY_PASSWORD" ] || [ "$FLYWAY_PASSWORD" = "null" ]; then
+          echo "Failed to acquire PostgreSQL access token for migration identity"
+          echo "Token response: $token_response"
+          exit 1
+        fi
+        export FLYWAY_PASSWORD
+        if ! flyway migrate; then
+          echo "Flyway migrate failed. Current migration state:"
+          flyway info || true
+          exit 1
+        fi
+      '''
+    ]
     image: migrationImage
     principalId: userAssignedIdentity.id
   }

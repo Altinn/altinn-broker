@@ -2,8 +2,6 @@ targetScope = 'subscription'
 @minLength(3)
 param location string
 @secure()
-param brokerPgAdminPassword string
-@secure()
 param sourceKeyVaultName string
 @secure()
 param tenantId string
@@ -36,7 +34,6 @@ param grafanaMonitoringPrincipalId string
 import { Sku as KeyVaultSku } from '../modules/keyvault/create.bicep'
 param keyVaultSku KeyVaultSku
 
-var resourceGroupName = '${namePrefix}-rg'
 var standardTags = {
   finops_environment: environment
   finops_product: 'formidling'
@@ -113,13 +110,6 @@ module keyvaultSecrets '../modules/keyvault/upsertSecrets.bicep' = {
 // Create resources with dependencies to other resources
 // #####################################################
 
-var srcKeyVault = {
-  name: sourceKeyVaultName
-  subscriptionId: subscription().subscriptionId
-  resourceGroupName: resourceGroupName
-}
-
-var brokerAdminPasswordSecretName = 'broker-admin-password'
 module postgresql '../modules/postgreSql/create.bicep' = {
   scope: resourceGroup
   name: 'postgresql'
@@ -130,11 +120,9 @@ module postgresql '../modules/postgreSql/create.bicep' = {
     namePrefix: namePrefix
     location: location
     environmentKeyVaultName: sourceKeyVaultName
-    srcKeyVault: srcKeyVault
-    srcSecretName: brokerAdminPasswordSecretName
-    administratorLoginPassword: brokerPgAdminPassword
     tenantId: tenantId
     environment: environment
+    auditLogAnalyticsWorkspaceId: containerAppEnv.outputs.auditLogAnalyticsWorkspaceId
   }
 }
 

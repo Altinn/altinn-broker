@@ -1,5 +1,10 @@
 FROM flyway/flyway:latest
 
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl jq \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy broker database migrations into the standard Flyway migrations directory.
 # These scripts will be executed when the job runs `flyway migrate`.
 COPY src/Altinn.Broker.Persistence/Migrations /flyway/sql

@@ -6,7 +6,6 @@ param environment = readEnvironmentVariable('ENVIRONMENT')
 param existingBackupPolicyName = readEnvironmentVariable('EXISTING_BACKUP_POLICY_NAME')
 
 // secrets
-param brokerPgAdminPassword = readEnvironmentVariable('BROKER_PG_ADMIN_PASSWORD')
 param tenantId = readEnvironmentVariable('TENANT_ID')
 param test_client_id = readEnvironmentVariable('TEST_CLIENT_ID')
 param sourceKeyVaultName = readEnvironmentVariable('KEY_VAULT_NAME')

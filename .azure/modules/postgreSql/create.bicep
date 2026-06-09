@@ -2,49 +2,31 @@ param namePrefix string
 param location string
 @secure()
 param environmentKeyVaultName string
-param srcSecretName string
 param environment string
 @secure()
-param srcKeyVault object
-@secure()
-param administratorLoginPassword string
-@secure()
 param tenantId string
+param auditLogAnalyticsWorkspaceId string = ''
 
 var prodLikeEnvironment = environment != 'test'
 var databaseName = 'brokerdb'
-var databaseUser = 'adminuser'
 var poolSize = environment == 'test' ? 25 : 50
-
-module saveAdmPassword '../keyvault/upsertSecret.bicep' = {
-  name: 'Save_${srcSecretName}'
-  scope: resourceGroup(srcKeyVault.subscriptionId, srcKeyVault.resourceGroupName)
-  params: {
-    destKeyVaultName: srcKeyVault.name
-    secretName: srcSecretName
-    secretValue: administratorLoginPassword
-  }
-}
 
 var migrationConnectionStringName = 'broker-migration-connection-string'
 module saveMigrationConnectionString '../keyvault/upsertSecret.bicep' = {
   name: 'Save_${migrationConnectionStringName}'
-  scope: resourceGroup(srcKeyVault.subscriptionId, srcKeyVault.resourceGroupName)
   params: {
-    destKeyVaultName: srcKeyVault.name
+    destKeyVaultName: environmentKeyVaultName
     secretName: migrationConnectionStringName
-    secretValue: 'jdbc:postgresql://${postgres.name}.postgres.database.azure.com/brokerdb?user=${databaseUser}&password=${administratorLoginPassword}'
+    secretValue: 'jdbc:postgresql://${postgres.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
   }
 }
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: '${namePrefix}-dbserver'
   location: location
   tags: resourceGroup().tags
   properties: {
     version: '16'
-    administratorLogin: databaseUser
-    administratorLoginPassword: administratorLoginPassword
     maintenanceWindow: {
       customWindow: 'Enabled'
       dayOfWeek: 1
@@ -61,7 +43,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
     backup: { backupRetentionDays: 35 }
     authConfig: {
       activeDirectoryAuth: 'Enabled'
-      passwordAuth: 'Enabled'
+      passwordAuth: 'Disabled'
       tenantId: tenantId
     }
     availabilityZone: environment == 'production' ? '3' : null
@@ -77,7 +59,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
   }
 }
 
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
   name: databaseName
   parent: postgres
   properties: {
@@ -86,12 +68,12 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-0
   }
 }
 
-resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+resource configurations 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
   name: 'azure.extensions'
   parent: postgres
   dependsOn: [database]
   properties: {
-    value: 'UUID-OSSP,PG_CRON'
+    value: 'UUID-OSSP,PG_CRON,PGAUDIT'
     source: 'user-override'
   }
 }
@@ -156,7 +138,7 @@ resource metricsAutovacuumDiagnostics 'Microsoft.DBforPostgreSQL/flexibleServers
   }
 }
 
-resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+resource allowAzureAccess 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
   name: 'azure-access'
   parent: postgres
   dependsOn: [database, metricsAutovacuumDiagnostics] // Needs to depend on database to avoid updating at the same time
@@ -176,12 +158,76 @@ resource cronDatabaseName 'Microsoft.DBforPostgreSQL/flexibleServers/configurati
   }
 }
 
+resource sharedPreloadLibraries 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'shared_preload_libraries'
+  parent: postgres
+  dependsOn: [database, cronDatabaseName]
+  properties: {
+    value: 'pg_cron,pgaudit'
+    source: 'user-override'
+  }
+}
+
+resource logConnections 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_connections'
+  parent: postgres
+  dependsOn: [database, sharedPreloadLibraries]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource logDisconnections 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_disconnections'
+  parent: postgres
+  dependsOn: [database, logConnections]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource pgauditLogCatalog 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'pgaudit.log_catalog'
+  parent: postgres
+  dependsOn: [database, logDisconnections]
+  properties: {
+    value: 'off'
+    source: 'user-override'
+  }
+}
+
+resource logLinePrefix 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  name: 'log_line_prefix'
+  parent: postgres
+  dependsOn: [database, pgauditLogCatalog]
+  properties: {
+    value: 't=%m u=%u db=%d pid=[%p]:'
+    source: 'user-override'
+  }
+}
+
 module adoConnectionString '../keyvault/upsertSecret.bicep' = {
   name: 'adoConnectionString'
   params: {
     destKeyVaultName: environmentKeyVaultName
     secretName: 'broker-ado-connection-string'
     secretValue: 'Host=${postgres.properties.fullyQualifiedDomainName};Database=${databaseName};Port=5432;Username=${namePrefix}-app-identity;Ssl Mode=Require;Trust Server Certificate=True;Maximum Pool Size=${poolSize};options=-c role=azure_pg_admin;'
+  }
+}
+
+resource postgreSqlAuditDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (auditLogAnalyticsWorkspaceId != '') {
+  name: 'PostgreSQLAuditLogs'
+  scope: postgres
+  properties: {
+    workspaceId: auditLogAnalyticsWorkspaceId
+    logs: [
+      {
+        category: 'PostgreSQLLogs'
+        enabled: true
+      }
+    ]
   }
 }
 

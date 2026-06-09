@@ -80,6 +80,7 @@ module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' =
   params: {
     tenantId: appIdentity.outputs.tenantId
     principalId: appIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
     appName: appIdentity.outputs.name
     namePrefix: namePrefix
   }

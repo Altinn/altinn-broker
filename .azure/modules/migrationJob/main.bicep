@@ -9,7 +9,7 @@ param volumes { name: string, storageName: string, storageType: string, mountOpt
 param volumeMounts { mountPath: string, subPath: string, volumeName: string }[] = []
 param principalId string
 
-resource job 'Microsoft.App/jobs@2024-03-01' = {
+resource job 'Microsoft.App/jobs@2025-01-01' = {
   name: name
   location: location
   tags: resourceGroup().tags
@@ -21,13 +21,21 @@ resource job 'Microsoft.App/jobs@2024-03-01' = {
   }
   properties: {
     configuration: {
+      // Identity is also used for Key Vault secret refs; without this, tokens are not
+      // available inside the container (IDENTITY_ENDPOINT is not injected).
+      identitySettings: [
+        {
+          identity: principalId
+          lifecycle: 'All'
+        }
+      ]
       secrets: secrets
       manualTriggerConfig: {
         parallelism: 1
         replicaCompletionCount: 1
       }
       replicaRetryLimit: 1
-      replicaTimeout: 120
+      replicaTimeout: 300
       triggerType: 'Manual'
     }
     environmentId: containerAppEnvId
