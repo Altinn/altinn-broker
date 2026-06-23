@@ -29,7 +29,8 @@ public static class OpenTelemetryConfiguration
                     .AddMeter(
                         "Microsoft.AspNetCore.Hosting",
                         "Microsoft.AspNetCore.Server.Kestrel",
-                        "System.Net.Http")
+                        "System.Net.Http",
+                        "Altinn.Broker.Integrations.Hangfire")
                     .AddNpgsqlInstrumentation();
             })
             .WithTracing(tracing =>

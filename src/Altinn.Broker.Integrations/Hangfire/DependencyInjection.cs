@@ -30,5 +30,7 @@ public static class DependencyInjection
         }
         );
         services.AddHangfireServer();
+
+        services.AddHostedService<HangfireQueueMetricsService>();
     }
 }
