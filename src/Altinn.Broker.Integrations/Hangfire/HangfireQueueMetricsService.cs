@@ -86,17 +86,22 @@ public sealed class HangfireQueueMetricsService : IHostedService
                 return _lastSnapshot;
             }
 
-            var monitoringApi = JobStorage.Current.GetMonitoringApi();
-            var activeServers = GetActiveServerCount(monitoringApi);
-            var snapshot = new HangfireMetricsSnapshot(
-                EnqueuedByQueue: GetEnqueuedByQueue(monitoringApi),
-                Processing: monitoringApi.ProcessingCount(),
-                Scheduled: monitoringApi.ScheduledCount(),
-                Failed: monitoringApi.FailedCount(),
-                ActiveServers: activeServers,
-                ComponentHealthy: activeServers > 0 ? 1 : 0);
-
-            _lastSnapshot = snapshot;
+            try
+            {
+                var monitoringApi = JobStorage.Current.GetMonitoringApi();
+                var activeServers = GetActiveServerCount(monitoringApi);
+                _lastSnapshot = new HangfireMetricsSnapshot(
+                    EnqueuedByQueue: GetEnqueuedByQueue(monitoringApi),
+                    Processing: monitoringApi.ProcessingCount(),
+                    Scheduled: monitoringApi.ScheduledCount(),
+                    Failed: monitoringApi.FailedCount(),
+                    ActiveServers: activeServers,
+                    ComponentHealthy: activeServers > 0 ? 1 : 0);
+            }
+            catch (Exception)
+            {
+                _lastSnapshot = _lastSnapshot with { ComponentHealthy = 0 };
+            }
             _lastSnapshotAtUtc = now;
 
             return _lastSnapshot;
