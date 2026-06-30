@@ -94,6 +94,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
         options.OperationFilter<BinaryRequestBodyOperationFilter>();
+        options.DocumentFilter<TusUploadDocumentFilter>();
     });
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
