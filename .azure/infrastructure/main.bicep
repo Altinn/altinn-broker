@@ -170,6 +170,19 @@ module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
   }
 }
 
+module redis '../modules/redis/create.bicep' = {
+  scope: resourceGroup
+  name: 'redis'
+  dependsOn: [environmentKeyVault]
+  params: {
+    location: location
+    namePrefix: namePrefix
+    keyVaultName: sourceKeyVaultName
+    environment: environment
+    prodLikeEnvironment: environment != 'test'
+  }
+}
+
 module virusscan '../modules/virusscan/create.bicep' = {
   name: 'virusscan'
 }
