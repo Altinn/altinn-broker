@@ -5,10 +5,12 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
+using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
+using Altinn.Broker.Integrations.Tus;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Persistence;
@@ -21,7 +23,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
+
+using StackExchange.Redis;
 
 BuildAndRun(args);
 
@@ -60,9 +65,12 @@ static void BuildAndRun(string[] args)
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
+    app.MapBrokerTusUploads();
 
     app.UseHangfireDashboard();
 
@@ -97,6 +105,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
+    services.Configure<DistributedCacheOptions>(config.GetSection(DistributedCacheOptions.SectionName));
+    services.Configure<TusOptions>(config.GetSection(TusOptions.SectionName));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
@@ -105,15 +115,19 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddHttpClient();
     services.AddProblemDetails();
 
-    // Add distributed cache for rate limiting (use memory cache for development, Redis for production)
-    if (hostEnvironment.IsDevelopment())
+    // Add distributed cache for rate limiting and TUS upload expiration tracking.
+    var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
+    if (!string.IsNullOrWhiteSpace(distributedCacheOptions?.RedisConnectionString))
     {
-        services.AddDistributedMemoryCache();
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = distributedCacheOptions.RedisConnectionString;
+        });
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString));
     }
     else
     {
-        // In production, use Redis if available
-        // For now, fall back to memory cache
         services.AddDistributedMemoryCache();
     }
 

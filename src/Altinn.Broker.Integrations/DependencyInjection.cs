@@ -11,8 +11,16 @@ using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Maskinporten;
 using Altinn.Broker.Persistence.Repositories;
+using Altinn.Broker.Integrations.Tus;
+
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+using StackExchange.Redis;
+
+using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
 using Altinn.Broker.Core.Helpers;
@@ -86,5 +94,22 @@ public static class DependencyInjection
         services.AddSingleton<SlackSettings>();
         services.AddSingleton<SlackExceptionNotificationHandler>();
         services.AddExceptionHandler<SlackExceptionNotificationHandler>();
+
+        AddTusUploads(services, configuration);
+    }
+
+    private static void AddTusUploads(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHttpContextAccessor();
+        services.Configure<TusOptions>(configuration.GetSection(TusOptions.SectionName));
+        services.AddSingleton<ITusExpirationDetailsStore>(serviceProvider =>
+        {
+            var multiplexer = serviceProvider.GetService<IConnectionMultiplexer>();
+            return multiplexer is not null
+                ? new RedisTusExpirationDetailsStore(multiplexer)
+                : new NullExpirationDetailsStore();
+        });
+        services.AddScoped<BrokerTusStore>();
+        services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
 }

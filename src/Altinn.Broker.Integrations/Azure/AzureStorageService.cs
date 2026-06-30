@@ -216,10 +216,80 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         try
         {
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            var tusStagingBlob = blobContainerClient.GetAppendBlobClient(
+                Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
+            await tusStagingBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
         }
         catch (RequestFailedException requestFailedException)
         {
             logger.LogError("Error occurred while deleting file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
+            throw;
+        }
+    }
+
+    public async Task<(string Checksum, long Length)?> FinalizeTusUpload(
+        ServiceOwnerEntity serviceOwnerEntity,
+        FileTransferEntity fileTransferEntity,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Finalizing TUS upload for {fileTransferId}", fileTransferEntity.FileTransferId);
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
+        var stagingBlobClient = blobContainerClient.GetAppendBlobClient(
+            Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
+        var destinationBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
+
+        try
+        {
+            if (!await stagingBlobClient.ExistsAsync(cancellationToken))
+            {
+                logger.LogError("TUS staging blob not found for {fileTransferId}", fileTransferEntity.FileTransferId);
+                return null;
+            }
+
+            var stagingProperties = await stagingBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var contentLength = stagingProperties.Value.ContentLength;
+            if (!stagingProperties.Value.Metadata.TryGetValue(AzureStorageConstants.TusMd5ChecksumMetadataKey, out var md5Base64)
+                || string.IsNullOrWhiteSpace(md5Base64))
+            {
+                logger.LogError("TUS staging blob is missing MD5 checksum metadata for {fileTransferId}", fileTransferEntity.FileTransferId);
+                return null;
+            }
+
+            var checksum = BitConverter.ToString(Convert.FromBase64String(md5Base64)).Replace("-", "").ToLowerInvariant();
+
+            var copyOperation = await destinationBlobClient.StartCopyFromUriAsync(
+                stagingBlobClient.Uri,
+                new BlobCopyFromUriOptions
+                {
+                    Metadata = new Dictionary<string, string>()
+                },
+                cancellationToken);
+            await copyOperation.WaitForCompletionAsync(cancellationToken);
+
+            var contentHash = Convert.FromBase64String(md5Base64);
+            await destinationBlobClient.SetHttpHeadersAsync(
+                new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream",
+                    ContentHash = contentHash
+                },
+                cancellationToken: cancellationToken);
+
+            await stagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+
+            logger.LogInformation(
+                "Finalized TUS upload for {fileTransferId}, size {contentLength}",
+                fileTransferEntity.FileTransferId,
+                contentLength);
+            return (checksum, contentLength);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                "Error finalizing TUS upload for {fileTransferId}: {errorMessage}",
+                fileTransferEntity.FileTransferId,
+                ex.Message);
+            await destinationBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             throw;
         }
     }
