@@ -6,24 +6,13 @@ public class PseudoRandomDataStream : Stream
 {
     private long _position;
     private long _length;
-    private XorShiftRandom _rng;
-    private Timer _timer;
-    private int timerElapsedCount = 0;
-
-    long bytesRead = 0;
+    private readonly XorShiftRandom _rng;
 
     public PseudoRandomDataStream(long length)
     {
         _length = length;
         _position = 0;
         _rng = new XorShiftRandom();
-        _timer = new Timer(OnTimerElapsed, null, 1000, 1000);
-    }
-
-    private void OnTimerElapsed(object state)
-    {
-        timerElapsedCount++;
-        Console.WriteLine($"Current position {(_position * 100.0 / _length):F3}%. Average speed so far is {(_position / timerElapsedCount) / (1024 * 1024)} MiB/s");
     }
 
     public override bool CanRead => true;
@@ -60,13 +49,12 @@ public class PseudoRandomDataStream : Stream
         return bytesToRead;
     }
 
-    public override void Flush() {
-        Console.WriteLine("Flush called");        
+    public override void Flush()
+    {
     }
 
     public override long Seek(long offset, SeekOrigin origin)
     {
-        Console.WriteLine($"Seek called with offset {offset} from origin {origin}");
         switch (origin)
         {
             case SeekOrigin.Begin:
@@ -86,7 +74,6 @@ public class PseudoRandomDataStream : Stream
 
     public override void SetLength(long value)
     {
-        Console.WriteLine($"Length set to {value}");
         if (value < 0)
             throw new ArgumentOutOfRangeException(nameof(value), "Length cannot be negative.");
         _length = value;
@@ -97,12 +84,6 @@ public class PseudoRandomDataStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException("This stream does not support writing.");
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        _timer.Dispose();
-        base.Dispose(disposing);
     }
 }
 

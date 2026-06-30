@@ -1,0 +1,237 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http.Headers;
+
+namespace Altinn.Broker.Tests.LargeFile;
+
+public static class TusUploader
+{
+    private const string TusVersion = "1.0.0";
+
+    public static async Task UploadAsync(
+        HttpClient httpClient,
+        string baseUrl,
+        string fileTransferId,
+        Stream source,
+        long uploadSize,
+        int chunkSize,
+        CancellationToken cancellationToken = default)
+    {
+        var tusEndpoint = BuildTusEndpointUri(baseUrl, fileTransferId);
+        await EnsureServerSupportsTus(httpClient, tusEndpoint, cancellationToken);
+
+        var uploadUri = await CreateUploadAsync(httpClient, tusEndpoint, fileTransferId, uploadSize, cancellationToken);
+        var offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+        if (offset > 0)
+        {
+            Console.WriteLine($"Resuming upload at offset {offset:N0} ({offset * 100.0 / uploadSize:F3}%)");
+            source.Seek(offset, SeekOrigin.Begin);
+        }
+
+        var progress = new UploadProgress(uploadSize, offset);
+        using var progressTimer = new Timer(_ => progress.LogProgress(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        var totalStopwatch = Stopwatch.StartNew();
+
+        var buffer = new byte[chunkSize];
+        while (offset < uploadSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var bytesToRead = (int)Math.Min(chunkSize, uploadSize - offset);
+            var bytesRead = await source.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
+            if (bytesRead == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Source stream ended unexpectedly at offset {offset} (expected {uploadSize} bytes).");
+            }
+
+            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
+            progress.Update(offset);
+
+            if (offset > uploadSize)
+            {
+                throw new InvalidOperationException(
+                    $"Server reported offset {offset} which exceeds upload length {uploadSize}.");
+            }
+        }
+
+        totalStopwatch.Stop();
+        var totalSeconds = Math.Max(totalStopwatch.Elapsed.TotalSeconds, 0.001);
+        var averageSpeedMbps = uploadSize / (1024.0 * 1024) / totalSeconds;
+        Console.WriteLine(
+            $"TUS upload completed for {fileTransferId}: " +
+            $"{uploadSize / (1024.0 * 1024 * 1024):N2} GiB in {totalSeconds:N1}s (avg: {averageSpeedMbps:N2} MB/s)");
+    }
+
+    private sealed class UploadProgress(long totalSize, long initialOffset)
+    {
+        private long _offset = initialOffset;
+        private readonly Stopwatch _intervalStopwatch = Stopwatch.StartNew();
+
+        public void Update(long offset)
+        {
+            Interlocked.Exchange(ref _offset, offset);
+        }
+
+        public void LogProgress()
+        {
+            var currentOffset = Interlocked.Read(ref _offset);
+            var elapsedSeconds = Math.Max(_intervalStopwatch.Elapsed.TotalSeconds, 0.001);
+            Console.WriteLine(
+                $"Progress: {currentOffset * 100.0 / totalSize:F3}% " +
+                $"({currentOffset / (1024.0 * 1024 * 1024):N2} GiB / {totalSize / (1024.0 * 1024 * 1024):N2} GiB) " +
+                $"avg {currentOffset / elapsedSeconds / (1024 * 1024):N2} MiB/s");
+            _intervalStopwatch.Restart();
+        }
+    }
+
+    private static Uri BuildTusEndpointUri(string baseUrl, string fileTransferId)
+        => new($"{baseUrl.TrimEnd('/')}/broker/api/v1/filetransfer/{fileTransferId}/upload/tus");
+
+    private static async Task EnsureServerSupportsTus(HttpClient httpClient, Uri tusEndpoint, CancellationToken cancellationToken)
+    {
+        using var optionsRequest = new HttpRequestMessage(HttpMethod.Options, tusEndpoint);
+        optionsRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+
+        using var optionsResponse = await httpClient.SendAsync(optionsRequest, cancellationToken);
+        var responseBody = await optionsResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!optionsResponse.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"TUS OPTIONS failed with {(int)optionsResponse.StatusCode} {optionsResponse.StatusCode}: {responseBody}");
+        }
+
+        if (!optionsResponse.Headers.Contains("Tus-Resumable"))
+        {
+            throw new InvalidOperationException("Server did not return Tus-Resumable header — is the TUS endpoint enabled?");
+        }
+    }
+
+    private static async Task<Uri> CreateUploadAsync(
+        HttpClient httpClient,
+        Uri tusEndpoint,
+        string fileTransferId,
+        long uploadSize,
+        CancellationToken cancellationToken)
+    {
+        using var createRequest = new HttpRequestMessage(HttpMethod.Post, tusEndpoint);
+        createRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+        createRequest.Headers.TryAddWithoutValidation("Upload-Length", uploadSize.ToString());
+
+        using var createResponse = await httpClient.SendAsync(createRequest, cancellationToken);
+        var responseBody = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+
+        if (createResponse.StatusCode == HttpStatusCode.Created)
+        {
+            return ResolveUploadUri(tusEndpoint, createResponse.Headers.Location)
+                ?? throw new InvalidOperationException("TUS POST succeeded but no Location header was returned.");
+        }
+
+        if (createResponse.StatusCode == HttpStatusCode.Conflict)
+        {
+            Console.WriteLine("Upload resource already exists — resuming via HEAD.");
+            return new Uri(tusEndpoint, fileTransferId);
+        }
+
+        throw new InvalidOperationException(
+            $"TUS POST failed with {(int)createResponse.StatusCode} {createResponse.StatusCode}: {responseBody}");
+    }
+
+    private static async Task<long> PatchChunkAsync(
+        HttpClient httpClient,
+        Uri uploadUri,
+        long offset,
+        byte[] buffer,
+        int bytesRead,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
+            chunkContent.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
+
+            using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUri);
+            patchRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+            patchRequest.Headers.TryAddWithoutValidation("Upload-Offset", offset.ToString());
+            patchRequest.Content = chunkContent;
+
+            using var patchResponse = await httpClient.SendAsync(patchRequest, cancellationToken);
+            if (patchResponse.StatusCode == HttpStatusCode.NoContent)
+            {
+                return ParseUploadOffset(patchResponse.Headers, offset + bytesRead);
+            }
+
+            var responseBody = await patchResponse.Content.ReadAsStringAsync(cancellationToken);
+            if (patchResponse.StatusCode == HttpStatusCode.Conflict)
+            {
+                var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (serverOffset > offset)
+                {
+                    Console.WriteLine($"Upload-Offset conflict — server is at {serverOffset}, resuming.");
+                    return serverOffset;
+                }
+            }
+
+            if (attempt == 5 || !IsTransientStatusCode(patchResponse.StatusCode))
+            {
+                throw new InvalidOperationException(
+                    $"TUS PATCH failed at offset {offset} with {(int)patchResponse.StatusCode} {patchResponse.StatusCode}: {responseBody}");
+            }
+
+            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+            Console.WriteLine(
+                $"TUS PATCH at offset {offset} failed ({patchResponse.StatusCode}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        throw new UnreachableException();
+    }
+
+    private static async Task<long> GetUploadOffsetAsync(
+        HttpClient httpClient,
+        Uri uploadUri,
+        CancellationToken cancellationToken)
+    {
+        using var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUri);
+        headRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+
+        using var headResponse = await httpClient.SendAsync(headRequest, cancellationToken);
+        var responseBody = await headResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!headResponse.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"TUS HEAD failed with {(int)headResponse.StatusCode} {headResponse.StatusCode}: {responseBody}");
+        }
+
+        return ParseUploadOffset(headResponse.Headers, 0);
+    }
+
+    private static long ParseUploadOffset(HttpResponseHeaders headers, long fallbackOffset)
+    {
+        if (headers.TryGetValues("Upload-Offset", out var values)
+            && long.TryParse(values.FirstOrDefault(), out var parsedOffset))
+        {
+            return parsedOffset;
+        }
+
+        return fallbackOffset;
+    }
+
+    private static Uri? ResolveUploadUri(Uri tusEndpoint, Uri? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        return location.IsAbsoluteUri ? location : new Uri(tusEndpoint, location);
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.InternalServerError
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout;
+}
