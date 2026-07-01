@@ -68,18 +68,10 @@ public class CleanupUseCaseTestsHandler(
             return;
         }
 
-        var resource = await resourceRepository.GetResource(resourceId, cancellationToken);
-        if (resource is null)
-        {
-            logger.LogError("Resource {resourceId} not found; skipping blob deletion during use case test cleanup", resourceId);
-            return;
-        }
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
-        if (serviceOwner is null)
-        {
-            logger.LogError("Service owner {serviceOwnerId} not found; skipping blob deletion during use case test cleanup", resource.ServiceOwnerId);
-            return;
-        }
+        var resource = await resourceRepository.GetResource(resourceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Resource {resourceId} not found; aborting use case test cleanup to avoid orphaning blobs");
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId)
+            ?? throw new InvalidOperationException($"Service owner {resource.ServiceOwnerId} not found; aborting use case test cleanup to avoid orphaning blobs");
 
         foreach (var fileTransfer in fileTransfersToDelete)
         {
