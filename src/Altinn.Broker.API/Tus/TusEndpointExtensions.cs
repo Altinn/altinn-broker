@@ -19,12 +19,18 @@ namespace Altinn.Broker.API.Tus;
 
 public static class TusEndpointExtensions
 {
-    // fileTransferId must be the last path segment (tusdotnet requirement) and must only appear once (APIM/OpenAPI).
+    // OpenAPI/APIM path (fileTransferId is the tus file id in the last segment).
     public const string RouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
+
+    // MapTus appends /{TusFileId?} automatically — do not add a path parameter here.
+    public const string TusMapPath = "/broker/api/v1/filetransfer/upload/tus";
+
+    // Route key added by tusdotnet; maps to fileTransferId in our API.
+    public const string TusFileIdRouteKey = TusRouteHelper.TusFileIdRouteKey;
 
     public static WebApplication MapBrokerTusUploads(this WebApplication app)
     {
-        app.MapTus(RouteTemplate, httpContext => CreateTusConfiguration(httpContext))
+        app.MapTus(TusMapPath, httpContext => CreateTusConfiguration(httpContext))
             .RequireAuthorization(AuthorizationConstants.Sender);
 
         return app;
@@ -32,11 +38,6 @@ public static class TusEndpointExtensions
 
     private static Task<DefaultTusConfiguration?> CreateTusConfiguration(HttpContext httpContext)
     {
-        if (!TryGetFileTransferId(httpContext, out var fileTransferId))
-        {
-            return Task.FromResult<DefaultTusConfiguration?>(null);
-        }
-
         var tusOptions = httpContext.RequestServices.GetRequiredService<IOptions<TusOptions>>().Value;
         var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
 
@@ -46,23 +47,32 @@ public static class TusEndpointExtensions
             Expiration = new SlidingExpiration(tusOptions.UploadExpiration),
             Events = new Events
             {
-                OnAuthorizeAsync = ctx => OnAuthorizeAsync(ctx, fileTransferId),
-                OnBeforeCreateAsync = ctx => OnBeforeCreateAsync(ctx, fileTransferId),
-                OnCreateCompleteAsync = ctx => OnCreateCompleteAsync(ctx, fileTransferId),
-                OnFileCompleteAsync = ctx => OnFileCompleteAsync(ctx, fileTransferId)
+                OnAuthorizeAsync = OnAuthorizeAsync,
+                OnBeforeCreateAsync = OnBeforeCreateAsync,
+                OnCreateCompleteAsync = OnCreateCompleteAsync,
+                OnFileCompleteAsync = OnFileCompleteAsync
             }
         });
     }
 
-    private static bool TryGetFileTransferId(HttpContext httpContext, out Guid fileTransferId)
+    private static bool TryResolveFileTransferId(HttpContext httpContext, string? tusFileId, out Guid fileTransferId)
     {
-        fileTransferId = default;
-        var routeValue = httpContext.Request.RouteValues["fileTransferId"]?.ToString();
-        return Guid.TryParse(routeValue, out fileTransferId);
+        if (Guid.TryParse(tusFileId, out fileTransferId))
+        {
+            return true;
+        }
+
+        return TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId);
     }
 
-    private static async Task OnAuthorizeAsync(AuthorizeContext context, Guid fileTransferId)
+    private static async Task OnAuthorizeAsync(AuthorizeContext context)
     {
+        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        {
+            context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
+            return;
+        }
+
         var validationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadValidationService>();
         var (_, _, error) = await validationService.ValidateForUploadAsync(
             context.HttpContext.User,
@@ -76,11 +86,17 @@ public static class TusEndpointExtensions
         }
     }
 
-    private static async Task OnBeforeCreateAsync(BeforeCreateContext context, Guid fileTransferId)
+    private static async Task OnBeforeCreateAsync(BeforeCreateContext context)
     {
         if (context.UploadLengthIsDeferred)
         {
             context.FailRequest(HttpStatusCode.BadRequest, "Upload-Defer-Length is not supported");
+            return;
+        }
+
+        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        {
+            context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             return;
         }
 
@@ -103,10 +119,15 @@ public static class TusEndpointExtensions
         }
     }
 
-    private static async Task OnCreateCompleteAsync(CreateCompleteContext context, Guid fileTransferId)
+    private static async Task OnCreateCompleteAsync(CreateCompleteContext context)
     {
-        // tusdotnet would otherwise append the file id again, producing .../tus/{id}/{id}.
-        context.SetUploadUrl(new Uri(context.HttpContext.Request.Path.Value!, UriKind.Relative));
+        var uploadPath = $"{TusMapPath}/{context.FileId}";
+        context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
+
+        if (!Guid.TryParse(context.FileId, out var fileTransferId))
+        {
+            throw new TusStoreException("Invalid file transfer id");
+        }
 
         var fileTransferStatusRepository = context.HttpContext.RequestServices
             .GetRequiredService<IFileTransferStatusRepository>();
@@ -120,8 +141,13 @@ public static class TusEndpointExtensions
             cancellationToken: context.CancellationToken);
     }
 
-    private static async Task OnFileCompleteAsync(FileCompleteContext context, Guid fileTransferId)
+    private static async Task OnFileCompleteAsync(FileCompleteContext context)
     {
+        if (!Guid.TryParse(context.FileId, out var fileTransferId))
+        {
+            throw new TusStoreException("Invalid file transfer id");
+        }
+
         var tusUploadCompleteHandler = context.HttpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
         var result = await tusUploadCompleteHandler.Process(
             fileTransferId,

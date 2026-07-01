@@ -23,6 +23,8 @@ public class TusStorageResolver(
     ITusExpirationDetailsStore expirationDetailsStore,
     IHttpContextAccessor httpContextAccessor) : ITusStorageResolver
 {
+    private const string TusFileIdRouteKey = TusRouteHelper.TusFileIdRouteKey;
+
     private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken)
@@ -72,8 +74,8 @@ public class TusStorageResolver(
                 AuthenticationMode = authenticationMode,
                 ExpirationDetailsStore = expirationDetailsStore,
                 FileIdGeneratorAsync = _ => Task.FromResult(
-                    httpContextAccessor.HttpContext?.Request.RouteValues["fileTransferId"]?.ToString()
-                    ?? throw new InvalidOperationException("Missing fileTransferId route value"))
+                    httpContextAccessor.HttpContext?.Request.RouteValues[TusFileIdRouteKey]?.ToString()
+                    ?? throw new InvalidOperationException("Missing TusFileId route value"))
             }));
     }
 }

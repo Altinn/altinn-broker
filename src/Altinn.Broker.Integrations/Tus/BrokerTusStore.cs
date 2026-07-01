@@ -121,12 +121,14 @@ public class BrokerTusStore(
 
     private string GetFileTransferIdFromRoute()
     {
-        var fileTransferId = httpContextAccessor.HttpContext?.Request.RouteValues["fileTransferId"]?.ToString();
-        if (string.IsNullOrWhiteSpace(fileTransferId))
+        var httpContext = httpContextAccessor.HttpContext
+            ?? throw new TusStoreException("Missing HTTP context");
+
+        if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
         {
-            throw new TusStoreException("Missing fileTransferId route value");
+            throw new TusStoreException("Missing file transfer id in route");
         }
 
-        return fileTransferId;
+        return fileTransferId.ToString();
     }
 }

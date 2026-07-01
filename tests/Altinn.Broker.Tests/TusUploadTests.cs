@@ -54,6 +54,13 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var uploadUrl = createResponse.Headers.Location;
         Assert.NotNull(uploadUrl);
 
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUrl);
+        headRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        var headResponse = await _senderClient.SendAsync(headRequest);
+        Assert.Equal(HttpStatusCode.OK, headResponse.StatusCode);
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
+        Assert.Equal("0", offsetValues.First());
+
         var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUrl);
         patchRequest.Headers.Add("Tus-Resumable", "1.0.0");
         patchRequest.Headers.Add("Upload-Offset", "0");
