@@ -57,16 +57,22 @@ public static class TusEndpointExtensions
 
     private static bool TryResolveFileTransferId(HttpContext httpContext, string? tusFileId, out Guid fileTransferId)
     {
-        if (Guid.TryParse(tusFileId, out fileTransferId))
+        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId))
         {
             return true;
         }
 
-        return TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId);
+        return Guid.TryParse(tusFileId, out fileTransferId);
     }
 
     private static async Task OnAuthorizeAsync(AuthorizeContext context)
     {
+        // TUS OPTIONS is server capability discovery and does not target a file resource.
+        if (context.Intent == IntentType.GetOptions)
+        {
+            return;
+        }
+
         if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");

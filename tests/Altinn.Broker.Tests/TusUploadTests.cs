@@ -43,7 +43,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var optionsRequest = new HttpRequestMessage(HttpMethod.Options, tusBaseUrl);
         optionsRequest.Headers.Add("Tus-Resumable", "1.0.0");
         var optionsResponse = await _senderClient.SendAsync(optionsRequest);
-        Assert.True(optionsResponse.IsSuccessStatusCode, await optionsResponse.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.NoContent, optionsResponse.StatusCode);
 
         var createRequest = new HttpRequestMessage(HttpMethod.Post, tusBaseUrl);
         createRequest.Headers.Add("Tus-Resumable", "1.0.0");

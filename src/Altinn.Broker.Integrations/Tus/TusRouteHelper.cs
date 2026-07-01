@@ -10,6 +10,13 @@ public static class TusRouteHelper
     {
         fileTransferId = default;
 
+        // Prefer our named route parameter when MapTus path includes {fileTransferId}.
+        var namedRouteValue = httpContext.Request.RouteValues["fileTransferId"]?.ToString();
+        if (Guid.TryParse(namedRouteValue, out fileTransferId))
+        {
+            return true;
+        }
+
         var routeValue = httpContext.Request.RouteValues[TusFileIdRouteKey]?.ToString();
         if (Guid.TryParse(routeValue, out fileTransferId))
         {
