@@ -1,4 +1,5 @@
 using Altinn.Broker.Application.CleanupUseCaseTests;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Hangfire;
 using Hangfire.Common;
@@ -18,7 +19,16 @@ public class CleanupUseCaseTestsHandlerTests
 		Mock<IFileTransferRepository> repoMock)
 	{
 		var loggerMock = new Mock<ILogger<CleanupUseCaseTestsHandler>>();
-		return new CleanupUseCaseTestsHandler(bgClientMock.Object, loggerMock.Object, repoMock.Object);
+		var resourceRepoMock = new Mock<IResourceRepository>();
+		var serviceOwnerRepoMock = new Mock<IServiceOwnerRepository>();
+		var storageMock = new Mock<IBrokerStorageService>();
+		return new CleanupUseCaseTestsHandler(
+			bgClientMock.Object,
+			loggerMock.Object,
+			repoMock.Object,
+			resourceRepoMock.Object,
+			serviceOwnerRepoMock.Object,
+			storageMock.Object);
 	}
 
 	[Fact]
@@ -60,10 +70,10 @@ public class CleanupUseCaseTestsHandlerTests
 		Assert.Equal(nameof(CleanupUseCaseTestsHandler.DeleteFileTransfers), capturedJob.Method.Name);
 		var argFileTransfersVal = capturedJob.Args[0] as List<Guid>;
 		var argResourceVal = capturedJob.Args[1] as string;
-		var argCancellationTokenVal = (CancellationToken)capturedJob.Args[2];
 		Assert.NotNull(argFileTransfersVal);
 		Assert.Equal(existingIds.OrderBy(x => x), argFileTransfersVal!.OrderBy(x => x));
 		Assert.Equal(ResourceId, argResourceVal);
+		Assert.IsType<DateTimeOffset>(capturedJob.Args[2]);
 	}
 
 	[Fact]
@@ -108,6 +118,8 @@ public class CleanupUseCaseTestsHandlerTests
 		// Arrange
 		var ids = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
 		var repoMock = new Mock<IFileTransferRepository>();
+		repoMock.Setup(r => r.GetNonPurgedFileTransfersByResourceId(ResourceId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync(new List<FileTransferEntity>());
 		repoMock.Setup(r => r.HardDeleteFileTransfersByIds(ids, It.IsAny<CancellationToken>()))
 			.ReturnsAsync(ids.Count);
 
@@ -115,7 +127,7 @@ public class CleanupUseCaseTestsHandlerTests
 		var handler = CreateHandler(bgClientMock, repoMock);
 
 		// Act
-		await handler.DeleteFileTransfers(ids, ResourceId, CancellationToken.None);
+		await handler.DeleteFileTransfers(ids, ResourceId, DateTimeOffset.UtcNow, CancellationToken.None);
 
 		// Assert
 		repoMock.Verify(r => r.HardDeleteFileTransfersByIds(ids, It.IsAny<CancellationToken>()), Times.Once);
