@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Models;
 using Altinn.Broker.Common.Constants;
@@ -18,11 +20,14 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
+    private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public TusUploadTests(CustomWebApplicationFactory factory)
     {
         _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
+        _responseSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        _responseSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     }
 
     [Fact]
@@ -33,7 +38,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
             FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeResponse.IsSuccessStatusCode, await initializeResponse.Content.ReadAsStringAsync());
 
-        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
         Assert.NotNull(initializeResult);
         var fileTransferId = initializeResult.FileTransferId.ToString();
         var fileContent = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
@@ -70,7 +75,8 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.NoContent, patchResponse.StatusCode);
 
         var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>(
-            $"broker/api/v1/filetransfer/{fileTransferId}");
+            $"broker/api/v1/filetransfer/{fileTransferId}",
+            _responseSerializerOptions);
         Assert.NotNull(overview);
         Assert.Equal(FileTransferStatusExt.Published, overview.FileTransferStatus);
 
