@@ -16,12 +16,15 @@ public class CleanupUseCaseTestsHandlerTests
 
 	private static CleanupUseCaseTestsHandler CreateHandler(
 		Mock<IBackgroundJobClient> bgClientMock,
-		Mock<IFileTransferRepository> repoMock)
+		Mock<IFileTransferRepository> repoMock,
+		Mock<IResourceRepository>? resourceRepoMock = null,
+		Mock<IServiceOwnerRepository>? serviceOwnerRepoMock = null,
+		Mock<IBrokerStorageService>? storageMock = null)
 	{
 		var loggerMock = new Mock<ILogger<CleanupUseCaseTestsHandler>>();
-		var resourceRepoMock = new Mock<IResourceRepository>();
-		var serviceOwnerRepoMock = new Mock<IServiceOwnerRepository>();
-		var storageMock = new Mock<IBrokerStorageService>();
+		resourceRepoMock ??= new Mock<IResourceRepository>();
+		serviceOwnerRepoMock ??= new Mock<IServiceOwnerRepository>();
+		storageMock ??= new Mock<IBrokerStorageService>();
 		return new CleanupUseCaseTestsHandler(
 			bgClientMock.Object,
 			loggerMock.Object,
@@ -30,6 +33,19 @@ public class CleanupUseCaseTestsHandlerTests
 			serviceOwnerRepoMock.Object,
 			storageMock.Object);
 	}
+
+	private static FileTransferEntity CreateLightweightFileTransfer(Guid id) => new()
+	{
+		FileTransferId = id,
+		ResourceId = ResourceId,
+		UseVirusScan = true,
+		Sender = null!,
+		FileTransferStatusEntity = null!,
+		RecipientCurrentStatuses = [],
+		FileName = string.Empty,
+		Created = default,
+		ExpirationTime = default,
+	};
 
 	[Fact]
 	public async Task Process_EnqueuesDeleteJob_ReturnsResponseWithCounts()
@@ -131,5 +147,52 @@ public class CleanupUseCaseTestsHandlerTests
 
 		// Assert
 		repoMock.Verify(r => r.HardDeleteFileTransfersByIds(ids, It.IsAny<CancellationToken>()), Times.Once);
+	}
+
+	[Fact]
+	public async Task DeleteFileTransfers_KeepsRowsWhoseBlobDeletionFailed()
+	{
+		// Arrange
+		var succeedId = Guid.NewGuid();
+		var failId = Guid.NewGuid();
+		var alreadyPurgedId = Guid.NewGuid();
+		var ids = new List<Guid> { succeedId, failId, alreadyPurgedId };
+
+		var repoMock = new Mock<IFileTransferRepository>();
+		repoMock.Setup(r => r.GetNonPurgedFileTransfersByResourceId(ResourceId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync(new List<FileTransferEntity>
+			{
+				CreateLightweightFileTransfer(succeedId),
+				CreateLightweightFileTransfer(failId),
+			});
+
+		List<Guid>? hardDeletedIds = null;
+		repoMock.Setup(r => r.HardDeleteFileTransfersByIds(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+			.Callback<IEnumerable<Guid>, CancellationToken>((deleted, _) => hardDeletedIds = deleted.ToList())
+			.ReturnsAsync(2);
+
+		var resourceRepoMock = new Mock<IResourceRepository>();
+		resourceRepoMock.Setup(r => r.GetResource(ResourceId, It.IsAny<CancellationToken>()))
+			.ReturnsAsync(new ResourceEntity { Id = ResourceId, ServiceOwnerId = "so-1" });
+
+		var serviceOwnerRepoMock = new Mock<IServiceOwnerRepository>();
+		serviceOwnerRepoMock.Setup(s => s.GetServiceOwner("so-1"))
+			.ReturnsAsync(new ServiceOwnerEntity { Id = "so-1", Name = "Test", StorageProviders = [] });
+
+		var storageMock = new Mock<IBrokerStorageService>();
+		storageMock.Setup(s => s.DeleteFile(It.IsAny<ServiceOwnerEntity>(), It.Is<FileTransferEntity>(f => f.FileTransferId == failId), It.IsAny<CancellationToken>()))
+			.ThrowsAsync(new Exception("blob delete failed"));
+
+		var bgClientMock = new Mock<IBackgroundJobClient>();
+		var handler = CreateHandler(bgClientMock, repoMock, resourceRepoMock, serviceOwnerRepoMock, storageMock);
+
+		// Act
+		await handler.DeleteFileTransfers(ids, ResourceId, DateTimeOffset.UtcNow, CancellationToken.None);
+
+		// Assert
+		Assert.NotNull(hardDeletedIds);
+		Assert.Contains(succeedId, hardDeletedIds!);
+		Assert.Contains(alreadyPurgedId, hardDeletedIds!);
+		Assert.DoesNotContain(failId, hardDeletedIds!);
 	}
 }
