@@ -86,7 +86,7 @@ public static class TusUploader
     }
 
     private static Uri BuildTusEndpointUri(string baseUrl, string fileTransferId)
-        => new($"{baseUrl.TrimEnd('/')}/broker/api/v1/filetransfer/{fileTransferId}/upload/tus");
+        => new($"{baseUrl.TrimEnd('/')}/broker/api/v1/filetransfer/upload/tus/{fileTransferId}");
 
     private static async Task EnsureServerSupportsTus(HttpClient httpClient, Uri tusEndpoint, CancellationToken cancellationToken)
     {
@@ -130,7 +130,7 @@ public static class TusUploader
         if (createResponse.StatusCode == HttpStatusCode.Conflict)
         {
             Console.WriteLine("Upload resource already exists — resuming via HEAD.");
-            return new Uri(tusEndpoint, fileTransferId);
+            return tusEndpoint;
         }
 
         throw new InvalidOperationException(

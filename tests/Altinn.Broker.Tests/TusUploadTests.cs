@@ -38,7 +38,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var fileTransferId = initializeResult.FileTransferId.ToString();
         var fileContent = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
 
-        var tusBaseUrl = $"broker/api/v1/filetransfer/{fileTransferId}/upload/tus";
+        var tusBaseUrl = $"broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
 
         var optionsRequest = new HttpRequestMessage(HttpMethod.Options, tusBaseUrl);
         optionsRequest.Headers.Add("Tus-Resumable", "1.0.0");

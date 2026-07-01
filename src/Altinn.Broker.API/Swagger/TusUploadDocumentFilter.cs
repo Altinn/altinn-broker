@@ -19,24 +19,16 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
     private const string UploadOffsetHeader = "Upload-Offset";
     private const string OffsetOctetStream = "application/offset+octet-stream";
 
-    private static readonly string TusBasePath = TusEndpointExtensions.RouteTemplate;
-    private static readonly string TusUploadPath = $"{TusEndpointExtensions.RouteTemplate}/{{fileTransferId}}";
+    private static readonly string TusPath = TusEndpointExtensions.RouteTemplate;
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
-        swaggerDoc.Paths[TusBasePath] = new OpenApiPathItem
+        swaggerDoc.Paths[TusPath] = new OpenApiPathItem
         {
             Operations = new Dictionary<OperationType, OpenApiOperation>
             {
                 [OperationType.Options] = CreateOptionsOperation(),
-                [OperationType.Post] = CreatePostOperation()
-            }
-        };
-
-        swaggerDoc.Paths[TusUploadPath] = new OpenApiPathItem
-        {
-            Operations = new Dictionary<OperationType, OpenApiOperation>
-            {
+                [OperationType.Post] = CreatePostOperation(),
                 [OperationType.Head] = CreateHeadOperation(),
                 [OperationType.Patch] = CreatePatchOperation(),
                 [OperationType.Delete] = CreateDeleteOperation()
@@ -68,7 +60,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Description = BuildDescription(
             "Creates a TUS upload resource for an initialized file transfer. " +
             "Requires the <c>Upload-Length</c> header with the total file size in bytes. " +
-            "The response <c>Location</c> header points to the URL used for <c>PATCH</c> and <c>HEAD</c> requests. " +
+            "Continue uploading with <c>PATCH</c> and <c>HEAD</c> on this same URL. " +
             "Upload-Defer-Length is not supported."),
         OperationId = "TusUploadCreate",
         Parameters =
@@ -78,7 +70,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
             UploadLengthParameter(required: true)
         ],
         Responses = CreateResponses(
-            ("201", "Upload created. Continue with PATCH to the Location URL."),
+            ("201", "Upload created. Continue with PATCH on this URL."),
             ("400", BadRequest),
             ("401", Unauthorized),
             ("403", Forbidden),

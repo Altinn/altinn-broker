@@ -19,7 +19,8 @@ namespace Altinn.Broker.API.Tus;
 
 public static class TusEndpointExtensions
 {
-    public const string RouteTemplate = "/broker/api/v1/filetransfer/{fileTransferId}/upload/tus";
+    // fileTransferId must be the last path segment (tusdotnet requirement) and must only appear once (APIM/OpenAPI).
+    public const string RouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
 
     public static WebApplication MapBrokerTusUploads(this WebApplication app)
     {
@@ -104,6 +105,9 @@ public static class TusEndpointExtensions
 
     private static async Task OnCreateCompleteAsync(CreateCompleteContext context, Guid fileTransferId)
     {
+        // tusdotnet would otherwise append the file id again, producing .../tus/{id}/{id}.
+        context.SetUploadUrl(new Uri(context.HttpContext.Request.Path.Value!, UriKind.Relative));
+
         var fileTransferStatusRepository = context.HttpContext.RequestServices
             .GetRequiredService<IFileTransferStatusRepository>();
         var uploaderVendor = context.HttpContext.User.GetCallerVendorId()?.WithPrefix();
