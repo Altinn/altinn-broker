@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 
 using tusdotnet;
 using tusdotnet.Models;
+using tusdotnet.Models.Concatenation;
 using tusdotnet.Models.Configuration;
 using tusdotnet.Models.Expiration;
 
@@ -101,6 +102,17 @@ public static class TusEndpointExtensions
 
     private static async Task OnBeforeCreateAsync(BeforeCreateContext context)
     {
+        if (context.FileConcatenation is FileConcatFinal)
+        {
+            // TUS concatenation final requests must not include Upload-Length.
+            if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out _))
+            {
+                context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
+            }
+
+            return;
+        }
+
         if (context.UploadLengthIsDeferred)
         {
             context.FailRequest(HttpStatusCode.BadRequest, "Upload-Defer-Length is not supported");
