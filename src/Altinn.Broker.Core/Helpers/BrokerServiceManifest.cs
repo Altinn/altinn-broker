@@ -18,7 +18,7 @@ public class BrokerServiceManifest
     public int? ExternalServiceEditionCode { get; set; }
 
     [XmlElement("SendersReference")]
-    public required string SendersReference { get; set; }
+    public string? SendersReference { get; set; }
 
     [XmlElement("Reportee")]
     public required string Reportee { get; set; }
