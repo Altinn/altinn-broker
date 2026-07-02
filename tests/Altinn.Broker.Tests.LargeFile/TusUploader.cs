@@ -191,18 +191,6 @@ public static class TusUploader
             ?? throw new InvalidOperationException("TUS partial POST succeeded but no Location header was returned.");
     }
 
-    private static Uri? ResolvePartialUploadUri(Uri tusEndpoint, Uri? location)
-    {
-        var resolved = ResolveUploadUri(tusEndpoint, location);
-        if (resolved is null)
-        {
-            return null;
-        }
-
-        var fileTransferId = tusEndpoint.AbsolutePath.TrimEnd('/').Split('/').Last();
-        return CanonicalizePartialUploadPath(resolved, fileTransferId);
-    }
-
     private static async Task CreateFinalUploadAsync(
         HttpClient httpClient,
         Uri tusEndpoint,
@@ -220,7 +208,7 @@ public static class TusUploader
         request.Headers.TryAddWithoutValidation("Upload-Concat", $"final;{partialReferences}");
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, "TUS final POST", HttpStatusCode.Created);
+        await EnsureSuccessAsync(response, "TUS final POST", HttpStatusCode.Created, requestUri: tusEndpoint);
     }
 
     private static async Task EnsurePartialUploadCompleteAsync(
@@ -246,7 +234,7 @@ public static class TusUploader
     }
 
     private static string ToTusConcatReference(Uri partialUploadUri)
-        => partialUploadUri.IsAbsoluteUri ? partialUploadUri.AbsolutePath : partialUploadUri.ToString();
+        => partialUploadUri.AbsolutePath;
 
     private static async Task UploadPartialAsync(
         HttpClient httpClient,
@@ -431,54 +419,56 @@ public static class TusUploader
         return new Uri(tusEndpoint, location);
     }
 
-    /// <summary>
-    /// Partial uploads are addressed at /tus/{fileTransferId}/partial/{partialUploadId}.
-    /// Canonicalize the Location path when the server omits the literal "partial" segment.
-    /// </summary>
-    private static Uri CanonicalizePartialUploadPath(Uri uploadUri, string fileTransferId)
+    private static Uri? ResolvePartialUploadUri(Uri tusEndpoint, Uri? location)
     {
-        if (!TryParseTusPathSegments(uploadUri, out var segments))
+        if (location is null)
         {
-            return uploadUri;
+            return null;
         }
 
-        if (segments.Length == 3
-            && string.Equals(segments[1], PartialPathSegment, StringComparison.OrdinalIgnoreCase))
-        {
-            return uploadUri;
-        }
-
-        if (segments.Length == 2 && Guid.TryParse(segments[0], out _))
-        {
-            return BuildUriWithPath(uploadUri, $"{TusUploadPath}/{segments[0]}/{PartialPathSegment}/{segments[1]}");
-        }
-
-        if (segments.Length == 1)
-        {
-            return BuildUriWithPath(uploadUri, $"{TusUploadPath}/{fileTransferId}/{PartialPathSegment}/{segments[0]}");
-        }
-
-        return uploadUri;
+        var fileTransferId = tusEndpoint.AbsolutePath.TrimEnd('/').Split('/').Last();
+        var partialUploadId = ExtractPartialUploadId(ResolveUploadUri(tusEndpoint, location) ?? location, fileTransferId);
+        return new Uri($"{tusEndpoint.GetLeftPart(UriPartial.Authority)}{TusUploadPath}/{fileTransferId}/{PartialPathSegment}/{partialUploadId}");
     }
 
-    private static Uri BuildUriWithPath(Uri baseUri, string path)
-        => baseUri.IsAbsoluteUri
-            ? new Uri($"{baseUri.GetLeftPart(UriPartial.Authority)}{path}")
-            : new Uri(path, UriKind.Relative);
-
-    private static bool TryParseTusPathSegments(Uri uploadUri, out string[] segments)
+    private static string ExtractPartialUploadId(Uri uploadUri, string fileTransferId)
     {
-        segments = [];
         var path = uploadUri.IsAbsoluteUri ? uploadUri.AbsolutePath : uploadUri.OriginalString;
         var prefix = $"{TusUploadPath}/";
-        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            var segments = path[prefix.Length..].TrimEnd('/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (segments.Length == 3
+                && string.Equals(segments[1], PartialPathSegment, StringComparison.OrdinalIgnoreCase))
+            {
+                return segments[2];
+            }
+
+            if (segments.Length == 2 && string.Equals(segments[0], fileTransferId, StringComparison.OrdinalIgnoreCase))
+            {
+                return segments[1];
+            }
+
+            if (segments.Length == 1)
+            {
+                return segments[0];
+            }
         }
 
-        segments = path[prefix.Length..].TrimEnd('/')
-            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return segments.Length > 0;
+        var relative = uploadUri.OriginalString.TrimStart('/');
+        if (relative.StartsWith($"{PartialPathSegment}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return relative[(PartialPathSegment.Length + 1)..];
+        }
+
+        if (!relative.Contains('/'))
+        {
+            return relative;
+        }
+
+        throw new InvalidOperationException($"Could not determine partial upload id from {uploadUri}");
     }
 
     private static async Task EnsureSuccessAsync(
