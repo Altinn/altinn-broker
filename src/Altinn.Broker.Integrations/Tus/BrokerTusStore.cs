@@ -35,6 +35,7 @@ public class BrokerTusStore(
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
 
         using var chunkBuffer = new MemoryStream();
@@ -81,6 +82,7 @@ public class BrokerTusStore(
 
     public async Task<bool> FileExistAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         if (_uploadLengths.ContainsKey(fileId))
         {
             return true;
@@ -117,6 +119,7 @@ public class BrokerTusStore(
 
     public async Task<long?> GetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         if (_uploadLengths.TryGetValue(fileId, out var cachedLength))
         {
             return cachedLength;
@@ -144,6 +147,7 @@ public class BrokerTusStore(
 
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
             lock (state!.SyncRoot)
@@ -266,6 +270,7 @@ public class BrokerTusStore(
 
     public Task<FileConcat?> GetUploadConcatAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         if (partialUploadRegistry.IsPartial(fileId))
         {
             return Task.FromResult<FileConcat?>(new FileConcatPartial());
@@ -281,6 +286,7 @@ public class BrokerTusStore(
 
     public async Task<string> GetUploadMetadataAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         if (_uploadMetadata.TryGetValue(fileId, out var metadata))
         {
             return metadata;
@@ -302,6 +308,7 @@ public class BrokerTusStore(
 
     public async Task<ITusFile> GetFileAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
@@ -313,6 +320,7 @@ public class BrokerTusStore(
 
     public async Task DeleteFileAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         await storageResolver.DeleteStagingBlobAsync(fileId, cancellationToken);
 
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
@@ -370,6 +378,7 @@ public class BrokerTusStore(
 
     public async Task<bool> VerifyChecksumAsync(string fileId, string algorithm, byte[] checksum, CancellationToken cancellationToken)
     {
+        fileId = ResolveStoreFileId(fileId);
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
@@ -572,6 +581,12 @@ public class BrokerTusStore(
 
         return fileTransferId;
     }
+
+    /// <summary>
+    /// tusdotnet passes concatenation partial ids as "partial/{partialUploadId}" when the upload URL
+    /// includes the literal partial segment. Storage always uses the bare partial upload id.
+    /// </summary>
+    private static string ResolveStoreFileId(string fileId) => NormalizePartialFileId(fileId);
 
     private static string NormalizePartialFileId(string partialFileReference)
     {
