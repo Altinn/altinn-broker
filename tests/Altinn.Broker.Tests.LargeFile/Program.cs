@@ -19,7 +19,9 @@ public class Program
         string? baseUrl = Environment.GetEnvironmentVariable("BASE_URL");
         string? username = Environment.GetEnvironmentVariable("TEST_TOOLS_USERNAME");
         string? password = Environment.GetEnvironmentVariable("TEST_TOOLS_PASSWORD");
-        int gbsToUpload = Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD") is not null ? int.Parse(Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD")!) : 100;
+        string? gbsToUploadEnv = Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD");
+        int gbsToUpload = gbsToUploadEnv is not null ? int.Parse(gbsToUploadEnv) : 100;
+        
         long uploadSize = gbsToUpload * 1024L * 1024 * 1024;
         Console.WriteLine($"BASE_URL: {baseUrl}");
         Console.WriteLine($"GIGABYTES_TO_UPLOAD: {gbsToUpload}");
