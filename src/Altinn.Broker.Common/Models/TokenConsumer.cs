@@ -4,8 +4,8 @@ namespace Altinn.Broker.Common.Helpers.Models;
 public class TokenConsumer
 {
     [JsonPropertyName("authority")]
-    public string Authority { get; set; }
+    public required string Authority { get; set; }
 
     [JsonPropertyName("ID")]
-    public string ID { get; set; }
+    public required string ID { get; set; }
 }

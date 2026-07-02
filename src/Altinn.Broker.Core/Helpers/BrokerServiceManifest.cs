@@ -12,16 +12,16 @@ public class BrokerServiceManifest
     }
 
     [XmlElement("ExternalServiceCode")]
-    public string ExternalServiceCode { get; set; }
+    public string? ExternalServiceCode { get; set; }
 
     [XmlElement("ExternalServiceEditionCode")]
     public int? ExternalServiceEditionCode { get; set; }
 
     [XmlElement("SendersReference")]
-    public string SendersReference { get; set; }
+    public required string SendersReference { get; set; }
 
     [XmlElement("Reportee")]
-    public string Reportee { get; set; }
+    public required string Reportee { get; set; }
 
     [XmlElement("SentDate")]
     public DateTime SentDate { get; set; }
@@ -39,17 +39,17 @@ public class BrokerServiceManifest
 public class FileEntry
 {
     [XmlElement("FileName")]
-    public string FileName { get; set; }
+    public required string FileName { get; set; }
 }
 
 [XmlType(Namespace = "http://schema.altinn.no/services/ServiceEngine/Broker/2015/06")]
 public class PropertyEntry
 {
     [XmlElement("PropertyKey")]
-    public string PropertyKey { get; set; }
+    public required string PropertyKey { get; set; }
 
     [XmlElement("PropertyValue")]
-    public string PropertyValue { get; set; }
+    public required string PropertyValue { get; set; }
 }
 
 public static class BrokerServiceManifestExtensions
