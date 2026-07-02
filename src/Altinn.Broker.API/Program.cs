@@ -68,6 +68,7 @@ static void BuildAndRun(string[] args)
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
 
     app.MapControllers();

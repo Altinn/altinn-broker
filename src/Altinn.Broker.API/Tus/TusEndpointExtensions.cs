@@ -145,15 +145,17 @@ public static class TusEndpointExtensions
 
     private static async Task OnCreateCompleteAsync(CreateCompleteContext context)
     {
-        var uploadPath = $"{TusMapPath}/{context.FileId}";
-        context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
-
         if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
         {
             throw new TusStoreException("Invalid file transfer id");
         }
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var uploadPath = partialUploadRegistry.IsPartial(context.FileId)
+            ? $"{TusMapPath}/{fileTransferId}/{context.FileId}"
+            : $"{TusMapPath}/{context.FileId}";
+        context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
+
         if (partialUploadRegistry.IsPartial(context.FileId))
         {
             return;
