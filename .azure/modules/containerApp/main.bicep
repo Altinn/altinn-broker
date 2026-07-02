@@ -137,9 +137,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 2525
         external: true
         transport: 'Auto'
-        stickySessions: {
-          affinity: 'sticky'
-        }
         ipSecurityRestrictions: ipSecurityRestrictions
       }
       secrets: concat([
