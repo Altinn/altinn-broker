@@ -4,10 +4,12 @@ using System.Security.Cryptography;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
+using Azure;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -47,7 +49,7 @@ public class TusStorageResolver(
     ITusPartialUploadRegistry partialUploadRegistry,
     IHttpContextAccessor httpContextAccessor) : ITusStorageResolver
 {
-    private const int ConcatenationReadBufferSize = 4 * 1024 * 1024;
+    private const int ConcatenationMd5BufferSize = 16 * 1024 * 1024;
 
     private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
 
@@ -230,44 +232,22 @@ public class TusStorageResolver(
         var finalBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, finalFileId));
 
-        using var uploadMd5 = MD5.Create();
-        var blockIds = new List<string>();
-        long blockIndex = 0;
-        long totalLength = 0;
-        var readBuffer = new byte[ConcatenationReadBufferSize];
+        var stagingTask = StagePartialBlobsForConcatenationAsync(
+            finalBlobClient,
+            containerClient,
+            partialFileIds,
+            cancellationToken);
+        var md5Task = ComputeConcatenatedMd5Async(containerClient, partialFileIds, cancellationToken);
 
-        foreach (var partialFileId in partialFileIds)
-        {
-            var partialBlobClient = containerClient.GetBlockBlobClient(
-                Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, partialFileId));
-            if (!await partialBlobClient.ExistsAsync(cancellationToken))
-            {
-                throw new InvalidOperationException($"Partial staging blob {partialFileId} does not exist.");
-            }
+        await Task.WhenAll(stagingTask, md5Task);
 
-            await using var partialStream = await partialBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
-            int bytesRead;
-            while ((bytesRead = await partialStream.ReadAsync(readBuffer, cancellationToken)) > 0)
-            {
-                var blockId = BuildBlockId(blockIndex++);
-                var blockData = readBuffer.AsSpan(0, bytesRead).ToArray();
-
-                await using var chunkStream = new MemoryStream(blockData, writable: false);
-                await finalBlobClient.StageBlockAsync(blockId, chunkStream, cancellationToken: cancellationToken);
-                blockIds.Add(blockId);
-                uploadMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
-                totalLength += bytesRead;
-            }
-        }
-
+        var (blockIds, totalLength) = await stagingTask;
         if (blockIds.Count == 0)
         {
             throw new InvalidOperationException($"Cannot concatenate partial uploads into file id {finalFileId} because no data was found.");
         }
 
-        uploadMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        var md5Hash = uploadMd5.Hash
-            ?? throw new InvalidOperationException($"Failed to calculate MD5 for concatenated file id {finalFileId}.");
+        var md5Hash = await md5Task;
 
         await finalBlobClient.CommitBlockListAsync(
             blockIds,
@@ -293,6 +273,118 @@ public class TusStorageResolver(
         }
 
         return totalLength;
+    }
+
+    private async Task<(List<string> BlockIds, long TotalLength)> StagePartialBlobsForConcatenationAsync(
+        BlockBlobClient finalBlobClient,
+        BlobContainerClient containerClient,
+        IReadOnlyList<string> partialFileIds,
+        CancellationToken cancellationToken)
+    {
+        var stagingTasks = new Task<(string BlockId, long Length)>[partialFileIds.Count];
+        for (var partialIndex = 0; partialIndex < partialFileIds.Count; partialIndex++)
+        {
+            stagingTasks[partialIndex] = StagePartialBlobForConcatenationAsync(
+                finalBlobClient,
+                containerClient,
+                partialFileIds[partialIndex],
+                partialIndex,
+                cancellationToken);
+        }
+
+        var stagedPartials = await Task.WhenAll(stagingTasks);
+        return (
+            stagedPartials.Select(static partial => partial.BlockId).ToList(),
+            stagedPartials.Sum(static partial => partial.Length));
+    }
+
+    private async Task<(string BlockId, long Length)> StagePartialBlobForConcatenationAsync(
+        BlockBlobClient finalBlobClient,
+        BlobContainerClient containerClient,
+        string partialFileId,
+        int partialIndex,
+        CancellationToken cancellationToken)
+    {
+        var partialBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, partialFileId));
+        if (!await partialBlobClient.ExistsAsync(cancellationToken))
+        {
+            throw new InvalidOperationException($"Partial staging blob {partialFileId} does not exist.");
+        }
+
+        var properties = await partialBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        var partialLength = properties.Value.ContentLength;
+        if (partialLength == 0)
+        {
+            throw new InvalidOperationException($"Partial staging blob {partialFileId} is empty.");
+        }
+
+        var blockId = BuildBlockId(partialIndex);
+        var sourceUri = GetReadableBlobUri(partialBlobClient);
+
+        try
+        {
+            await finalBlobClient.StageBlockFromUriAsync(
+                sourceUri,
+                blockId,
+                cancellationToken: cancellationToken);
+        }
+        catch (RequestFailedException) when (hostEnvironment.IsDevelopment())
+        {
+            await FallbackStagePartialBlobAsync(
+                finalBlobClient,
+                partialBlobClient,
+                blockId,
+                cancellationToken);
+        }
+
+        return (blockId, partialLength);
+    }
+
+    private static async Task FallbackStagePartialBlobAsync(
+        BlockBlobClient finalBlobClient,
+        BlockBlobClient partialBlobClient,
+        string blockId,
+        CancellationToken cancellationToken)
+    {
+        await using var partialStream = await partialBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+        await finalBlobClient.StageBlockAsync(blockId, partialStream, cancellationToken: cancellationToken);
+    }
+
+    private static async Task<byte[]> ComputeConcatenatedMd5Async(
+        BlobContainerClient containerClient,
+        IReadOnlyList<string> partialFileIds,
+        CancellationToken cancellationToken)
+    {
+        using var md5 = MD5.Create();
+        var buffer = new byte[ConcatenationMd5BufferSize];
+
+        foreach (var partialFileId in partialFileIds)
+        {
+            var partialBlobClient = containerClient.GetBlockBlobClient(
+                Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, partialFileId));
+            await using var partialStream = await partialBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+
+            int bytesRead;
+            while ((bytesRead = await partialStream.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                md5.TransformBlock(buffer, 0, bytesRead, null, 0);
+            }
+        }
+
+        md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return md5.Hash
+            ?? throw new InvalidOperationException("Failed to calculate MD5 for concatenated upload.");
+    }
+
+    private static Uri GetReadableBlobUri(BlockBlobClient blobClient)
+    {
+        if (blobClient.CanGenerateSasUri)
+        {
+            return blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+        }
+
+        return blobClient.Uri;
     }
 
     public async Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken)
