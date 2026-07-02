@@ -110,6 +110,8 @@ public static class DependencyInjection
                 : new NullExpirationDetailsStore();
         });
         services.AddSingleton<ITusPartialUploadRegistry, TusPartialUploadRegistry>();
+        services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
+        services.AddSingleton<ITusUploadProgressCache, TusUploadProgressCache>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }

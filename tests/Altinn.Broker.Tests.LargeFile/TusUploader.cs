@@ -384,6 +384,7 @@ public static class TusUploader
             {
                 using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
                 chunkContent.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
+                chunkContent.Headers.ContentLength = bytesRead;
 
                 using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUri);
                 patchRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
@@ -399,18 +400,8 @@ public static class TusUploader
                 var responseBody = await patchResponse.Content.ReadAsStringAsync(cancellationToken);
                 if (patchResponse.StatusCode == HttpStatusCode.Conflict)
                 {
-                    var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
-                    if (serverOffset > offset)
-                    {
-                        Console.WriteLine($"Upload-Offset conflict — server is at {serverOffset}, resuming.");
-                        return serverOffset;
-                    }
-
-                    if (serverOffset < offset)
-                    {
-                        Console.WriteLine(
-                            $"Upload-Offset conflict — server is behind at {serverOffset}, waiting for async commit to reach {offset}.");
-                    }
+                    offset = await ResolveOffsetAfterConflictAsync(httpClient, uploadUri, offset, cancellationToken);
+                    continue;
                 }
 
                 if (attempt == 5 || !IsTransientStatusCode(patchResponse.StatusCode))
@@ -422,19 +413,55 @@ public static class TusUploader
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                 Console.WriteLine(
                     $"TUS PATCH at offset {offset} failed ({patchResponse.StatusCode}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+                offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
                 await Task.Delay(delay, cancellationToken);
             }
-            catch (HttpRequestException ex) when (ex.InnerException is SocketException && attempt < 5)
+            catch (Exception ex) when (IsTransientRequestException(ex) && attempt < 5)
             {
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                 Console.WriteLine(
-                    $"TUS PATCH at offset {offset} failed ({ex.InnerException.GetType().Name}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+                    $"TUS PATCH at offset {offset} failed ({ex.Message}), realigning offset and retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+                offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
                 await Task.Delay(delay, cancellationToken);
-            }            
+            }
         }
 
         throw new UnreachableException();
     }
+
+    private static async Task<long> ResolveOffsetAfterConflictAsync(
+        HttpClient httpClient,
+        Uri uploadUri,
+        long offset,
+        CancellationToken cancellationToken)
+    {
+        var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+        if (serverOffset > offset)
+        {
+            Console.WriteLine($"Upload-Offset conflict — server is at {serverOffset}, resuming.");
+            return serverOffset;
+        }
+
+        if (serverOffset < offset)
+        {
+            Console.WriteLine(
+                $"Upload-Offset conflict — server is behind at {serverOffset}, waiting for async commit to reach {offset}.");
+            for (var waitAttempt = 0; waitAttempt < 30; waitAttempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (serverOffset >= offset)
+                {
+                    return serverOffset;
+                }
+            }
+        }
+
+        return serverOffset;
+    }
+
+    private static bool IsTransientRequestException(Exception exception)
+        => exception is HttpRequestException or IOException or TaskCanceledException;
 
     private static async Task<long> GetUploadOffsetAsync(
         HttpClient httpClient,

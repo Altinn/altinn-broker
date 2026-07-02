@@ -24,8 +24,9 @@ public interface ITusStorageResolver
     Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
-        byte[] md5Hash,
         CancellationToken cancellationToken);
+    Task<byte[]> ComputeCommittedStagingMd5Async(string fileId, CancellationToken cancellationToken);
+    Task SetCommittedStagingMd5Async(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
     Task<bool> StagingBlobExistsAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetCommittedStagingLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long> ConcatenatePartialStagingBlobsAsync(
@@ -118,7 +119,6 @@ public class TusStorageResolver(
     public async Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
-        byte[] md5Hash,
         CancellationToken cancellationToken)
     {
         var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
@@ -134,15 +134,49 @@ public class TusStorageResolver(
             blockIds,
             new CommitBlockListOptions
             {
-                Metadata = new Dictionary<string, string>
-                {
-                    [AzureStorageConstants.TusMd5ChecksumMetadataKey] = Convert.ToBase64String(md5Hash)
-                },
                 HttpHeaders = new BlobHttpHeaders
                 {
-                    ContentType = "application/octet-stream",
-                    ContentHash = md5Hash
+                    ContentType = "application/octet-stream"
                 }
+            },
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task<byte[]> ComputeCommittedStagingMd5Async(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        await using var contentStream = await blockBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+        return await MD5.HashDataAsync(contentStream, cancellationToken);
+    }
+
+    public async Task SetCommittedStagingMd5Async(string fileId, byte[] md5Hash, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        var properties = await blockBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        var metadata = properties.Value.Metadata.ToDictionary(static k => k.Key, static v => v.Value);
+        metadata[AzureStorageConstants.TusMd5ChecksumMetadataKey] = Convert.ToBase64String(md5Hash);
+        await blockBlobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
+        await blockBlobClient.SetHttpHeadersAsync(
+            new BlobHttpHeaders
+            {
+                ContentType = "application/octet-stream",
+                ContentHash = md5Hash
             },
             cancellationToken: cancellationToken);
     }
