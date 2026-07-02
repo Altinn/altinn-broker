@@ -15,21 +15,25 @@ public class Program
 
     static async Task Main(string[] args)
     {
-        string? baseUrl = "https://altinn-dev-api.azure-api.net"; // Environment.GetEnvironmentVariable("BASE_URL");
-        string? username = "autotest"; // Environment.GetEnvironmentVariable("TEST_TOOLS_USERNAME");
-        string? password = "altinn8900bnn"; // Environment.GetEnvironmentVariable("TEST_TOOLS_PASSWORD");
+        string? baseUrl = Environment.GetEnvironmentVariable("BASE_URL");
+        string? username = Environment.GetEnvironmentVariable("TEST_TOOLS_USERNAME");
+        string? password = Environment.GetEnvironmentVariable("TEST_TOOLS_PASSWORD");
         int gbsToUpload = Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD") is not null
             ? int.Parse(Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD")!)
             : 10;
         int chunkSizeMb = Environment.GetEnvironmentVariable("CHUNK_SIZE_MB") is not null
             ? int.Parse(Environment.GetEnvironmentVariable("CHUNK_SIZE_MB")!)
             : DefaultChunkSizeMb;
+        int parallelPartialUploads = Environment.GetEnvironmentVariable("TUS_PARALLEL_PARTIAL_UPLOADS") is not null
+            ? int.Parse(Environment.GetEnvironmentVariable("TUS_PARALLEL_PARTIAL_UPLOADS")!)
+            : 1;
         long uploadSize = gbsToUpload * 1024L * 1024 * 1024;
         int chunkSize = chunkSizeMb * 1024 * 1024;
 
         Console.WriteLine($"BASE_URL: {baseUrl}");
         Console.WriteLine($"GIGABYTES_TO_UPLOAD: {gbsToUpload}");
         Console.WriteLine($"CHUNK_SIZE_MB: {chunkSizeMb}");
+        Console.WriteLine($"TUS_PARALLEL_PARTIAL_UPLOADS: {parallelPartialUploads}");
 
         if (string.IsNullOrEmpty(baseUrl))
         {
@@ -59,7 +63,21 @@ public class Program
         var fileTransferId = await InitializeFileTransfer(httpClient, baseUrl);
 
         using var randomDataStream = new PseudoRandomDataStream(uploadSize);
-        await TusUploader.UploadAsync(httpClient, baseUrl, fileTransferId, randomDataStream, uploadSize, chunkSize);
+        if (parallelPartialUploads > 1)
+        {
+            await TusUploader.UploadWithConcatenationAsync(
+                httpClient,
+                baseUrl,
+                fileTransferId,
+                randomDataStream,
+                uploadSize,
+                chunkSize,
+                parallelPartialUploads);
+        }
+        else
+        {
+            await TusUploader.UploadAsync(httpClient, baseUrl, fileTransferId, randomDataStream, uploadSize, chunkSize);
+        }
     }
 
     private static string GetRequiredInput(string prompt, string? defaultValue = null)
