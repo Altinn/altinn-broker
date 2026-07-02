@@ -31,14 +31,24 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
-        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
+        if (callerOrganizationId is null)
+        {
+            return Problem(detail: "Caller organization id could not be determined", statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        var callerOrganizationIdWithPrefix = callerOrganizationId.WithPrefix();
+        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (existingServiceOwner is not null)
         {
             return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
         }
 
-        await serviceOwnerRepository.InitializeServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix(), serviceOwnerInitializeExt.Name);
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        await serviceOwnerRepository.InitializeServiceOwner(callerOrganizationIdWithPrefix, serviceOwnerInitializeExt.Name);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
+        if (serviceOwner is null)
+        {
+            return Problem(detail: "Service owner could not be initialized", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
         resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
@@ -58,7 +68,13 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
+        if (callerOrganizationId is null)
+        {
+            return Problem(detail: "Caller organization id could not be determined", statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        var callerOrganizationIdWithPrefix = callerOrganizationId.WithPrefix();
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (serviceOwner is null)
         {
             return NotFound();
