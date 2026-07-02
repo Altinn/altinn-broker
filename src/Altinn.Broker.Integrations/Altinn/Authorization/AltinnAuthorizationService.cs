@@ -175,13 +175,13 @@ public class AltinnAuthorizationService : IAuthorizationService
         if (result.Obligations != null)
         {
             List<XacmlJsonObligationOrAdvice> obligationList = result.Obligations;
-            XacmlJsonAttributeAssignment attributeMinLvAuth = GetObligation(PolicyObligationMinAuthnLevel, obligationList);
+            XacmlJsonAttributeAssignment? attributeMinLvAuth = GetObligation(PolicyObligationMinAuthnLevel, obligationList);
 
             // Checks if the obligation contains a minimum authentication level attribute
             if (attributeMinLvAuth != null)
             {
                 string minAuthenticationLevel = attributeMinLvAuth.Value;
-                string usersAuthenticationLevel = user.Claims.FirstOrDefault(c => c.Type.Equals("urn:altinn:authlevel"))?.Value;
+                string? usersAuthenticationLevel = user.Claims.FirstOrDefault(c => c.Type.Equals("urn:altinn:authlevel"))?.Value;
                 if (usersAuthenticationLevel is null && isMaskinportenToken)
                 {
                     usersAuthenticationLevel = "3";
@@ -192,7 +192,7 @@ public class AltinnAuthorizationService : IAuthorizationService
                 {
                     if (user.Claims.FirstOrDefault(c => c.Type.Equals("urn:altinn:org")) != null)
                     {
-                        XacmlJsonAttributeAssignment attributeMinLvAuthOrg = GetObligation(PolicyObligationMinAuthnLevelOrg, obligationList);
+                        XacmlJsonAttributeAssignment? attributeMinLvAuthOrg = GetObligation(PolicyObligationMinAuthnLevelOrg, obligationList);
                         if (attributeMinLvAuthOrg != null)
                         {
                             if (Convert.ToInt32(usersAuthenticationLevel) >= Convert.ToInt32(attributeMinLvAuthOrg.Value))
@@ -210,11 +210,11 @@ public class AltinnAuthorizationService : IAuthorizationService
         return true;
     }
 
-    private static XacmlJsonAttributeAssignment GetObligation(string category, List<XacmlJsonObligationOrAdvice> obligations)
+    private static XacmlJsonAttributeAssignment? GetObligation(string category, List<XacmlJsonObligationOrAdvice> obligations)
     {
         foreach (XacmlJsonObligationOrAdvice obligation in obligations)
         {
-            XacmlJsonAttributeAssignment assignment = obligation.AttributeAssignment.FirstOrDefault(a => a.Category.Equals(category));
+            XacmlJsonAttributeAssignment? assignment = obligation.AttributeAssignment.FirstOrDefault(a => a.Category.Equals(category));
             if (assignment != null)
             {
                 return assignment;
