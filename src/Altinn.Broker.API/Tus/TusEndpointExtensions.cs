@@ -79,12 +79,13 @@ public static class TusEndpointExtensions
             return;
         }
 
-        var validationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadValidationService>();
-        var (_, _, error) = await validationService.ValidateForUploadAsync(
+        var authorizationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
+        var error = await authorizationService.AuthorizeAsync(
             context.HttpContext.User,
             fileTransferId,
+            MapAuthIntent(context.Intent),
             uploadLength: null,
-            cancellationToken: context.CancellationToken);
+            context.CancellationToken);
 
         if (error is not null)
         {
@@ -107,11 +108,10 @@ public static class TusEndpointExtensions
         }
 
         var validationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadValidationService>();
-        var (_, maxUploadSize, error) = await validationService.ValidateForUploadAsync(
-            context.HttpContext.User,
+        var (maxUploadSize, error) = await validationService.ValidateUploadSizeAsync(
             fileTransferId,
             context.UploadLength,
-            cancellationToken: context.CancellationToken);
+            context.CancellationToken);
 
         if (error is not null)
         {
@@ -164,5 +164,17 @@ public static class TusEndpointExtensions
         {
             throw new TusStoreException(result.AsT1.Message);
         }
+
+        var authorizationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
+        await authorizationService.InvalidateAsync(fileTransferId, context.HttpContext.User, context.CancellationToken);
     }
+
+    private static TusUploadAuthIntent MapAuthIntent(IntentType intent) => intent switch
+    {
+        IntentType.CreateFile => TusUploadAuthIntent.Create,
+        IntentType.WriteFile => TusUploadAuthIntent.WriteChunk,
+        IntentType.GetFileInfo => TusUploadAuthIntent.GetInfo,
+        IntentType.DeleteFile => TusUploadAuthIntent.Delete,
+        _ => TusUploadAuthIntent.WriteChunk
+    };
 }

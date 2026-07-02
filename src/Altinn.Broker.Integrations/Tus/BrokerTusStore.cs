@@ -22,26 +22,19 @@ public class BrokerTusStore(
     ITusChecksumStore
 {
     private readonly ConcurrentDictionary<string, MD5> _uploadMd5Hashers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
         var md5 = await GetOrCreateUploadMd5Async(store, fileId, cancellationToken);
+        var uploadLength = await GetCachedUploadLengthAsync(store, fileId, cancellationToken);
+        var offsetBefore = await store.GetUploadOffsetAsync(fileId, cancellationToken);
 
-        using var chunkData = new MemoryStream();
-        await stream.CopyToAsync(chunkData, cancellationToken);
-        var chunkBytes = chunkData.ToArray();
-        if (chunkBytes.Length > 0)
-        {
-            md5.TransformBlock(chunkBytes, 0, chunkBytes.Length, null, 0);
-        }
+        var bytesWritten = await store.AppendDataAsync(fileId, new Md5ComputingStream(stream, md5), cancellationToken);
+        var newOffset = offsetBefore + bytesWritten;
 
-        await using var chunkStream = new MemoryStream(chunkBytes, writable: false);
-        var bytesWritten = await store.AppendDataAsync(fileId, chunkStream, cancellationToken);
-
-        var uploadLength = await store.GetUploadLengthAsync(fileId, cancellationToken);
-        var offset = await store.GetUploadOffsetAsync(fileId, cancellationToken);
-        if (uploadLength is not null && offset >= uploadLength.Value)
+        if (newOffset >= uploadLength)
         {
             md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             if (md5.Hash is not null)
@@ -53,6 +46,8 @@ public class BrokerTusStore(
             {
                 hasher.Dispose();
             }
+
+            _uploadLengths.TryRemove(fileId, out _);
         }
 
         return bytesWritten;
@@ -80,7 +75,9 @@ public class BrokerTusStore(
     {
         var fileTransferId = GetFileTransferIdFromRoute();
         var store = await GetRequiredStore(fileTransferId, cancellationToken);
-        return await store.CreateFileAsync(uploadLength, metadata, cancellationToken);
+        var fileId = await store.CreateFileAsync(uploadLength, metadata, cancellationToken);
+        _uploadLengths[fileId] = uploadLength;
+        return fileId;
     }
 
     public async Task<string> GetUploadMetadataAsync(string fileId, CancellationToken cancellationToken)
@@ -103,6 +100,8 @@ public class BrokerTusStore(
         {
             hasher.Dispose();
         }
+
+        _uploadLengths.TryRemove(fileId, out _);
 
         if (expirationDetailsStore is RedisTusExpirationDetailsStore redisExpirationStore)
         {
@@ -149,6 +148,22 @@ public class BrokerTusStore(
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
         return await store.VerifyChecksumAsync(fileId, algorithm, checksum, cancellationToken);
+    }
+
+    private async Task<long> GetCachedUploadLengthAsync(
+        AzureBlobTusStore store,
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        if (_uploadLengths.TryGetValue(fileId, out var cachedLength))
+        {
+            return cachedLength;
+        }
+
+        var uploadLength = await store.GetUploadLengthAsync(fileId, cancellationToken)
+            ?? throw new TusStoreException($"Upload length is missing for file id {fileId}");
+        _uploadLengths[fileId] = uploadLength;
+        return uploadLength;
     }
 
     private async Task<MD5> GetOrCreateUploadMd5Async(AzureBlobTusStore store, string fileId, CancellationToken cancellationToken)

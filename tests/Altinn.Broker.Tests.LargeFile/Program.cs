@@ -110,7 +110,7 @@ public class Program
         };
         using var httpRequestMessage = new HttpRequestMessage
         {
-            RequestUri = new Uri(baseUrl + "/broker/api/v1/resource"),
+            RequestUri = new Uri(baseUrl + "/broker/api/v1/resource/" + TestResource),
             Method = HttpMethod.Put,
             Content = new StringContent(JsonSerializer.Serialize(configureResourceBody), Encoding.UTF8, "application/json")
         };

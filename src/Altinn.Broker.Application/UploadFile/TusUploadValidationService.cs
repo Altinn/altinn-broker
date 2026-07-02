@@ -75,4 +75,50 @@ public class TusUploadValidationService(
 
         return (fileTransfer, resource.MaxFileTransferSize, null);
     }
+
+    public async Task<Error?> ValidateUploadInProgressAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            return Errors.FileTransferNotFound;
+        }
+
+        if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
+        {
+            return Errors.FileTransferAlreadyUploaded;
+        }
+
+        return null;
+    }
+
+    public async Task<(long? MaxUploadSize, Error? Error)> ValidateUploadSizeAsync(
+        Guid fileTransferId,
+        long uploadLength,
+        CancellationToken cancellationToken)
+    {
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            return (null, Errors.FileTransferNotFound);
+        }
+
+        var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+        if (resource is null)
+        {
+            return (null, Errors.InvalidResourceDefinition);
+        }
+
+        if (fileTransfer.UseVirusScan && uploadLength > ApplicationConstants.MaxVirusScanUploadSize)
+        {
+            return (resource.MaxFileTransferSize, Errors.FileSizeTooBig);
+        }
+
+        if (resource.MaxFileTransferSize is not null && uploadLength > resource.MaxFileTransferSize)
+        {
+            return (resource.MaxFileTransferSize, Errors.FileSizeTooBig);
+        }
+
+        return (resource.MaxFileTransferSize, null);
+    }
 }
