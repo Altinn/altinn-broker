@@ -17,9 +17,11 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
     private const string TusResumableHeader = "Tus-Resumable";
     private const string UploadLengthHeader = "Upload-Length";
     private const string UploadOffsetHeader = "Upload-Offset";
+    private const string UploadConcatHeader = "Upload-Concat";
     private const string OffsetOctetStream = "application/offset+octet-stream";
 
     private static readonly string TusPath = TusEndpointExtensions.RouteTemplate;
+    private static readonly string TusPartialPath = TusEndpointExtensions.PartialRouteTemplate;
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
@@ -34,6 +36,16 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
                 [OperationType.Delete] = CreateDeleteOperation()
             }
         };
+
+        swaggerDoc.Paths[TusPartialPath] = new OpenApiPathItem
+        {
+            Operations = new Dictionary<OperationType, OpenApiOperation>
+            {
+                [OperationType.Head] = CreatePartialHeadOperation(),
+                [OperationType.Patch] = CreatePartialPatchOperation(),
+                [OperationType.Delete] = CreatePartialDeleteOperation()
+            }
+        };
     }
 
     private static OpenApiOperation CreateOptionsOperation() => new()
@@ -43,6 +55,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Description = BuildDescription(
             "Returns supported TUS protocol version and extensions. " +
             "Call this before starting a resumable upload. " +
+            "The <c>Tus-Extension</c> response header includes <c>concatenation</c> for parallel partial uploads. " +
             "See https://tus.io/protocols/resumable-upload.html"),
         OperationId = "TusUploadOptions",
         Parameters = [FileTransferIdParameter()],
@@ -59,18 +72,25 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Summary = "Create a resumable upload",
         Description = BuildDescription(
             "Creates a TUS upload resource for an initialized file transfer. " +
-            "Requires the <c>Upload-Length</c> header with the total file size in bytes. " +
+            "<br/><br/><b>Single-file upload</b>: send <c>Upload-Length</c> only. " +
             "Continue uploading with <c>PATCH</c> and <c>HEAD</c> on this same URL. " +
+            "<br/><br/><b>Concatenation partial</b>: send <c>Upload-Concat: partial</c> and <c>Upload-Length</c> " +
+            "for each file segment. The response <c>Location</c> is " +
+            $"<c>{TusPartialPath}</c>. " +
+            "<br/><br/><b>Concatenation final</b>: after all partials are complete, send " +
+            "<c>Upload-Concat: final;&lt;partial-location-1&gt; &lt;partial-location-2&gt; ...</c> " +
+            "using the <c>Location</c> URLs from partial creates. Do not send <c>Upload-Length</c> on the final request. " +
             "Upload-Defer-Length is not supported."),
         OperationId = "TusUploadCreate",
         Parameters =
         [
             FileTransferIdParameter(),
             TusResumableParameter(required: true),
-            UploadLengthParameter(required: true)
+            UploadLengthParameter(required: false),
+            UploadConcatParameter(required: false)
         ],
         Responses = CreateResponses(
-            ("201", "Upload created. Continue with PATCH on this URL."),
+            ("201", "Upload created. For partial uploads, continue with PATCH on the returned Location URL."),
             ("400", BadRequest),
             ("401", Unauthorized),
             ("403", Forbidden),
@@ -86,7 +106,8 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Summary = "Get current upload offset",
         Description = BuildDescription(
             "Returns how many bytes have been uploaded so far via the <c>Upload-Offset</c> response header. " +
-            "Use this to resume an interrupted upload."),
+            "Use this to resume an interrupted single-file upload on this URL. " +
+            "For concatenation partial uploads, use the two-segment partial URL instead."),
         OperationId = "TusUploadHead",
         Parameters =
         [
@@ -107,7 +128,8 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Description = BuildDescription(
             "Appends a chunk of file data at the offset given in the <c>Upload-Offset</c> request header. " +
             "Repeat until the server offset equals <c>Upload-Length</c>. " +
-            "On completion the file is finalized and the file transfer status is updated."),
+            "On completion the file is finalized and the file transfer status is updated. " +
+            "For concatenation partial uploads, use the two-segment partial URL instead."),
         OperationId = "TusUploadPatch",
         Parameters =
         [
@@ -115,21 +137,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
             TusResumableParameter(required: true),
             UploadOffsetParameter(required: true)
         ],
-        RequestBody = new OpenApiRequestBody
-        {
-            Required = true,
-            Content = new Dictionary<string, OpenApiMediaType>
-            {
-                [OffsetOctetStream] = new OpenApiMediaType
-                {
-                    Schema = new OpenApiSchema
-                    {
-                        Type = "string",
-                        Format = "binary"
-                    }
-                }
-            }
-        },
+        RequestBody = CreateChunkRequestBody(),
         Responses = CreateResponses(
             ("204", "Chunk accepted. New offset returned in Upload-Offset header."),
             ("400", BadRequest),
@@ -159,6 +167,89 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
             ("404", NotFound))
     };
 
+    private static OpenApiOperation CreatePartialHeadOperation() => new()
+    {
+        Tags = [new OpenApiTag { Name = Tag }],
+        Summary = "Get current partial upload offset",
+        Description = BuildDescription(
+            "Returns the current byte offset for a concatenation partial upload via the <c>Upload-Offset</c> response header. " +
+            "Use the <c>Location</c> URL returned when creating the partial upload."),
+        OperationId = "TusPartialUploadHead",
+        Parameters =
+        [
+            FileTransferIdParameter(),
+            PartialUploadIdParameter(),
+            TusResumableParameter(required: true)
+        ],
+        Responses = CreateResponses(
+            ("200", "Current offset and Upload-Length returned in response headers"),
+            ("401", Unauthorized),
+            ("403", Forbidden),
+            ("404", NotFound))
+    };
+
+    private static OpenApiOperation CreatePartialPatchOperation() => new()
+    {
+        Tags = [new OpenApiTag { Name = Tag }],
+        Summary = "Upload the next chunk to a partial upload",
+        Description = BuildDescription(
+            "Appends a chunk to a concatenation partial upload at the offset given in the <c>Upload-Offset</c> request header. " +
+            "Repeat until the server offset equals the partial <c>Upload-Length</c>."),
+        OperationId = "TusPartialUploadPatch",
+        Parameters =
+        [
+            FileTransferIdParameter(),
+            PartialUploadIdParameter(),
+            TusResumableParameter(required: true),
+            UploadOffsetParameter(required: true)
+        ],
+        RequestBody = CreateChunkRequestBody(),
+        Responses = CreateResponses(
+            ("204", "Chunk accepted. New offset returned in Upload-Offset header."),
+            ("400", BadRequest),
+            ("401", Unauthorized),
+            ("403", Forbidden),
+            ("404", NotFound),
+            ("409", "Upload-Offset does not match server offset"),
+            ("503", ServiceUnavailable))
+    };
+
+    private static OpenApiOperation CreatePartialDeleteOperation() => new()
+    {
+        Tags = [new OpenApiTag { Name = Tag }],
+        Summary = "Terminate an incomplete partial upload",
+        Description = BuildDescription(
+            "Deletes an in-progress concatenation partial upload."),
+        OperationId = "TusPartialUploadDelete",
+        Parameters =
+        [
+            FileTransferIdParameter(),
+            PartialUploadIdParameter(),
+            TusResumableParameter(required: true)
+        ],
+        Responses = CreateResponses(
+            ("204", "Partial upload terminated"),
+            ("401", Unauthorized),
+            ("403", Forbidden),
+            ("404", NotFound))
+    };
+
+    private static OpenApiRequestBody CreateChunkRequestBody() => new()
+    {
+        Required = true,
+        Content = new Dictionary<string, OpenApiMediaType>
+        {
+            [OffsetOctetStream] = new OpenApiMediaType
+            {
+                Schema = new OpenApiSchema
+                {
+                    Type = "string",
+                    Format = "binary"
+                }
+            }
+        }
+    };
+
     private static string BuildDescription(string body) =>
         $"{body}<br/><br/>One of the scopes:<br/>- altinn:broker.write<br/><br/>" +
         $"Requires the <c>{TusResumableHeader}: {TusVersion}</c> header on every request except OPTIONS.";
@@ -170,6 +261,15 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Required = true,
         Schema = new OpenApiSchema { Type = "string", Format = "uuid" },
         Description = "The file transfer id returned from initialize."
+    };
+
+    private static OpenApiParameter PartialUploadIdParameter() => new()
+    {
+        Name = "partialUploadId",
+        In = ParameterLocation.Path,
+        Required = true,
+        Schema = new OpenApiSchema { Type = "string" },
+        Description = "The partial upload id returned in the Location header when creating a partial upload."
     };
 
     private static OpenApiParameter TusResumableParameter(bool required) => new()
@@ -187,7 +287,18 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         In = ParameterLocation.Header,
         Required = required,
         Schema = new OpenApiSchema { Type = "integer", Format = "int64" },
-        Description = "Total upload size in bytes."
+        Description = "Total upload size in bytes. Required for single-file and partial uploads. Omit on final concatenation requests."
+    };
+
+    private static OpenApiParameter UploadConcatParameter(bool required) => new()
+    {
+        Name = UploadConcatHeader,
+        In = ParameterLocation.Header,
+        Required = required,
+        Schema = new OpenApiSchema { Type = "string" },
+        Description =
+            "Concatenation mode. Use <c>partial</c> when creating a segment upload, or " +
+            "<c>final;&lt;partial-location-1&gt; &lt;partial-location-2&gt; ...</c> to finalize."
     };
 
     private static OpenApiParameter UploadOffsetParameter(bool required) => new()

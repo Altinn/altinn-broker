@@ -23,6 +23,9 @@ public static class TusEndpointExtensions
     // OpenAPI/APIM path (fileTransferId is the tus file id in the last segment).
     public const string RouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
 
+    // Concatenation partial uploads are addressed at /tus/{fileTransferId}/{partialUploadId}.
+    public const string PartialRouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}/{partialUploadId}";
+
     // MapTus appends /{TusFileId?} automatically — do not add a path parameter here.
     public const string TusMapPath = "/broker/api/v1/filetransfer/upload/tus";
 
