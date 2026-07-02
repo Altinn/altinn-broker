@@ -109,6 +109,7 @@ public static class DependencyInjection
                 ? new RedisTusExpirationDetailsStore(multiplexer)
                 : new NullExpirationDetailsStore();
         });
+        services.AddSingleton<ITusPartialUploadRegistry, TusPartialUploadRegistry>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }

@@ -57,6 +57,12 @@ public static class TusEndpointExtensions
 
     private static bool TryResolveFileTransferId(HttpContext httpContext, string? tusFileId, out Guid fileTransferId)
     {
+        var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        if (!string.IsNullOrEmpty(tusFileId) && partialUploadRegistry.TryGetFileTransferId(tusFileId, out fileTransferId))
+        {
+            return true;
+        }
+
         if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId))
         {
             return true;
@@ -130,9 +136,15 @@ public static class TusEndpointExtensions
         var uploadPath = $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 
-        if (!Guid.TryParse(context.FileId, out var fileTransferId))
+        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
         {
             throw new TusStoreException("Invalid file transfer id");
+        }
+
+        var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        if (partialUploadRegistry.IsPartial(context.FileId))
+        {
+            return;
         }
 
         var fileTransferStatusRepository = context.HttpContext.RequestServices
