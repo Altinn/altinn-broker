@@ -23,34 +23,59 @@ public class BrokerTusStore(
 {
     private readonly ConcurrentDictionary<string, MD5> _uploadMd5Hashers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, UploadState> _uploadStates = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
-        var md5 = await GetOrCreateUploadMd5Async(store, fileId, cancellationToken);
-        var uploadLength = await GetCachedUploadLengthAsync(store, fileId, cancellationToken);
-        var offsetBefore = await store.GetUploadOffsetAsync(fileId, cancellationToken);
+        var state = await GetOrCreateUploadStateAsync(store, fileId, cancellationToken);
 
-        var bytesWritten = await store.AppendDataAsync(fileId, new Md5ComputingStream(stream, md5), cancellationToken);
-        var newOffset = offsetBefore + bytesWritten;
-
-        if (newOffset >= uploadLength)
+        using var chunkBuffer = new MemoryStream();
+        await stream.CopyToAsync(chunkBuffer, cancellationToken);
+        var chunk = chunkBuffer.ToArray();
+        if (chunk.Length == 0)
         {
-            md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            if (md5.Hash is not null)
-            {
-                await storageResolver.SetStagingBlobMd5ChecksumAsync(fileId, md5.Hash, cancellationToken);
-            }
-
-            if (_uploadMd5Hashers.TryRemove(fileId, out var hasher))
-            {
-                hasher.Dispose();
-            }
-
-            _uploadLengths.TryRemove(fileId, out _);
+            return 0;
         }
 
-        return bytesWritten;
+        var shouldStartProcessor = false;
+        long acceptedOffset;
+        bool isFinalChunk;
+
+        lock (state.SyncRoot)
+        {
+            if (state.Fault is not null)
+            {
+                throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+            }
+
+            state.PendingChunks.Enqueue(chunk);
+            state.AcceptedOffset += chunk.Length;
+            acceptedOffset = state.AcceptedOffset;
+            isFinalChunk = acceptedOffset >= state.UploadLength;
+
+            if (!state.IsProcessing)
+            {
+                state.IsProcessing = true;
+                shouldStartProcessor = true;
+            }
+        }
+
+        if (shouldStartProcessor)
+        {
+            _ = Task.Run(() => ProcessPendingChunksAsync(fileId, store, state));
+        }
+
+        // For intermediate chunks we ACK as soon as bytes are read into memory.
+        // For the final chunk we still wait until all buffered data is committed to storage.
+        if (isFinalChunk)
+        {
+            await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
+            await FinalizeUploadChecksumAsync(fileId, state, cancellationToken);
+            CleanupUploadState(fileId);
+        }
+
+        return chunk.Length;
     }
 
     public async Task<bool> FileExistAsync(string fileId, CancellationToken cancellationToken)
@@ -67,6 +92,19 @@ public class BrokerTusStore(
 
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
+        if (_uploadStates.TryGetValue(fileId, out var state))
+        {
+            lock (state.SyncRoot)
+            {
+                if (state.Fault is not null)
+                {
+                    throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+                }
+
+                return state.AcceptedOffset;
+            }
+        }
+
         var store = await GetRequiredStore(fileId, cancellationToken);
         return await store.GetUploadOffsetAsync(fileId, cancellationToken);
     }
@@ -77,6 +115,7 @@ public class BrokerTusStore(
         var store = await GetRequiredStore(fileTransferId, cancellationToken);
         var fileId = await store.CreateFileAsync(uploadLength, metadata, cancellationToken);
         _uploadLengths[fileId] = uploadLength;
+        _uploadStates[fileId] = new UploadState(uploadLength, initialOffset: 0);
         return fileId;
     }
 
@@ -96,12 +135,7 @@ public class BrokerTusStore(
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
         await store.DeleteFileAsync(fileId, cancellationToken);
-        if (_uploadMd5Hashers.TryRemove(fileId, out var hasher))
-        {
-            hasher.Dispose();
-        }
-
-        _uploadLengths.TryRemove(fileId, out _);
+        CleanupUploadState(fileId);
 
         if (expirationDetailsStore is RedisTusExpirationDetailsStore redisExpirationStore)
         {
@@ -166,6 +200,22 @@ public class BrokerTusStore(
         return uploadLength;
     }
 
+    private async Task<UploadState> GetOrCreateUploadStateAsync(
+        AzureBlobTusStore store,
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        if (_uploadStates.TryGetValue(fileId, out var existingState))
+        {
+            return existingState;
+        }
+
+        var uploadLength = await GetCachedUploadLengthAsync(store, fileId, cancellationToken);
+        var currentOffset = await store.GetUploadOffsetAsync(fileId, cancellationToken);
+        var newState = new UploadState(uploadLength, currentOffset);
+        return _uploadStates.GetOrAdd(fileId, newState);
+    }
+
     private async Task<MD5> GetOrCreateUploadMd5Async(AzureBlobTusStore store, string fileId, CancellationToken cancellationToken)
     {
         if (_uploadMd5Hashers.TryGetValue(fileId, out var existing))
@@ -196,6 +246,119 @@ public class BrokerTusStore(
         return md5;
     }
 
+    private async Task ProcessPendingChunksAsync(string fileId, AzureBlobTusStore store, UploadState state)
+    {
+        while (true)
+        {
+            byte[]? chunk;
+            lock (state.SyncRoot)
+            {
+                if (state.PendingChunks.Count == 0)
+                {
+                    state.IsProcessing = false;
+                    return;
+                }
+
+                chunk = state.PendingChunks.Dequeue();
+            }
+
+            try
+            {
+                await using var chunkStream = new MemoryStream(chunk, writable: false);
+                var bytesWritten = await store.AppendDataAsync(fileId, chunkStream, CancellationToken.None);
+                if (bytesWritten != chunk.Length)
+                {
+                    throw new TusStoreException($"Unexpected append result for file id {fileId}. Expected {chunk.Length} bytes, wrote {bytesWritten} bytes.");
+                }
+
+                var md5 = await GetOrCreateUploadMd5Async(store, fileId, CancellationToken.None);
+                md5.TransformBlock(chunk, 0, chunk.Length, null, 0);
+
+                lock (state.SyncRoot)
+                {
+                    state.CommittedOffset += bytesWritten;
+                    var previousProgress = state.ProgressSignal;
+                    state.ProgressSignal = NewProgressSignal();
+                    previousProgress.TrySetResult(state.CommittedOffset);
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (state.SyncRoot)
+                {
+                    state.Fault = ex;
+                    state.IsProcessing = false;
+                    var previousProgress = state.ProgressSignal;
+                    state.ProgressSignal = NewProgressSignal();
+                    previousProgress.TrySetException(ex);
+                }
+
+                return;
+            }
+        }
+    }
+
+    private static TaskCompletionSource<long> NewProgressSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private async Task WaitForCommittedOffsetAsync(
+        string fileId,
+        UploadState state,
+        long targetOffset,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            Task waitTask;
+            lock (state.SyncRoot)
+            {
+                if (state.Fault is not null)
+                {
+                    throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+                }
+
+                if (state.CommittedOffset >= targetOffset)
+                {
+                    return;
+                }
+
+                waitTask = state.ProgressSignal.Task;
+            }
+
+            await waitTask.WaitAsync(cancellationToken);
+        }
+    }
+
+    private async Task FinalizeUploadChecksumAsync(string fileId, UploadState state, CancellationToken cancellationToken)
+    {
+        lock (state.SyncRoot)
+        {
+            if (state.Fault is not null)
+            {
+                throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+            }
+        }
+
+        var store = await GetRequiredStore(fileId, cancellationToken);
+        var md5 = await GetOrCreateUploadMd5Async(store, fileId, cancellationToken);
+        md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        if (md5.Hash is not null)
+        {
+            await storageResolver.SetStagingBlobMd5ChecksumAsync(fileId, md5.Hash, cancellationToken);
+        }
+    }
+
+    private void CleanupUploadState(string fileId)
+    {
+        if (_uploadMd5Hashers.TryRemove(fileId, out var hasher))
+        {
+            hasher.Dispose();
+        }
+
+        _uploadLengths.TryRemove(fileId, out _);
+        _uploadStates.TryRemove(fileId, out _);
+    }
+
     private async Task<AzureBlobTusStore> GetRequiredStore(string fileId, CancellationToken cancellationToken)
     {
         var store = await storageResolver.GetStoreForFileAsync(fileId, cancellationToken);
@@ -218,5 +381,32 @@ public class BrokerTusStore(
         }
 
         return fileTransferId.ToString();
+    }
+
+    private sealed class UploadState
+    {
+        public UploadState(long uploadLength, long initialOffset)
+        {
+            UploadLength = uploadLength;
+            AcceptedOffset = initialOffset;
+            CommittedOffset = initialOffset;
+            ProgressSignal = NewProgressSignal();
+        }
+
+        public object SyncRoot { get; } = new();
+
+        public Queue<byte[]> PendingChunks { get; } = new();
+
+        public long UploadLength { get; }
+
+        public long AcceptedOffset { get; set; }
+
+        public long CommittedOffset { get; set; }
+
+        public bool IsProcessing { get; set; }
+
+        public Exception? Fault { get; set; }
+
+        public TaskCompletionSource<long> ProgressSignal { get; set; }
     }
 }
