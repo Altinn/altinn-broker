@@ -38,6 +38,7 @@ public class UploadFileHandler(
             user,
             request.FileTransferId,
             request.ContentLength,
+            request.IsLegacy,
             cancellationToken);
         if (validationError is not null)
         {
@@ -75,13 +76,23 @@ public class UploadFileHandler(
             var result = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
             if (result is null)
             {
-                await fileTransferStatusRepository.InsertFileTransferStatus(
-                    request.FileTransferId,
-                    FileTransferStatus.Failed,
-                    timestamp: DateTime.UtcNow,
-                    detailedFileTransferStatus: "File upload failed and was aborted",
-                    cancellationToken: cancellationToken);
-                return Errors.UploadFailed;
+                return await TransactionWithRetriesPolicy.Execute(async ct =>
+                {
+                    await fileTransferStatusRepository.InsertFileTransferStatus(
+                        request.FileTransferId,
+                        FileTransferStatus.Failed,
+                        timestamp: DateTime.UtcNow,
+                        detailedFileTransferStatus: "File upload failed and was aborted",
+                        cancellationToken: ct);
+                    backgroundJobClient.Enqueue(() => eventBus.Publish(
+                        AltinnEventType.UploadFailed,
+                        fileTransfer.ResourceId,
+                        request.FileTransferId.ToString(),
+                        fileTransfer.Sender.ActorExternalId,
+                        Guid.NewGuid(),
+                        AltinnEventSubjectRole.Sender));
+                    return Errors.UploadFailed;
+                }, logger, cancellationToken);
             }
 
             var (checksum, uploadLength) = result.Value;

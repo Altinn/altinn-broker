@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Common;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
@@ -38,6 +39,11 @@ public class TusUploadCompleteHandler(
         if (serviceOwner is null)
         {
             return Errors.ServiceOwnerNotConfigured;
+        }
+
+        if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
+        {
+            return fileTransferId;
         }
 
         var finalizeResult = await brokerStorageService.FinalizeTusUpload(serviceOwner, fileTransfer, cancellationToken);

@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+
 using Microsoft.AspNetCore.Http;
 
 using tusdotnet.Interfaces;
@@ -15,12 +18,44 @@ public class BrokerTusStore(
     ITusCreationStore,
     ITusReadableStore,
     ITusTerminationStore,
-    ITusExpirationStore
+    ITusExpirationStore,
+    ITusChecksumStore
 {
+    private readonly ConcurrentDictionary<string, MD5> _uploadMd5Hashers = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
-        return await store.AppendDataAsync(fileId, stream, cancellationToken);
+        var md5 = await GetOrCreateUploadMd5Async(store, fileId, cancellationToken);
+
+        using var chunkData = new MemoryStream();
+        await stream.CopyToAsync(chunkData, cancellationToken);
+        var chunkBytes = chunkData.ToArray();
+        if (chunkBytes.Length > 0)
+        {
+            md5.TransformBlock(chunkBytes, 0, chunkBytes.Length, null, 0);
+        }
+
+        await using var chunkStream = new MemoryStream(chunkBytes, writable: false);
+        var bytesWritten = await store.AppendDataAsync(fileId, chunkStream, cancellationToken);
+
+        var uploadLength = await store.GetUploadLengthAsync(fileId, cancellationToken);
+        var offset = await store.GetUploadOffsetAsync(fileId, cancellationToken);
+        if (uploadLength is not null && offset >= uploadLength.Value)
+        {
+            md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            if (md5.Hash is not null)
+            {
+                await storageResolver.SetStagingBlobMd5ChecksumAsync(fileId, md5.Hash, cancellationToken);
+            }
+
+            if (_uploadMd5Hashers.TryRemove(fileId, out var hasher))
+            {
+                hasher.Dispose();
+            }
+        }
+
+        return bytesWritten;
     }
 
     public async Task<bool> FileExistAsync(string fileId, CancellationToken cancellationToken)
@@ -64,6 +99,11 @@ public class BrokerTusStore(
     {
         var store = await GetRequiredStore(fileId, cancellationToken);
         await store.DeleteFileAsync(fileId, cancellationToken);
+        if (_uploadMd5Hashers.TryRemove(fileId, out var hasher))
+        {
+            hasher.Dispose();
+        }
+
         if (expirationDetailsStore is RedisTusExpirationDetailsStore redisExpirationStore)
         {
             await redisExpirationStore.RemoveExpirationAsync(fileId, cancellationToken);
@@ -103,10 +143,43 @@ public class BrokerTusStore(
     }
 
     public Task<IEnumerable<string>> GetSupportedAlgorithmsAsync(CancellationToken cancellationToken)
-        => Task.FromResult(Enumerable.Empty<string>());
+        => Task.FromResult<IEnumerable<string>>(new[] { "md5" });
 
-    public Task<bool> VerifyChecksumAsync(string fileId, string algorithm, byte[] checksum, CancellationToken cancellationToken)
-        => Task.FromResult(false);
+    public async Task<bool> VerifyChecksumAsync(string fileId, string algorithm, byte[] checksum, CancellationToken cancellationToken)
+    {
+        var store = await GetRequiredStore(fileId, cancellationToken);
+        return await store.VerifyChecksumAsync(fileId, algorithm, checksum, cancellationToken);
+    }
+
+    private async Task<MD5> GetOrCreateUploadMd5Async(AzureBlobTusStore store, string fileId, CancellationToken cancellationToken)
+    {
+        if (_uploadMd5Hashers.TryGetValue(fileId, out var existing))
+        {
+            return existing;
+        }
+
+        var md5 = MD5.Create();
+        var offset = await store.GetUploadOffsetAsync(fileId, cancellationToken);
+        if (offset > 0)
+        {
+            var file = await store.GetFileAsync(fileId, cancellationToken);
+            await using var content = await file.GetContentAsync(cancellationToken);
+            var buffer = new byte[1024 * 1024];
+            int read;
+            while ((read = await content.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                md5.TransformBlock(buffer, 0, read, null, 0);
+            }
+        }
+
+        if (!_uploadMd5Hashers.TryAdd(fileId, md5))
+        {
+            md5.Dispose();
+            return _uploadMd5Hashers[fileId];
+        }
+
+        return md5;
+    }
 
     private async Task<AzureBlobTusStore> GetRequiredStore(string fileId, CancellationToken cancellationToken)
     {

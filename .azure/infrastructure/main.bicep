@@ -179,7 +179,6 @@ module redis '../modules/redis/create.bicep' = {
     namePrefix: namePrefix
     keyVaultName: sourceKeyVaultName
     environment: environment
-    prodLikeEnvironment: environment != 'test'
   }
 }
 

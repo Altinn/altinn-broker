@@ -84,7 +84,7 @@ public static class TusEndpointExtensions
             context.HttpContext.User,
             fileTransferId,
             uploadLength: null,
-            context.CancellationToken);
+            cancellationToken: context.CancellationToken);
 
         if (error is not null)
         {
@@ -111,7 +111,7 @@ public static class TusEndpointExtensions
             context.HttpContext.User,
             fileTransferId,
             context.UploadLength,
-            context.CancellationToken);
+            cancellationToken: context.CancellationToken);
 
         if (error is not null)
         {

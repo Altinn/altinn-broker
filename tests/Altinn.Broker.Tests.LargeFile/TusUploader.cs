@@ -17,6 +17,11 @@ public static class TusUploader
         int chunkSize,
         CancellationToken cancellationToken = default)
     {
+        if (chunkSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(chunkSize), chunkSize, "Chunk size must be greater than zero.");
+        }
+
         var tusEndpoint = BuildTusEndpointUri(baseUrl, fileTransferId);
         await EnsureServerSupportsTus(httpClient, tusEndpoint, cancellationToken);
 
@@ -45,7 +50,20 @@ public static class TusUploader
                     $"Source stream ended unexpectedly at offset {offset} (expected {uploadSize} bytes).");
             }
 
-            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
+            var chunkStartOffset = offset;
+            offset = await PatchChunkAsync(httpClient, uploadUri, chunkStartOffset, buffer, bytesRead, cancellationToken);
+            var expectedOffset = chunkStartOffset + bytesRead;
+            if (offset != expectedOffset)
+            {
+                if (!source.CanSeek)
+                {
+                    throw new InvalidOperationException(
+                        $"Server reported offset {offset}, expected {expectedOffset}, but the source stream cannot be realigned.");
+                }
+
+                source.Seek(offset, SeekOrigin.Begin);
+            }
+
             progress.Update(offset);
 
             if (offset > uploadSize)
@@ -81,7 +99,6 @@ public static class TusUploader
                 $"Progress: {currentOffset * 100.0 / totalSize:F3}% " +
                 $"({currentOffset / (1024.0 * 1024 * 1024):N2} GiB / {totalSize / (1024.0 * 1024 * 1024):N2} GiB) " +
                 $"avg {currentOffset / elapsedSeconds / (1024 * 1024):N2} MiB/s");
-            _intervalStopwatch.Restart();
         }
     }
 
@@ -158,7 +175,7 @@ public static class TusUploader
             using var patchResponse = await httpClient.SendAsync(patchRequest, cancellationToken);
             if (patchResponse.StatusCode == HttpStatusCode.NoContent)
             {
-                return ParseUploadOffset(patchResponse.Headers, offset + bytesRead);
+                return ParseUploadOffset(patchResponse.Headers);
             }
 
             var responseBody = await patchResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -203,10 +220,10 @@ public static class TusUploader
                 $"TUS HEAD failed with {(int)headResponse.StatusCode} {headResponse.StatusCode}: {responseBody}");
         }
 
-        return ParseUploadOffset(headResponse.Headers, 0);
+        return ParseUploadOffset(headResponse.Headers);
     }
 
-    private static long ParseUploadOffset(HttpResponseHeaders headers, long fallbackOffset)
+    private static long ParseUploadOffset(HttpResponseHeaders headers)
     {
         if (headers.TryGetValues("Upload-Offset", out var values)
             && long.TryParse(values.FirstOrDefault(), out var parsedOffset))
@@ -214,7 +231,7 @@ public static class TusUploader
             return parsedOffset;
         }
 
-        return fallbackOffset;
+        throw new InvalidOperationException("TUS response did not include a valid Upload-Offset header.");
     }
 
     private static Uri? ResolveUploadUri(Uri tusEndpoint, Uri? location)

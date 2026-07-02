@@ -17,7 +17,8 @@ public class TusUploadValidationService(
         ClaimsPrincipal? user,
         Guid fileTransferId,
         long? uploadLength,
-        CancellationToken cancellationToken)
+        bool isLegacyUser = false,
+        CancellationToken cancellationToken = default)
     {
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
         if (fileTransfer is null)
@@ -29,7 +30,7 @@ public class TusUploadValidationService(
             user,
             fileTransfer.ResourceId,
             fileTransfer.Sender.ActorExternalId,
-            isLegacyUser: false,
+            isLegacyUser,
             cancellationToken);
         if (!hasAccess)
         {

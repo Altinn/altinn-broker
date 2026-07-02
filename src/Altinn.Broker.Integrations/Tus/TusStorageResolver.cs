@@ -3,6 +3,10 @@ using System.Collections.Concurrent;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 
@@ -13,6 +17,7 @@ namespace Altinn.Broker.Integrations.Tus;
 public interface ITusStorageResolver
 {
     Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
+    Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
 }
 
 public class TusStorageResolver(
@@ -26,6 +31,66 @@ public class TusStorageResolver(
     private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return null;
+        }
+
+        return _stores.GetOrAdd(storageContext.StorageAccountName, _ => new AzureBlobTusStore(
+            storageContext.ConnectionString,
+            AzureStorageConstants.BrokerFilesContainerName,
+            new AzureBlobTusStoreOptions
+            {
+                BlobPath = AzureStorageConstants.TusStagingBlobPath,
+                AuthenticationMode = storageContext.AuthenticationMode,
+                ExpirationDetailsStore = expirationDetailsStore,
+                FileIdGeneratorAsync = _ =>
+                {
+                    var httpContext = httpContextAccessor.HttpContext
+                        ?? throw new InvalidOperationException("Missing HTTP context");
+                    if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+                    {
+                        throw new InvalidOperationException("Missing file transfer id in route");
+                    }
+
+                    return Task.FromResult(fileTransferId.ToString());
+                }
+            }));
+    }
+
+    public async Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var appendBlobClient = containerClient.GetAppendBlobClient(
+            Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileId));
+        var properties = await appendBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        var metadata = properties.Value.Metadata.ToDictionary(static k => k.Key, static v => v.Value);
+        metadata[AzureStorageConstants.TusMd5ChecksumMetadataKey] = Convert.ToBase64String(md5Hash);
+        await appendBlobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
+    }
+
+    private BlobContainerClient GetBlobContainerClient(TusStorageContext storageContext)
+    {
+        if (hostEnvironment.IsDevelopment())
+        {
+            return new BlobServiceClient(AzureConstants.AzuriteUrl)
+                .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
+        }
+
+        var storageUri = new Uri(storageContext.ConnectionString);
+        return new BlobServiceClient(storageUri, new DefaultAzureCredential())
+            .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
+    }
+
+    private async Task<TusStorageContext?> ResolveStorageContextAsync(string fileId, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(fileId, out var fileTransferId))
         {
@@ -63,25 +128,11 @@ public class TusStorageResolver(
             ? AzureBlobTusStoreAuthenticationMode.ConnectionString
             : AzureBlobTusStoreAuthenticationMode.SystemAssignedManagedIdentity;
 
-        return _stores.GetOrAdd(storageProvider.ResourceName, _ => new AzureBlobTusStore(
-            connectionString,
-            AzureStorageConstants.BrokerFilesContainerName,
-            new AzureBlobTusStoreOptions
-            {
-                BlobPath = AzureStorageConstants.TusStagingBlobPath,
-                AuthenticationMode = authenticationMode,
-                ExpirationDetailsStore = expirationDetailsStore,
-                FileIdGeneratorAsync = _ =>
-                {
-                    var httpContext = httpContextAccessor.HttpContext
-                        ?? throw new InvalidOperationException("Missing HTTP context");
-                    if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
-                    {
-                        throw new InvalidOperationException("Missing file transfer id in route");
-                    }
-
-                    return Task.FromResult(fileTransferId.ToString());
-                }
-            }));
+        return new TusStorageContext(connectionString, authenticationMode, storageProvider.ResourceName);
     }
+
+    private sealed record TusStorageContext(
+        string ConnectionString,
+        AzureBlobTusStoreAuthenticationMode AuthenticationMode,
+        string StorageAccountName);
 }

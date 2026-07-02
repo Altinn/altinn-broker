@@ -70,7 +70,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// </summary>
     /// <remarks>
     /// For large files that may exceed reverse-proxy connection timeouts, use the resumable TUS endpoint instead:
-    /// POST/PATCH <c>/broker/api/v1/filetransfer/{fileTransferId}/upload/tus</c> (TUS protocol).
+    /// POST/PATCH <c>/broker/api/v1/filetransfer/upload/tus/{fileTransferId}</c> (TUS protocol).
     /// One of the scopes: <br />
     /// - altinn:broker.write
     /// </remarks>

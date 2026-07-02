@@ -15,12 +15,12 @@ public class Program
 
     static async Task Main(string[] args)
     {
-        string? baseUrl = Environment.GetEnvironmentVariable("BASE_URL");
-        string? username = Environment.GetEnvironmentVariable("TEST_TOOLS_USERNAME");
-        string? password = Environment.GetEnvironmentVariable("TEST_TOOLS_PASSWORD");
+        string? baseUrl = "https://altinn-dev-api.azure-api.net"; // Environment.GetEnvironmentVariable("BASE_URL");
+        string? username = "autotest"; // Environment.GetEnvironmentVariable("TEST_TOOLS_USERNAME");
+        string? password = "altinn8900bnn"; // Environment.GetEnvironmentVariable("TEST_TOOLS_PASSWORD");
         int gbsToUpload = Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD") is not null
             ? int.Parse(Environment.GetEnvironmentVariable("GIGABYTES_TO_UPLOAD")!)
-            : 1;
+            : 10;
         int chunkSizeMb = Environment.GetEnvironmentVariable("CHUNK_SIZE_MB") is not null
             ? int.Parse(Environment.GetEnvironmentVariable("CHUNK_SIZE_MB")!)
             : DefaultChunkSizeMb;
