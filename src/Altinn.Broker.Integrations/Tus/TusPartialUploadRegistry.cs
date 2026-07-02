@@ -1,82 +1,148 @@
-using System.Collections.Concurrent;
+using System.Text.Json;
+
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Altinn.Broker.Integrations.Tus;
 
 public interface ITusPartialUploadRegistry
 {
-    void RegisterPartial(string partialFileId, Guid fileTransferId, long uploadLength);
+    Task RegisterPartialAsync(string partialFileId, Guid fileTransferId, long uploadLength, CancellationToken cancellationToken = default);
 
-    void RegisterUpload(string fileId, long uploadLength);
+    Task RegisterUploadAsync(string fileId, long uploadLength, CancellationToken cancellationToken = default);
 
-    bool TryGetPartialInfo(string partialFileId, out Guid fileTransferId, out long uploadLength);
+    Task<(Guid FileTransferId, long UploadLength)?> TryGetPartialInfoAsync(string partialFileId, CancellationToken cancellationToken = default);
 
-    bool TryGetUploadLength(string fileId, out long uploadLength);
+    Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken = default);
 
-    bool IsKnownUpload(string fileId);
+    Task<bool> IsKnownUploadAsync(string fileId, CancellationToken cancellationToken = default);
 
-    bool IsPartial(string fileId);
+    Task<bool> IsPartialAsync(string fileId, CancellationToken cancellationToken = default);
 
-    bool TryGetFileTransferId(string tusFileId, out Guid fileTransferId);
+    Task<Guid?> TryGetFileTransferIdAsync(string tusFileId, CancellationToken cancellationToken = default);
 
-    void RemovePartial(string partialFileId);
+    Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken = default);
 
-    void RemoveUpload(string fileId);
+    Task RemoveUploadAsync(string fileId, CancellationToken cancellationToken = default);
+
+    Task RegisterFinalConcatAsync(string finalFileId, string[] partialFileIds, CancellationToken cancellationToken = default);
+
+    Task<string[]?> TryGetFinalConcatPartialIdsAsync(string finalFileId, CancellationToken cancellationToken = default);
+
+    Task RemoveFinalConcatAsync(string finalFileId, CancellationToken cancellationToken = default);
 }
 
-public sealed class TusPartialUploadRegistry : ITusPartialUploadRegistry
+public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPartialUploadRegistry
 {
-    private readonly ConcurrentDictionary<string, PartialUploadInfo> _partials = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
 
-    public void RegisterPartial(string partialFileId, Guid fileTransferId, long uploadLength)
-    {
-        _partials[partialFileId] = new PartialUploadInfo(fileTransferId, uploadLength);
-        _uploadLengths[partialFileId] = uploadLength;
-    }
+    private static string PartialKey(string fileId) => $"tus-partial:{fileId}";
 
-    public void RegisterUpload(string fileId, long uploadLength)
-        => _uploadLengths[fileId] = uploadLength;
+    private static string UploadLengthKey(string fileId) => $"tus-upload-length:{fileId}";
 
-    public bool TryGetPartialInfo(string partialFileId, out Guid fileTransferId, out long uploadLength)
-    {
-        if (_partials.TryGetValue(partialFileId, out var info))
-        {
-            fileTransferId = info.FileTransferId;
-            uploadLength = info.UploadLength;
-            return true;
-        }
-
-        fileTransferId = default;
-        uploadLength = 0;
-        return false;
-    }
-
-    public bool IsPartial(string fileId) => _partials.ContainsKey(fileId);
-
-    public bool TryGetUploadLength(string fileId, out long uploadLength)
-        => _uploadLengths.TryGetValue(fileId, out uploadLength);
-
-    public bool IsKnownUpload(string fileId) => _uploadLengths.ContainsKey(fileId);
-
-    public bool TryGetFileTransferId(string tusFileId, out Guid fileTransferId)
-    {
-        if (_partials.TryGetValue(tusFileId, out var info))
-        {
-            fileTransferId = info.FileTransferId;
-            return true;
-        }
-
-        fileTransferId = default;
-        return false;
-    }
-
-    public void RemovePartial(string partialFileId)
-    {
-        _partials.TryRemove(partialFileId, out _);
-        _uploadLengths.TryRemove(partialFileId, out _);
-    }
-
-    public void RemoveUpload(string fileId) => _uploadLengths.TryRemove(fileId, out _);
+    private static string FinalConcatKey(string fileId) => $"tus-final-concat:{fileId}";
 
     private sealed record PartialUploadInfo(Guid FileTransferId, long UploadLength);
+
+    public async Task RegisterPartialAsync(
+        string partialFileId,
+        Guid fileTransferId,
+        long uploadLength,
+        CancellationToken cancellationToken = default)
+    {
+        var options = CreateCacheOptions();
+        await cache.SetStringAsync(
+            PartialKey(partialFileId),
+            JsonSerializer.Serialize(new PartialUploadInfo(fileTransferId, uploadLength)),
+            options,
+            cancellationToken);
+        await cache.SetStringAsync(
+            UploadLengthKey(partialFileId),
+            uploadLength.ToString(),
+            options,
+            cancellationToken);
+    }
+
+    public Task RegisterUploadAsync(string fileId, long uploadLength, CancellationToken cancellationToken = default)
+        => cache.SetStringAsync(
+            UploadLengthKey(fileId),
+            uploadLength.ToString(),
+            CreateCacheOptions(),
+            cancellationToken);
+
+    public async Task<(Guid FileTransferId, long UploadLength)?> TryGetPartialInfoAsync(
+        string partialFileId,
+        CancellationToken cancellationToken = default)
+    {
+        var json = await cache.GetStringAsync(PartialKey(partialFileId), cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        var info = JsonSerializer.Deserialize<PartialUploadInfo>(json);
+        return info is null ? null : (info.FileTransferId, info.UploadLength);
+    }
+
+    public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        var lengthValue = await cache.GetStringAsync(UploadLengthKey(fileId), cancellationToken);
+        if (long.TryParse(lengthValue, out var uploadLength))
+        {
+            return uploadLength;
+        }
+
+        var partialInfo = await TryGetPartialInfoAsync(fileId, cancellationToken);
+        return partialInfo?.UploadLength;
+    }
+
+    public async Task<bool> IsKnownUploadAsync(string fileId, CancellationToken cancellationToken = default)
+        => await TryGetUploadLengthAsync(fileId, cancellationToken) is not null;
+
+    public async Task<bool> IsPartialAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        var json = await cache.GetStringAsync(PartialKey(fileId), cancellationToken);
+        return !string.IsNullOrWhiteSpace(json);
+    }
+
+    public async Task<Guid?> TryGetFileTransferIdAsync(string tusFileId, CancellationToken cancellationToken = default)
+    {
+        var partialInfo = await TryGetPartialInfoAsync(tusFileId, cancellationToken);
+        return partialInfo?.FileTransferId;
+    }
+
+    public async Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken = default)
+    {
+        await cache.RemoveAsync(PartialKey(partialFileId), cancellationToken);
+        await cache.RemoveAsync(UploadLengthKey(partialFileId), cancellationToken);
+    }
+
+    public Task RemoveUploadAsync(string fileId, CancellationToken cancellationToken = default)
+        => cache.RemoveAsync(UploadLengthKey(fileId), cancellationToken);
+
+    public Task RegisterFinalConcatAsync(string finalFileId, string[] partialFileIds, CancellationToken cancellationToken = default)
+        => cache.SetStringAsync(
+            FinalConcatKey(finalFileId),
+            JsonSerializer.Serialize(partialFileIds),
+            CreateCacheOptions(),
+            cancellationToken);
+
+    public async Task<string[]?> TryGetFinalConcatPartialIdsAsync(string finalFileId, CancellationToken cancellationToken = default)
+    {
+        var json = await cache.GetStringAsync(FinalConcatKey(finalFileId), cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<string[]>(json);
+    }
+
+    public Task RemoveFinalConcatAsync(string finalFileId, CancellationToken cancellationToken = default)
+        => cache.RemoveAsync(FinalConcatKey(finalFileId), cancellationToken);
+
+    private static DistributedCacheEntryOptions CreateCacheOptions()
+        => new()
+        {
+            AbsoluteExpirationRelativeToNow = CacheExpiration
+        };
 }
