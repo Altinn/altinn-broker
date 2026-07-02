@@ -555,16 +555,6 @@ public class BrokerTusStore(
         }
 
         await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
-
-        byte[] md5Hash;
-        lock (state.SyncRoot)
-        {
-            state.UploadMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            md5Hash = state.UploadMd5.Hash
-                ?? throw new TusStoreException($"Failed to calculate MD5 for file id {fileId}.");
-        }
-
-        await storageResolver.SetCommittedStagingMd5Async(fileId, md5Hash, cancellationToken);
     }
 
     private async Task CleanupUploadState(string fileId, CancellationToken cancellationToken)

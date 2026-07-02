@@ -29,6 +29,7 @@ public class CompleteFileUploadHandler(
     IResourceRepository resourceRepository,
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
+    UploadChecksumHandler uploadChecksumHandler,
     IHostEnvironment hostEnvironment,
     IOptions<GeneralSettings> generalSettings,
     MalwareScanningResultHandler malwareScanResultHandler,
@@ -66,7 +67,10 @@ public class CompleteFileUploadHandler(
         }
 
         var finishedUploadTimestamp = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum)
+        var requiresChecksumVerification = !string.IsNullOrWhiteSpace(fileTransfer.Checksum);
+
+        if (requiresChecksumVerification
+            && !string.IsNullOrWhiteSpace(request.Checksum)
             && !string.Equals(request.Checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
         {
             await fileTransferStatusRepository.InsertFileTransferStatus(
@@ -77,6 +81,14 @@ public class CompleteFileUploadHandler(
                 cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue<IBrokerStorageService>(service =>
                 service.DeleteFile(serviceOwner, fileTransfer, cancellationToken));
+            return Errors.ChecksumMismatch;
+        }
+
+        if (requiresChecksumVerification
+            && storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan
+            && !generalSettings.Value.SimulateMalwareScan
+            && !await uploadChecksumHandler.Process(request.FileTransferId, cancellationToken))
+        {
             return Errors.ChecksumMismatch;
         }
 
@@ -98,6 +110,8 @@ public class CompleteFileUploadHandler(
                         fileTransfer.Sender.ActorExternalId,
                         Guid.NewGuid(),
                         AltinnEventSubjectRole.Sender));
+                    backgroundJobClient.Enqueue<UploadChecksumHandler>(handler =>
+                        handler.Process(request.FileTransferId, CancellationToken.None));
                 }
                 else if (storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan
                          && !generalSettings.Value.SimulateMalwareScan)
@@ -124,6 +138,12 @@ public class CompleteFileUploadHandler(
                             Guid.NewGuid(),
                             AltinnEventSubjectRole.Recipient));
                     }
+
+                    if (!requiresChecksumVerification)
+                    {
+                        backgroundJobClient.Enqueue<UploadChecksumHandler>(handler =>
+                            handler.Process(request.FileTransferId, CancellationToken.None));
+                    }
                 }
 
                 await fileTransferRepository.SetStorageDetails(
@@ -133,7 +153,8 @@ public class CompleteFileUploadHandler(
                     request.UploadLength,
                     ct);
 
-                if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
+                if (!requiresChecksumVerification
+                    && !string.IsNullOrWhiteSpace(request.Checksum))
                 {
                     await fileTransferRepository.SetChecksum(request.FileTransferId, request.Checksum, ct);
                 }

@@ -16,6 +16,7 @@ public interface IBrokerStorageService
     Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken);
     Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
+    Task<string?> ComputeDestinationBlobChecksumAsync(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken);
-    Task<(string Checksum, long Length)?> FinalizeTusUpload(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
+    Task<(string? Checksum, long Length)?> FinalizeTusUpload(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
 }
