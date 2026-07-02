@@ -17,7 +17,10 @@ public class GetResourceHandler(IResourceRepository resourceRepository) : IHandl
         {
             return Errors.ResourceHasNotBeenConfigured;
         };
-        if (resource.OrganizationNumber?.WithoutPrefix() != user?.GetCallerOrganizationId()?.WithoutPrefix())
+        
+        var callerOrganizationId = user?.GetCallerOrganizationId()?.WithoutPrefix();
+        var resourceOrgNumber = resource.OrganizationNumber?.WithoutPrefix();
+        if (resourceOrgNumber == null || callerOrganizationId == null || resourceOrgNumber != callerOrganizationId)
         {
             return Errors.NoAccessToResource;
         }
