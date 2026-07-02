@@ -855,6 +855,43 @@ LEFT JOIN LATERAL (
         }, cancellationToken);
     }
 
+    public async Task<List<FileTransferEntity>> GetNonPurgedFileTransfersByResourceId(string resourceId, DateTimeOffset minAge, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT file_transfer_id_pk, resource_id, use_virus_scan " +
+            "FROM broker.file_transfer " +
+            "WHERE resource_id = @resourceId AND created < @minAge " +
+            "AND latest_file_status_id IS DISTINCT FROM @purgedStatus");
+
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@minAge", minAge);
+        command.Parameters.AddWithValue("@purgedStatus", (int)FileTransferStatus.Purged);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var result = new List<FileTransferEntity>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                result.Add(new FileTransferEntity
+                {
+                    FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
+                    ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
+                    Sender = null!,
+                    FileTransferStatusEntity = null!,
+                    RecipientCurrentStatuses = [],
+                    FileName = string.Empty,
+                    Created = default,
+                    ExpirationTime = default,
+                });
+            }
+
+            return result;
+        }, cancellationToken);
+    }
+
     public async Task<int> HardDeleteFileTransfersByIds(IEnumerable<Guid> fileTransferIds, CancellationToken cancellationToken)
     {
         var idsArray = fileTransferIds.ToArray();
@@ -862,7 +899,7 @@ LEFT JOIN LATERAL (
         {
             return 0;
         }
-        if (idsArray.Length > 1000) //Safety margin
+        if (idsArray.Length > 10000) //Safety margin
         {
             throw new ArgumentException($"Too many file transfers to delete. Total file transfers in requested hard delete: {idsArray.Length}", nameof(fileTransferIds));
         }
