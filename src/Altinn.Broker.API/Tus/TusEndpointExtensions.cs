@@ -31,7 +31,11 @@ public static class TusEndpointExtensions
 
     public static WebApplication MapBrokerTusUploads(this WebApplication app)
     {
-        app.MapTus(TusMapPath, httpContext => CreateTusConfiguration(httpContext))
+        app.MapTus(TusMapPath, CreateTusConfiguration)
+            .RequireAuthorization(AuthorizationConstants.Sender);
+
+        // Concatenation partial uploads use /tus/{fileTransferId}/{partialId}.
+        app.MapTus($"{TusMapPath}/{{fileTransferId}}", CreateTusConfiguration)
             .RequireAuthorization(AuthorizationConstants.Sender);
 
         return app;

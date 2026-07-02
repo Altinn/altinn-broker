@@ -85,4 +85,40 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var downloadedBytes = await downloadResponse.Content.ReadAsByteArrayAsync();
         Assert.Equal(fileContent, downloadedBytes);
     }
+
+    [Fact]
+    public async Task TusUpload_PartialHead_TwoSegmentLocation_Succeeds()
+    {
+        var initializeResponse = await _senderClient.PostAsJsonAsync(
+            "broker/api/v1/filetransfer",
+            FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeResponse.IsSuccessStatusCode, await initializeResponse.Content.ReadAsStringAsync());
+
+        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
+        Assert.NotNull(initializeResult);
+        var fileTransferId = initializeResult.FileTransferId.ToString();
+        const int partialLength = 1024;
+        var tusBaseUrl = $"broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
+
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, tusBaseUrl);
+        createRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        createRequest.Headers.Add("Upload-Length", partialLength.ToString());
+        createRequest.Headers.Add("Upload-Concat", "partial");
+        var createResponse = await _senderClient.SendAsync(createRequest);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var uploadUrl = createResponse.Headers.Location;
+        Assert.NotNull(uploadUrl);
+        var uploadPath = uploadUrl.IsAbsoluteUri ? uploadUrl.AbsolutePath : uploadUrl.ToString();
+        Assert.Contains($"/{fileTransferId}/", uploadPath, StringComparison.OrdinalIgnoreCase);
+
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUrl);
+        headRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        var headResponse = await _senderClient.SendAsync(headRequest);
+        Assert.Equal(HttpStatusCode.OK, headResponse.StatusCode);
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
+        Assert.Equal("0", offsetValues.First());
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
+        Assert.Equal(partialLength.ToString(), lengthValues.First());
+    }
 }

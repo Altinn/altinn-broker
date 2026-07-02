@@ -24,7 +24,15 @@ public sealed class TusFileTransferIdRouteMiddleware(RequestDelegate next)
     }
 
     private static bool IsTusEndpoint(HttpContext context)
-        => context.GetEndpoint()?.DisplayName?.StartsWith("tus:", StringComparison.Ordinal) == true;
+    {
+        if (context.GetEndpoint()?.DisplayName?.StartsWith("tus:", StringComparison.Ordinal) == true)
+        {
+            return true;
+        }
+
+        var path = context.Request.Path.Value;
+        return path?.StartsWith(TusEndpointExtensions.TusMapPath, StringComparison.OrdinalIgnoreCase) == true;
+    }
 
     private static void NormalizeRouteValues(HttpContext context)
     {

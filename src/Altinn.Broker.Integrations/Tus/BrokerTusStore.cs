@@ -96,6 +96,11 @@ public class BrokerTusStore(
             return true;
         }
 
+        if (await uploadProgressCache.GetAsync(fileId, cancellationToken) is not null)
+        {
+            return true;
+        }
+
         if (await storageResolver.StagingBlobExistsAsync(fileId, cancellationToken))
         {
             return true;
@@ -120,6 +125,12 @@ public class BrokerTusStore(
         if (partialUploadRegistry.TryGetUploadLength(fileId, out var registeredLength))
         {
             return registeredLength;
+        }
+
+        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (cachedProgress is not null)
+        {
+            return cachedProgress.UploadLength;
         }
 
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
