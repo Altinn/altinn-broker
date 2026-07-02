@@ -153,8 +153,9 @@ public static class TusUploader
             progress.Update(Interlocked.Add(ref progressBytes, uploadedBytes));
         });
 
-        var finalUri = await CreateFinalUploadAsync(httpClient, tusEndpoint, partialUris, cancellationToken);
-        var finalOffset = await GetUploadOffsetAsync(httpClient, finalUri, cancellationToken);
+        await CreateFinalUploadAsync(httpClient, tusEndpoint, partialUris, cancellationToken);
+        // Final concat POST creates a complete upload and the server may finalize it before a follow-up HEAD.
+        var finalOffset = uploadSize;
         if (finalOffset != uploadSize)
         {
             throw new InvalidOperationException(

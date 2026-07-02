@@ -33,6 +33,8 @@ public interface ITusStorageResolver
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken);
     Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken);
+    Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken);
+    Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken);
 }
 
 public class TusStorageResolver(
@@ -271,6 +273,38 @@ public class TusStorageResolver(
         var blockBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
         await blockBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return false;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var destinationBlobClient = containerClient.GetBlobClient(fileId);
+        return await destinationBlobClient.ExistsAsync(cancellationToken);
+    }
+
+    public async Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return 0;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var destinationBlobClient = containerClient.GetBlobClient(fileId);
+        if (!await destinationBlobClient.ExistsAsync(cancellationToken))
+        {
+            return 0;
+        }
+
+        var properties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        return properties.Value.ContentLength;
     }
 
     private BlobContainerClient GetBlobContainerClient(TusStorageContext storageContext)

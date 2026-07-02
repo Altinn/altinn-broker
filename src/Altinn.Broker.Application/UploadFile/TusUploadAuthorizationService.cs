@@ -29,9 +29,17 @@ public class TusUploadAuthorizationService(
         long? uploadLength,
         CancellationToken cancellationToken)
     {
+        if (intent is TusUploadAuthIntent.GetInfo)
+        {
+            return await validationService.ValidateTusGetInfoAsync(
+                user,
+                fileTransferId,
+                cancellationToken);
+        }
+
         var cacheKey = BuildCacheKey(fileTransferId, user);
 
-        if (intent is TusUploadAuthIntent.WriteChunk or TusUploadAuthIntent.GetInfo
+        if (intent is TusUploadAuthIntent.WriteChunk
             && await cache.GetStringAsync(cacheKey, cancellationToken) == CacheValue)
         {
             return await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);

@@ -76,6 +76,31 @@ public class TusUploadValidationService(
         return (fileTransfer, resource.MaxFileTransferSize, null);
     }
 
+    public async Task<Error?> ValidateTusGetInfoAsync(
+        ClaimsPrincipal? user,
+        Guid fileTransferId,
+        CancellationToken cancellationToken = default)
+    {
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            return Errors.FileTransferNotFound;
+        }
+
+        var hasAccess = await authorizationService.CheckAccessAsSender(
+            user,
+            fileTransfer.ResourceId,
+            fileTransfer.Sender.ActorExternalId,
+            isLegacyUser: false,
+            cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoAccessToResource;
+        }
+
+        return null;
+    }
+
     public async Task<Error?> ValidateUploadInProgressAsync(Guid fileTransferId, CancellationToken cancellationToken)
     {
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);

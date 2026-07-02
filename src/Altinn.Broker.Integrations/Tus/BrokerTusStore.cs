@@ -84,7 +84,17 @@ public class BrokerTusStore(
             return true;
         }
 
+        if (partialUploadRegistry.IsKnownUpload(fileId))
+        {
+            return true;
+        }
+
         if (await storageResolver.StagingBlobExistsAsync(fileId, cancellationToken))
+        {
+            return true;
+        }
+
+        if (await storageResolver.DestinationBlobExistsAsync(fileId, cancellationToken))
         {
             return true;
         }
@@ -98,6 +108,11 @@ public class BrokerTusStore(
         if (_uploadLengths.TryGetValue(fileId, out var cachedLength))
         {
             return cachedLength;
+        }
+
+        if (partialUploadRegistry.TryGetUploadLength(fileId, out var registeredLength))
+        {
+            return registeredLength;
         }
 
         var store = await storageResolver.GetStoreForFileAsync(fileId, cancellationToken);
@@ -130,6 +145,12 @@ public class BrokerTusStore(
             return committedLength;
         }
 
+        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        if (destinationLength > 0)
+        {
+            return destinationLength;
+        }
+
         var store = await storageResolver.GetStoreForFileAsync(fileId, cancellationToken);
         if (store is not null)
         {
@@ -144,6 +165,7 @@ public class BrokerTusStore(
         var fileId = GetFileTransferIdFromRoute();
         _uploadLengths[fileId] = uploadLength;
         _uploadMetadata[fileId] = metadata;
+        partialUploadRegistry.RegisterUpload(fileId, uploadLength);
         _uploadStates[fileId] = new UploadState(uploadLength, initialOffset: 0, azureStorageOptions.Value.ConcurrentUploadThreads);
         return Task.FromResult(fileId);
     }
@@ -201,6 +223,7 @@ public class BrokerTusStore(
 
         _uploadLengths[finalFileId] = totalLength;
         _uploadMetadata[finalFileId] = metadata;
+        partialUploadRegistry.RegisterUpload(finalFileId, totalLength);
         _finalConcatPartials[finalFileId] = normalizedPartialFileIds;
         _uploadStates[finalFileId] = new UploadState(
             totalLength,
@@ -272,6 +295,7 @@ public class BrokerTusStore(
         }
 
         partialUploadRegistry.RemovePartial(fileId);
+        partialUploadRegistry.RemoveUpload(fileId);
         _finalConcatPartials.TryRemove(fileId, out _);
         _uploadMetadata.TryRemove(fileId, out _);
         CleanupUploadState(fileId);
