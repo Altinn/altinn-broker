@@ -303,7 +303,8 @@ public static class TusUploader
         Uri partialUploadUri,
         CancellationToken cancellationToken)
     {
-        using var headRequest = new HttpRequestMessage(HttpMethod.Head, partialUploadUri);
+        var uploadUri = await ResolveWorkingPartialUploadUriAsync(httpClient, partialUploadUri, cancellationToken);
+        using var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUri);
         headRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
 
         using var headResponse = await httpClient.SendAsync(headRequest, cancellationToken);
@@ -342,7 +343,8 @@ public static class TusUploader
         Action<long> onBytesUploaded,
         CancellationToken cancellationToken)
     {
-        var offset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
+        var uploadUri = await ResolveWorkingPartialUploadUriAsync(httpClient, partialUploadUri, cancellationToken);
+        var offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
         var buffer = new byte[chunkSize];
 
         while (offset < partLength)
@@ -357,7 +359,7 @@ public static class TusUploader
             }
 
             var chunkStartOffset = offset;
-            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
             var uploadedThisChunk = Math.Max(offset - chunkStartOffset, 0);
             if (uploadedThisChunk > 0)
             {
@@ -519,23 +521,156 @@ public static class TusUploader
     private static bool IsTransientRequestException(Exception exception)
         => exception is HttpRequestException or IOException or TaskCanceledException;
 
+    private static async Task<Uri> ResolveWorkingPartialUploadUriAsync(
+        HttpClient httpClient,
+        Uri partialUploadUri,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+        foreach (var candidate in GetPartialUploadUriCandidates(partialUploadUri))
+        {
+            using var headResponse = await SendHeadAsync(httpClient, candidate, cancellationToken);
+            if (headResponse.IsSuccessStatusCode)
+            {
+                if (!ReferenceEquals(candidate, partialUploadUri) && !candidate.Equals(partialUploadUri))
+                {
+                    Console.WriteLine($"Using alternate partial upload URL {candidate}.");
+                }
+
+                return candidate;
+            }
+
+            var responseBody = await headResponse.Content.ReadAsStringAsync(cancellationToken);
+            lastError = new InvalidOperationException(
+                $"TUS HEAD failed with {(int)headResponse.StatusCode} {headResponse.StatusCode}: {responseBody}");
+        }
+
+        throw lastError ?? new InvalidOperationException("TUS HEAD failed for all partial upload URL candidates.");
+    }
+
+    private static IEnumerable<Uri> GetPartialUploadUriCandidates(Uri partialUploadUri)
+    {
+        yield return partialUploadUri;
+
+        if (TryGetNormalizedPartialUploadUri(partialUploadUri, out var normalizedPartialUri))
+        {
+            yield return normalizedPartialUri;
+        }
+
+        if (TryGetSingleSegmentPartialUploadUri(partialUploadUri, out var singleSegmentPartialUri))
+        {
+            yield return singleSegmentPartialUri;
+        }
+    }
+
     private static async Task<long> GetUploadOffsetAsync(
         HttpClient httpClient,
         Uri uploadUri,
         CancellationToken cancellationToken)
     {
-        using var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUri);
-        headRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
-
-        using var headResponse = await httpClient.SendAsync(headRequest, cancellationToken);
-        var responseBody = await headResponse.Content.ReadAsStringAsync(cancellationToken);
-        if (!headResponse.IsSuccessStatusCode)
+        Exception? lastError = null;
+        foreach (var candidate in GetPartialUploadUriCandidates(uploadUri))
         {
-            throw new InvalidOperationException(
+            using var headResponse = await SendHeadAsync(httpClient, candidate, cancellationToken);
+            if (headResponse.IsSuccessStatusCode)
+            {
+                return ParseUploadOffset(headResponse.Headers);
+            }
+
+            var responseBody = await headResponse.Content.ReadAsStringAsync(cancellationToken);
+            lastError = new InvalidOperationException(
                 $"TUS HEAD failed with {(int)headResponse.StatusCode} {headResponse.StatusCode}: {responseBody}");
         }
 
-        return ParseUploadOffset(headResponse.Headers);
+        throw lastError ?? new InvalidOperationException("TUS HEAD failed for all upload URL candidates.");
+    }
+
+    private static async Task<HttpResponseMessage> SendHeadAsync(
+        HttpClient httpClient,
+        Uri uploadUri,
+        CancellationToken cancellationToken)
+    {
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUri);
+        headRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+        return await httpClient.SendAsync(headRequest, cancellationToken);
+    }
+
+    /// <summary>
+    /// Converts legacy /tus/{fileTransferId}/{partialId} URLs to /tus/{fileTransferId}/partial/{partialId}.
+    /// </summary>
+    private static bool TryGetNormalizedPartialUploadUri(Uri uploadUri, out Uri normalizedPartialUri)
+    {
+        normalizedPartialUri = uploadUri;
+        if (!TryParseTusPathSegments(uploadUri, out var segments))
+        {
+            return false;
+        }
+
+        if (segments.Length != 2 || !Guid.TryParse(segments[0], out _))
+        {
+            return false;
+        }
+
+        return TryBuildPartialUploadUri(uploadUri, segments[0], segments[1], out normalizedPartialUri);
+    }
+
+    /// <summary>
+    /// Oldest deployments returned partial Location as /tus/{partialId} only.
+    /// </summary>
+    private static bool TryGetSingleSegmentPartialUploadUri(Uri uploadUri, out Uri singleSegmentPartialUri)
+    {
+        singleSegmentPartialUri = uploadUri;
+        if (!TryParseTusPathSegments(uploadUri, out var segments))
+        {
+            return false;
+        }
+
+        var partialId = segments.Length switch
+        {
+            1 => segments[0],
+            2 => segments[1],
+            3 when string.Equals(segments[1], "partial", StringComparison.OrdinalIgnoreCase) => segments[2],
+            _ => null
+        };
+
+        if (string.IsNullOrEmpty(partialId))
+        {
+            return false;
+        }
+
+        var legacyPath = $"{TusUploadPath}/{partialId}";
+        singleSegmentPartialUri = uploadUri.IsAbsoluteUri
+            ? new Uri(uploadUri.GetLeftPart(UriPartial.Authority) + legacyPath)
+            : new Uri(legacyPath, UriKind.Relative);
+        return true;
+    }
+
+    private static bool TryBuildPartialUploadUri(
+        Uri uploadUri,
+        string fileTransferId,
+        string partialId,
+        out Uri partialUploadUri)
+    {
+        var normalizedPath = $"{TusUploadPath}/{fileTransferId}/partial/{partialId}";
+        partialUploadUri = uploadUri.IsAbsoluteUri
+            ? new Uri(uploadUri.GetLeftPart(UriPartial.Authority) + normalizedPath)
+            : new Uri(normalizedPath, UriKind.Relative);
+        return true;
+    }
+
+    private static bool TryParseTusPathSegments(Uri uploadUri, out string[] segments)
+    {
+        segments = [];
+        var path = uploadUri.IsAbsoluteUri ? uploadUri.AbsolutePath : uploadUri.ToString();
+        var prefix = $"{TusUploadPath}/";
+        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        segments = path[prefix.Length..].TrimEnd('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return segments.Length > 0;
     }
 
     private static long ParseUploadOffset(HttpResponseHeaders headers)
