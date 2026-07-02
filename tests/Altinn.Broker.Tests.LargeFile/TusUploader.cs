@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 
 namespace Altinn.Broker.Tests.LargeFile;
 
@@ -378,47 +379,57 @@ public static class TusUploader
     {
         for (var attempt = 1; attempt <= 5; attempt++)
         {
-            using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
-            chunkContent.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
-
-            using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUri);
-            patchRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
-            patchRequest.Headers.TryAddWithoutValidation("Upload-Offset", offset.ToString());
-            patchRequest.Content = chunkContent;
-
-            using var patchResponse = await httpClient.SendAsync(patchRequest, cancellationToken);
-            if (patchResponse.StatusCode == HttpStatusCode.NoContent)
+            try
             {
-                return ParseUploadOffset(patchResponse.Headers);
-            }
+                using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
+                chunkContent.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
 
-            var responseBody = await patchResponse.Content.ReadAsStringAsync(cancellationToken);
-            if (patchResponse.StatusCode == HttpStatusCode.Conflict)
-            {
-                var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
-                if (serverOffset > offset)
+                using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUri);
+                patchRequest.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
+                patchRequest.Headers.TryAddWithoutValidation("Upload-Offset", offset.ToString());
+                patchRequest.Content = chunkContent;
+
+                using var patchResponse = await httpClient.SendAsync(patchRequest, cancellationToken);
+                if (patchResponse.StatusCode == HttpStatusCode.NoContent)
                 {
-                    Console.WriteLine($"Upload-Offset conflict — server is at {serverOffset}, resuming.");
-                    return serverOffset;
+                    return ParseUploadOffset(patchResponse.Headers);
                 }
 
-                if (serverOffset < offset)
+                var responseBody = await patchResponse.Content.ReadAsStringAsync(cancellationToken);
+                if (patchResponse.StatusCode == HttpStatusCode.Conflict)
                 {
-                    Console.WriteLine(
-                        $"Upload-Offset conflict — server is behind at {serverOffset}, waiting for async commit to reach {offset}.");
+                    var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                    if (serverOffset > offset)
+                    {
+                        Console.WriteLine($"Upload-Offset conflict — server is at {serverOffset}, resuming.");
+                        return serverOffset;
+                    }
+
+                    if (serverOffset < offset)
+                    {
+                        Console.WriteLine(
+                            $"Upload-Offset conflict — server is behind at {serverOffset}, waiting for async commit to reach {offset}.");
+                    }
                 }
-            }
 
-            if (attempt == 5 || !IsTransientStatusCode(patchResponse.StatusCode))
+                if (attempt == 5 || !IsTransientStatusCode(patchResponse.StatusCode))
+                {
+                    throw new InvalidOperationException(
+                        $"TUS PATCH failed at offset {offset} with {(int)patchResponse.StatusCode} {patchResponse.StatusCode}: {responseBody}");
+                }
+
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                Console.WriteLine(
+                    $"TUS PATCH at offset {offset} failed ({patchResponse.StatusCode}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (HttpRequestException ex) when (ex.InnerException is SocketException && attempt < 5)
             {
-                throw new InvalidOperationException(
-                    $"TUS PATCH failed at offset {offset} with {(int)patchResponse.StatusCode} {patchResponse.StatusCode}: {responseBody}");
-            }
-
-            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-            Console.WriteLine(
-                $"TUS PATCH at offset {offset} failed ({patchResponse.StatusCode}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
-            await Task.Delay(delay, cancellationToken);
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                Console.WriteLine(
+                    $"TUS PATCH at offset {offset} failed ({ex.InnerException.GetType().Name}), retrying in {delay.TotalSeconds:N0}s (attempt {attempt}/5)...");
+                await Task.Delay(delay, cancellationToken);
+            }            
         }
 
         throw new UnreachableException();
