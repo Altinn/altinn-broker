@@ -37,9 +37,10 @@ public class TusUploadAuthorizationService(
                 cancellationToken);
         }
 
-        var cacheKey = BuildCacheKey(fileTransferId, user);
+        var hasCacheKey = TryBuildCacheKey(fileTransferId, user, out var cacheKey);
 
         if (intent is TusUploadAuthIntent.WriteChunk
+            && hasCacheKey
             && await cache.GetStringAsync(cacheKey, cancellationToken) == CacheValue)
         {
             return await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
@@ -52,7 +53,7 @@ public class TusUploadAuthorizationService(
             isLegacyUser: false,
             cancellationToken);
 
-        if (error is null && intent is not TusUploadAuthIntent.Delete)
+        if (error is null && intent is not TusUploadAuthIntent.Delete && hasCacheKey)
         {
             await cache.SetStringAsync(
                 cacheKey,
@@ -64,7 +65,7 @@ public class TusUploadAuthorizationService(
                 cancellationToken);
         }
 
-        if (error is null && intent is TusUploadAuthIntent.Delete)
+        if (error is null && intent is TusUploadAuthIntent.Delete && hasCacheKey)
         {
             await cache.RemoveAsync(cacheKey, cancellationToken);
         }
@@ -73,15 +74,29 @@ public class TusUploadAuthorizationService(
     }
 
     public Task InvalidateAsync(Guid fileTransferId, ClaimsPrincipal user, CancellationToken cancellationToken)
-        => cache.RemoveAsync(BuildCacheKey(fileTransferId, user), cancellationToken);
+    {
+        if (!TryBuildCacheKey(fileTransferId, user, out var cacheKey))
+        {
+            return Task.CompletedTask;
+        }
 
-    private static string BuildCacheKey(Guid fileTransferId, ClaimsPrincipal user)
+        return cache.RemoveAsync(cacheKey, cancellationToken);
+    }
+
+    private static bool TryBuildCacheKey(Guid fileTransferId, ClaimsPrincipal user, out string cacheKey)
     {
         var subject = user.FindFirst("sid")?.Value
-            ?? user.FindFirst("client_id")?.Value
-            ?? "unknown";
+            ?? user.FindFirst("client_id")?.Value;
+
+        if (string.IsNullOrEmpty(subject))
+        {
+            cacheKey = string.Empty;
+            return false;
+        }
+
         var organization = user.GetCallerOrganizationId() ?? string.Empty;
-        return $"tus-upload-auth:{fileTransferId}:{subject}:{organization}";
+        cacheKey = $"tus-upload-auth:{fileTransferId}:{subject}:{organization}";
+        return true;
     }
 
     private TimeSpan GetCacheExpiration()

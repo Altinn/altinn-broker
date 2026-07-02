@@ -207,9 +207,10 @@ public static class TusEndpointExtensions
     private static TusUploadAuthIntent MapAuthIntent(IntentType intent) => intent switch
     {
         IntentType.CreateFile => TusUploadAuthIntent.Create,
+        IntentType.ConcatenateFiles => TusUploadAuthIntent.Create,
         IntentType.WriteFile => TusUploadAuthIntent.WriteChunk,
         IntentType.GetFileInfo => TusUploadAuthIntent.GetInfo,
         IntentType.DeleteFile => TusUploadAuthIntent.Delete,
-        _ => TusUploadAuthIntent.WriteChunk
+        _ => throw new ArgumentOutOfRangeException(nameof(intent), intent, "Unsupported tus authorization intent.")
     };
 }

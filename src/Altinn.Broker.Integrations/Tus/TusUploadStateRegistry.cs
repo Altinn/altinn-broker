@@ -13,19 +13,28 @@ public interface ITusUploadStateRegistry
 
 public sealed class TusUploadStateRegistry : ITusUploadStateRegistry
 {
-    private readonly ConcurrentDictionary<string, TusUploadState> _states = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Lazy<TusUploadState>> _states = new(StringComparer.OrdinalIgnoreCase);
 
     public TusUploadState GetOrAdd(string fileId, Func<TusUploadState> factory)
-        => _states.GetOrAdd(fileId, _ => factory());
+        => _states.GetOrAdd(fileId, _ => new Lazy<TusUploadState>(factory)).Value;
 
     public bool TryGet(string fileId, out TusUploadState? state)
-        => _states.TryGetValue(fileId, out state);
+    {
+        if (_states.TryGetValue(fileId, out var lazy) && lazy.IsValueCreated)
+        {
+            state = lazy.Value;
+            return true;
+        }
+
+        state = null;
+        return false;
+    }
 
     public void Remove(string fileId)
     {
-        if (_states.TryRemove(fileId, out var state))
+        if (_states.TryRemove(fileId, out var lazy) && lazy.IsValueCreated)
         {
-            state.Dispose();
+            lazy.Value.Dispose();
         }
     }
 }
