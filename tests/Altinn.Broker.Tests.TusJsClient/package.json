@@ -1,0 +1,16 @@
+{
+  "name": "altinn-broker-tus-js-client-test",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Validates Altinn Broker TUS concatenation uploads using tus-js-client",
+  "scripts": {
+    "upload": "node src/main.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "tus-js-client": "^4.3.1"
+  }
+}
