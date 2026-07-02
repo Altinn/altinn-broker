@@ -256,7 +256,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        var parsedErrorValue = parsedError.Extensions.FirstOrDefault().Value?.ToString();
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
         Assert.NotNull(parsedErrorValue);
         Assert.Contains("PropertyList can contain at most 10 properties", parsedErrorValue);
     }
@@ -273,7 +273,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        var parsedErrorValue = parsedError.Extensions.FirstOrDefault().Value?.ToString();
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
         Assert.NotNull(parsedErrorValue);
         Assert.Contains("PropertyList Key can not be longer than 50", parsedErrorValue);
     }
@@ -291,9 +291,9 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        var parsedErrorValue = parsedError.Extensions.FirstOrDefault().Value?.ToString();
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
         Assert.NotNull(parsedErrorValue);
-        Assert.Contains("PropertyList Value can not be longer than 3000", parsedErrorValue.ToString());
+        Assert.Contains("PropertyList Value can not be longer than 3000", parsedErrorValue);
     }
 
     [Fact]
