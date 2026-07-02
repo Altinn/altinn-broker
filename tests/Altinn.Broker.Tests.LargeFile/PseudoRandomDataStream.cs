@@ -10,8 +10,6 @@ public class PseudoRandomDataStream : Stream
     private Timer _timer;
     private int timerElapsedCount = 0;
 
-    long bytesRead = 0;
-
     public PseudoRandomDataStream(long length)
     {
         _length = length;
@@ -20,7 +18,7 @@ public class PseudoRandomDataStream : Stream
         _timer = new Timer(OnTimerElapsed, null, 1000, 1000);
     }
 
-    private void OnTimerElapsed(object state)
+    private void OnTimerElapsed(object? state)
     {
         timerElapsedCount++;
         Console.WriteLine($"Current position {(_position * 100.0 / _length):F3}%. Average speed so far is {(_position / timerElapsedCount) / (1024 * 1024)} MiB/s");

@@ -17,7 +17,7 @@ public class HangfireStorageCompatibilityTests(CustomWebApplicationFactory facto
     // TransactionScope is used to ensure eventual consistency for events posted to events API 
     // Test ensures that Hangfire implementation is compatible with TransactionScope.
     [Fact]
-    public async void BackgroundJobClient_TransactionScopeCompatible()
+    public async Task BackgroundJobClient_TransactionScopeCompatible()
     {
         var migrateConnection = await _dataSource.OpenConnectionAsync();
         PostgreSqlObjectsInstaller.Install(migrateConnection);
@@ -33,13 +33,12 @@ public class HangfireStorageCompatibilityTests(CustomWebApplicationFactory facto
             var command = outsideConnection.CreateCommand();
             command.CommandText = "select COUNT(job) FROM hangfire.job WHERE id = @jobId";
             command.Parameters.AddWithValue("jobId", parentJobId);
-            var result = command.ExecuteScalar();
-            Assert.True((long)command.ExecuteScalar() == 0);
+            Assert.Equal(0L, (long)(command.ExecuteScalar() ?? 0L));
             transaction.Complete();
         }
         var postCommitCommand = _dataSource.CreateCommand("select COUNT(job) FROM hangfire.job WHERE id = @jobId");
         postCommitCommand.Parameters.AddWithValue("jobId", parentJobId);
-        Assert.True((long)postCommitCommand.ExecuteScalar() == 1);
+        Assert.Equal(1L, (long)(postCommitCommand.ExecuteScalar() ?? 0L));
     }
 
     internal class TestConnectionFactory(NpgsqlDataSource dataSource) : IConnectionFactory
