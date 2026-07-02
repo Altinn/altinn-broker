@@ -51,7 +51,14 @@ public class Program
         Console.WriteLine(
             $"Uploading {uploadSize / (1024.0 * 1024.0 * 1024.0):N2} GiB via TUS with {chunkSizeMb} MiB chunks");
 
-        using var httpClient = new HttpClient
+        using var httpClientHandler = new SocketsHttpHandler
+        {
+            // Reduce transient socket failures under parallel PATCH pressure.
+            MaxConnectionsPerServer = 200,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2)
+        };
+        using var httpClient = new HttpClient(httpClientHandler)
         {
             // Each TUS PATCH is a short request; no multi-hour connection is required.
             Timeout = TimeSpan.FromMinutes(30)

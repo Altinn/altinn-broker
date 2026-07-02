@@ -216,9 +216,12 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         try
         {
             await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            var tusStagingBlob = blobContainerClient.GetAppendBlobClient(
+            var tusStagingAppendBlob = blobContainerClient.GetBlobClient(
                 Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
-            await tusStagingBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await tusStagingAppendBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            var tusStagingBlockBlob = blobContainerClient.GetBlobClient(
+                Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
+            await tusStagingBlockBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
         }
         catch (RequestFailedException requestFailedException)
         {
@@ -234,12 +237,17 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
     {
         logger.LogInformation("Finalizing TUS upload for {fileTransferId}", fileTransferEntity.FileTransferId);
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
-        var stagingBlobClient = blobContainerClient.GetAppendBlobClient(
+        var blockStagingBlobClient = blobContainerClient.GetBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
+        var appendStagingBlobClient = blobContainerClient.GetBlobClient(
             Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
         var destinationBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
         try
         {
+            var stagingBlobClient = await blockStagingBlobClient.ExistsAsync(cancellationToken)
+                ? blockStagingBlobClient
+                : appendStagingBlobClient;
             if (!await stagingBlobClient.ExistsAsync(cancellationToken))
             {
                 logger.LogError("TUS staging blob not found for {fileTransferId}", fileTransferEntity.FileTransferId);
@@ -276,6 +284,8 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 cancellationToken: cancellationToken);
 
             await stagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
 
             logger.LogInformation(
                 "Finalized TUS upload for {fileTransferId}, size {contentLength}",
