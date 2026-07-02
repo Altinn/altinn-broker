@@ -110,7 +110,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var uploadUrl = createResponse.Headers.Location;
         Assert.NotNull(uploadUrl);
         var uploadPath = uploadUrl.IsAbsoluteUri ? uploadUrl.AbsolutePath : uploadUrl.ToString();
-        Assert.Contains($"/{fileTransferId}/", uploadPath, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"/{fileTransferId}/partial/", uploadPath, StringComparison.OrdinalIgnoreCase);
 
         var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUrl);
         headRequest.Headers.Add("Tus-Resumable", "1.0.0");

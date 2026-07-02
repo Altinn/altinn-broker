@@ -23,8 +23,10 @@ public static class TusEndpointExtensions
     // OpenAPI/APIM path (fileTransferId is the tus file id in the last segment).
     public const string RouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
 
-    // Concatenation partial uploads are addressed at /tus/{fileTransferId}/{partialUploadId}.
-    public const string PartialRouteTemplate = "/broker/api/v1/filetransfer/upload/tus/{fileTransferId}/{partialUploadId}";
+    // Concatenation partial uploads use a literal "partial" segment to avoid APIM route ambiguity.
+    public const string PartialPathSegment = "partial";
+    public const string PartialRouteTemplate =
+        $"/broker/api/v1/filetransfer/upload/tus/{{fileTransferId}}/{PartialPathSegment}/{{partialUploadId}}";
 
     // MapTus appends /{TusFileId?} automatically — do not add a path parameter here.
     public const string TusMapPath = "/broker/api/v1/filetransfer/upload/tus";
@@ -37,8 +39,8 @@ public static class TusEndpointExtensions
         app.MapTus(TusMapPath, CreateTusConfiguration)
             .RequireAuthorization(AuthorizationConstants.Sender);
 
-        // Concatenation partial uploads use /tus/{fileTransferId}/{partialId}.
-        app.MapTus($"{TusMapPath}/{{fileTransferId}}", CreateTusConfiguration)
+        // Concatenation partial uploads use /tus/{fileTransferId}/partial/{partialId}.
+        app.MapTus($"{TusMapPath}/{{fileTransferId}}/{PartialPathSegment}", CreateTusConfiguration)
             .RequireAuthorization(AuthorizationConstants.Sender);
 
         return app;
@@ -159,7 +161,7 @@ public static class TusEndpointExtensions
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
         var uploadPath = partialUploadRegistry.IsPartial(context.FileId)
-            ? $"{TusMapPath}/{fileTransferId}/{context.FileId}"
+            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{context.FileId}"
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 

@@ -3,9 +3,8 @@ using Altinn.Broker.Integrations.Tus;
 namespace Altinn.Broker.API.Tus;
 
 /// <summary>
-/// Rewrites concatenation partial URLs from
-/// /upload/tus/{fileTransferId}/{partialId} to /upload/tus/{partialId}
-/// so tusdotnet's single-segment MapTus route can handle PATCH/HEAD/DELETE.
+/// Rewrites legacy concatenation partial URLs from
+/// /upload/tus/{fileTransferId}/{partialId} to /upload/tus/{fileTransferId}/partial/{partialId}.
 /// The file transfer id is preserved in <see cref="TusRouteHelper.FileTransferIdItemKey"/> for auth and storage resolution.
 /// </summary>
 public sealed class TusPartialPathRewriteMiddleware(RequestDelegate next)
@@ -39,13 +38,15 @@ public sealed class TusPartialPathRewriteMiddleware(RequestDelegate next)
 
         var fileTransferId = segments[0];
         var partialId = segments[1];
-        if (!Guid.TryParse(fileTransferId, out _))
+        if (!Guid.TryParse(fileTransferId, out _)
+            || string.Equals(partialId, TusEndpointExtensions.PartialPathSegment, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
         context.Items[TusRouteHelper.FileTransferIdItemKey] = fileTransferId;
-        context.Request.Path = new PathString($"{prefix}{partialId}");
+        context.Request.Path = new PathString(
+            $"{prefix}{fileTransferId}/{TusEndpointExtensions.PartialPathSegment}/{partialId}");
         return true;
     }
 }
