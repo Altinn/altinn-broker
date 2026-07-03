@@ -57,7 +57,7 @@ public sealed class TusUploadSessionAuthenticationHelper(
 
     private static bool IsTusUploadDataRequest(HttpRequest request)
     {
-        var path = request.Path.Value;
+        var path = TusRouteHelper.GetRequestPath(request.HttpContext);
         if (path?.StartsWith(TusRouteHelper.TusMapPath, StringComparison.OrdinalIgnoreCase) != true)
         {
             return false;
@@ -123,7 +123,7 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return fileTransferId;
         }
 
-        if (!TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value)
+        if (!TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
             && !string.IsNullOrEmpty(normalizedTusFileId)
             && Guid.TryParse(normalizedTusFileId, out fileTransferId))
         {
