@@ -37,11 +37,13 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
 
-    private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{partialFileId}";
+    private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{NormalizeId(partialFileId)}";
 
-    private static string UploadLengthKey(string fileId) => $"tus-upload-length:{fileId}";
+    private static string UploadLengthKey(string fileId) => $"tus-upload-length:{NormalizeId(fileId)}";
 
-    private static string FinalConcatKey(string fileId) => $"tus-final-concat:{fileId}";
+    private static string FinalConcatKey(string fileId) => $"tus-final-concat:{NormalizeId(fileId)}";
+
+    private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
     public async Task RegisterPartialAsync(
         string partialFileId,
@@ -85,13 +87,14 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
 
     public async Task<Guid?> TryGetFileTransferIdAsync(string tusFileId, CancellationToken cancellationToken)
     {
-        var partialInfo = await TryGetPartialInfoAsync(tusFileId, cancellationToken);
+        var normalizedId = NormalizeId(tusFileId);
+        var partialInfo = await TryGetPartialInfoAsync(normalizedId, cancellationToken);
         if (partialInfo is not null)
         {
             return partialInfo.Value.FileTransferId;
         }
 
-        if (Guid.TryParse(tusFileId, out var fileTransferId))
+        if (Guid.TryParse(normalizedId, out var fileTransferId))
         {
             return fileTransferId;
         }

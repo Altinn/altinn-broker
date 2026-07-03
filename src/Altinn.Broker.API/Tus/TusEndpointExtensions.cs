@@ -71,9 +71,12 @@ public static class TusEndpointExtensions
         CancellationToken cancellationToken)
     {
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var normalizedTusFileId = string.IsNullOrWhiteSpace(tusFileId)
+            ? tusFileId
+            : TusRouteHelper.NormalizePartialFileId(tusFileId);
 
-        if (!string.IsNullOrEmpty(tusFileId)
-            && await partialUploadRegistry.TryGetFileTransferIdAsync(tusFileId, cancellationToken) is Guid mappedFileTransferId)
+        if (!string.IsNullOrEmpty(normalizedTusFileId)
+            && await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedTusFileId, cancellationToken) is Guid mappedFileTransferId)
         {
             return (true, mappedFileTransferId);
         }
@@ -183,12 +186,13 @@ public static class TusEndpointExtensions
         }
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        var uploadPath = await partialUploadRegistry.IsPartialAsync(context.FileId, context.CancellationToken)
-            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{context.FileId}"
+        var partialFileId = TusRouteHelper.NormalizePartialFileId(context.FileId);
+        var uploadPath = await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken)
+            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{partialFileId}"
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 
-        if (await partialUploadRegistry.IsPartialAsync(context.FileId, context.CancellationToken))
+        if (await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken))
         {
             return;
         }

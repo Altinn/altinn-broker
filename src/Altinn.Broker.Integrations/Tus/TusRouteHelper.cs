@@ -6,6 +6,8 @@ public static class TusRouteHelper
 {
     public const string TusFileIdRouteKey = "TusFileId";
     public const string FileTransferIdItemKey = "TusFileTransferId";
+    public const string TusMapPath = "/broker/api/v1/filetransfer/upload/tus";
+    public const string PartialPathSegment = "partial";
 
     public static bool TryGetFileTransferIdFromRoute(HttpContext httpContext, out Guid fileTransferId)
     {
@@ -18,11 +20,24 @@ public static class TusRouteHelper
             return true;
         }
 
+        var requestPath = httpContext.Request.Path.Value;
+        if (TryGetFileTransferIdFromPath(requestPath, out fileTransferId))
+        {
+            return true;
+        }
+
         // Prefer our named route parameter when MapTus path includes {fileTransferId}.
         var namedRouteValue = httpContext.Request.RouteValues["fileTransferId"]?.ToString();
         if (Guid.TryParse(namedRouteValue, out fileTransferId))
         {
             return true;
+        }
+
+        // On partial upload URLs the tus file id and last path segment are the partial upload id,
+        // not the file transfer id. Never fall back to those for /partial/ paths.
+        if (IsPartialUploadPath(requestPath ?? string.Empty))
+        {
+            return false;
         }
 
         var routeValue = httpContext.Request.RouteValues[TusFileIdRouteKey]?.ToString();
@@ -31,8 +46,62 @@ public static class TusRouteHelper
             return true;
         }
 
-        var lastSegment = httpContext.Request.Path.Value?.TrimEnd('/').Split('/').LastOrDefault();
+        var lastSegment = requestPath?.TrimEnd('/').Split('/').LastOrDefault();
         return Guid.TryParse(lastSegment, out fileTransferId);
+    }
+
+    /// <summary>
+    /// Extracts the file transfer id from a TUS upload URL without relying on route values.
+    /// Required for multi-replica setups where route values may not be bound yet.
+    /// </summary>
+    public static bool TryGetFileTransferIdFromPath(string? requestPath, out Guid fileTransferId)
+    {
+        fileTransferId = default;
+        if (string.IsNullOrWhiteSpace(requestPath))
+        {
+            return false;
+        }
+
+        var segments = requestPath.TrimEnd('/').Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        for (var i = 0; i < segments.Length; i++)
+        {
+            if (!string.Equals(segments[i], "tus", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // .../tus/{fileTransferId}/partial/{partialUploadId}
+            if (i + 3 < segments.Length
+                && string.Equals(segments[i + 2], PartialPathSegment, StringComparison.OrdinalIgnoreCase)
+                && Guid.TryParse(segments[i + 1], out fileTransferId))
+            {
+                return true;
+            }
+
+            // .../tus/{fileTransferId}
+            if (i + 1 < segments.Length && Guid.TryParse(segments[i + 1], out fileTransferId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool TrySetFileTransferIdItemFromPartialPath(HttpContext httpContext)
+    {
+        if (!IsPartialUploadPath(GetRequestPath(httpContext)))
+        {
+            return false;
+        }
+
+        if (!TryGetFileTransferIdFromPath(httpContext.Request.Path.Value, out var fileTransferId))
+        {
+            return false;
+        }
+
+        httpContext.Items[FileTransferIdItemKey] = fileTransferId.ToString();
+        return true;
     }
 
     public static string GetRequestPath(HttpContext httpContext)

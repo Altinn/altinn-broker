@@ -498,6 +498,8 @@ public class TusStorageResolver(
 
     private async Task<Guid?> ResolveFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = TusRouteHelper.NormalizePartialFileId(fileId);
+
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId
             && await FileTransferExistsAsync(mappedFileTransferId, cancellationToken))
         {
