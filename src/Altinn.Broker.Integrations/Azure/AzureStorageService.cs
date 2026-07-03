@@ -230,7 +230,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
-    public async Task<(string Checksum, long Length)?> FinalizeTusUpload(
+    public async Task<(string? Checksum, long Length)?> FinalizeTusUpload(
         ServiceOwnerEntity serviceOwnerEntity,
         FileTransferEntity fileTransferEntity,
         CancellationToken cancellationToken)
@@ -256,14 +256,12 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
 
             var stagingProperties = await stagingBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
             var contentLength = stagingProperties.Value.ContentLength;
-            if (!stagingProperties.Value.Metadata.TryGetValue(AzureStorageConstants.TusMd5ChecksumMetadataKey, out var md5Base64)
-                || string.IsNullOrWhiteSpace(md5Base64))
+            string? checksum = null;
+            if (stagingProperties.Value.Metadata.TryGetValue(AzureStorageConstants.TusMd5ChecksumMetadataKey, out var md5Base64)
+                && !string.IsNullOrWhiteSpace(md5Base64))
             {
-                logger.LogError("TUS staging blob is missing MD5 checksum metadata for {fileTransferId}", fileTransferEntity.FileTransferId);
-                return null;
+                checksum = BitConverter.ToString(Convert.FromBase64String(md5Base64)).Replace("-", "").ToLowerInvariant();
             }
-
-            var checksum = BitConverter.ToString(Convert.FromBase64String(md5Base64)).Replace("-", "").ToLowerInvariant();
 
             var copyOperation = await destinationBlobClient.StartCopyFromUriAsync(
                 stagingBlobClient.Uri,
@@ -274,14 +272,26 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 cancellationToken);
             await copyOperation.WaitForCompletionAsync(cancellationToken);
 
-            var contentHash = Convert.FromBase64String(md5Base64);
-            await destinationBlobClient.SetHttpHeadersAsync(
-                new BlobHttpHeaders
-                {
-                    ContentType = "application/octet-stream",
-                    ContentHash = contentHash
-                },
-                cancellationToken: cancellationToken);
+            if (checksum is not null)
+            {
+                var contentHash = Convert.FromBase64String(md5Base64!);
+                await destinationBlobClient.SetHttpHeadersAsync(
+                    new BlobHttpHeaders
+                    {
+                        ContentType = "application/octet-stream",
+                        ContentHash = contentHash
+                    },
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await destinationBlobClient.SetHttpHeadersAsync(
+                    new BlobHttpHeaders
+                    {
+                        ContentType = "application/octet-stream"
+                    },
+                    cancellationToken: cancellationToken);
+            }
 
             await stagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
             await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
@@ -369,6 +379,24 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             ContentHash = HexStringToByteArray(fileTransferEntity.Checksum)
         };
         await blobClient.SetHttpHeadersAsync(headers);
+    }
+
+    public async Task<string?> ComputeFileChecksumAsync(
+        ServiceOwnerEntity serviceOwnerEntity,
+        FileTransferEntity fileTransferEntity,
+        CancellationToken cancellationToken)
+    {
+        var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
+        var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
+        if (!await blobClient.ExistsAsync(cancellationToken))
+        {
+            logger.LogError("Cannot compute checksum because blob does not exist for {fileTransferId}", fileTransferEntity.FileTransferId);
+            return null;
+        }
+
+        await using var contentStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+        var hash = await MD5.HashDataAsync(contentStream, cancellationToken);
+        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
     private static byte[] HexStringToByteArray(string hex)

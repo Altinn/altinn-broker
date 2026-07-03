@@ -58,7 +58,8 @@ public class TusUploadCompleteHandler(
             {
                 FileTransferId = fileTransferId,
                 Checksum = checksum,
-                UploadLength = uploadLength
+                UploadLength = uploadLength,
+                DeferChecksumValidation = true
             },
             user,
             cancellationToken);

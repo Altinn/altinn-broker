@@ -950,8 +950,6 @@ public class BrokerTusStore(
 
         var uploadLength = state.UploadLength;
         await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
-        var md5Hash = await storageResolver.ComputeCommittedStagingMd5Async(fileId, cancellationToken);
-        await storageResolver.SetCommittedStagingMd5Async(fileId, md5Hash, cancellationToken);
         await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
     }
 

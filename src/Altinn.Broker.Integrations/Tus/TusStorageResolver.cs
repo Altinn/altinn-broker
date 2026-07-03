@@ -437,7 +437,6 @@ public class TusStorageResolver(
         var finalBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, finalFileId));
 
-        using var uploadMd5 = MD5.Create();
         var blockIds = new List<string>();
         long blockIndex = 0;
         long totalLength = 0;
@@ -462,7 +461,6 @@ public class TusStorageResolver(
                 await using var chunkStream = new MemoryStream(blockData, writable: false);
                 await finalBlobClient.StageBlockAsync(blockId, chunkStream, cancellationToken: cancellationToken);
                 blockIds.Add(blockId);
-                uploadMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
                 totalLength += bytesRead;
             }
         }
@@ -472,22 +470,13 @@ public class TusStorageResolver(
             throw new InvalidOperationException($"Cannot concatenate partial uploads into file id {finalFileId} because no data was found.");
         }
 
-        uploadMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        var md5Hash = uploadMd5.Hash
-            ?? throw new InvalidOperationException($"Failed to calculate MD5 for concatenated file id {finalFileId}.");
-
         await finalBlobClient.CommitBlockListAsync(
             blockIds,
             new CommitBlockListOptions
             {
-                Metadata = new Dictionary<string, string>
-                {
-                    [AzureStorageConstants.TusMd5ChecksumMetadataKey] = Convert.ToBase64String(md5Hash)
-                },
                 HttpHeaders = new BlobHttpHeaders
                 {
-                    ContentType = "application/octet-stream",
-                    ContentHash = md5Hash
+                    ContentType = "application/octet-stream"
                 }
             },
             cancellationToken: cancellationToken);
