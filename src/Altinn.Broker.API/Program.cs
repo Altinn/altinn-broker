@@ -56,6 +56,7 @@ static void BuildAndRun(string[] args)
     builder.Services.ConfigureOpenTelemetry(generalSettings?.ApplicationInsightsConnectionString ?? string.Empty);
 
     var app = builder.Build();
+    app.LogDistributedCacheStatus();
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
@@ -119,20 +120,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddProblemDetails();
 
     // Add distributed cache for rate limiting and TUS upload expiration tracking.
-    var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
-    if (!string.IsNullOrWhiteSpace(distributedCacheOptions?.RedisConnectionString))
-    {
-        services.AddStackExchangeRedisCache(options =>
-        {
-            options.Configuration = distributedCacheOptions.RedisConnectionString;
-        });
-        services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString));
-    }
-    else
-    {
-        services.AddDistributedMemoryCache();
-    }
+    services.AddBrokerDistributedCache(config);
 
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();

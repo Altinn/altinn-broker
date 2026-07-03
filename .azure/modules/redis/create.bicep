@@ -22,11 +22,21 @@ resource redis 'Microsoft.Cache/redis@2024-11-01' = {
   properties: {
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
     sku: {
       name: 'Standard'
       family: 'C'
       capacity: environment == 'test' ? 0 : environment == 'staging' ? 1 : 2
     }
+  }
+}
+
+resource redisFirewallAllowAzureServices 'Microsoft.Cache/redis/firewallRules@2024-11-01' = {
+  parent: redis
+  name: 'AllowAzureServices'
+  properties: {
+    startIP: '0.0.0.0'
+    endIP: '0.0.0.0'
   }
 }
 
