@@ -507,8 +507,10 @@ public static class TusUploader
         => exception is HttpRequestException or IOException or TaskCanceledException;
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
-        => statusCode is HttpStatusCode.RequestTimeout
+        => statusCode is HttpStatusCode.NotFound
+            or HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.Unauthorized
             or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway
             or HttpStatusCode.ServiceUnavailable

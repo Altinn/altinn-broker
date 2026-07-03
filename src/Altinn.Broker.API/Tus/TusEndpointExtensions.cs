@@ -70,10 +70,14 @@ public static class TusEndpointExtensions
         string? tusFileId,
         CancellationToken cancellationToken)
     {
+        var normalizedTusFileId = string.IsNullOrWhiteSpace(tusFileId)
+            ? null
+            : TusRouteHelper.NormalizePartialFileId(tusFileId);
+
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        if (!string.IsNullOrEmpty(tusFileId))
+        if (!string.IsNullOrEmpty(normalizedTusFileId))
         {
-            var mappedFileTransferId = await partialUploadRegistry.TryGetFileTransferIdAsync(tusFileId, cancellationToken);
+            var mappedFileTransferId = await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedTusFileId, cancellationToken);
             if (mappedFileTransferId is Guid resolvedFileTransferId)
             {
                 return resolvedFileTransferId;
@@ -85,7 +89,9 @@ public static class TusEndpointExtensions
             return fileTransferId;
         }
 
-        if (Guid.TryParse(tusFileId, out fileTransferId))
+        if (!TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value)
+            && !string.IsNullOrEmpty(normalizedTusFileId)
+            && Guid.TryParse(normalizedTusFileId, out fileTransferId))
         {
             return fileTransferId;
         }

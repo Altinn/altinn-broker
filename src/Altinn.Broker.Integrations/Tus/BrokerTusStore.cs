@@ -221,7 +221,7 @@ public class BrokerTusStore(
         long totalLength = 0;
         foreach (var partialFileReference in partialFiles)
         {
-            var partialFileId = NormalizePartialFileId(partialFileReference);
+            var partialFileId = TusRouteHelper.NormalizePartialFileId(partialFileReference);
             var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
             if (partialInfo is null)
             {
@@ -245,7 +245,7 @@ public class BrokerTusStore(
             totalLength += partialLength;
         }
 
-        var normalizedPartialFileIds = partialFiles.Select(NormalizePartialFileId).ToArray();
+        var normalizedPartialFileIds = partialFiles.Select(TusRouteHelper.NormalizePartialFileId).ToArray();
         var concatenatedLength = await storageResolver.ConcatenatePartialStagingBlobsAsync(
             finalFileId,
             normalizedPartialFileIds,
@@ -465,7 +465,35 @@ public class BrokerTusStore(
         }
 
         await uploadProgressCache.SaveAsync(fileId, snapshot, cancellationToken);
+        await RefreshPartialRegistryAsync(fileId, snapshot.UploadLength, cancellationToken);
         await RecordUploadActivityAsync(fileId, cancellationToken);
+    }
+
+    private async Task RefreshPartialRegistryAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    {
+        var existingPartial = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
+        if (existingPartial is not null)
+        {
+            await partialUploadRegistry.RegisterPartialAsync(
+                fileId,
+                existingPartial.Value.FileTransferId,
+                existingPartial.Value.UploadLength,
+                cancellationToken);
+            return;
+        }
+
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is null || !TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value))
+        {
+            return;
+        }
+
+        if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+        {
+            return;
+        }
+
+        await partialUploadRegistry.RegisterPartialAsync(fileId, fileTransferId, uploadLength, cancellationToken);
     }
 
     private async Task RecordUploadActivityAsync(string fileId, CancellationToken cancellationToken)
@@ -473,6 +501,14 @@ public class BrokerTusStore(
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
         {
             await uploadActivityCache.RecordActivityAsync(mappedFileTransferId, cancellationToken);
+            return;
+        }
+
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is not null
+            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
+        {
+            await uploadActivityCache.RecordActivityAsync(routeFileTransferId, cancellationToken);
             return;
         }
 
@@ -605,18 +641,7 @@ public class BrokerTusStore(
     /// tusdotnet passes concatenation partial ids as "partial/{partialUploadId}" when the upload URL
     /// includes the literal partial segment. Storage always uses the bare partial upload id.
     /// </summary>
-    private static string ResolveStoreFileId(string fileId) => NormalizePartialFileId(fileId);
-
-    private static string NormalizePartialFileId(string partialFileReference)
-    {
-        var trimmedReference = partialFileReference.Trim();
-        if (!trimmedReference.Contains('/'))
-        {
-            return trimmedReference;
-        }
-
-        return trimmedReference.TrimEnd('/').Split('/').Last();
-    }
+    private static string ResolveStoreFileId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
     private static string BuildBlockId(long blockIndex)
     {

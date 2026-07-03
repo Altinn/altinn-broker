@@ -36,6 +36,13 @@ public sealed class TusFileTransferIdRouteMiddleware(RequestDelegate next)
 
     private static void NormalizeRouteValues(HttpContext context)
     {
+        var path = context.Request.Path.Value;
+        if (TusRouteHelper.IsPartialUploadPath(path))
+        {
+            NormalizePartialRouteValues(context, path);
+            return;
+        }
+
         var tusFileId = context.Request.RouteValues[TusRouteHelper.TusFileIdRouteKey]?.ToString();
         var method = context.Request.Method;
 
@@ -52,6 +59,28 @@ public sealed class TusFileTransferIdRouteMiddleware(RequestDelegate next)
             && !string.IsNullOrWhiteSpace(fileTransferId?.ToString()))
         {
             context.Request.RouteValues[TusRouteHelper.TusFileIdRouteKey] = fileTransferId.ToString();
+        }
+    }
+
+    private static void NormalizePartialRouteValues(HttpContext context, string? path)
+    {
+        if (TusRouteHelper.TryParseFileTransferIdFromPartialPath(path, out var fileTransferId))
+        {
+            context.Items[TusRouteHelper.FileTransferIdItemKey] = fileTransferId.ToString();
+            context.Request.RouteValues[FileTransferIdRouteKey] = fileTransferId.ToString();
+        }
+
+        var tusFileId = context.Request.RouteValues[TusRouteHelper.TusFileIdRouteKey]?.ToString();
+        if (!string.IsNullOrEmpty(tusFileId))
+        {
+            context.Request.RouteValues[TusRouteHelper.TusFileIdRouteKey] =
+                TusRouteHelper.NormalizePartialFileId(tusFileId);
+            return;
+        }
+
+        if (TusRouteHelper.TryParsePartialUploadIdFromPath(path, out var partialUploadId))
+        {
+            context.Request.RouteValues[TusRouteHelper.TusFileIdRouteKey] = partialUploadId;
         }
     }
 }

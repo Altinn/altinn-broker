@@ -419,6 +419,8 @@ public class TusStorageResolver(
 
     private async Task<Guid?> ResolveFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
     {
+        fileId = TusRouteHelper.NormalizePartialFileId(fileId);
+
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
         {
             return mappedFileTransferId;
@@ -432,7 +434,8 @@ public class TusStorageResolver(
             return routeFileTransferId;
         }
 
-        if (Guid.TryParse(fileId, out var parsedFileTransferId)
+        if (!TusRouteHelper.IsPartialUploadPath(httpContext?.Request.Path.Value)
+            && Guid.TryParse(fileId, out var parsedFileTransferId)
             && await FileTransferExistsAsync(parsedFileTransferId, cancellationToken))
         {
             return parsedFileTransferId;
