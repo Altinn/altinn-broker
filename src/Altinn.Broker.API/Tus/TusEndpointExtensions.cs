@@ -11,6 +11,7 @@ using Altinn.Broker.Integrations.Tus;
 using Microsoft.Extensions.Options;
 
 using tusdotnet;
+using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 using tusdotnet.Models.Configuration;
@@ -50,10 +51,12 @@ public static class TusEndpointExtensions
     {
         var tusOptions = httpContext.RequestServices.GetRequiredService<IOptions<TusOptions>>().Value;
         var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
+        var fileLockProvider = httpContext.RequestServices.GetRequiredService<ITusFileLockProvider>();
 
         return Task.FromResult<DefaultTusConfiguration?>(new DefaultTusConfiguration
         {
             Store = store,
+            FileLockProvider = fileLockProvider,
             Expiration = new SlidingExpiration(tusOptions.UploadExpiration),
             Events = new Events
             {

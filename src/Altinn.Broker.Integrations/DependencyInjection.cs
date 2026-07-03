@@ -20,6 +20,8 @@ using Microsoft.Extensions.Hosting;
 
 using StackExchange.Redis;
 
+using tusdotnet.Interfaces;
+
 using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
@@ -113,6 +115,8 @@ public static class DependencyInjection
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache, TusUploadProgressCache>();
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
+        services.AddSingleton<ITusFileLockProvider>(serviceProvider =>
+            TusFileLockProviderFactory.Create(serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
