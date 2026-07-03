@@ -4,11 +4,12 @@ using System.Security.Cryptography;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
-using Azure.Identity;
 using Azure;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -59,7 +60,7 @@ public class TusStorageResolver(
     ITusPartialUploadRegistry partialUploadRegistry,
     IHttpContextAccessor httpContextAccessor) : ITusStorageResolver
 {
-    private const int ConcatenationReadBufferSize = 4 * 1024 * 1024;
+    private const long MaxPutBlockFromUrlSize = 100L * 1024 * 1024;
 
     private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
 
@@ -437,34 +438,11 @@ public class TusStorageResolver(
         var finalBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, finalFileId));
 
-        var blockIds = new List<string>();
-        long blockIndex = 0;
-        long totalLength = 0;
-        var readBuffer = new byte[ConcatenationReadBufferSize];
-
-        foreach (var partialFileId in partialFileIds)
-        {
-            var partialBlobClient = containerClient.GetBlockBlobClient(
-                Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, partialFileId));
-            if (!await partialBlobClient.ExistsAsync(cancellationToken))
-            {
-                throw new InvalidOperationException($"Partial staging blob {partialFileId} does not exist.");
-            }
-
-            await using var partialStream = await partialBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
-            int bytesRead;
-            while ((bytesRead = await partialStream.ReadAsync(readBuffer, cancellationToken)) > 0)
-            {
-                var blockId = BuildBlockId(blockIndex++);
-                var blockData = readBuffer.AsSpan(0, bytesRead).ToArray();
-
-                await using var chunkStream = new MemoryStream(blockData, writable: false);
-                await finalBlobClient.StageBlockAsync(blockId, chunkStream, cancellationToken: cancellationToken);
-                blockIds.Add(blockId);
-                totalLength += bytesRead;
-            }
-        }
-
+        var (blockIds, totalLength) = await StagePartialBlobsForConcatenationAsync(
+            finalBlobClient,
+            containerClient,
+            partialFileIds,
+            cancellationToken);
         if (blockIds.Count == 0)
         {
             throw new InvalidOperationException($"Cannot concatenate partial uploads into file id {finalFileId} because no data was found.");
@@ -489,6 +467,148 @@ public class TusStorageResolver(
         }
 
         return totalLength;
+    }
+
+    private async Task<(List<string> BlockIds, long TotalLength)> StagePartialBlobsForConcatenationAsync(
+        BlockBlobClient finalBlobClient,
+        BlobContainerClient containerClient,
+        IReadOnlyList<string> partialFileIds,
+        CancellationToken cancellationToken)
+    {
+        var stagingTasks = new Task<(List<string> BlockIds, long Length)>[partialFileIds.Count];
+        for (var partialIndex = 0; partialIndex < partialFileIds.Count; partialIndex++)
+        {
+            stagingTasks[partialIndex] = StagePartialBlobForConcatenationAsync(
+                finalBlobClient,
+                containerClient,
+                partialFileIds[partialIndex],
+                partialIndex,
+                cancellationToken);
+        }
+
+        var stagedPartials = await Task.WhenAll(stagingTasks);
+        return (
+            stagedPartials.SelectMany(static partial => partial.BlockIds).ToList(),
+            stagedPartials.Sum(static partial => partial.Length));
+    }
+
+    private async Task<(List<string> BlockIds, long Length)> StagePartialBlobForConcatenationAsync(
+        BlockBlobClient finalBlobClient,
+        BlobContainerClient containerClient,
+        string partialFileId,
+        int partialIndex,
+        CancellationToken cancellationToken)
+    {
+        var partialBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, partialFileId));
+        if (!await partialBlobClient.ExistsAsync(cancellationToken))
+        {
+            throw new InvalidOperationException($"Partial staging blob {partialFileId} does not exist.");
+        }
+
+        var properties = await partialBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        var partialLength = properties.Value.ContentLength;
+        if (partialLength == 0)
+        {
+            throw new InvalidOperationException($"Partial staging blob {partialFileId} is empty.");
+        }
+
+        var chunkCount = (int)((partialLength + MaxPutBlockFromUrlSize - 1) / MaxPutBlockFromUrlSize);
+        var sourceUri = GetReadableBlobUri(partialBlobClient);
+        var blockIds = new List<string>(chunkCount);
+        var offset = 0L;
+
+        for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+        {
+            var chunkLength = Math.Min(MaxPutBlockFromUrlSize, partialLength - offset);
+            var blockId = BuildConcatBlockId(partialIndex, chunkIndex, chunkCount);
+            await StagePartialChunkForConcatenationAsync(
+                finalBlobClient,
+                partialBlobClient,
+                sourceUri,
+                blockId,
+                offset,
+                chunkLength,
+                cancellationToken);
+            blockIds.Add(blockId);
+            offset += chunkLength;
+        }
+
+        return (blockIds, partialLength);
+    }
+
+    private async Task StagePartialChunkForConcatenationAsync(
+        BlockBlobClient finalBlobClient,
+        BlockBlobClient partialBlobClient,
+        Uri sourceUri,
+        string blockId,
+        long sourceOffset,
+        long chunkLength,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await finalBlobClient.StageBlockFromUriAsync(
+                sourceUri,
+                blockId,
+                new StageBlockFromUriOptions
+                {
+                    SourceRange = new HttpRange(sourceOffset, chunkLength)
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (RequestFailedException) when (hostEnvironment.IsDevelopment())
+        {
+            await FallbackStagePartialBlobChunkAsync(
+                finalBlobClient,
+                partialBlobClient,
+                blockId,
+                sourceOffset,
+                chunkLength,
+                cancellationToken);
+        }
+    }
+
+    private static async Task FallbackStagePartialBlobChunkAsync(
+        BlockBlobClient finalBlobClient,
+        BlockBlobClient partialBlobClient,
+        string blockId,
+        long sourceOffset,
+        long chunkLength,
+        CancellationToken cancellationToken)
+    {
+        await using var partialStream = await partialBlobClient.OpenReadAsync(
+            position: sourceOffset,
+            cancellationToken: cancellationToken);
+        await using var chunkStream = new MemoryStream((int)chunkLength);
+        var bytesCopied = 0L;
+        var buffer = new byte[81920];
+        while (bytesCopied < chunkLength)
+        {
+            var toRead = (int)Math.Min(buffer.Length, chunkLength - bytesCopied);
+            var read = await partialStream.ReadAsync(buffer.AsMemory(0, toRead), cancellationToken);
+            if (read == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Partial staging blob ended before reading {chunkLength} bytes at offset {sourceOffset}.");
+            }
+
+            await chunkStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            bytesCopied += read;
+        }
+
+        chunkStream.Position = 0;
+        await finalBlobClient.StageBlockAsync(blockId, chunkStream, cancellationToken: cancellationToken);
+    }
+
+    private static Uri GetReadableBlobUri(BlockBlobClient blobClient)
+    {
+        if (blobClient.CanGenerateSasUri)
+        {
+            return blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+        }
+
+        return blobClient.Uri;
     }
 
     public async Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken)
@@ -642,6 +762,21 @@ public class TusStorageResolver(
     private static string BuildBlockId(long blockIndex)
     {
         var blockId = blockIndex.ToString("D12");
+        return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blockId));
+    }
+
+    /// <summary>
+    /// Single-chunk partials keep the original per-partial block id. Multi-chunk partials encode
+    /// both partial and chunk indices so block ids stay unique across the final commit list.
+    /// </summary>
+    private static string BuildConcatBlockId(int partialIndex, int chunkIndex, int chunkCount)
+    {
+        if (chunkCount == 1)
+        {
+            return BuildBlockId(partialIndex);
+        }
+
+        var blockId = $"{partialIndex:D6}{chunkIndex:D6}";
         return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blockId));
     }
 

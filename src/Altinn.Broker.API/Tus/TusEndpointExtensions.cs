@@ -50,12 +50,10 @@ public static class TusEndpointExtensions
     {
         var tusOptions = httpContext.RequestServices.GetRequiredService<IOptions<TusOptions>>().Value;
         var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
-        var fileLockProvider = httpContext.RequestServices.GetRequiredService<RedisTusFileLockProvider>();
 
         return Task.FromResult<DefaultTusConfiguration?>(new DefaultTusConfiguration
         {
             Store = store,
-            FileLockProvider = fileLockProvider,
             Expiration = new SlidingExpiration(tusOptions.UploadExpiration),
             Events = new Events
             {

@@ -3,8 +3,6 @@ using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
-using StackExchange.Redis;
-
 using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
@@ -22,7 +20,6 @@ public class BrokerTusStore(
     ITusUploadProgressCache uploadProgressCache,
     ITusUploadActivityCache uploadActivityCache,
     IHttpContextAccessor httpContextAccessor,
-    IConnectionMultiplexer? redisMultiplexer,
     IOptions<AzureStorageOptions> azureStorageOptions,
     IOptions<TusOptions> tusOptions) :
     ITusStore,
@@ -35,7 +32,6 @@ public class BrokerTusStore(
 {
     private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _uploadMetadata = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, long> _durableOffsetCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
     private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
 
@@ -66,42 +62,22 @@ public class BrokerTusStore(
 
             blockId = BuildBlockId(state.NextBlockIndex++);
             state.BlockIds.Add(blockId);
+            state.AcceptedOffset += chunkLength;
+            acceptedOffset = state.AcceptedOffset;
+            isFinalChunk = acceptedOffset >= state.UploadLength;
             state.PendingUploads++;
         }
 
-        await UploadBlockAsync(fileId, state, blockId, chunk, cancellationToken);
-
-        lock (state.SyncRoot)
-        {
-            acceptedOffset = state.AcceptedOffset;
-            isFinalChunk = acceptedOffset >= state.UploadLength;
-        }
+        _ = Task.Run(() => UploadBlockAsync(fileId, state, blockId, chunk));
 
         await PersistProgressAsync(fileId, state, cancellationToken);
-        InvalidateDurableOffsetCache(fileId);
+        await RecordUploadActivityAsync(fileId, cancellationToken);
 
         if (isFinalChunk)
         {
             await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
-            if (await TryAcquireFinalizeLockAsync(fileId))
-            {
-                try
-                {
-                    await FinalizeUploadAsync(fileId, state, cancellationToken);
-                }
-                finally
-                {
-                    await ReleaseFinalizeLockAsync(fileId);
-                }
-            }
-
+            await FinalizeUploadAsync(fileId, state, cancellationToken);
             await CleanupUploadState(fileId, cancellationToken);
-        }
-        else
-        {
-            // In-memory state is per-replica. Release it after each chunk so the next
-            // request (possibly on another replica) reads offset from Redis/Azure.
-            uploadStateRegistry.Remove(fileId);
         }
 
         return chunkLength;
@@ -223,15 +199,6 @@ public class BrokerTusStore(
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
-
-        if (await ShouldTryFinalizePartialAsync(fileId, cancellationToken))
-        {
-            await TryFinalizeCompletedPartialAsync(fileId, cancellationToken);
-            InvalidateDurableOffsetCache(fileId);
-        }
-
-        var offset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
-
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
             lock (state!.SyncRoot)
@@ -241,87 +208,44 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                offset = Math.Max(offset, state.AcceptedOffset);
+                return state.AcceptedOffset;
             }
         }
 
-        if (await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken) is long uploadLength
-            && offset >= uploadLength)
-        {
-            offset = uploadLength;
-        }
-
-        await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-        return offset;
-    }
-
-    private async Task<long> GetDurableUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
-    {
-        if (_durableOffsetCache.TryGetValue(fileId, out var cachedOffset))
-        {
-            return cachedOffset;
-        }
-
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-        if (cachedProgress is not null && cachedProgress.AcceptedOffset < cachedProgress.UploadLength)
+        if (cachedProgress is not null)
         {
-            return CacheDurableOffset(fileId, cachedProgress.AcceptedOffset);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return cachedProgress.AcceptedOffset;
         }
-
-        var offset = cachedProgress?.AcceptedOffset ?? 0L;
 
         var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
         var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         if (stagedOffset > 0 || committedOffset > 0)
         {
-            offset = Math.Max(offset, Math.Max(stagedOffset, committedOffset));
+            var offset = Math.Max(stagedOffset, committedOffset);
             await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, offset, cancellationToken);
-            return CacheDurableOffset(fileId, offset);
-        }
-
-        if (offset > 0)
-        {
-            return CacheDurableOffset(fileId, offset);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return offset;
         }
 
         var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
         if (destinationLength > 0)
         {
-            return CacheDurableOffset(fileId, destinationLength);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return destinationLength;
         }
 
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
-            return CacheDurableOffset(
-                fileId,
-                await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken));
+            var offset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return offset;
         }
 
-        return CacheDurableOffset(fileId, 0);
-    }
-
-    private long CacheDurableOffset(string fileId, long offset)
-    {
-        _durableOffsetCache[fileId] = offset;
-        return offset;
-    }
-
-    private void InvalidateDurableOffsetCache(string fileId)
-    {
-        _durableOffsetCache.TryRemove(fileId, out _);
-    }
-
-    private async Task<bool> ShouldTryFinalizePartialAsync(string fileId, CancellationToken cancellationToken)
-    {
-        if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
-        {
-            return false;
-        }
-
-        var httpContext = httpContextAccessor.HttpContext;
-        return httpContext is not null
-            && !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext));
+        await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+        return 0;
     }
 
     public async Task<string> CreateFileAsync(long uploadLength, string metadata, CancellationToken cancellationToken)
@@ -332,7 +256,6 @@ public class BrokerTusStore(
         await partialUploadRegistry.RegisterUploadAsync(fileId, uploadLength, cancellationToken);
         var state = RegisterUploadState(fileId, uploadLength, initialOffset: 0);
         await PersistProgressAsync(fileId, state, cancellationToken);
-        uploadStateRegistry.Remove(fileId);
         return fileId;
     }
 
@@ -346,7 +269,6 @@ public class BrokerTusStore(
         _uploadMetadata[partialFileId] = metadata;
         var state = RegisterUploadState(partialFileId, uploadLength, initialOffset: 0);
         await PersistProgressAsync(partialFileId, state, cancellationToken);
-        uploadStateRegistry.Remove(partialFileId);
         return partialFileId;
     }
 
@@ -359,8 +281,6 @@ public class BrokerTusStore(
         foreach (var partialFileReference in partialFiles)
         {
             var partialFileId = TusRouteHelper.NormalizePartialFileId(partialFileReference);
-            await TryFinalizeCompletedPartialAsync(partialFileId, cancellationToken);
-
             var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
             if (partialInfo is null)
             {
@@ -573,30 +493,12 @@ public class BrokerTusStore(
 
     private async Task<TusUploadState> GetOrCreateUploadStateAsync(string fileId, CancellationToken cancellationToken)
     {
-        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-        var durableOffset = cachedProgress is not null && cachedProgress.AcceptedOffset < cachedProgress.UploadLength
-            ? cachedProgress.AcceptedOffset
-            : await GetDurableUploadOffsetAsync(fileId, cancellationToken);
-
         if (uploadStateRegistry.TryGet(fileId, out var existingState))
         {
-            bool shouldRefresh;
-            lock (existingState!.SyncRoot)
-            {
-                shouldRefresh = existingState.AcceptedOffset < durableOffset
-                    || (cachedProgress is not null
-                        && (existingState.AcceptedOffset < cachedProgress.AcceptedOffset
-                            || existingState.NextBlockIndex < cachedProgress.NextBlockIndex));
-            }
-
-            if (!shouldRefresh)
-            {
-                return existingState!;
-            }
-
-            uploadStateRegistry.Remove(fileId);
+            return existingState!;
         }
 
+        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
         {
             return uploadStateRegistry.GetOrAdd(fileId, () => CreateStateFromSnapshot(cachedProgress));
@@ -611,9 +513,12 @@ public class BrokerTusStore(
                 () => CreateStateFromStagedBlocks(uploadLength, stagedSnapshot));
         }
 
+        var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+        var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        var currentOffset = Math.Max(stagedOffset, committedOffset);
         return uploadStateRegistry.GetOrAdd(
             fileId,
-            () => new TusUploadState(uploadLength, durableOffset, _maxParallelBlockUploads));
+            () => new TusUploadState(uploadLength, currentOffset, _maxParallelBlockUploads));
     }
 
     private TusUploadState RegisterUploadState(string fileId, long uploadLength, long initialOffset)
@@ -779,26 +684,22 @@ public class BrokerTusStore(
         }
     }
 
-    private async Task UploadBlockAsync(
-        string fileId,
-        TusUploadState state,
-        string blockId,
-        byte[] chunk,
-        CancellationToken cancellationToken)
+    private async Task UploadBlockAsync(string fileId, TusUploadState state, string blockId, byte[] chunk)
     {
-        await state.ConcurrentUploader.WaitAsync(cancellationToken);
+        await state.ConcurrentUploader.WaitAsync();
         try
         {
-            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, cancellationToken);
+            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, CancellationToken.None);
             lock (state.SyncRoot)
             {
-                state.AcceptedOffset += chunk.Length;
                 state.CommittedOffset += chunk.Length;
                 state.PendingUploads--;
                 var previousProgress = state.ProgressSignal;
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetResult(state.CommittedOffset);
             }
+
+            await PersistProgressAsync(fileId, state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -810,8 +711,6 @@ public class BrokerTusStore(
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetException(ex);
             }
-
-            throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {ex.Message}");
         }
         finally
         {
@@ -848,80 +747,6 @@ public class BrokerTusStore(
 
             await waitTask.WaitAsync(cancellationToken);
         }
-    }
-
-    private async Task TryFinalizeCompletedPartialAsync(string fileId, CancellationToken cancellationToken)
-    {
-        if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
-        {
-            return;
-        }
-
-        var uploadLength = await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken);
-        if (uploadLength is null)
-        {
-            return;
-        }
-
-        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        if (committedLength >= uploadLength.Value)
-        {
-            return;
-        }
-
-        var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
-        if (stagedSnapshot is null || stagedSnapshot.TotalLength < uploadLength.Value)
-        {
-            return;
-        }
-
-        if (!await TryAcquireFinalizeLockAsync(fileId))
-        {
-            return;
-        }
-
-        try
-        {
-            committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-            if (committedLength >= uploadLength.Value)
-            {
-                return;
-            }
-
-            var state = CreateStateFromStagedBlocks(uploadLength.Value, stagedSnapshot);
-            await FinalizeUploadAsync(fileId, state, cancellationToken);
-            await PersistProgressAsync(fileId, state, cancellationToken);
-            uploadStateRegistry.Remove(fileId);
-            InvalidateDurableOffsetCache(fileId);
-        }
-        finally
-        {
-            await ReleaseFinalizeLockAsync(fileId);
-        }
-    }
-
-    private async Task<bool> TryAcquireFinalizeLockAsync(string fileId)
-    {
-        if (redisMultiplexer is null)
-        {
-            return true;
-        }
-
-        return await redisMultiplexer.GetDatabase().StringSetAsync(
-            $"tus-finalize-lock:{fileId}",
-            Environment.MachineName,
-            TimeSpan.FromMinutes(2),
-            When.NotExists);
-    }
-
-    private Task ReleaseFinalizeLockAsync(string fileId)
-    {
-        if (redisMultiplexer is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        return redisMultiplexer.GetDatabase().KeyDeleteAsync($"tus-finalize-lock:{fileId}");
     }
 
     private async Task FinalizeUploadAsync(string fileId, TusUploadState state, CancellationToken cancellationToken)
