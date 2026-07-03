@@ -16,6 +16,11 @@ using Xtensible.TusDotNet.Azure;
 
 namespace Altinn.Broker.Integrations.Tus;
 
+public sealed record TusStagedBlocksSnapshot(
+    long TotalLength,
+    IReadOnlyList<string> BlockIds,
+    long NextBlockIndex);
+
 public interface ITusStorageResolver
 {
     Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
@@ -31,6 +36,7 @@ public interface ITusStorageResolver
     Task<bool> HasStagedBlocksAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetCommittedStagingLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetStagedBlocksLengthAsync(string fileId, CancellationToken cancellationToken);
+    Task<TusStagedBlocksSnapshot?> TryGetStagedBlocksSnapshotAsync(string fileId, CancellationToken cancellationToken);
     Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken);
     Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
     Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
@@ -242,6 +248,62 @@ public class TusStorageResolver(
             BlockListTypes.Uncommitted,
             cancellationToken: cancellationToken);
         return blockList.Value.UncommittedBlocks.Sum(block => block.SizeLong);
+    }
+
+    public async Task<TusStagedBlocksSnapshot?> TryGetStagedBlocksSnapshotAsync(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return null;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        if (!await blockBlobClient.ExistsAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var blockList = await blockBlobClient.GetBlockListAsync(
+            BlockListTypes.Uncommitted,
+            cancellationToken: cancellationToken);
+        var uncommittedBlocks = blockList.Value.UncommittedBlocks;
+        if (!uncommittedBlocks.Any())
+        {
+            return null;
+        }
+
+        var orderedBlocks = uncommittedBlocks
+            .Select(block => new { Block = block, Index = TryParseBlockIndex(block.Name) })
+            .Where(entry => entry.Index.HasValue)
+            .OrderBy(entry => entry.Index!.Value)
+            .ToList();
+        if (orderedBlocks.Count == 0)
+        {
+            return null;
+        }
+
+        var blockIds = orderedBlocks.Select(entry => entry.Block.Name).ToList();
+        var totalLength = orderedBlocks.Sum(entry => entry.Block.SizeLong);
+        var nextBlockIndex = orderedBlocks[^1].Index!.Value + 1;
+        return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
+    }
+
+    private static long? TryParseBlockIndex(string blockId)
+    {
+        try
+        {
+            var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(blockId));
+            return long.TryParse(decoded, out var index) ? index : null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     public async Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken)

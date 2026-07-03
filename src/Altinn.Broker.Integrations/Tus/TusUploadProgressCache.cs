@@ -23,6 +23,7 @@ public interface ITusUploadProgressCache
 public sealed class TusUploadProgressCache(IDistributedCache cache) : ITusUploadProgressCache
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private static string BuildKey(string fileId) => $"tus-upload-progress:{fileId}";
 
@@ -34,13 +35,13 @@ public sealed class TusUploadProgressCache(IDistributedCache cache) : ITusUpload
             return null;
         }
 
-        return JsonSerializer.Deserialize<TusUploadProgressSnapshot>(json);
+        return JsonSerializer.Deserialize<TusUploadProgressSnapshot>(json, JsonOptions);
     }
 
     public Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
         => cache.SetStringAsync(
             BuildKey(fileId),
-            JsonSerializer.Serialize(snapshot),
+            JsonSerializer.Serialize(snapshot, JsonOptions),
             new DistributedCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = CacheExpiration
