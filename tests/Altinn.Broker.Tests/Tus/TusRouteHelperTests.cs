@@ -56,4 +56,15 @@ public class TusRouteHelperTests
         Assert.True(set);
         Assert.Equal(FileTransferId, context.Items[TusRouteHelper.FileTransferIdItemKey]);
     }
+
+    [Fact]
+    public void TryGetPartialUploadIdFromPath_CanonicalPartialUrl_ReturnsPartialUploadId()
+    {
+        var path = $"{TusRouteHelper.TusMapPath}/{FileTransferId}/partial/{PartialUploadId}";
+
+        var resolved = TusRouteHelper.TryGetPartialUploadIdFromPath(path, out var partialUploadId);
+
+        Assert.True(resolved);
+        Assert.Equal(PartialUploadId, partialUploadId);
+    }
 }

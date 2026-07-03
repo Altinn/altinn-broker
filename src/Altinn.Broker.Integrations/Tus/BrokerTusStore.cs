@@ -103,6 +103,15 @@ public class BrokerTusStore(
             return true;
         }
 
+        if (TusRouteHelper.IsPartialUploadRequest(httpContextAccessor.HttpContext, fileId))
+        {
+            await TryRestorePartialRegistrationFromBlobAsync(fileId, cancellationToken);
+            if (await partialUploadRegistry.IsKnownUploadAsync(fileId, cancellationToken))
+            {
+                return true;
+            }
+        }
+
         if (await uploadProgressCache.GetAsync(fileId, cancellationToken) is not null)
         {
             return true;
@@ -114,6 +123,11 @@ public class BrokerTusStore(
         }
 
         if (await storageResolver.StagingBlobExistsAsync(fileId, cancellationToken))
+        {
+            return true;
+        }
+
+        if (await storageResolver.TryGetStagingUploadLengthAsync(fileId, cancellationToken) is not null)
         {
             return true;
         }

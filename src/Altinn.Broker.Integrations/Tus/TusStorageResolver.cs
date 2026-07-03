@@ -499,6 +499,16 @@ public class TusStorageResolver(
     private async Task<Guid?> ResolveFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
+        var httpContext = httpContextAccessor.HttpContext;
+        var requestPath = httpContext?.Request.Path.Value;
+        var isPartialRequest = TusRouteHelper.IsPartialUploadRequest(httpContext, fileId);
+
+        if (isPartialRequest
+            && TusRouteHelper.TryGetFileTransferIdFromPath(requestPath, out var pathFileTransferId)
+            && await FileTransferExistsAsync(pathFileTransferId, cancellationToken))
+        {
+            return pathFileTransferId;
+        }
 
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId
             && await FileTransferExistsAsync(mappedFileTransferId, cancellationToken))
@@ -506,7 +516,6 @@ public class TusStorageResolver(
             return mappedFileTransferId;
         }
 
-        var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is not null
             && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId)
             && await FileTransferExistsAsync(routeFileTransferId, cancellationToken))
@@ -514,7 +523,8 @@ public class TusStorageResolver(
             return routeFileTransferId;
         }
 
-        if (Guid.TryParse(fileId, out var parsedFileTransferId)
+        if (!isPartialRequest
+            && Guid.TryParse(fileId, out var parsedFileTransferId)
             && await FileTransferExistsAsync(parsedFileTransferId, cancellationToken))
         {
             return parsedFileTransferId;

@@ -110,6 +110,31 @@ public static class TusRouteHelper
     public static bool IsPartialUploadPath(string requestPath)
         => requestPath.Contains("/partial/", StringComparison.OrdinalIgnoreCase);
 
+    public static bool TryGetPartialUploadIdFromPath(string? requestPath, out string partialUploadId)
+    {
+        partialUploadId = string.Empty;
+        if (string.IsNullOrWhiteSpace(requestPath) || !IsPartialUploadPath(requestPath))
+        {
+            return false;
+        }
+
+        partialUploadId = requestPath.TrimEnd('/').Split('/').Last();
+        return !string.IsNullOrWhiteSpace(partialUploadId);
+    }
+
+    public static bool IsPartialUploadRequest(HttpContext? httpContext, string normalizedFileId)
+    {
+        if (httpContext is null)
+        {
+            return false;
+        }
+
+        var requestPath = GetRequestPath(httpContext);
+        return IsPartialUploadPath(requestPath)
+            && TryGetPartialUploadIdFromPath(requestPath, out var pathPartialId)
+            && string.Equals(pathPartialId, normalizedFileId, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// tusdotnet passes concatenation partial ids as "partial/{partialUploadId}" when the upload URL
     /// includes the literal partial segment. Storage always uses the bare partial upload id.
