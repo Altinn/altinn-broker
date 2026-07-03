@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 using Microsoft.Extensions.Caching.Distributed;
@@ -24,21 +25,37 @@ public sealed class TusUploadProgressCache(IDistributedCache cache) : ITusUpload
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
 
+    private readonly ConcurrentDictionary<string, TusUploadProgressSnapshot> _localSnapshots =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private static string BuildKey(string fileId) => $"tus-upload-progress:{fileId}";
 
     public async Task<TusUploadProgressSnapshot?> GetAsync(string fileId, CancellationToken cancellationToken)
     {
+        if (_localSnapshots.TryGetValue(fileId, out var localSnapshot))
+        {
+            return localSnapshot;
+        }
+
         var json = await cache.GetStringAsync(BuildKey(fileId), cancellationToken);
         if (string.IsNullOrWhiteSpace(json))
         {
             return null;
         }
 
-        return JsonSerializer.Deserialize<TusUploadProgressSnapshot>(json);
+        var snapshot = JsonSerializer.Deserialize<TusUploadProgressSnapshot>(json);
+        if (snapshot is not null)
+        {
+            _localSnapshots[fileId] = snapshot;
+        }
+
+        return snapshot;
     }
 
-    public Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
-        => cache.SetStringAsync(
+    public async Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        _localSnapshots[fileId] = snapshot;
+        await cache.SetStringAsync(
             BuildKey(fileId),
             JsonSerializer.Serialize(snapshot),
             new DistributedCacheEntryOptions
@@ -46,7 +63,11 @@ public sealed class TusUploadProgressCache(IDistributedCache cache) : ITusUpload
                 AbsoluteExpirationRelativeToNow = CacheExpiration
             },
             cancellationToken);
+    }
 
-    public Task RemoveAsync(string fileId, CancellationToken cancellationToken)
-        => cache.RemoveAsync(BuildKey(fileId), cancellationToken);
+    public async Task RemoveAsync(string fileId, CancellationToken cancellationToken)
+    {
+        _localSnapshots.TryRemove(fileId, out _);
+        await cache.RemoveAsync(BuildKey(fileId), cancellationToken);
+    }
 }

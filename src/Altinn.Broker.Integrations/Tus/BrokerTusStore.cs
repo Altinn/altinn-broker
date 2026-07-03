@@ -105,7 +105,7 @@ public class BrokerTusStore(
             return true;
         }
 
-        if (await storageResolver.HasStagedBlocksAsync(fileId, cancellationToken))
+        if (await HasPartialUploadDataInStorageAsync(fileId, cancellationToken))
         {
             return true;
         }
@@ -122,6 +122,16 @@ public class BrokerTusStore(
 
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         return legacyStore is not null;
+    }
+
+    private async Task<bool> HasPartialUploadDataInStorageAsync(string fileId, CancellationToken cancellationToken)
+    {
+        if (await storageResolver.HasStagedBlocksAsync(fileId, cancellationToken))
+        {
+            return true;
+        }
+
+        return await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken) > 0;
     }
 
     public async Task<long?> GetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
