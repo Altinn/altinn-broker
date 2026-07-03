@@ -8,6 +8,7 @@ using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Core.Services;
 using Xtensible.TusDotNet.Azure;
 
 namespace Altinn.Broker.Integrations.Tus;
@@ -18,6 +19,7 @@ public class BrokerTusStore(
     ITusPartialUploadRegistry partialUploadRegistry,
     ITusUploadStateRegistry uploadStateRegistry,
     ITusUploadProgressCache uploadProgressCache,
+    ITusUploadActivityCache uploadActivityCache,
     IHttpContextAccessor httpContextAccessor,
     IOptions<AzureStorageOptions> azureStorageOptions) :
     ITusStore,
@@ -463,6 +465,21 @@ public class BrokerTusStore(
         }
 
         await uploadProgressCache.SaveAsync(fileId, snapshot, cancellationToken);
+        await RecordUploadActivityAsync(fileId, cancellationToken);
+    }
+
+    private async Task RecordUploadActivityAsync(string fileId, CancellationToken cancellationToken)
+    {
+        if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
+        {
+            await uploadActivityCache.RecordActivityAsync(mappedFileTransferId, cancellationToken);
+            return;
+        }
+
+        if (Guid.TryParse(fileId, out var fileTransferId))
+        {
+            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
+        }
     }
 
     private async Task UploadBlockAsync(string fileId, TusUploadState state, string blockId, byte[] chunk)

@@ -14,12 +14,14 @@ namespace Altinn.Broker.Application;
 public class StuckFileTransferHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
     IFileTransferRepository fileTransferRepository,
+    ITusUploadActivityCache tusUploadActivityCache,
     IBackgroundJobClient backgroundJobClient,
     SlackStuckFileTransferNotifier slackNotifier,
     ILogger<StuckFileTransferHandler> logger)
 {
     private readonly int _stuckInUploadProcessingThresholdMinutes = 15;
     private readonly int _stuckInUploadStartingThresholdMinutes = 60 * 24;
+    private readonly int _recentTusActivityGracePeriodMinutes = 60;
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
     {
@@ -32,6 +34,17 @@ public class StuckFileTransferHandler(
 
         foreach (FileTransferStatusEntity fileTransferStatus in stuckInUploadStarted)
         {
+            if (await tusUploadActivityCache.HasRecentActivityAsync(
+                    fileTransferStatus.FileTransferId,
+                    TimeSpan.FromMinutes(_recentTusActivityGracePeriodMinutes),
+                    cancellationToken))
+            {
+                logger.LogInformation(
+                    "File transfer {fileTransferId} exceeded the UploadStarted threshold but has TUS activity within the last {gracePeriodMinutes} minutes; skipping failure.",
+                    fileTransferStatus.FileTransferId,
+                    _recentTusActivityGracePeriodMinutes);
+                continue;
+            }
             var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferStatus.FileTransferId, cancellationToken);
             if (fileTransfer is null)
             {

@@ -37,7 +37,8 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
+        var tusUploadActivityCache = CreateTusUploadActivityCacheMock();
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, tusUploadActivityCache.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         fileTransferStatusRepository.Setup(r => r
             .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
@@ -69,7 +70,8 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
+        var tusUploadActivityCache = CreateTusUploadActivityCacheMock();
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, tusUploadActivityCache.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         var fileTransferId = Guid.NewGuid();
         var stuckfileTransferStatuses = new List<FileTransferStatusEntity>()
@@ -146,7 +148,8 @@ public class StuckFileTransferHandlerTests
         hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
         var slackSettings = new SlackSettings(hostEnvironment.Object);
         var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
-        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
+        var tusUploadActivityCache = CreateTusUploadActivityCacheMock();
+        var handler = new StuckFileTransferHandler(fileTransferStatusRepository.Object, fileTransferRepository.Object, tusUploadActivityCache.Object, backgroundJobClient.Object, slackNotifier, monitorLogger.Object);
         var cancellationToken = new CancellationToken();
         var fileTransferId = Guid.NewGuid();
         var stuckInUploadStartedStatuses = new List<FileTransferStatusEntity>
@@ -222,5 +225,81 @@ public class StuckFileTransferHandlerTests
             It.IsAny<Exception>(),
             (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
         slackClient.Verify(s => s.PostAsync(It.IsAny<SlackMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CheckForStuckFileTransfers_WhenStuckInUploadStartedButRecentTusActivity_SkipsFailure()
+    {
+        // Arrange
+        var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+        var slackClient = new Mock<ISlackClient>();
+        var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
+        var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
+        var hostEnvironment = new Mock<IHostEnvironment>();
+        hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
+        var slackSettings = new SlackSettings(hostEnvironment.Object);
+        var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
+        var fileTransferId = Guid.NewGuid();
+        var tusUploadActivityCache = new Mock<ITusUploadActivityCache>();
+        tusUploadActivityCache.Setup(c => c.HasRecentActivityAsync(
+                fileTransferId,
+                It.IsAny<TimeSpan>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var handler = new StuckFileTransferHandler(
+            fileTransferStatusRepository.Object,
+            fileTransferRepository.Object,
+            tusUploadActivityCache.Object,
+            backgroundJobClient.Object,
+            slackNotifier,
+            monitorLogger.Object);
+        var cancellationToken = new CancellationToken();
+        fileTransferStatusRepository.Setup(r => r
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(
+                It.Is<List<FileTransferStatus>>(s => s.Count == 1 && s[0] == FileTransferStatus.UploadStarted),
+                It.IsAny<DateTime>(),
+                cancellationToken))
+            .ReturnsAsync(new List<FileTransferStatusEntity>
+            {
+                new()
+                {
+                    FileTransferId = fileTransferId,
+                    Status = FileTransferStatus.UploadStarted,
+                    Date = DateTime.UtcNow.AddDays(-2)
+                }
+            });
+        fileTransferStatusRepository.Setup(r => r
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(
+                It.Is<List<FileTransferStatus>>(s => s.Count == 1 && s[0] == FileTransferStatus.UploadProcessing),
+                It.IsAny<DateTime>(),
+                cancellationToken))
+            .ReturnsAsync(new List<FileTransferStatusEntity>());
+
+        // Act
+        await handler.CheckForStuckFileTransfers(cancellationToken);
+
+        // Assert
+        fileTransferRepository.Verify(r => r.GetFileTransfer(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        fileTransferStatusRepository.Verify(r => r.InsertFileTransferStatus(
+            It.IsAny<Guid>(),
+            FileTransferStatus.Failed,
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        backgroundJobClient.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Never);
+    }
+
+    private static Mock<ITusUploadActivityCache> CreateTusUploadActivityCacheMock()
+    {
+        var tusUploadActivityCache = new Mock<ITusUploadActivityCache>();
+        tusUploadActivityCache.Setup(c => c.HasRecentActivityAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<TimeSpan>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return tusUploadActivityCache;
     }
 }

@@ -1,8 +1,9 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:9.0.2-alpine3.20 AS base
+
 USER app
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0.200-alpine3.20 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["tests/Altinn.Broker.Tests.LargeFile/Altinn.Broker.Tests.LargeFile.csproj", "tests/Altinn.Broker.Tests.LargeFile/"]
