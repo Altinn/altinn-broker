@@ -21,8 +21,7 @@ public class BrokerTusStore(
     ITusUploadProgressCache uploadProgressCache,
     ITusUploadActivityCache uploadActivityCache,
     IHttpContextAccessor httpContextAccessor,
-    IOptions<AzureStorageOptions> azureStorageOptions,
-    IOptions<TusOptions> tusOptions) :
+    IOptions<AzureStorageOptions> azureStorageOptions) :
     ITusStore,
     ITusCreationStore,
     ITusReadableStore,
@@ -34,7 +33,6 @@ public class BrokerTusStore(
     private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _uploadMetadata = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
-    private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
@@ -134,15 +132,9 @@ public class BrokerTusStore(
             return cachedLength;
         }
 
-        if (await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken) is null)
-        {
-            await TryRestorePartialRegistrationFromBlobAsync(fileId, cancellationToken);
-        }
-
         var registeredLength = await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken);
         if (registeredLength is not null)
         {
-            await TouchUploadLengthAsync(fileId, registeredLength.Value, cancellationToken);
             return registeredLength;
         }
 
@@ -152,25 +144,10 @@ public class BrokerTusStore(
             return cachedProgress.UploadLength;
         }
 
-        var stagingUploadLength = await storageResolver.TryGetStagingUploadLengthAsync(fileId, cancellationToken);
-        if (stagingUploadLength is not null)
-        {
-            await TouchUploadLengthAsync(fileId, stagingUploadLength.Value, cancellationToken);
-            return stagingUploadLength;
-        }
-
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
             return await legacyStore.GetUploadLengthAsync(fileId, cancellationToken);
-        }
-
-        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        if (committedLength > 0 && stagedLength == 0)
-        {
-            await TryRestorePartialRegistrationFromBlobAsync(fileId, committedLength, cancellationToken);
-            return committedLength;
         }
 
         return null;
@@ -198,13 +175,11 @@ public class BrokerTusStore(
             return cachedProgress.AcceptedOffset;
         }
 
-        var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        if (stagedOffset > 0 || committedOffset > 0)
+        var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (stagedLength > 0 || committedLength > 0)
         {
-            var offset = Math.Max(stagedOffset, committedOffset);
-            await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, offset, cancellationToken);
-            return offset;
+            return Math.Max(stagedLength, committedLength);
         }
 
         var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
@@ -238,7 +213,6 @@ public class BrokerTusStore(
         var fileTransferId = GetFileTransferIdFromRouteGuid();
         var partialFileId = Guid.NewGuid().ToString("N");
         await partialUploadRegistry.RegisterPartialAsync(partialFileId, fileTransferId, uploadLength, cancellationToken);
-        await storageResolver.InitializePartialStagingBlobAsync(partialFileId, uploadLength, cancellationToken);
         _uploadLengths[partialFileId] = uploadLength;
         _uploadMetadata[partialFileId] = metadata;
         var state = RegisterUploadState(partialFileId, uploadLength, initialOffset: 0);
@@ -309,11 +283,6 @@ public class BrokerTusStore(
     public async Task<FileConcat?> GetUploadConcatAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
-        if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
-        {
-            await TryRestorePartialRegistrationFromBlobAsync(fileId, cancellationToken);
-        }
-
         if (await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
             return new FileConcatPartial();
@@ -402,13 +371,6 @@ public class BrokerTusStore(
         {
             try
             {
-                var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
-                if (await HasDurableUploadStateAsync(normalizedFileId, cancellationToken))
-                {
-                    await RenewExpirationAsync(fileId, cancellationToken);
-                    continue;
-                }
-
                 if (await FileExistAsync(fileId, cancellationToken))
                 {
                     await DeleteFileAsync(fileId, cancellationToken);
@@ -467,18 +429,12 @@ public class BrokerTusStore(
 
     private async Task<TusUploadState> GetOrCreateUploadStateAsync(string fileId, CancellationToken cancellationToken)
     {
-        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-
         if (uploadStateRegistry.TryGet(fileId, out var existingState))
         {
-            if (cachedProgress is not null)
-            {
-                ApplySnapshotIfAhead(existingState!, cachedProgress);
-            }
-
             return existingState!;
         }
 
+        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
         {
             return uploadStateRegistry.GetOrAdd(fileId, () => CreateStateFromSnapshot(cachedProgress));
@@ -489,23 +445,6 @@ public class BrokerTusStore(
         var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         var currentOffset = Math.Max(stagedOffset, committedOffset);
         return uploadStateRegistry.GetOrAdd(fileId, () => new TusUploadState(uploadLength, currentOffset, _maxParallelBlockUploads));
-    }
-
-    private static void ApplySnapshotIfAhead(TusUploadState state, TusUploadProgressSnapshot snapshot)
-    {
-        lock (state.SyncRoot)
-        {
-            if (snapshot.AcceptedOffset <= state.AcceptedOffset)
-            {
-                return;
-            }
-
-            state.AcceptedOffset = snapshot.AcceptedOffset;
-            state.CommittedOffset = snapshot.CommittedOffset;
-            state.NextBlockIndex = snapshot.NextBlockIndex;
-            state.BlockIds.Clear();
-            state.BlockIds.AddRange(snapshot.BlockIds);
-        }
     }
 
     private TusUploadState RegisterUploadState(string fileId, long uploadLength, long initialOffset)
@@ -535,110 +474,6 @@ public class BrokerTusStore(
         }
 
         await uploadProgressCache.SaveAsync(fileId, snapshot, cancellationToken);
-    }
-
-    private Task TouchUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
-        => Task.WhenAll(
-            partialUploadRegistry.RegisterUploadAsync(fileId, uploadLength, cancellationToken),
-            RefreshPartialRegistryAsync(fileId, uploadLength, cancellationToken),
-            storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken));
-
-    private Task TryRestorePartialRegistrationFromBlobAsync(string fileId, CancellationToken cancellationToken)
-        => TryRestorePartialRegistrationFromBlobAsync(
-            fileId,
-            uploadLength: null,
-            cancellationToken);
-
-    private async Task TryRestorePartialRegistrationFromBlobAsync(
-        string fileId,
-        long? uploadLength,
-        CancellationToken cancellationToken)
-    {
-        if (await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken) is not null)
-        {
-            return;
-        }
-
-        uploadLength ??= await storageResolver.TryGetStagingUploadLengthAsync(fileId, cancellationToken);
-        if (uploadLength is null)
-        {
-            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-            var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-            if (committedLength > 0 && stagedLength == 0)
-            {
-                uploadLength = committedLength;
-            }
-            else
-            {
-                return;
-            }
-        }
-
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null || !TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
-        {
-            return;
-        }
-
-        await partialUploadRegistry.RegisterPartialAsync(fileId, fileTransferId, uploadLength.Value, cancellationToken);
-        await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-    }
-
-    private async Task TryRestorePartialRegistrationFromStagedUploadAsync(
-        string fileId,
-        long stagedOffset,
-        CancellationToken cancellationToken)
-    {
-        var existingPartial = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
-        if (existingPartial is not null)
-        {
-            return;
-        }
-
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null
-            || !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
-            || !TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
-        {
-            return;
-        }
-
-        var uploadLength = await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken)
-            ?? await storageResolver.TryGetStagingUploadLengthAsync(fileId, cancellationToken);
-        if (uploadLength is null)
-        {
-            return;
-        }
-
-        await partialUploadRegistry.RegisterPartialAsync(fileId, fileTransferId, uploadLength.Value, cancellationToken);
-        await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-    }
-
-    private async Task RefreshPartialRegistryAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
-    {
-        var existingPartial = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
-        if (existingPartial is not null)
-        {
-            await partialUploadRegistry.RegisterPartialAsync(
-                fileId,
-                existingPartial.Value.FileTransferId,
-                existingPartial.Value.UploadLength,
-                cancellationToken);
-            return;
-        }
-
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null || !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext)))
-        {
-            return;
-        }
-
-        if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
-        {
-            return;
-        }
-
-        await partialUploadRegistry.RegisterPartialAsync(fileId, fileTransferId, uploadLength, cancellationToken);
     }
 
     private async Task RecordUploadActivityAsync(string fileId, CancellationToken cancellationToken)
@@ -752,9 +587,7 @@ public class BrokerTusStore(
             throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
         }
 
-        var uploadLength = state.UploadLength;
         await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
-        await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, CancellationToken.None);
     }
 
     private async Task CleanupUploadState(string fileId, CancellationToken cancellationToken)
@@ -765,27 +598,6 @@ public class BrokerTusStore(
         if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
             _uploadLengths.TryRemove(fileId, out _);
-        }
-    }
-
-    private async Task<bool> HasDurableUploadStateAsync(string fileId, CancellationToken cancellationToken)
-        => await uploadProgressCache.GetAsync(fileId, cancellationToken) is not null
-            || await partialUploadRegistry.IsKnownUploadAsync(fileId, cancellationToken)
-            || await storageResolver.StagingBlobExistsAsync(fileId, cancellationToken)
-            || await storageResolver.HasStagedBlocksAsync(fileId, cancellationToken);
-
-    private async Task RenewExpirationAsync(string fileId, CancellationToken cancellationToken)
-    {
-        await SetExpirationAsync(fileId, DateTimeOffset.UtcNow.Add(_uploadExpiration), cancellationToken);
-
-        var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
-        if (await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedFileId, cancellationToken) is Guid fileTransferId)
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-        }
-        else if (Guid.TryParse(normalizedFileId, out fileTransferId))
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
         }
     }
 
@@ -805,10 +617,6 @@ public class BrokerTusStore(
         return fileTransferId;
     }
 
-    /// <summary>
-    /// tusdotnet passes concatenation partial ids as "partial/{partialUploadId}" when the upload URL
-    /// includes the literal partial segment. Storage always uses the bare partial upload id.
-    /// </summary>
     private static string ResolveStoreFileId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
     private static string BuildBlockId(long blockIndex)

@@ -40,9 +40,6 @@ public interface ITusStorageResolver
     Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken);
     Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken);
-    Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken);
-    Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
-    Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
 }
 
 public class TusStorageResolver(
@@ -124,12 +121,6 @@ public class TusStorageResolver(
             blockId,
             chunkStream,
             cancellationToken: cancellationToken);
-
-        var uploadLength = await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken);
-        if (uploadLength is not null)
-        {
-            await SetStagingUploadLengthAsync(fileId, uploadLength.Value, cancellationToken);
-        }
     }
 
     public async Task CommitTusBlocksAsync(
@@ -502,103 +493,6 @@ public class TusStorageResolver(
 
         var properties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
         return properties.Value.ContentLength;
-    }
-
-    public async Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return null;
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        try
-        {
-            var properties = await blockBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-            if (properties.Value.Metadata.TryGetValue(AzureStorageConstants.TusUploadLengthMetadataKey, out var lengthValue)
-                && long.TryParse(lengthValue, out var uploadLength))
-            {
-                return uploadLength;
-            }
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            return null;
-        }
-
-        return null;
-    }
-
-    public Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
-        => SetStagingBlobMetadataAsync(
-            fileId,
-            AzureStorageConstants.TusUploadLengthMetadataKey,
-            uploadLength.ToString(),
-            cancellationToken);
-
-    public async Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        if (await blockBlobClient.ExistsAsync(cancellationToken))
-        {
-            await SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
-            return;
-        }
-
-        await using var emptyStream = new MemoryStream();
-        await blockBlobClient.UploadAsync(
-            emptyStream,
-            new BlobUploadOptions
-            {
-                Metadata = new Dictionary<string, string>
-                {
-                    [AzureStorageConstants.TusUploadLengthMetadataKey] = uploadLength.ToString()
-                },
-                HttpHeaders = new BlobHttpHeaders
-                {
-                    ContentType = "application/octet-stream"
-                }
-            },
-            cancellationToken: cancellationToken);
-    }
-
-    private async Task SetStagingBlobMetadataAsync(
-        string fileId,
-        string metadataKey,
-        string metadataValue,
-        CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return;
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        try
-        {
-            var properties = await blockBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-            var metadata = properties.Value.Metadata.ToDictionary(static k => k.Key, static v => v.Value);
-            metadata[metadataKey] = metadataValue;
-            await blockBlobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            // Blob metadata is only available after the first staged block.
-        }
     }
 
     private BlobContainerClient GetBlobContainerClient(TusStorageContext storageContext)
