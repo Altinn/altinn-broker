@@ -48,15 +48,16 @@ static void BuildAndRun(string[] args)
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
-        .AddJsonFile("appsettings.local.json", true, true);
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+        .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables();
+
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
     var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
     bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
     builder.Services.ConfigureOpenTelemetry(generalSettings?.ApplicationInsightsConnectionString ?? string.Empty);
 
     var app = builder.Build();
-    app.LogDistributedCacheStatus();
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
@@ -120,7 +121,20 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddProblemDetails();
 
     // Add distributed cache for rate limiting and TUS upload expiration tracking.
-    services.AddBrokerDistributedCache(config);
+    var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
+    if (!string.IsNullOrWhiteSpace(distributedCacheOptions?.RedisConnectionString))
+    {
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = distributedCacheOptions.RedisConnectionString;
+        });
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString));
+    }
+    else
+    {
+        services.AddDistributedMemoryCache();
+    }
 
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();
