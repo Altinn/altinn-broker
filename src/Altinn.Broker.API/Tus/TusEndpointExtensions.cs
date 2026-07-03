@@ -36,11 +36,11 @@ public static class TusEndpointExtensions
 
     public static WebApplication MapBrokerTusUploads(this WebApplication app)
     {
-        app.MapTus(TusMapPath, CreateTusConfiguration)
+        // Register the more specific partial route first so it wins over the collection route.
+        app.MapTus($"{TusMapPath}/{{fileTransferId}}/{PartialPathSegment}", CreateTusConfiguration)
             .RequireAuthorization(AuthorizationConstants.Sender);
 
-        // Concatenation partial uploads use /tus/{fileTransferId}/partial/{partialId}.
-        app.MapTus($"{TusMapPath}/{{fileTransferId}}/{PartialPathSegment}", CreateTusConfiguration)
+        app.MapTus(TusMapPath, CreateTusConfiguration)
             .RequireAuthorization(AuthorizationConstants.Sender);
 
         return app;
@@ -89,7 +89,13 @@ public static class TusEndpointExtensions
             return fileTransferId;
         }
 
-        if (!TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
+        if (TusRouteHelper.TryParseFileTransferIdFromPartialPath(requestPath, out fileTransferId))
+        {
+            return fileTransferId;
+        }
+
+        if (!TusRouteHelper.IsPartialUploadPath(requestPath)
             && !string.IsNullOrEmpty(normalizedTusFileId)
             && Guid.TryParse(normalizedTusFileId, out fileTransferId))
         {

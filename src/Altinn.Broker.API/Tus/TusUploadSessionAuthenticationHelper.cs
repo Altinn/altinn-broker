@@ -123,7 +123,13 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return fileTransferId;
         }
 
-        if (!TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
+        if (TusRouteHelper.TryParseFileTransferIdFromPartialPath(requestPath, out fileTransferId))
+        {
+            return fileTransferId;
+        }
+
+        if (!TusRouteHelper.IsPartialUploadPath(requestPath)
             && !string.IsNullOrEmpty(normalizedTusFileId)
             && Guid.TryParse(normalizedTusFileId, out fileTransferId))
         {

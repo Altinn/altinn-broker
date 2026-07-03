@@ -72,20 +72,29 @@ public static class TusRouteHelper
             return false;
         }
 
-        var prefix = $"{TusMapPath}/";
-        if (string.IsNullOrEmpty(path) || !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        var partialIndex = path!.IndexOf(PartialPathMarker, StringComparison.OrdinalIgnoreCase);
+        if (partialIndex <= 0)
         {
             return false;
         }
 
-        var partialIndex = path.IndexOf(PartialPathMarker, StringComparison.OrdinalIgnoreCase);
-        if (partialIndex < prefix.Length)
-        {
-            return false;
-        }
-
-        var fileTransferIdSegment = path[prefix.Length..partialIndex].Trim('/');
+        var fileTransferIdSegment = path[..partialIndex]
+            .TrimEnd('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .LastOrDefault();
         return Guid.TryParse(fileTransferIdSegment, out fileTransferId);
+    }
+
+    public static string GetTusPathRelativeToPathBase(HttpContext httpContext)
+    {
+        var pathBase = httpContext.Request.PathBase.Value ?? string.Empty;
+        if (!string.IsNullOrEmpty(pathBase)
+            && TusMapPath.StartsWith(pathBase, StringComparison.OrdinalIgnoreCase))
+        {
+            return TusMapPath[pathBase.Length..];
+        }
+
+        return TusMapPath;
     }
 
     public static bool TryParsePartialUploadIdFromPath(string? path, out string partialUploadId)

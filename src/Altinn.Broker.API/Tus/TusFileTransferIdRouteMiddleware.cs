@@ -30,8 +30,8 @@ public sealed class TusFileTransferIdRouteMiddleware(RequestDelegate next)
             return true;
         }
 
-        var path = context.Request.Path.Value;
-        return path?.StartsWith(TusEndpointExtensions.TusMapPath, StringComparison.OrdinalIgnoreCase) == true;
+        var path = TusRouteHelper.GetRequestPath(context);
+        return path.StartsWith(TusEndpointExtensions.TusMapPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void NormalizeRouteValues(HttpContext context)

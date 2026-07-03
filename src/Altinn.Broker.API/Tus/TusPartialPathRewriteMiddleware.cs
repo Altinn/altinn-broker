@@ -46,7 +46,7 @@ public sealed class TusPartialPathRewriteMiddleware(RequestDelegate next)
 
         context.Items[TusRouteHelper.FileTransferIdItemKey] = fileTransferId;
         context.Request.Path = new PathString(
-            $"{prefix}{fileTransferId}/{TusEndpointExtensions.PartialPathSegment}/{partialId}");
+            $"{TusRouteHelper.GetTusPathRelativeToPathBase(context).TrimEnd('/')}/{fileTransferId}/{TusEndpointExtensions.PartialPathSegment}/{partialId}");
         return true;
     }
 }

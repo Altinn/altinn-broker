@@ -69,9 +69,38 @@ public class TusRouteHelperTests
         Assert.Equal(expected, TusRouteHelper.NormalizePartialFileId(input));
     }
 
-    private static DefaultHttpContext CreateContext(string path)
+    [Fact]
+    public void TryGetFileTransferIdFromRoute_PartialPath_WithPathBase_ParsesFromPathWhenRouteValuesMissing()
+    {
+        var context = CreateContext(
+            $"/filetransfer/upload/tus/{FileTransferId}/partial/{PartialUploadId}",
+            "/broker/api/v1");
+
+        var resolved = TusRouteHelper.TryGetFileTransferIdFromRoute(context, out var fileTransferId);
+
+        Assert.True(resolved);
+        Assert.Equal(FileTransferId, fileTransferId);
+    }
+
+    [Fact]
+    public void TryParseFileTransferIdFromPartialPath_DoesNotRequireBrokerPrefix()
+    {
+        var path = $"/filetransfer/upload/tus/{FileTransferId}/partial/{PartialUploadId}";
+
+        var resolved = TusRouteHelper.TryParseFileTransferIdFromPartialPath(path, out var fileTransferId);
+
+        Assert.True(resolved);
+        Assert.Equal(FileTransferId, fileTransferId);
+    }
+
+    private static DefaultHttpContext CreateContext(string path, string? pathBase = null)
     {
         var context = new DefaultHttpContext();
+        if (!string.IsNullOrEmpty(pathBase))
+        {
+            context.Request.PathBase = pathBase;
+        }
+
         context.Request.Path = path;
         return context;
     }
