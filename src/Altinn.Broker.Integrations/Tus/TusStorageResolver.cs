@@ -5,6 +5,7 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
 using Azure.Identity;
+using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -164,8 +165,21 @@ public class TusStorageResolver(
         var containerClient = GetBlobContainerClient(storageContext);
         var blockBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        await using var contentStream = await blockBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
-        return await MD5.HashDataAsync(contentStream, cancellationToken);
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                await using var contentStream = await blockBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+                return await MD5.HashDataAsync(contentStream, cancellationToken);
+            }
+            catch (RequestFailedException ex) when (ex.Status == 412 && attempt < 2)
+            {
+                await Task.Delay(100, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException($"Failed to read committed staging blob for file id {fileId}.");
     }
 
     public async Task SetCommittedStagingMd5Async(string fileId, byte[] md5Hash, CancellationToken cancellationToken)

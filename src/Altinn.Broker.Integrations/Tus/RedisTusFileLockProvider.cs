@@ -25,6 +25,9 @@ public sealed class RedisTusFileLockProvider(IConnectionMultiplexer? multiplexer
         private const string ReleaseLockScript =
             "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
+        private const int MaxLockAttempts = 120;
+        private static readonly TimeSpan LockRetryDelay = TimeSpan.FromMilliseconds(25);
+
         private readonly IDatabase _database = multiplexer.GetDatabase();
         private readonly string _lockKey = $"tus-upload-lock:{fileId}";
         private readonly string _lockToken = Guid.NewGuid().ToString("N");
@@ -37,12 +40,22 @@ public sealed class RedisTusFileLockProvider(IConnectionMultiplexer? multiplexer
                 return true;
             }
 
-            _hasLock = await _database.StringSetAsync(
-                _lockKey,
-                _lockToken,
-                LockExpiry,
-                When.NotExists);
-            return _hasLock;
+            for (var attempt = 0; attempt < MaxLockAttempts; attempt++)
+            {
+                _hasLock = await _database.StringSetAsync(
+                    _lockKey,
+                    _lockToken,
+                    LockExpiry,
+                    When.NotExists);
+                if (_hasLock)
+                {
+                    return true;
+                }
+
+                await Task.Delay(LockRetryDelay);
+            }
+
+            return false;
         }
 
         public async Task ReleaseIfHeld()
