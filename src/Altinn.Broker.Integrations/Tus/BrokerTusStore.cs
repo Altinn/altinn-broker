@@ -63,13 +63,16 @@ public class BrokerTusStore(
 
             blockId = BuildBlockId(state.NextBlockIndex++);
             state.BlockIds.Add(blockId);
-            state.AcceptedOffset += chunkLength;
-            acceptedOffset = state.AcceptedOffset;
-            isFinalChunk = acceptedOffset >= state.UploadLength;
             state.PendingUploads++;
         }
 
-        _ = Task.Run(() => UploadBlockAsync(fileId, state, blockId, chunk));
+        await UploadBlockAsync(fileId, state, blockId, chunk, cancellationToken);
+
+        lock (state.SyncRoot)
+        {
+            acceptedOffset = state.AcceptedOffset;
+            isFinalChunk = acceptedOffset >= state.UploadLength;
+        }
 
         await PersistProgressAsync(fileId, state, cancellationToken);
 
@@ -149,7 +152,6 @@ public class BrokerTusStore(
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
         {
-            await TouchUploadProgressAsync(fileId, cachedProgress, cancellationToken);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return cachedProgress.UploadLength;
         }
@@ -196,7 +198,7 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                offset = state.AcceptedOffset;
+                offset = state.CommittedOffset;
             }
         }
         else
@@ -204,8 +206,7 @@ public class BrokerTusStore(
             var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
             if (cachedProgress is not null)
             {
-                await TouchUploadProgressAsync(fileId, cachedProgress, cancellationToken);
-                offset = cachedProgress.AcceptedOffset;
+                offset = cachedProgress.CommittedOffset;
             }
             else
             {
@@ -500,7 +501,9 @@ public class BrokerTusStore(
         }
 
         var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
-        var currentOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+        var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        var currentOffset = Math.Max(stagedOffset, committedOffset);
         return uploadStateRegistry.GetOrAdd(fileId, () => new TusUploadState(uploadLength, currentOffset, _maxParallelBlockUploads));
     }
 
@@ -672,22 +675,26 @@ public class BrokerTusStore(
         }
     }
 
-    private async Task UploadBlockAsync(string fileId, TusUploadState state, string blockId, byte[] chunk)
+    private async Task UploadBlockAsync(
+        string fileId,
+        TusUploadState state,
+        string blockId,
+        byte[] chunk,
+        CancellationToken cancellationToken)
     {
-        await state.ConcurrentUploader.WaitAsync();
+        await state.ConcurrentUploader.WaitAsync(cancellationToken);
         try
         {
-            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, CancellationToken.None);
+            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, cancellationToken);
             lock (state.SyncRoot)
             {
+                state.AcceptedOffset += chunk.Length;
                 state.CommittedOffset += chunk.Length;
                 state.PendingUploads--;
                 var previousProgress = state.ProgressSignal;
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetResult(state.CommittedOffset);
             }
-
-            await PersistProgressAsync(fileId, state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -699,6 +706,8 @@ public class BrokerTusStore(
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetException(ex);
             }
+
+            throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {ex.Message}");
         }
         finally
         {
