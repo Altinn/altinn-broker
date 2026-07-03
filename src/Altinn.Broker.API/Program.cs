@@ -133,6 +133,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     {
         services.AddDistributedMemoryCache();
     }
+    // Uses the distributed cache registered above as its secondary storage
+    services.AddHybridCache();
 
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();

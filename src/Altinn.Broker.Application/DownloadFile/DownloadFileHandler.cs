@@ -8,13 +8,13 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
-using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.DownloadFile;
-public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, IDistributedCache distributedCache, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
+public class DownloadFileHandler(IResourceRepository resourceRepository, IServiceOwnerRepository serviceOwnerRepository, IAuthorizationService authorizationService, IFileTransferRepository fileTransferRepository, IActorFileTransferStatusRepository actorFileTransferStatusRepository, IBrokerStorageService brokerStorageService, HybridCache hybridCache, ILogger<DownloadFileHandler> logger) : IHandler<DownloadFileRequest, DownloadFileResponse>
 {
     private static readonly TimeSpan RangedDownloadStatusDebounceWindow = TimeSpan.FromMinutes(5);
 
@@ -85,34 +85,31 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
 
     private async Task InsertDownloadStartedStatus(Guid fileTransferId, bool isRangedDownload, string caller, string? vendor, CancellationToken cancellationToken)
     {
-        var debounceCacheKey = $"download-started:{fileTransferId}:{caller}";
-        if (isRangedDownload)
+        if (!isRangedDownload)
         {
-            try
-            {
-                if (await distributedCache.GetAsync(debounceCacheKey, cancellationToken) is not null)
-                {
-                    return;
-                }
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(exception, "Failed to read DownloadStarted debounce cache for file transfer {FileTransferId}", fileTransferId);
-            }
+            await actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.DownloadStarted, caller, vendor, cancellationToken);
+            return;
         }
-        await actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.DownloadStarted, caller, vendor, cancellationToken);
-        if (isRangedDownload)
+        var statusRecorded = false;
+        try
         {
-            try
-            {
-                await distributedCache.SetAsync(debounceCacheKey, new byte[] { 1 }, new DistributedCacheEntryOptions
+            await hybridCache.GetOrCreateAsync(
+                $"download-started:{fileTransferId}:{caller}",
+                async cancellationToken =>
                 {
-                    SlidingExpiration = RangedDownloadStatusDebounceWindow
-                }, cancellationToken);
-            }
-            catch (Exception exception)
+                    await actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.DownloadStarted, caller, vendor, cancellationToken);
+                    statusRecorded = true;
+                    return true;
+                },
+                new HybridCacheEntryOptions { Expiration = RangedDownloadStatusDebounceWindow },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "DownloadStarted debounce cache failed for file transfer {FileTransferId}", fileTransferId);
+            if (!statusRecorded)
             {
-                logger.LogWarning(exception, "Failed to write DownloadStarted debounce cache for file transfer {FileTransferId}", fileTransferId);
+                await actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.DownloadStarted, caller, vendor, cancellationToken);
             }
         }
     }
