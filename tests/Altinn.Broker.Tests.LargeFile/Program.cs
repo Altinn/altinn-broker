@@ -51,18 +51,19 @@ public class Program
         Console.WriteLine(
             $"Uploading {uploadSize / (1024.0 * 1024.0 * 1024.0):N2} GiB via TUS with {chunkSizeMb} MiB chunks");
 
-        using var httpClientHandler = new SocketsHttpHandler
+        using var uploadHandler = new SocketsHttpHandler
         {
             // Reduce transient socket failures under parallel PATCH pressure.
             MaxConnectionsPerServer = 200,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2)
         };
+        using var tokenHandler = new SocketsHttpHandler();
         var tokenProvider = new AccessTokenProvider(
-            cancellationToken => GetAccessToken(httpClientHandler, username, password, "991825827", cancellationToken));
+            cancellationToken => GetAccessToken(tokenHandler, username, password, "991825827", cancellationToken));
         using var httpClient = new HttpClient(new BearerTokenHandler(tokenProvider)
         {
-            InnerHandler = httpClientHandler
+            InnerHandler = uploadHandler
         })
         {
             // Each TUS PATCH is a short request; no multi-hour connection is required.
@@ -119,7 +120,7 @@ public class Program
         string orgNumber,
         CancellationToken cancellationToken = default)
     {
-        using var httpClient = new HttpClient(httpMessageHandler);
+        using var httpClient = new HttpClient(httpMessageHandler, disposeHandler: false);
         using var httpRequestMessage = new HttpRequestMessage
         {
             RequestUri = new Uri(
