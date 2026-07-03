@@ -10,7 +10,7 @@ namespace Altinn.Broker.Tests.LargeFile;
 
 public class Program
 {
-    private const int DefaultChunkSizeMb = 32;
+    private const int DefaultChunkSizeMb = 8;
     private const string TestResource = "altinn-broker-test-resource-2";
 
     static async Task Main(string[] args)
@@ -58,13 +58,16 @@ public class Program
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2)
         };
-        using var httpClient = new HttpClient(httpClientHandler)
+        var tokenProvider = new AccessTokenProvider(
+            cancellationToken => GetAccessToken(httpClientHandler, username, password, "991825827", cancellationToken));
+        using var httpClient = new HttpClient(new BearerTokenHandler(tokenProvider)
+        {
+            InnerHandler = httpClientHandler
+        })
         {
             // Each TUS PATCH is a short request; no multi-hour connection is required.
             Timeout = TimeSpan.FromMinutes(30)
         };
-        var token = await GetAccessToken(httpClient, username, password, "991825827");
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await ConfigureResource(httpClient, baseUrl, uploadSize);
         var fileTransferId = await InitializeFileTransfer(httpClient, baseUrl);
@@ -79,11 +82,12 @@ public class Program
                 randomDataStream,
                 uploadSize,
                 chunkSize,
-                parallelPartialUploads);
+                parallelPartialUploads,
+                tokenProvider);
         }
         else
         {
-            await TusUploader.UploadAsync(httpClient, baseUrl, fileTransferId, randomDataStream, uploadSize, chunkSize);
+            await TusUploader.UploadAsync(httpClient, baseUrl, fileTransferId, randomDataStream, uploadSize, chunkSize, tokenProvider);
         }
     }
 
@@ -109,11 +113,13 @@ public class Program
     }
 
     private static async Task<string> GetAccessToken(
-        HttpClient httpClient,
+        HttpMessageHandler httpMessageHandler,
         string testToolsUsername,
         string testToolsPassword,
-        string orgNumber)
+        string orgNumber,
+        CancellationToken cancellationToken = default)
     {
+        using var httpClient = new HttpClient(httpMessageHandler);
         using var httpRequestMessage = new HttpRequestMessage
         {
             RequestUri = new Uri(
@@ -122,9 +128,9 @@ public class Program
         var authenticationString = $"{testToolsUsername}:{testToolsPassword}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(Encoding.UTF8.GetBytes(authenticationString));
         httpRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
-        using var response = await httpClient.SendAsync(httpRequestMessage);
+        using var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
     private static async Task ConfigureResource(HttpClient httpClient, string baseUrl, long uploadSize)

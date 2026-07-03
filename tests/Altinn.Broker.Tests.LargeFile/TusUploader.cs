@@ -22,13 +22,14 @@ public static class TusUploader
         Stream source,
         long uploadSize,
         int chunkSize,
+        AccessTokenProvider? tokenProvider = null,
         CancellationToken cancellationToken = default)
     {
         var tusEndpoint = BuildTusEndpointUri(baseUrl, fileTransferId);
         await EnsureServerSupportsTus(httpClient, tusEndpoint, cancellationToken);
 
         var uploadUri = await CreateUploadAsync(httpClient, tusEndpoint, uploadSize, cancellationToken);
-        var offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+        var offset = await GetUploadOffsetAsync(httpClient, uploadUri, tokenProvider, cancellationToken);
         if (offset > 0)
         {
             Console.WriteLine($"Resuming upload at offset {offset:N0}");
@@ -51,7 +52,7 @@ public static class TusUploader
                 throw new InvalidOperationException($"Source stream ended at offset {offset}.");
             }
 
-            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, tokenProvider, cancellationToken);
             progress.Update(offset);
         }
 
@@ -66,6 +67,7 @@ public static class TusUploader
         long uploadSize,
         int chunkSize,
         int parallelPartialUploads,
+        AccessTokenProvider? tokenProvider = null,
         CancellationToken cancellationToken = default)
     {
         if (!source.CanSeek)
@@ -101,6 +103,7 @@ public static class TusUploader
                 part.Length,
                 chunkSize,
                 uploadedBytes => progress.Update(Interlocked.Add(ref progressBytes, uploadedBytes)),
+                tokenProvider,
                 ct);
         });
 
@@ -245,9 +248,10 @@ public static class TusUploader
         long partLength,
         int chunkSize,
         Action<long> onBytesUploaded,
+        AccessTokenProvider? tokenProvider,
         CancellationToken cancellationToken)
     {
-        var offset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
+        var offset = await GetUploadOffsetAsync(httpClient, partialUploadUri, tokenProvider, cancellationToken);
         var buffer = new byte[chunkSize];
 
         while (offset < partLength)
@@ -262,7 +266,7 @@ public static class TusUploader
             }
 
             var chunkStartOffset = offset;
-            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, tokenProvider, cancellationToken);
             onBytesUploaded(Math.Max(offset - chunkStartOffset, 0));
         }
     }
@@ -316,6 +320,7 @@ public static class TusUploader
         long offset,
         byte[] buffer,
         int bytesRead,
+        AccessTokenProvider? tokenProvider,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
@@ -336,9 +341,16 @@ public static class TusUploader
                     return ParseUploadOffset(response.Headers);
                 }
 
+                if (response.StatusCode == HttpStatusCode.Unauthorized && attempt < MaxPatchAttempts)
+                {
+                    await RefreshTokenOnUnauthorizedAsync(tokenProvider, cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                    continue;
+                }
+
                 if (response.StatusCode == HttpStatusCode.Conflict)
                 {
-                    var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                    var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, tokenProvider, cancellationToken);
                     if (serverOffset > offset)
                     {
                         return serverOffset;
@@ -354,12 +366,12 @@ public static class TusUploader
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-                offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                offset = await GetUploadOffsetAsync(httpClient, uploadUri, tokenProvider, cancellationToken);
             }
             catch (Exception ex) when (IsTransientRequestException(ex) && attempt < MaxPatchAttempts)
             {
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-                offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                offset = await GetUploadOffsetAsync(httpClient, uploadUri, tokenProvider, cancellationToken);
             }
         }
 
@@ -369,6 +381,7 @@ public static class TusUploader
     private static async Task<long> GetUploadOffsetAsync(
         HttpClient httpClient,
         Uri uploadUri,
+        AccessTokenProvider? tokenProvider,
         CancellationToken cancellationToken)
     {
         using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, uploadUri, cancellationToken);
@@ -503,6 +516,16 @@ public static class TusUploader
             $"{uploadSize / (1024.0 * 1024 * 1024):N2} GiB in {totalSeconds:N1}s (avg: {averageSpeedMbps:N2} MB/s)");
     }
 
+    private static async Task RefreshTokenOnUnauthorizedAsync(
+        AccessTokenProvider? tokenProvider,
+        CancellationToken cancellationToken)
+    {
+        if (tokenProvider is not null)
+        {
+            await tokenProvider.ForceRefreshAsync(cancellationToken);
+        }
+    }
+
     private static bool IsTransientRequestException(Exception exception)
         => exception is HttpRequestException or IOException or TaskCanceledException;
 
@@ -510,7 +533,6 @@ public static class TusUploader
         => statusCode is HttpStatusCode.NotFound
             or HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.Unauthorized
             or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway
             or HttpStatusCode.ServiceUnavailable

@@ -43,6 +43,7 @@ public class TusUploadAuthorizationService(
             && hasCacheKey
             && await cache.GetStringAsync(cacheKey, cancellationToken) == CacheValue)
         {
+            await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
             return await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
         }
 
@@ -55,14 +56,7 @@ public class TusUploadAuthorizationService(
 
         if (error is null && intent is not TusUploadAuthIntent.Delete && hasCacheKey)
         {
-            await cache.SetStringAsync(
-                cacheKey,
-                CacheValue,
-                new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = GetCacheExpiration()
-                },
-                cancellationToken);
+            await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
         }
 
         if (error is null && intent is TusUploadAuthIntent.Delete && hasCacheKey)
@@ -71,6 +65,24 @@ public class TusUploadAuthorizationService(
         }
 
         return error;
+    }
+
+    public async Task<bool> HasActiveUploadSessionAsync(
+        Guid fileTransferId,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken)
+    {
+        if (!TryBuildCacheKey(fileTransferId, user, out var cacheKey))
+        {
+            return false;
+        }
+
+        if (await cache.GetStringAsync(cacheKey, cancellationToken) != CacheValue)
+        {
+            return false;
+        }
+
+        return await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken) is null;
     }
 
     public Task InvalidateAsync(Guid fileTransferId, ClaimsPrincipal user, CancellationToken cancellationToken)
@@ -98,6 +110,16 @@ public class TusUploadAuthorizationService(
         cacheKey = $"tus-upload-auth:{fileTransferId}:{subject}:{organization}";
         return true;
     }
+
+    private Task RefreshUploadSessionCacheAsync(string cacheKey, CancellationToken cancellationToken)
+        => cache.SetStringAsync(
+            cacheKey,
+            CacheValue,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = GetCacheExpiration()
+            },
+            cancellationToken);
 
     private TimeSpan GetCacheExpiration()
     {
