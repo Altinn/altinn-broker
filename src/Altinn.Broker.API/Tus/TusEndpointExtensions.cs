@@ -70,6 +70,13 @@ public static class TusEndpointExtensions
         string? tusFileId,
         CancellationToken cancellationToken)
     {
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
+
+        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+        {
+            return (true, fileTransferId);
+        }
+
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
         var normalizedTusFileId = string.IsNullOrWhiteSpace(tusFileId)
             ? tusFileId
@@ -81,14 +88,14 @@ public static class TusEndpointExtensions
             return (true, mappedFileTransferId);
         }
 
-        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+        if (!TusRouteHelper.IsPartialUploadPath(requestPath)
+            && !string.IsNullOrEmpty(tusFileId)
+            && Guid.TryParse(tusFileId, out fileTransferId))
         {
             return (true, fileTransferId);
         }
 
-        return Guid.TryParse(tusFileId, out fileTransferId)
-            ? (true, fileTransferId)
-            : (false, default);
+        return (false, default);
     }
 
     private static async Task OnAuthorizeAsync(AuthorizeContext context)

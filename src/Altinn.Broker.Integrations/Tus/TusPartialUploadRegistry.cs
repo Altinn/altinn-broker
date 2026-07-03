@@ -36,6 +36,7 @@ public interface ITusPartialUploadRegistry
 public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPartialUploadRegistry
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{NormalizeId(partialFileId)}";
 
@@ -53,7 +54,7 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
     {
         await SetCachedValueAsync(
             PartialInfoKey(partialFileId),
-            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength)),
+            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength), JsonOptions),
             cancellationToken);
         await RegisterUploadAsync(partialFileId, uploadLength, cancellationToken);
     }
@@ -69,7 +70,7 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
             return null;
         }
 
-        var dto = JsonSerializer.Deserialize<PartialUploadInfoDto>(json);
+        var dto = JsonSerializer.Deserialize<PartialUploadInfoDto>(json, JsonOptions);
         return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength);
     }
 
@@ -89,24 +90,14 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
     {
         var normalizedId = NormalizeId(tusFileId);
         var partialInfo = await TryGetPartialInfoAsync(normalizedId, cancellationToken);
-        if (partialInfo is not null)
-        {
-            return partialInfo.Value.FileTransferId;
-        }
-
-        if (Guid.TryParse(normalizedId, out var fileTransferId))
-        {
-            return fileTransferId;
-        }
-
-        return null;
+        return partialInfo?.FileTransferId;
     }
 
     public Task RegisterFinalConcatAsync(
         string fileId,
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken)
-        => SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds), cancellationToken);
+        => SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
 
     public async Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -116,7 +107,7 @@ public sealed class TusPartialUploadRegistry(IDistributedCache cache) : ITusPart
             return null;
         }
 
-        return JsonSerializer.Deserialize<string[]>(json);
+        return JsonSerializer.Deserialize<string[]>(json, JsonOptions);
     }
 
     public Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken)

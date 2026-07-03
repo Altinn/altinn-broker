@@ -9,6 +9,9 @@ public static class TusRouteHelper
     public const string TusMapPath = "/broker/api/v1/filetransfer/upload/tus";
     public const string PartialPathSegment = "partial";
 
+    public static string GetRequestPath(HttpContext httpContext)
+        => (httpContext.Request.PathBase + httpContext.Request.Path).ToString();
+
     public static bool TryGetFileTransferIdFromRoute(HttpContext httpContext, out Guid fileTransferId)
     {
         fileTransferId = default;
@@ -20,8 +23,9 @@ public static class TusRouteHelper
             return true;
         }
 
-        var requestPath = httpContext.Request.Path.Value;
-        if (TryGetFileTransferIdFromPath(requestPath, out fileTransferId))
+        var requestPath = GetRequestPath(httpContext);
+        if (TryGetFileTransferIdFromPath(requestPath, out fileTransferId)
+            || TryGetFileTransferIdFromPath(httpContext.Request.Path.Value, out fileTransferId))
         {
             return true;
         }
@@ -95,7 +99,8 @@ public static class TusRouteHelper
             return false;
         }
 
-        if (!TryGetFileTransferIdFromPath(httpContext.Request.Path.Value, out var fileTransferId))
+        if (!TryGetFileTransferIdFromPath(GetRequestPath(httpContext), out var fileTransferId)
+            && !TryGetFileTransferIdFromPath(httpContext.Request.Path.Value, out fileTransferId))
         {
             return false;
         }
@@ -103,9 +108,6 @@ public static class TusRouteHelper
         httpContext.Items[FileTransferIdItemKey] = fileTransferId.ToString();
         return true;
     }
-
-    public static string GetRequestPath(HttpContext httpContext)
-        => httpContext.Request.Path.Value ?? string.Empty;
 
     public static bool IsPartialUploadPath(string requestPath)
         => requestPath.Contains("/partial/", StringComparison.OrdinalIgnoreCase);
