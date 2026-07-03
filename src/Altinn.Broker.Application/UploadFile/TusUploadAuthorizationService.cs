@@ -123,7 +123,7 @@ public class TusUploadAuthorizationService(
         }
 
         await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
-        return (true, null);
+        return (true, await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken));
     }
 
     private static bool TryBuildCacheKey(Guid fileTransferId, ClaimsPrincipal user, out string cacheKey)

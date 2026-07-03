@@ -69,9 +69,16 @@ public class BrokerTusStore(
             state.PendingUploads++;
         }
 
-        _ = Task.Run(() => UploadBlockAsync(fileId, state, blockId, chunk));
+        await UploadBlockAsync(fileId, state, blockId, chunk, cancellationToken);
 
-        await PersistProgressAsync(fileId, state, cancellationToken);
+        lock (state.SyncRoot)
+        {
+            if (state.Fault is not null)
+            {
+                throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+            }
+        }
+
         await RecordUploadActivityAsync(fileId, cancellationToken);
 
         if (isFinalChunk)
@@ -200,6 +207,8 @@ public class BrokerTusStore(
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
+        long offset = 0;
+
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
             lock (state!.SyncRoot)
@@ -209,23 +218,26 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                return state.AcceptedOffset;
+                offset = state.AcceptedOffset;
             }
         }
 
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
         {
-            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return cachedProgress.AcceptedOffset;
+            offset = Math.Max(offset, cachedProgress.AcceptedOffset);
         }
 
         var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
         var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         if (stagedOffset > 0 || committedOffset > 0)
         {
-            var offset = Math.Max(stagedOffset, committedOffset);
+            offset = Math.Max(offset, Math.Max(stagedOffset, committedOffset));
             await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, offset, cancellationToken);
+        }
+
+        if (offset > 0)
+        {
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return offset;
         }
@@ -240,7 +252,7 @@ public class BrokerTusStore(
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
-            var offset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
+            offset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return offset;
         }
@@ -685,12 +697,17 @@ public class BrokerTusStore(
         }
     }
 
-    private async Task UploadBlockAsync(string fileId, TusUploadState state, string blockId, byte[] chunk)
+    private async Task UploadBlockAsync(
+        string fileId,
+        TusUploadState state,
+        string blockId,
+        byte[] chunk,
+        CancellationToken cancellationToken)
     {
-        await state.ConcurrentUploader.WaitAsync();
+        await state.ConcurrentUploader.WaitAsync(cancellationToken);
         try
         {
-            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, CancellationToken.None);
+            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, cancellationToken);
             lock (state.SyncRoot)
             {
                 state.CommittedOffset += chunk.Length;
@@ -700,7 +717,7 @@ public class BrokerTusStore(
                 previousProgress.TrySetResult(state.CommittedOffset);
             }
 
-            await PersistProgressAsync(fileId, state, CancellationToken.None);
+            await PersistProgressAsync(fileId, state, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -712,6 +729,8 @@ public class BrokerTusStore(
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetException(ex);
             }
+
+            throw;
         }
         finally
         {
