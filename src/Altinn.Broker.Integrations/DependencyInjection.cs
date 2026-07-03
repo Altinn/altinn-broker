@@ -115,7 +115,10 @@ public static class DependencyInjection
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
         services.AddSingleton<RedisTusFileLockProvider>(serviceProvider =>
             new RedisTusFileLockProvider(serviceProvider.GetService<IConnectionMultiplexer>()));
-        services.AddScoped<BrokerTusStore>();
+        services.AddScoped<BrokerTusStore>(serviceProvider =>
+            ActivatorUtilities.CreateInstance<BrokerTusStore>(
+                serviceProvider,
+                serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
 }
