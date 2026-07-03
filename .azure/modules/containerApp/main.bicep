@@ -84,6 +84,8 @@ var containerAppEnvVars = concat([
   { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
+  { name: 'TusOptions__UploadExpiration', value: '24:00:00' }
+  { name: 'DistributedCacheOptions__RedisConnectionString', secretRef: 'redis-connection-string' }
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
   { name: 'ReportResourceIdFilter', secretRef: 'report-resource-id-filter' }
   { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
@@ -183,6 +185,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUrl}/secrets/report-resource-id-filter'
           name: 'report-resource-id-filter'
         }
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/redis-connection-string'
+          name: 'redis-connection-string'
+        }
       ], rotationKeyvaultSecrets)
     }
 
@@ -231,8 +238,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: containerAppEnvVars
           probes: probes
           resources: {
-            cpu: environment == 'production' ? json('2.0') : json('0.5')
-            memory: environment == 'production' ? '4.0Gi' : '1.0Gi'
+            cpu: json('2.0')
+            memory: '4.0Gi'
           }
         }
       ]
