@@ -213,6 +213,13 @@ public static class TusEndpointExtensions
 
     private static async Task OnFileCompleteAsync(FileCompleteContext context)
     {
+        var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var partialFileId = TusRouteHelper.NormalizePartialFileId(context.FileId);
+        if (await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken))
+        {
+            return;
+        }
+
         if (!Guid.TryParse(context.FileId, out var fileTransferId))
         {
             throw new TusStoreException("Invalid file transfer id");

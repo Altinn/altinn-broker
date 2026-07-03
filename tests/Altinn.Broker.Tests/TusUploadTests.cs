@@ -177,4 +177,81 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
         Assert.Equal(partialLength.ToString(), lengthValues.First());
     }
+
+    [Fact]
+    public async Task TusUpload_ConcatenationFinalPost_Succeeds()
+    {
+        var initializeResponse = await _senderClient.PostAsJsonAsync(
+            "broker/api/v1/filetransfer",
+            FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeResponse.IsSuccessStatusCode, await initializeResponse.Content.ReadAsStringAsync());
+
+        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
+        Assert.NotNull(initializeResult);
+        var fileTransferId = initializeResult.FileTransferId.ToString();
+        var tusBaseUrl = $"broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
+        var partOne = new byte[512];
+        var partTwo = new byte[768];
+        Random.Shared.NextBytes(partOne);
+        Random.Shared.NextBytes(partTwo);
+
+        var partialOneUrl = await CreateAndUploadPartialAsync(tusBaseUrl, partOne);
+        var partialTwoUrl = await CreateAndUploadPartialAsync(tusBaseUrl, partTwo);
+
+        var partialOneReference = BuildTusJsConcatReference(partialOneUrl, tusBaseUrl);
+        var partialTwoReference = BuildTusJsConcatReference(partialTwoUrl, tusBaseUrl);
+
+        var finalRequest = new HttpRequestMessage(HttpMethod.Post, tusBaseUrl);
+        finalRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        finalRequest.Headers.Add("Upload-Concat", $"final;{partialOneReference} {partialTwoReference}");
+        var finalResponse = await _senderClient.SendAsync(finalRequest);
+        Assert.Equal(HttpStatusCode.Created, finalResponse.StatusCode);
+
+        var finalUploadUrl = finalResponse.Headers.Location;
+        Assert.NotNull(finalUploadUrl);
+
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, finalUploadUrl);
+        headRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        var headResponse = await _senderClient.SendAsync(headRequest);
+        Assert.Equal(HttpStatusCode.OK, headResponse.StatusCode);
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
+        Assert.Equal((partOne.Length + partTwo.Length).ToString(), offsetValues.First());
+        Assert.Equal((partOne.Length + partTwo.Length).ToString(), lengthValues.First());
+    }
+
+    private async Task<Uri> CreateAndUploadPartialAsync(string tusBaseUrl, byte[] content)
+    {
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, tusBaseUrl);
+        createRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        createRequest.Headers.Add("Upload-Length", content.Length.ToString());
+        createRequest.Headers.Add("Upload-Concat", "partial");
+        var createResponse = await _senderClient.SendAsync(createRequest);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var uploadUrl = createResponse.Headers.Location;
+        Assert.NotNull(uploadUrl);
+
+        var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUrl);
+        patchRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        patchRequest.Headers.Add("Upload-Offset", "0");
+        patchRequest.Content = new ByteArrayContent(content);
+        patchRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
+        var patchResponse = await _senderClient.SendAsync(patchRequest);
+        Assert.Equal(HttpStatusCode.NoContent, patchResponse.StatusCode);
+
+        return uploadUrl;
+    }
+
+    private static string BuildTusJsConcatReference(Uri partialUploadUrl, string tusBaseUrl)
+    {
+        var partialPath = partialUploadUrl.IsAbsoluteUri ? partialUploadUrl.AbsolutePath : partialUploadUrl.ToString();
+        var endpointPath = tusBaseUrl.StartsWith('/') ? tusBaseUrl : $"/{tusBaseUrl}";
+        if (!partialPath.StartsWith(endpointPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Partial upload path {partialPath} is not under {endpointPath}");
+        }
+
+        return partialPath[endpointPath.Length..].TrimStart('/');
+    }
 }

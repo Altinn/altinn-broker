@@ -141,10 +141,22 @@ public class TusStorageResolver(
         var containerClient = GetBlobContainerClient(storageContext);
         var blockBlobClient = containerClient.GetBlockBlobClient(
             Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        IDictionary<string, string> metadata = new Dictionary<string, string>();
+        try
+        {
+            var properties = await blockBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            metadata = properties.Value.Metadata.ToDictionary(static k => k.Key, static v => v.Value);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Blob metadata is only available after the placeholder blob or first staged block.
+        }
+
         await blockBlobClient.CommitBlockListAsync(
             blockIds,
             new CommitBlockListOptions
             {
+                Metadata = metadata,
                 HttpHeaders = new BlobHttpHeaders
                 {
                     ContentType = "application/octet-stream"
