@@ -1,4 +1,5 @@
 ﻿using Altinn.Broker.API.Models.Maskinporten;
+using Altinn.Broker.API.Tus;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -8,11 +9,30 @@ namespace Altinn.Broker.API.Helpers;
 
 public class AltinnTokenEventsHelper
 {
-    public static Task OnAuthenticationFailed(AuthenticationFailedContext context)
+    public static async Task OnAuthenticationFailed(AuthenticationFailedContext context)
     {
-        // Allow authentication failures to be handled by the default mechanism
-        // This removes the blocking of Maskinporten tokens to support pure Maskinporten tokens
-        return Task.CompletedTask;
+        if (context.Exception is not SecurityTokenExpiredException)
+        {
+            return;
+        }
+
+        var sessionHelper = context.HttpContext.RequestServices.GetService<TusUploadSessionAuthenticationHelper>();
+        if (sessionHelper is null)
+        {
+            return;
+        }
+
+        var principal = await sessionHelper.TryValidateExpiredTokenForActiveUploadAsync(
+            context.HttpContext,
+            context.Scheme.Name,
+            context.HttpContext.RequestAborted);
+        if (principal is null)
+        {
+            return;
+        }
+
+        context.Principal = principal;
+        context.Success();
     }
 
     public static async Task OnChallenge(JwtBearerChallengeContext context)
