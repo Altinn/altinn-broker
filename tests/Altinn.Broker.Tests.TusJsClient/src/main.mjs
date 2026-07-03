@@ -39,6 +39,9 @@ function formatMiB(bytes) {
 async function uploadWithTusJsClient({
   baseUrl,
   token,
+  username,
+  password,
+  orgNumber,
   fileTransferId,
   filePath,
   chunkSize,
@@ -47,6 +50,7 @@ async function uploadWithTusJsClient({
   const { size } = await stat(filePath);
   const endpoint = `${baseUrl.replace(/\/$/, '')}/broker/api/v1/filetransfer/upload/tus/${fileTransferId}`;
   const startedAt = Date.now();
+  let authToken = token;
 
   await new Promise((resolve, reject) => {
     const upload = new Upload(
@@ -55,9 +59,17 @@ async function uploadWithTusJsClient({
         endpoint,
         chunkSize,
         parallelUploads,
-        retryDelays: [0, 2000, 4000, 8000, 16000],
+        retryDelays: [0, 1000, 3000, 5000, 10000],
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
+        },
+        onBeforeRequest(req) {
+          req.setHeader('Authorization', `Bearer ${authToken}`);
+        },
+        onAfterResponse: async (_, res) => {
+          if (res.getStatus() === 401) {
+            authToken = await getAccessToken(username, password, orgNumber);
+          }
         },
         metadata: {
           filename: 'input.txt',
@@ -125,6 +137,9 @@ async function main() {
     await uploadWithTusJsClient({
       baseUrl,
       token,
+      username,
+      password,
+      orgNumber,
       fileTransferId,
       filePath,
       chunkSize,
