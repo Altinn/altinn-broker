@@ -187,9 +187,10 @@ public static class TusEndpointExtensions
             ?? throw new TusStoreException("Invalid file transfer id");
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        var isPartial = await partialUploadRegistry.IsPartialAsync(context.FileId, context.CancellationToken);
+        var partialFileId = TusRouteHelper.NormalizePartialFileId(context.FileId);
+        var isPartial = await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken);
         var uploadPath = isPartial
-            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{context.FileId}"
+            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{partialFileId}"
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 

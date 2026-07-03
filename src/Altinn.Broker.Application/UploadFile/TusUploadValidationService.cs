@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -112,6 +113,40 @@ public class TusUploadValidationService(
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
             return Errors.FileTransferAlreadyUploaded;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Lightweight sender check for in-progress uploads. Used when the upload session is already
+    /// established so standard TUS clients can resume HEAD/PATCH without repeating full resource authorization.
+    /// </summary>
+    public async Task<Error?> ValidateActiveUploadSenderAsync(
+        ClaimsPrincipal? user,
+        Guid fileTransferId,
+        CancellationToken cancellationToken = default)
+    {
+        var inProgressError = await ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
+        if (inProgressError is not null)
+        {
+            return inProgressError;
+        }
+
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            return Errors.FileTransferNotFound;
+        }
+
+        var callerOrganization = user?.GetCallerOrganizationId();
+        if (string.IsNullOrEmpty(callerOrganization)
+            || !string.Equals(
+                fileTransfer.Sender.ActorExternalId.WithoutPrefix(),
+                callerOrganization.WithoutPrefix(),
+                StringComparison.Ordinal))
+        {
+            return Errors.NoAccessToResource;
         }
 
         return null;

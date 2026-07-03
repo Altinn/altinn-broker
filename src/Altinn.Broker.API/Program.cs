@@ -57,6 +57,7 @@ static void BuildAndRun(string[] args)
 
     var app = builder.Build();
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
+    app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
     app.UseExceptionHandler();
@@ -69,7 +70,6 @@ static void BuildAndRun(string[] args)
 
     app.UseAuthentication();
     app.UseAuthorization();
-    app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
 
     app.MapControllers();
     app.MapBrokerTusUploads();
