@@ -17,7 +17,7 @@ public sealed class TusPartialPathRewriteMiddleware(RequestDelegate next)
 
     public static bool TryRewriteConcatPartialPath(HttpContext context)
     {
-        var path = context.Request.Path.Value;
+        var path = TusRouteHelper.GetRequestPath(context);
         if (string.IsNullOrEmpty(path))
         {
             return false;

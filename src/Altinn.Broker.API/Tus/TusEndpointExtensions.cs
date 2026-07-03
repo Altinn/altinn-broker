@@ -89,7 +89,7 @@ public static class TusEndpointExtensions
             return fileTransferId;
         }
 
-        if (!TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value)
+        if (!TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
             && !string.IsNullOrEmpty(normalizedTusFileId)
             && Guid.TryParse(normalizedTusFileId, out fileTransferId))
         {

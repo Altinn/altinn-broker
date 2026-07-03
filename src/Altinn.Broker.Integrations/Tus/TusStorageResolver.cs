@@ -42,6 +42,7 @@ public interface ITusStorageResolver
     Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken);
     Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
+    Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
 }
 
 public class TusStorageResolver(
@@ -465,6 +466,40 @@ public class TusStorageResolver(
             uploadLength.ToString(),
             cancellationToken);
 
+    public async Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = containerClient.GetBlockBlobClient(
+            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        if (await blockBlobClient.ExistsAsync(cancellationToken))
+        {
+            await SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+            return;
+        }
+
+        await using var emptyStream = new MemoryStream();
+        await blockBlobClient.UploadAsync(
+            emptyStream,
+            new BlobUploadOptions
+            {
+                Metadata = new Dictionary<string, string>
+                {
+                    [AzureStorageConstants.TusUploadLengthMetadataKey] = uploadLength.ToString()
+                },
+                HttpHeaders = new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream"
+                }
+            },
+            cancellationToken: cancellationToken);
+    }
+
     private async Task SetStagingBlobMetadataAsync(
         string fileId,
         string metadataKey,
@@ -520,21 +555,28 @@ public class TusStorageResolver(
     private async Task<Guid?> ResolveFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
+        var httpContext = httpContextAccessor.HttpContext;
+
+        if (httpContext is not null
+            && TusRouteHelper.TryGetPartialUploadContext(httpContext, fileId, out var routeFileTransferId, out _)
+            && await FileTransferExistsAsync(routeFileTransferId, cancellationToken))
+        {
+            return routeFileTransferId;
+        }
 
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
         {
             return mappedFileTransferId;
         }
 
-        var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is not null
-            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId)
+            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out routeFileTransferId)
             && await FileTransferExistsAsync(routeFileTransferId, cancellationToken))
         {
             return routeFileTransferId;
         }
 
-        if (!TusRouteHelper.IsPartialUploadPath(httpContext?.Request.Path.Value)
+        if (!TusRouteHelper.IsPartialUploadPath(httpContext is null ? null : TusRouteHelper.GetRequestPath(httpContext))
             && Guid.TryParse(fileId, out var parsedFileTransferId)
             && await FileTransferExistsAsync(parsedFileTransferId, cancellationToken))
         {

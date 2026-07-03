@@ -12,18 +12,26 @@ using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
+using Microsoft.Extensions.DependencyInjection;
+
+using Altinn.Broker.Integrations.Tus;
+
+using Microsoft.Extensions.Caching.Distributed;
+
 using Xunit;
 
 namespace Altinn.Broker.Tests;
 
 public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
 {
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _senderClient;
     private readonly HttpClient _recipientClient;
     private readonly JsonSerializerOptions _responseSerializerOptions;
 
     public TusUploadTests(CustomWebApplicationFactory factory)
     {
+        _factory = factory;
         _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
         _recipientClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -118,6 +126,54 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, headResponse.StatusCode);
         Assert.True(headResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
         Assert.Equal("0", offsetValues.First());
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
+        Assert.Equal(partialLength.ToString(), lengthValues.First());
+    }
+
+    [Fact]
+    public async Task TusUpload_PartialHead_WorksAfterRedisCacheCleared()
+    {
+        var initializeResponse = await _senderClient.PostAsJsonAsync(
+            "broker/api/v1/filetransfer",
+            FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeResponse.IsSuccessStatusCode, await initializeResponse.Content.ReadAsStringAsync());
+
+        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
+        Assert.NotNull(initializeResult);
+        var fileTransferId = initializeResult.FileTransferId.ToString();
+        const int partialLength = 2048;
+        var tusBaseUrl = $"broker/api/v1/filetransfer/upload/tus/{fileTransferId}";
+        var chunk = new byte[1024];
+
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, tusBaseUrl);
+        createRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        createRequest.Headers.Add("Upload-Length", partialLength.ToString());
+        createRequest.Headers.Add("Upload-Concat", "partial");
+        var createResponse = await _senderClient.SendAsync(createRequest);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var uploadUrl = createResponse.Headers.Location;
+        Assert.NotNull(uploadUrl);
+
+        var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUrl);
+        patchRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        patchRequest.Headers.Add("Upload-Offset", "0");
+        patchRequest.Content = new ByteArrayContent(chunk);
+        patchRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
+        var patchResponse = await _senderClient.SendAsync(patchRequest);
+        Assert.Equal(HttpStatusCode.NoContent, patchResponse.StatusCode);
+
+        var cache = _factory.Services.GetRequiredService<IDistributedCache>();
+        await cache.RemoveAsync($"tus-partial:{uploadUrl.AbsolutePath.Split('/').Last()}");
+        await cache.RemoveAsync($"tus-upload-length:{uploadUrl.AbsolutePath.Split('/').Last()}");
+        await cache.RemoveAsync($"tus-upload-progress:{uploadUrl.AbsolutePath.Split('/').Last()}");
+
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUrl);
+        headRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        var headResponse = await _senderClient.SendAsync(headRequest);
+        Assert.Equal(HttpStatusCode.OK, headResponse.StatusCode);
+        Assert.True(headResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
+        Assert.Equal(chunk.Length.ToString(), offsetValues.First());
         Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
         Assert.Equal(partialLength.ToString(), lengthValues.First());
     }

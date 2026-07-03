@@ -11,9 +11,22 @@ public static class TusRouteHelper
 
     private static readonly string PartialPathMarker = $"/{PartialPathSegment}/";
 
+    public static string GetRequestPath(HttpContext httpContext)
+    {
+        var pathBase = httpContext.Request.PathBase.Value ?? string.Empty;
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        if (string.IsNullOrEmpty(pathBase))
+        {
+            return path;
+        }
+
+        return $"{pathBase.TrimEnd('/')}{path}";
+    }
+
     public static bool TryGetFileTransferIdFromRoute(HttpContext httpContext, out Guid fileTransferId)
     {
         fileTransferId = default;
+        var requestPath = GetRequestPath(httpContext);
 
         if (httpContext.Items.TryGetValue(FileTransferIdItemKey, out var item)
             && item is string fileTransferIdFromRewrite
@@ -28,12 +41,12 @@ public static class TusRouteHelper
             return true;
         }
 
-        if (TryParseFileTransferIdFromPartialPath(httpContext.Request.Path.Value, out fileTransferId))
+        if (TryParseFileTransferIdFromPartialPath(requestPath, out fileTransferId))
         {
             return true;
         }
 
-        if (IsPartialUploadPath(httpContext.Request.Path.Value))
+        if (IsPartialUploadPath(requestPath))
         {
             return false;
         }
@@ -44,7 +57,7 @@ public static class TusRouteHelper
             return true;
         }
 
-        var lastSegment = httpContext.Request.Path.Value?.TrimEnd('/').Split('/').LastOrDefault();
+        var lastSegment = requestPath.TrimEnd('/').Split('/').LastOrDefault();
         return Guid.TryParse(lastSegment, out fileTransferId);
     }
 
@@ -91,6 +104,31 @@ public static class TusRouteHelper
 
         partialUploadId = path[(partialIndex + PartialPathMarker.Length)..].Trim('/');
         return !string.IsNullOrWhiteSpace(partialUploadId);
+    }
+
+    public static bool TryGetPartialUploadContext(
+        HttpContext? httpContext,
+        string normalizedFileId,
+        out Guid fileTransferId,
+        out string partialUploadId)
+    {
+        fileTransferId = default;
+        partialUploadId = string.Empty;
+        if (httpContext is null)
+        {
+            return false;
+        }
+
+        var requestPath = GetRequestPath(httpContext);
+        if (!IsPartialUploadPath(requestPath)
+            || !TryParsePartialUploadIdFromPath(requestPath, out partialUploadId)
+            || !string.Equals(normalizedFileId, partialUploadId, StringComparison.OrdinalIgnoreCase)
+            || !TryGetFileTransferIdFromRoute(httpContext, out fileTransferId))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

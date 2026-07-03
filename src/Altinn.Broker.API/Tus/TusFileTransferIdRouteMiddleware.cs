@@ -36,7 +36,7 @@ public sealed class TusFileTransferIdRouteMiddleware(RequestDelegate next)
 
     private static void NormalizeRouteValues(HttpContext context)
     {
-        var path = context.Request.Path.Value;
+        var path = TusRouteHelper.GetRequestPath(context);
         if (TusRouteHelper.IsPartialUploadPath(path))
         {
             NormalizePartialRouteValues(context, path);

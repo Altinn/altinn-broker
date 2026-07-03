@@ -21,7 +21,8 @@ public class BrokerTusStore(
     ITusUploadProgressCache uploadProgressCache,
     ITusUploadActivityCache uploadActivityCache,
     IHttpContextAccessor httpContextAccessor,
-    IOptions<AzureStorageOptions> azureStorageOptions) :
+    IOptions<AzureStorageOptions> azureStorageOptions,
+    IOptions<TusOptions> tusOptions) :
     ITusStore,
     ITusCreationStore,
     ITusReadableStore,
@@ -33,6 +34,7 @@ public class BrokerTusStore(
     private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _uploadMetadata = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
+    private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
@@ -135,6 +137,7 @@ public class BrokerTusStore(
         if (registeredLength is not null)
         {
             await TouchUploadLengthAsync(fileId, registeredLength.Value, cancellationToken);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return registeredLength;
         }
 
@@ -142,6 +145,7 @@ public class BrokerTusStore(
         if (cachedProgress is not null)
         {
             await TouchUploadProgressAsync(fileId, cachedProgress, cancellationToken);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return cachedProgress.UploadLength;
         }
 
@@ -149,21 +153,26 @@ public class BrokerTusStore(
         if (stagingUploadLength is not null)
         {
             await TouchUploadLengthAsync(fileId, stagingUploadLength.Value, cancellationToken);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return stagingUploadLength;
         }
 
         var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
         if (legacyStore is not null)
         {
-            return await legacyStore.GetUploadLengthAsync(fileId, cancellationToken);
+            var legacyLength = await legacyStore.GetUploadLengthAsync(fileId, cancellationToken);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return legacyLength;
         }
 
+        await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
         return null;
     }
 
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
+        long offset;
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
             lock (state!.SyncRoot)
@@ -173,43 +182,58 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                return state.AcceptedOffset;
+                offset = state.AcceptedOffset;
+            }
+        }
+        else
+        {
+            var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+            if (cachedProgress is not null)
+            {
+                await TouchUploadProgressAsync(fileId, cachedProgress, cancellationToken);
+                offset = cachedProgress.AcceptedOffset;
+            }
+            else
+            {
+                var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+                if (stagedOffset > 0)
+                {
+                    await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, stagedOffset, cancellationToken);
+                    offset = stagedOffset;
+                }
+                else
+                {
+                    var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+                    if (committedLength > 0)
+                    {
+                        offset = committedLength;
+                    }
+                    else
+                    {
+                        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+                        if (destinationLength > 0)
+                        {
+                            offset = destinationLength;
+                        }
+                        else
+                        {
+                            var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
+                            if (legacyStore is not null)
+                            {
+                                offset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
+                            }
+                            else
+                            {
+                                offset = 0;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-        if (cachedProgress is not null)
-        {
-            await TouchUploadProgressAsync(fileId, cachedProgress, cancellationToken);
-            return cachedProgress.AcceptedOffset;
-        }
-
-        var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        if (stagedOffset > 0)
-        {
-            await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, stagedOffset, cancellationToken);
-            return stagedOffset;
-        }
-
-        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        if (committedLength > 0)
-        {
-            return committedLength;
-        }
-
-        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
-        if (destinationLength > 0)
-        {
-            return destinationLength;
-        }
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            return await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
-        }
-
-        return 0;
+        await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+        return offset;
     }
 
     public async Task<string> CreateFileAsync(long uploadLength, string metadata, CancellationToken cancellationToken)
@@ -228,6 +252,7 @@ public class BrokerTusStore(
         var fileTransferId = GetFileTransferIdFromRouteGuid();
         var partialFileId = Guid.NewGuid().ToString("N");
         await partialUploadRegistry.RegisterPartialAsync(partialFileId, fileTransferId, uploadLength, cancellationToken);
+        await storageResolver.InitializePartialStagingBlobAsync(partialFileId, uploadLength, cancellationToken);
         _uploadLengths[partialFileId] = uploadLength;
         _uploadMetadata[partialFileId] = metadata;
         var state = RegisterUploadState(partialFileId, uploadLength, initialOffset: 0);
@@ -386,6 +411,13 @@ public class BrokerTusStore(
         {
             try
             {
+                var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
+                if (await HasDurableUploadStateAsync(normalizedFileId, cancellationToken))
+                {
+                    await RenewExpirationAsync(fileId, cancellationToken);
+                    continue;
+                }
+
                 if (await FileExistAsync(fileId, cancellationToken))
                 {
                     await DeleteFileAsync(fileId, cancellationToken);
@@ -521,7 +553,7 @@ public class BrokerTusStore(
 
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is null
-            || !TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value)
+            || !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
             || !TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
         {
             return;
@@ -552,7 +584,7 @@ public class BrokerTusStore(
         }
 
         var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null || !TusRouteHelper.IsPartialUploadPath(httpContext.Request.Path.Value))
+        if (httpContext is null || !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext)))
         {
             return;
         }
@@ -687,6 +719,35 @@ public class BrokerTusStore(
         if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
             _uploadLengths.TryRemove(fileId, out _);
+        }
+    }
+
+    private async Task<bool> HasDurableUploadStateAsync(string fileId, CancellationToken cancellationToken)
+        => await uploadProgressCache.GetAsync(fileId, cancellationToken) is not null
+            || await partialUploadRegistry.IsKnownUploadAsync(fileId, cancellationToken)
+            || await storageResolver.StagingBlobExistsAsync(fileId, cancellationToken)
+            || await storageResolver.HasStagedBlocksAsync(fileId, cancellationToken);
+
+    private async Task RenewExpirationAsync(string fileId, CancellationToken cancellationToken)
+    {
+        await SetExpirationAsync(fileId, DateTimeOffset.UtcNow.Add(_uploadExpiration), cancellationToken);
+
+        var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
+        if (await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedFileId, cancellationToken) is Guid fileTransferId)
+        {
+            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
+        }
+        else if (Guid.TryParse(normalizedFileId, out fileTransferId))
+        {
+            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
+        }
+    }
+
+    private async Task RenewExpirationIfTrackedAsync(string fileId, CancellationToken cancellationToken)
+    {
+        if (await GetExpirationAsync(fileId, cancellationToken) is not null)
+        {
+            await RenewExpirationAsync(fileId, cancellationToken);
         }
     }
 
