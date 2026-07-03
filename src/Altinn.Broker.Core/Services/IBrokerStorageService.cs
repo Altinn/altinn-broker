@@ -13,7 +13,10 @@ public interface IBrokerStorageService
     /// <returns>A string containing the MD5 checksum. Null if failure.</returns>
     Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, Stream stream, CancellationToken cancellationToken);
 
-    Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken);
+    /// <summary>
+    /// Downloads the file, optionally restricted to a byte range so that only the requested bytes are fetched from storage.
+    /// </summary>
+    Task<BrokerFileDownload> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, ByteRange? range, CancellationToken cancellationToken);
     Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken);

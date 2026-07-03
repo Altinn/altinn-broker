@@ -320,6 +320,127 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task DownloadFile_WithoutRange_ReturnsFullFileWithAcceptRanges()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
+        Assert.Equal(fileBytes.Length, response.Content.Headers.ContentLength);
+        Assert.Equal(fileBytes, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithRange_ReturnsPartialContent()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 9));
+
+        Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+        Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
+        var contentRange = response.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal("bytes", contentRange.Unit);
+        Assert.Equal(0, contentRange.From);
+        Assert.Equal(9, contentRange.To);
+        Assert.Equal(fileBytes.Length, contentRange.Length);
+        Assert.Equal(10, response.Content.Headers.ContentLength);
+        Assert.Equal(fileBytes[0..10], await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithOpenEndedAndSuffixRanges_ReturnsPartialContent()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Open-ended range from byte 10 to end of file
+        var openEndedResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, null));
+        Assert.Equal(HttpStatusCode.PartialContent, openEndedResponse.StatusCode);
+        var contentRange = openEndedResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes.Length, contentRange.Length);
+        Assert.Equal(fileBytes[10..], await openEndedResponse.Content.ReadAsByteArrayAsync());
+
+        // Suffix range of the last 10 bytes
+        var suffixResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(null, 10));
+        Assert.Equal(HttpStatusCode.PartialContent, suffixResponse.StatusCode);
+        contentRange = suffixResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(fileBytes.Length - 10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes[^10..], await suffixResponse.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_ChunkedRangeDownloads_ReassembleToFullFile()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var firstChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 19));
+        var secondChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(20, null));
+        Assert.Equal(HttpStatusCode.PartialContent, firstChunk.StatusCode);
+        Assert.Equal(HttpStatusCode.PartialContent, secondChunk.StatusCode);
+
+        var reassembled = (await firstChunk.Content.ReadAsByteArrayAsync())
+            .Concat(await secondChunk.Content.ReadAsByteArrayAsync())
+            .ToArray();
+        Assert.Equal(fileBytes, reassembled);
+
+        // The chunked requests make up one logical download and should be debounced to a single DownloadStarted status
+        var details = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(details);
+        var downloadStartedEvents = details.RecipientFileTransferStatusHistory.Where(recipientFileStatus => recipientFileStatus.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadStarted);
+        Assert.Single(downloadStartedEvents);
+    }
+
+    [Fact]
+    public async Task DownloadFile_RangeStartBeyondFileEnd_ReturnsRangeNotSatisfiable()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(fileBytes.Length, null));
+
+        Assert.Equal(HttpStatusCode.RequestedRangeNotSatisfiable, response.StatusCode);
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.InvalidByteRange.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task DownloadFile_RangeEndBeyondFileEnd_IsClampedToFileEnd()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, 99999));
+
+        Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+        var contentRange = response.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes[10..], await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithMultiRange_ReturnsFullFile()
+    {
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        var rangeHeader = new RangeHeaderValue();
+        rangeHeader.Ranges.Add(new RangeItemHeaderValue(0, 1));
+        rangeHeader.Ranges.Add(new RangeItemHeaderValue(5, 10));
+        var response = await DownloadWithRange(fileTransferId, rangeHeader);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fileBytes, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
     public async Task ConfirmFileTransferBeforeDownloadStarted_Fails()
     {
         // Arrange
@@ -973,6 +1094,22 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<API.Models.FileTransferInitializeResponseExt>();
         return fileTransferResponse?.FileTransferId.ToString() ?? string.Empty;
+    }
+
+    private async Task<(string FileTransferId, byte[] FileBytes)> InitializeAndUploadDummyFile()
+    {
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var fileContent = "This is the contents of the uploaded file";
+        var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        return (fileTransferId, Encoding.UTF8.GetBytes(fileContent));
+    }
+
+    private async Task<HttpResponseMessage> DownloadWithRange(string fileTransferId, RangeHeaderValue range)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"broker/api/v1/filetransfer/{fileTransferId}/download");
+        request.Headers.Range = range;
+        return await _recipientClient.SendAsync(request);
     }
 
     private string CalculateChecksum(byte[] data)
