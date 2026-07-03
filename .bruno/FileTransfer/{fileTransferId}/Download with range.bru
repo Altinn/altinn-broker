@@ -1,0 +1,37 @@
+meta {
+  name: Download (range first 10 bytes)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer/{{fileTransferId}}/download
+  body: none
+  auth: bearer
+}
+
+headers {
+  Range: bytes=0-9
+}
+
+auth:bearer {
+  token: {{recipient_token}}
+}
+
+tests {
+  test("Status code is 206 Partial Content", function() {
+    expect(res.getStatus()).to.equal(206);
+  });
+
+  test("Content-Range starts with 'bytes 0-9/'", function() {
+    expect(res.getHeader('content-range')).to.match(/^bytes 0-9\/\d+$/);
+  });
+
+  test("Accept-Ranges is bytes", function() {
+    expect(res.getHeader('accept-ranges')).to.equal('bytes');
+  });
+
+  test("Content-Length is 10", function() {
+    expect(res.getHeader('content-length')).to.equal('10');
+  });
+}
