@@ -219,6 +219,8 @@ public class BrokerTusStore(
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
+        await TryFinalizeCompletedPartialAsync(fileId, cancellationToken);
+
         var offset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
 
         if (uploadStateRegistry.TryGet(fileId, out var state))
@@ -232,6 +234,12 @@ public class BrokerTusStore(
 
                 offset = Math.Max(offset, state.AcceptedOffset);
             }
+        }
+
+        if (await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken) is long uploadLength
+            && offset >= uploadLength)
+        {
+            offset = uploadLength;
         }
 
         await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
@@ -307,6 +315,8 @@ public class BrokerTusStore(
         foreach (var partialFileReference in partialFiles)
         {
             var partialFileId = TusRouteHelper.NormalizePartialFileId(partialFileReference);
+            await TryFinalizeCompletedPartialAsync(partialFileId, cancellationToken);
+
             var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
             if (partialInfo is null)
             {
@@ -792,6 +802,37 @@ public class BrokerTusStore(
 
             await waitTask.WaitAsync(cancellationToken);
         }
+    }
+
+    private async Task TryFinalizeCompletedPartialAsync(string fileId, CancellationToken cancellationToken)
+    {
+        if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
+        {
+            return;
+        }
+
+        var uploadLength = await partialUploadRegistry.TryGetUploadLengthAsync(fileId, cancellationToken);
+        if (uploadLength is null)
+        {
+            return;
+        }
+
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (committedLength >= uploadLength.Value)
+        {
+            return;
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
+        if (stagedSnapshot is null || stagedSnapshot.TotalLength < uploadLength.Value)
+        {
+            return;
+        }
+
+        var state = CreateStateFromStagedBlocks(uploadLength.Value, stagedSnapshot);
+        await FinalizeUploadAsync(fileId, state, cancellationToken);
+        await PersistProgressAsync(fileId, state, cancellationToken);
+        uploadStateRegistry.Remove(fileId);
     }
 
     private async Task FinalizeUploadAsync(string fileId, TusUploadState state, CancellationToken cancellationToken)

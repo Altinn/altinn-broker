@@ -113,6 +113,8 @@ public static class DependencyInjection
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache, TusUploadProgressCache>();
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
+        services.AddSingleton<RedisTusFileLockProvider>(serviceProvider =>
+            new RedisTusFileLockProvider(serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
