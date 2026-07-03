@@ -65,20 +65,27 @@ public static class TusEndpointExtensions
         });
     }
 
-    private static bool TryResolveFileTransferId(HttpContext httpContext, string? tusFileId, out Guid fileTransferId)
+    private static async Task<(bool Resolved, Guid FileTransferId)> TryResolveFileTransferIdAsync(
+        HttpContext httpContext,
+        string? tusFileId,
+        CancellationToken cancellationToken)
     {
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        if (!string.IsNullOrEmpty(tusFileId) && partialUploadRegistry.TryGetFileTransferId(tusFileId, out fileTransferId))
+
+        if (!string.IsNullOrEmpty(tusFileId)
+            && await partialUploadRegistry.TryGetFileTransferIdAsync(tusFileId, cancellationToken) is Guid mappedFileTransferId)
         {
-            return true;
+            return (true, mappedFileTransferId);
         }
 
-        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId))
+        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
         {
-            return true;
+            return (true, fileTransferId);
         }
 
-        return Guid.TryParse(tusFileId, out fileTransferId);
+        return Guid.TryParse(tusFileId, out fileTransferId)
+            ? (true, fileTransferId)
+            : (false, default);
     }
 
     private static async Task OnAuthorizeAsync(AuthorizeContext context)
@@ -89,7 +96,11 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             return;
@@ -114,7 +125,11 @@ public static class TusEndpointExtensions
         if (context.FileConcatenation is FileConcatFinal)
         {
             // TUS concatenation final requests must not include Upload-Length.
-            if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out _))
+            var (finalResolved, _) = await TryResolveFileTransferIdAsync(
+                context.HttpContext,
+                context.FileId,
+                context.CancellationToken);
+            if (!finalResolved)
             {
                 context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             }
@@ -128,7 +143,11 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             return;
@@ -154,18 +173,22 @@ public static class TusEndpointExtensions
 
     private static async Task OnCreateCompleteAsync(CreateCompleteContext context)
     {
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             throw new TusStoreException("Invalid file transfer id");
         }
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        var uploadPath = partialUploadRegistry.IsPartial(context.FileId)
+        var uploadPath = await partialUploadRegistry.IsPartialAsync(context.FileId, context.CancellationToken)
             ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{context.FileId}"
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 
-        if (partialUploadRegistry.IsPartial(context.FileId))
+        if (await partialUploadRegistry.IsPartialAsync(context.FileId, context.CancellationToken))
         {
             return;
         }

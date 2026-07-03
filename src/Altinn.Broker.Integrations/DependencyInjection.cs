@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddSingleton<ITusPartialUploadRegistry, TusPartialUploadRegistry>();
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache, TusUploadProgressCache>();
+        services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
