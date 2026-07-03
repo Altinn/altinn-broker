@@ -39,6 +39,18 @@ public class BrokerTusStore(
     {
         fileId = ResolveStoreFileId(fileId);
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
+        var durableOffset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
+        bool needsReload;
+        lock (state.SyncRoot)
+        {
+            needsReload = state.AcceptedOffset != durableOffset;
+        }
+
+        if (needsReload)
+        {
+            uploadStateRegistry.Remove(fileId);
+            state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
+        }
 
         using var chunkBuffer = new MemoryStream();
         await stream.CopyToAsync(chunkBuffer, cancellationToken);
@@ -229,17 +241,19 @@ public class BrokerTusStore(
     private async Task<long> GetDurableUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-        if (cachedProgress is not null)
-        {
-            return cachedProgress.AcceptedOffset;
-        }
+        var offset = cachedProgress?.AcceptedOffset ?? 0L;
 
         var stagedOffset = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
         var committedOffset = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         if (stagedOffset > 0 || committedOffset > 0)
         {
-            var offset = Math.Max(stagedOffset, committedOffset);
+            offset = Math.Max(offset, Math.Max(stagedOffset, committedOffset));
             await TryRestorePartialRegistrationFromStagedUploadAsync(fileId, offset, cancellationToken);
+            return offset;
+        }
+
+        if (offset > 0)
+        {
             return offset;
         }
 
@@ -266,6 +280,7 @@ public class BrokerTusStore(
         await partialUploadRegistry.RegisterUploadAsync(fileId, uploadLength, cancellationToken);
         var state = RegisterUploadState(fileId, uploadLength, initialOffset: 0);
         await PersistProgressAsync(fileId, state, cancellationToken);
+        uploadStateRegistry.Remove(fileId);
         return fileId;
     }
 
@@ -279,6 +294,7 @@ public class BrokerTusStore(
         _uploadMetadata[partialFileId] = metadata;
         var state = RegisterUploadState(partialFileId, uploadLength, initialOffset: 0);
         await PersistProgressAsync(partialFileId, state, cancellationToken);
+        uploadStateRegistry.Remove(partialFileId);
         return partialFileId;
     }
 
@@ -504,19 +520,17 @@ public class BrokerTusStore(
     private async Task<TusUploadState> GetOrCreateUploadStateAsync(string fileId, CancellationToken cancellationToken)
     {
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        var durableOffset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
 
         if (uploadStateRegistry.TryGet(fileId, out var existingState))
         {
-            if (cachedProgress is null)
-            {
-                return existingState!;
-            }
-
             bool shouldRefresh;
             lock (existingState!.SyncRoot)
             {
-                shouldRefresh = existingState.AcceptedOffset < cachedProgress.AcceptedOffset
-                    || existingState.NextBlockIndex < cachedProgress.NextBlockIndex;
+                shouldRefresh = existingState.AcceptedOffset < durableOffset
+                    || (cachedProgress is not null
+                        && (existingState.AcceptedOffset < cachedProgress.AcceptedOffset
+                            || existingState.NextBlockIndex < cachedProgress.NextBlockIndex));
             }
 
             if (!shouldRefresh)
@@ -543,7 +557,7 @@ public class BrokerTusStore(
 
         return uploadStateRegistry.GetOrAdd(
             fileId,
-            () => new TusUploadState(uploadLength, initialOffset: 0, _maxParallelBlockUploads));
+            () => new TusUploadState(uploadLength, durableOffset, _maxParallelBlockUploads));
     }
 
     private TusUploadState RegisterUploadState(string fileId, long uploadLength, long initialOffset)
