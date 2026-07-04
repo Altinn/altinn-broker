@@ -46,7 +46,7 @@ public sealed class TusUploadProgressCache(
     private static readonly HybridCacheEntryOptions HybridProgressOptions = new()
     {
         Expiration = CacheExpiration,
-        LocalCacheExpiration = CacheExpiration
+        Flags = HybridCacheEntryFlags.DisableLocalCache
     };
 
     private static readonly ConcurrentDictionary<string, InMemoryProgressEntry> InMemoryProgress =
@@ -92,20 +92,11 @@ public sealed class TusUploadProgressCache(
         var sw = Stopwatch.StartNew();
         if (_database is not null)
         {
-            var cached = await hybridCache.GetOptionalAsync<TusUploadProgressSnapshot>(
-                BuildHybridKey(fileId),
-                HybridProgressOptions,
-                cancellationToken);
-            if (cached is not null)
-            {
-                LogGetHit(sw, fileId, cached.AcceptedOffset, source: "hybrid");
-                return cached;
-            }
-
+            // Redis hash is authoritative across replicas. Do not read HybridCache first:
+            // per-replica L1 can hold a stale offset and cause 409 storms without session affinity.
             var snapshot = await ReadHashAsync(fileId, cancellationToken);
             if (snapshot is not null)
             {
-                await SetHybridProgressAsync(fileId, snapshot, cancellationToken);
                 LogGetHit(sw, fileId, snapshot.AcceptedOffset, source: "redis");
                 return snapshot;
             }
@@ -113,13 +104,22 @@ public sealed class TusUploadProgressCache(
             var migrated = await TryMigrateLegacyJsonAsync(fileId, cancellationToken);
             if (migrated is not null)
             {
-                await SetHybridProgressAsync(fileId, migrated, cancellationToken);
                 LogGetHit(sw, fileId, migrated.AcceptedOffset, source: "legacy");
                 return migrated;
             }
 
             LogGetMiss(sw, fileId);
             return null;
+        }
+
+        var cached = await hybridCache.GetOptionalAsync<TusUploadProgressSnapshot>(
+            BuildHybridKey(fileId),
+            HybridProgressOptions,
+            cancellationToken);
+        if (cached is not null)
+        {
+            LogGetHit(sw, fileId, cached.AcceptedOffset, source: "hybrid");
+            return cached;
         }
 
         if (InMemoryProgress.TryGetValue(fileId, out var entry))
@@ -149,9 +149,8 @@ public sealed class TusUploadProgressCache(
         else
         {
             InMemoryProgress[fileId] = new InMemoryProgressEntry(uploadLength);
+            await SetHybridProgressAsync(fileId, snapshot, cancellationToken);
         }
-
-        await SetHybridProgressAsync(fileId, snapshot, cancellationToken);
     }
 
     public async Task<TusAcceptChunkResult> TryAcceptChunkAsync(
@@ -170,7 +169,7 @@ public sealed class TusUploadProgressCache(
             result = TryAcceptChunkInMemory(fileId, expectedOffset, chunkLength);
         }
 
-        if (result.Status == TusAcceptChunkStatus.Accepted)
+        if (result.Status == TusAcceptChunkStatus.Accepted && _database is null)
         {
             await RefreshHybridProgressAsync(fileId, cancellationToken);
         }
@@ -192,7 +191,10 @@ public sealed class TusUploadProgressCache(
             }
         }
 
-        await RefreshHybridProgressAsync(fileId, cancellationToken);
+        if (_database is null)
+        {
+            await RefreshHybridProgressAsync(fileId, cancellationToken);
+        }
     }
 
     public async Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
@@ -218,9 +220,8 @@ public sealed class TusUploadProgressCache(
 
                     return existing;
                 });
+            await SetHybridProgressAsync(fileId, snapshot, cancellationToken);
         }
-
-        await SetHybridProgressAsync(fileId, snapshot, cancellationToken);
     }
 
     public async Task RemoveAsync(string fileId, CancellationToken cancellationToken)

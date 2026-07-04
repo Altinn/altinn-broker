@@ -3,6 +3,8 @@ using Altinn.Broker.Integrations.Tus;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
+using StackExchange.Redis;
+
 namespace Altinn.Broker.Tests.Tus;
 
 internal static class TestHybridCacheFactory
