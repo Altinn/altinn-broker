@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using System.Security.Claims;
 
+using Altinn.Broker.Application;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Services;
 
-using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +20,7 @@ public enum TusUploadAuthIntent
 }
 
 public class TusUploadAuthorizationService(
-    IDistributedCache cache,
+    HybridCache cache,
     ITusUploadActivityCache uploadActivityCache,
     TusUploadValidationService validationService,
     IConfiguration configuration,
@@ -106,7 +107,7 @@ public class TusUploadAuthorizationService(
             return Task.CompletedTask;
         }
 
-        return cache.RemoveAsync(cacheKey, cancellationToken);
+        return cache.RemoveKeyAsync(cacheKey, cancellationToken);
     }
 
     private async Task<(bool Handled, Error? Error)> TryAuthorizeActiveUploadAsync(
@@ -121,7 +122,7 @@ public class TusUploadAuthorizationService(
             return (false, null);
         }
 
-        if (await cache.GetStringAsync(cacheKey, cancellationToken) == CacheValue)
+        if (await cache.GetOptionalStringAsync(cacheKey, cancellationToken: cancellationToken) == CacheValue)
         {
             timing?.Step("activeUpload.sessionCacheHit");
             await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
@@ -175,14 +176,18 @@ public class TusUploadAuthorizationService(
     }
 
     private Task RefreshUploadSessionCacheAsync(string cacheKey, CancellationToken cancellationToken)
-        => cache.SetStringAsync(
+    {
+        var expiration = GetCacheExpiration();
+        return cache.SetStringAsync(
             cacheKey,
             CacheValue,
-            new DistributedCacheEntryOptions
+            new HybridCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = GetCacheExpiration()
+                Expiration = expiration,
+                LocalCacheExpiration = expiration
             },
             cancellationToken);
+    }
 
     private TimeSpan GetCacheExpiration()
     {

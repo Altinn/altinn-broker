@@ -1,6 +1,8 @@
+using Altinn.Broker.Application;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Primitives;
 using System.Text.Json;
 
@@ -15,13 +17,13 @@ public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
     
     private readonly IConfiguration _configuration;
     private readonly ILogger<StatisticsApiKeyFilter> _logger;
-    private readonly IDistributedCache _cache;
+    private readonly HybridCache _cache;
     private readonly IHostEnvironment _environment;
 
     public StatisticsApiKeyFilter(
         IConfiguration configuration, 
         ILogger<StatisticsApiKeyFilter> logger,
-        IDistributedCache cache,
+        HybridCache cache,
         IHostEnvironment environment)
     {
         _configuration = configuration;
@@ -151,6 +153,12 @@ public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
     /// </summary>
     /// <param name="clientIdentifier">Unique identifier for the client (IP address)</param>
     /// <returns>Rate limit check result</returns>
+    private static readonly HybridCacheEntryOptions RateLimitCacheOptions = new()
+    {
+        Expiration = TimeSpan.FromMinutes(RateLimitWindowMinutes + 1),
+        Flags = HybridCacheEntryFlags.DisableLocalCache
+    };
+
     private async Task<RateLimitResult> CheckRateLimitAsync(string clientIdentifier)
     {
         
@@ -161,7 +169,7 @@ public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
         try
         {
             // Get existing rate limit data
-            var existingDataJson = await _cache.GetStringAsync(cacheKey);
+            var existingDataJson = await _cache.GetOptionalStringAsync(cacheKey, RateLimitCacheOptions);
             var rateLimitData = existingDataJson != null 
                 ? JsonSerializer.Deserialize<RateLimitData>(existingDataJson) ?? new RateLimitData { Requests = new List<DateTimeOffset>() }
                 : new RateLimitData { Requests = new List<DateTimeOffset>() };
@@ -196,12 +204,7 @@ public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
             // Store updated data atomically
             // Note: This is not fully atomic across distributed cache, but reduces race condition window
             var updatedDataJson = JsonSerializer.Serialize(rateLimitData);
-            var cacheOptions = new DistributedCacheEntryOptions
-            {
-                AbsoluteExpiration = now.AddMinutes(RateLimitWindowMinutes + 1) // Add buffer
-            };
-            
-            await _cache.SetStringAsync(cacheKey, updatedDataJson, cacheOptions);
+            await _cache.SetStringAsync(cacheKey, updatedDataJson, RateLimitCacheOptions);
 
             var remainingAttempts = RateLimitAttempts - rateLimitData.Requests.Count;
             var nextResetTime = rateLimitData.Requests.Min().AddMinutes(RateLimitWindowMinutes);

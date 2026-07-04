@@ -15,8 +15,8 @@ using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
@@ -116,7 +116,7 @@ public static class DependencyInjection
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache>(serviceProvider =>
             new TusUploadProgressCache(
-                serviceProvider.GetRequiredService<IDistributedCache>(),
+                serviceProvider.GetRequiredService<HybridCache>(),
                 serviceProvider.GetRequiredService<ILogger<TusUploadProgressCache>>(),
                 serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();

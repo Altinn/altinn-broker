@@ -256,12 +256,26 @@ public class BrokerTusStore(
         fileId = ResolveStoreFileId(fileId);
         using var timing = TusUploadDebugTiming.Start(logger, "GetUploadOffset", fileId);
 
+        if (uploadStateRegistry.TryGet(fileId, out var state))
+        {
+            lock (state!.SyncRoot)
+            {
+                if (state.Fault is not null)
+                {
+                    throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
+                }
+
+                timing.Step("memoryProgressOffset", state.AcceptedOffset);
+                return state.AcceptedOffset;
+            }
+        }
+
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
         {
-            if (uploadStateRegistry.TryGet(fileId, out var state))
+            if (uploadStateRegistry.TryGet(fileId, out var existingState))
             {
-                SyncStateFromProgress(state!, cachedProgress);
+                SyncStateFromProgress(existingState!, cachedProgress);
             }
 
             timing.Step("redisProgressOffset", cachedProgress.AcceptedOffset);

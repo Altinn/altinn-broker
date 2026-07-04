@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
 
@@ -135,6 +136,15 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     {
         services.AddDistributedMemoryCache();
     }
+
+    services.AddHybridCache(options =>
+    {
+        options.DefaultEntryOptions = new HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromHours(24),
+            LocalCacheExpiration = TimeSpan.FromMinutes(5)
+        };
+    });
 
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();

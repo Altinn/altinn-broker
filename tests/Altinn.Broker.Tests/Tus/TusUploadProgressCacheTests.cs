@@ -1,10 +1,5 @@
 using Altinn.Broker.Integrations.Tus;
 
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-
 using Xunit;
 
 namespace Altinn.Broker.Tests.Tus;
@@ -14,9 +9,7 @@ public class TusUploadProgressCacheTests
     [Fact]
     public async Task TryAcceptChunk_IsAtomicWithoutAffinity()
     {
-        var cache = new TusUploadProgressCache(
-            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
-            NullLogger<TusUploadProgressCache>.Instance);
+        var cache = TestHybridCacheFactory.CreateProgressCache();
 
         const string fileId = "partial-1";
         await cache.InitializeAsync(fileId, uploadLength: 128 * 1024 * 1024, CancellationToken.None);
@@ -45,9 +38,7 @@ public class TusUploadProgressCacheTests
     [Fact]
     public async Task IncrementCommittedOffset_UpdatesProgress()
     {
-        var cache = new TusUploadProgressCache(
-            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
-            NullLogger<TusUploadProgressCache>.Instance);
+        var cache = TestHybridCacheFactory.CreateProgressCache();
 
         const string fileId = "partial-2";
         await cache.InitializeAsync(fileId, uploadLength: 64 * 1024 * 1024, CancellationToken.None);
@@ -59,5 +50,20 @@ public class TusUploadProgressCacheTests
         var progress = await cache.GetAsync(fileId, CancellationToken.None);
         Assert.NotNull(progress);
         Assert.Equal(16L * 1024 * 1024, progress!.CommittedOffset);
+    }
+
+    [Fact]
+    public async Task GetAsync_UsesHybridCacheAfterFirstRead()
+    {
+        var cache = TestHybridCacheFactory.CreateProgressCache();
+
+        const string fileId = "partial-3";
+        await cache.InitializeAsync(fileId, uploadLength: 32 * 1024 * 1024, CancellationToken.None);
+
+        var first = await cache.GetAsync(fileId, CancellationToken.None);
+        var second = await cache.GetAsync(fileId, CancellationToken.None);
+
+        Assert.NotNull(first);
+        Assert.Equal(first, second);
     }
 }
