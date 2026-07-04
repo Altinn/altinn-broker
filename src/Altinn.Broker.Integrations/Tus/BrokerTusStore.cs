@@ -316,6 +316,7 @@ public class BrokerTusStore(
     {
         fileId = ResolveStoreFileId(fileId);
         using var timing = TusUploadDebugTiming.Start(logger, "GetUploadOffset", fileId);
+        var reportDurableOffset = IsHeadOffsetRequest();
 
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
@@ -325,29 +326,48 @@ public class BrokerTusStore(
                 SyncStateFromProgress(existingState!, cachedProgress);
             }
 
-            // HEAD/resume must reflect durable bytes (committed blocks), not in-flight accepted chunks.
-            timing.Step("redisProgressOffset", cachedProgress.CommittedOffset);
+            var offset = reportDurableOffset
+                ? cachedProgress.CommittedOffset
+                : cachedProgress.AcceptedOffset;
+            timing.Step(reportDurableOffset ? "redisCommittedOffset" : "redisAcceptedOffset", offset);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return cachedProgress.CommittedOffset;
+            return offset;
         }
 
         timing.Step("redisProgressMiss");
 
-        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        var durableOffset = committedLength + stagedLength;
-        if (durableOffset > 0)
+        if (reportDurableOffset)
         {
-            timing.Step("durableStagingOffset", durableOffset);
+            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+            var durableOffset = committedLength + stagedLength;
+            if (durableOffset > 0)
+            {
+                timing.Step("durableStagingOffset", durableOffset);
+                await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+                return durableOffset;
+            }
+
+            if (committedLength > 0)
+            {
+                timing.Step("committedStagingLength", committedLength);
+                await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+                return committedLength;
+            }
+        }
+        else if (uploadStateRegistry.TryGet(fileId, out var state))
+        {
+            timing.Step("inMemoryAcceptedOffset", state!.AcceptedOffset);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return durableOffset;
+            return state.AcceptedOffset;
         }
 
-        if (committedLength > 0)
+        var committedStagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (committedStagingLength > 0)
         {
-            timing.Step("committedStagingLength", committedLength);
+            timing.Step("committedStagingLength", committedStagingLength);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return committedLength;
+            return committedStagingLength;
         }
 
         var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
@@ -1051,6 +1071,16 @@ public class BrokerTusStore(
     }
 
     private static string ResolveStoreFileId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
+
+    /// <summary>
+    /// PATCH responses must expose accepted offset so clients can pipeline chunks.
+    /// HEAD/resume must expose committed (durable) offset only.
+    /// </summary>
+    private bool IsHeadOffsetRequest()
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        return httpContext is not null && HttpMethods.IsHead(httpContext.Request.Method);
+    }
 
     private static string DescribeUploadConcat(FileConcat? uploadConcat)
         => uploadConcat switch
