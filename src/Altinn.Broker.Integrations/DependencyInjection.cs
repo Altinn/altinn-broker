@@ -121,6 +121,6 @@ public static class DependencyInjection
                 serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
         services.AddScoped<BrokerTusStore>();
-        services.AddSingleton<ITusStorageResolver, TusStorageResolver>();
+        services.AddScoped<ITusStorageResolver, TusStorageResolver>();
     }
 }

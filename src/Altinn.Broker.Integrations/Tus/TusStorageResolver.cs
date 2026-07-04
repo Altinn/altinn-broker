@@ -28,12 +28,7 @@ public interface ITusStorageResolver
 {
     Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
     Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
-    Task<long> StageTusBlockAsync(
-        string fileId,
-        string blockId,
-        Stream blockData,
-        CancellationToken cancellationToken,
-        Guid? knownFileTransferId = null);
+    Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
     Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
@@ -126,8 +121,7 @@ public class TusStorageResolver(
         string fileId,
         string blockId,
         Stream blockData,
-        CancellationToken cancellationToken,
-        Guid? knownFileTransferId = null)
+        CancellationToken cancellationToken)
     {
         if (!blockData.CanSeek)
         {
@@ -138,7 +132,7 @@ public class TusStorageResolver(
         int? expectedBytes = blockBytes is >= 0 and <= int.MaxValue ? (int)blockBytes : null;
         using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, expectedBytes);
 
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing, knownFileTransferId);
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
         if (storageContext is null)
         {
             throw new InvalidOperationException($"Missing storage context for file id {fileId}");
@@ -234,85 +228,57 @@ public class TusStorageResolver(
 
     public async Task<bool> StagingBlobExistsAsync(string fileId, CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
+        var blockBlobClient = await GetBlockStagingBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
         {
             return false;
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        return await blockBlobClient.ExistsAsync(cancellationToken);
+        if (await blockBlobClient.ExistsAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        var uncommittedBlocks = await TryGetUncommittedBlocksAsync(blockBlobClient, cancellationToken);
+        return uncommittedBlocks is { Count: > 0 };
     }
 
     public async Task<bool> HasStagedBlocksAsync(string fileId, CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
+        var blockBlobClient = await GetBlockStagingBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
         {
             return false;
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        if (!await blockBlobClient.ExistsAsync(cancellationToken))
-        {
-            return false;
-        }
-
-        var blockList = await blockBlobClient.GetBlockListAsync(
-            BlockListTypes.Uncommitted,
-            cancellationToken: cancellationToken);
-        return blockList.Value.UncommittedBlocks.Any();
+        var uncommittedBlocks = await TryGetUncommittedBlocksAsync(blockBlobClient, cancellationToken);
+        return uncommittedBlocks is { Count: > 0 };
     }
 
     public async Task<long> GetStagedBlocksLengthAsync(string fileId, CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
+        var blockBlobClient = await GetBlockStagingBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
         {
             return 0;
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        if (!await blockBlobClient.ExistsAsync(cancellationToken))
-        {
-            return 0;
-        }
-
-        var blockList = await blockBlobClient.GetBlockListAsync(
-            BlockListTypes.Uncommitted,
-            cancellationToken: cancellationToken);
-        return blockList.Value.UncommittedBlocks.Sum(block => block.SizeLong);
+        var uncommittedBlocks = await TryGetUncommittedBlocksAsync(blockBlobClient, cancellationToken);
+        return uncommittedBlocks?.Sum(static block => block.SizeLong) ?? 0;
     }
 
     public async Task<TusStagedBlocksSnapshot?> TryGetStagedBlocksSnapshotAsync(
         string fileId,
         CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
+        var blockBlobClient = await GetBlockStagingBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
         {
             return null;
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        if (!await blockBlobClient.ExistsAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        var blockList = await blockBlobClient.GetBlockListAsync(
-            BlockListTypes.Uncommitted,
-            cancellationToken: cancellationToken);
-        var uncommittedBlocks = blockList.Value.UncommittedBlocks;
-        if (!uncommittedBlocks.Any())
+        var uncommittedBlocks = await TryGetUncommittedBlocksAsync(blockBlobClient, cancellationToken);
+        if (uncommittedBlocks is null || uncommittedBlocks.Count == 0)
         {
             return null;
         }
@@ -324,24 +290,47 @@ public class TusStorageResolver(
             .ToList();
         if (orderedBlocks.Count == 0)
         {
-            var fallbackBlocks = uncommittedBlocks
-                .OrderBy(static block => block.Name, StringComparer.Ordinal)
-                .ToList();
-            if (fallbackBlocks.Count == 0)
-            {
-                return null;
-            }
-
-            return new TusStagedBlocksSnapshot(
-                fallbackBlocks.Sum(static block => block.SizeLong),
-                fallbackBlocks.Select(static block => block.Name).ToList(),
-                fallbackBlocks.Count);
+            return null;
         }
 
         var blockIds = orderedBlocks.Select(entry => entry.Block.Name).ToList();
         var totalLength = orderedBlocks.Sum(entry => entry.Block.SizeLong);
         var nextBlockIndex = orderedBlocks[^1].Index!.Value + 1;
         return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
+    }
+
+    private async Task<BlockBlobClient?> GetBlockStagingBlobClientAsync(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return null;
+        }
+
+        return GetBlockBlobClient(storageContext, fileId);
+    }
+
+    /// <summary>
+    /// Block blobs with only uncommitted staged blocks are not visible to ExistsAsync/GetProperties.
+    /// Use GetBlockList(Uncommitted) to detect in-progress TUS uploads.
+    /// </summary>
+    private static async Task<IReadOnlyList<BlobBlock>?> TryGetUncommittedBlocksAsync(
+        BlockBlobClient blockBlobClient,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var blockList = await blockBlobClient.GetBlockListAsync(
+                BlockListTypes.Uncommitted,
+                cancellationToken: cancellationToken);
+            return blockList.Value.UncommittedBlocks.ToList();
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
     }
 
     private static long? TryParseBlockIndex(string blockId)
@@ -718,11 +707,9 @@ public class TusStorageResolver(
     private async Task<TusStorageContext?> ResolveStorageContextAsync(
         string fileId,
         CancellationToken cancellationToken,
-        TusUploadDebugTiming? timing = null,
-        Guid? knownFileTransferId = null)
+        TusUploadDebugTiming? timing = null)
     {
-        var fileTransferId = knownFileTransferId
-            ?? await ResolveFileTransferIdAsync(fileId, cancellationToken, timing);
+        var fileTransferId = await ResolveFileTransferIdAsync(fileId, cancellationToken, timing);
         if (fileTransferId is null)
         {
             timing?.Step("resolve.fileTransferIdNotFound");
@@ -761,9 +748,7 @@ public class TusStorageResolver(
             return mappedFileTransferId;
         }
 
-        // Partial upload ids are 32-char hex strings without dashes. Guid.TryParse accepts that
-        // format but the result is not the parent file transfer id.
-        if (fileId.Contains('-', StringComparison.Ordinal) && Guid.TryParse(fileId, out var parsedFileTransferId))
+        if (Guid.TryParse(fileId, out var parsedFileTransferId))
         {
             timing?.Step("resolve.fileTransferId.fromParse", parsedFileTransferId);
             return parsedFileTransferId;
