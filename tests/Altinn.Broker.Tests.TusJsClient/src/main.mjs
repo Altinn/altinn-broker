@@ -55,7 +55,7 @@ async function uploadWithTusJsClient({
         endpoint,
         chunkSize,
         parallelUploads,
-        retryDelays: [0, 2000, 4000, 8000, 16000],
+        retryDelays: [1000, 2000, 4000, 8000, 16000],
         headers: {
           Authorization: `Bearer ${token}`,
         },

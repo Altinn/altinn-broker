@@ -857,8 +857,6 @@ public class BrokerTusStore(
 
     private async Task FinalizeUploadAsync(string fileId, TusUploadState state, CancellationToken cancellationToken)
     {
-        List<string> blockIds;
-
         lock (state.SyncRoot)
         {
             if (state.Fault is not null)
@@ -870,23 +868,29 @@ public class BrokerTusStore(
             {
                 throw new TusStoreException($"Buffered TUS upload for file id {fileId} has {state.PendingUploads} pending block uploads.");
             }
-
-            blockIds = state.BlockIds.ToList();
-        }
-
-        if (blockIds.Count == 0)
-        {
-            var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
-            if (stagedSnapshot is null || stagedSnapshot.BlockIds.Count == 0)
-            {
-                throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
-            }
-
-            blockIds = stagedSnapshot.BlockIds.ToList();
         }
 
         var uploadLength = state.UploadLength;
-        await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (committedLength >= uploadLength)
+        {
+            await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+            return;
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
+        if (stagedSnapshot is null || stagedSnapshot.BlockIds.Count == 0)
+        {
+            throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
+        }
+
+        if (stagedSnapshot.TotalLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Cannot finalize TUS upload for file id {fileId}. Staged {stagedSnapshot.TotalLength} bytes, expected {uploadLength}.");
+        }
+
+        await storageResolver.CommitTusBlocksAsync(fileId, stagedSnapshot.BlockIds, cancellationToken);
         await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
     }
 
