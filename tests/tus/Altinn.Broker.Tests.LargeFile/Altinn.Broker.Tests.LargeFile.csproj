@@ -6,7 +6,11 @@
     <Nullable>enable</Nullable>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..\..</DockerfileContext>
+    <DockerfileFile>Dockerfile</DockerfileFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="Dockerfile" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.14.2" />
     <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />

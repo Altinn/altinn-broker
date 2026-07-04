@@ -201,7 +201,19 @@ public static class AltinnAuthClient
 
     private static string ReadPrivateKeyPem()
     {
-        var filePath = RequireEnv("CLIENT_PEM_FILE");
+        var inlinePem = Environment.GetEnvironmentVariable("CLIENT_PEM");
+        if (!string.IsNullOrWhiteSpace(inlinePem))
+        {
+            return inlinePem.Replace("\\n", "\n", StringComparison.Ordinal);
+        }
+
+        var filePath = Environment.GetEnvironmentVariable("CLIENT_PEM_FILE");
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            throw new InvalidOperationException(
+                "Missing Maskinporten private key. Set CLIENT_PEM (inline PEM) or CLIENT_PEM_FILE (path to PEM file).");
+        }
+
         var resolvedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(filePath));
         if (!File.Exists(resolvedPath))
         {

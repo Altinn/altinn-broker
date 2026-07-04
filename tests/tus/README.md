@@ -18,7 +18,7 @@ All three clients share the same environment variables and defaults:
 | --- | --- | --- |
 | `CLIENT_ID` | yes | — |
 | `CLIENT_KID` | yes | — |
-| `CLIENT_PEM_FILE` | yes | — |
+| `CLIENT_PEM_FILE` | yes* | — | Path to Maskinporten private key `.pem` file |
 | `RESOURCE_ID` | yes | — |
 | `ORG_NO` | yes | — |
 | `BASE_URL` | no | `https://platform.tt02.altinn.no` |
@@ -27,17 +27,19 @@ All three clients share the same environment variables and defaults:
 | `GIGABYTES_TO_UPLOAD` | no | **64 MiB** smoke-test size when unset |
 | `UPLOAD_FILE_PATH` | no | — (use with `generate-file.ps1`; ignores `GIGABYTES_TO_UPLOAD`) |
 
+\* Provide `CLIENT_PEM_FILE` for local runs, or `CLIENT_PEM` with the PEM content inline (`.NET` LargeFile only — for Azure Container Apps and similar).
+
 ### Authentication
 
 Clients authenticate like the Bruno requests in `.bruno/Authentication/`:
 
-1. Sign a short-lived JWT with `CLIENT_ID`, `CLIENT_KID`, `CLIENT_PEM_FILE`, and `ORG_NO`
+1. Sign a short-lived JWT with `CLIENT_ID`, `CLIENT_KID`, your private key PEM, and `ORG_NO`
 2. Exchange it for a Maskinporten access token at `test.maskinporten.no/token` (or prod)
 3. Exchange that token for a 1-hour Altinn token at `{BASE_URL}/authentication/api/v1/exchange/maskinporten`
 
 `ORG_NO` is the organisation number for the system user tied to your `CLIENT_ID` (used in the Maskinporten JWT and as the file-transfer sender). You must [set up a system user for that organisation](https://docs.altinn.studio/en/authorization/getting-started/systemuser/) before running the clients.
 
-`CLIENT_PEM_FILE` is the path to your RSA private key PEM file (same key as Bruno's `client_pem`).
+`CLIENT_PEM_FILE` is the path to your RSA private key PEM file (same key as Bruno's `client_pem`). For the `.NET` LargeFile client in Azure Container Apps, set `CLIENT_PEM` to the PEM content directly instead (secret/env injection).
 
 Optional: `MASKINPORTEN_TOKEN_URL` (override token endpoint).
 

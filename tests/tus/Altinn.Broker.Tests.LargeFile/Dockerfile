@@ -8,6 +8,7 @@ WORKDIR /src
 COPY ["tests/tus/Altinn.Broker.Tests.LargeFile/Altinn.Broker.Tests.LargeFile.csproj", "tests/tus/Altinn.Broker.Tests.LargeFile/"]
 COPY ["src/Altinn.Broker.API/Altinn.Broker.API.csproj", "src/Altinn.Broker.API/"]
 COPY ["src/Altinn.Broker.Application/Altinn.Broker.Application.csproj", "src/Altinn.Broker.Application/"]
+COPY ["src/Altinn.Broker.Common/Altinn.Broker.Common.csproj", "src/Altinn.Broker.Common/"]
 COPY ["src/Altinn.Broker.Core/Altinn.Broker.Core.csproj", "src/Altinn.Broker.Core/"]
 COPY ["src/Altinn.Broker.Integrations/Altinn.Broker.Integrations.csproj", "src/Altinn.Broker.Integrations/"]
 COPY ["src/Altinn.Broker.Persistence/Altinn.Broker.Persistence.csproj", "src/Altinn.Broker.Persistence/"]
