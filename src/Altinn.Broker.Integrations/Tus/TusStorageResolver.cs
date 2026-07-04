@@ -28,7 +28,12 @@ public interface ITusStorageResolver
 {
     Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
     Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
-    Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
+    Task<long> StageTusBlockAsync(
+        string fileId,
+        string blockId,
+        Stream blockData,
+        CancellationToken cancellationToken,
+        Guid? knownFileTransferId = null);
     Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
@@ -121,7 +126,8 @@ public class TusStorageResolver(
         string fileId,
         string blockId,
         Stream blockData,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? knownFileTransferId = null)
     {
         if (!blockData.CanSeek)
         {
@@ -132,7 +138,7 @@ public class TusStorageResolver(
         int? expectedBytes = blockBytes is >= 0 and <= int.MaxValue ? (int)blockBytes : null;
         using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, expectedBytes);
 
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing, knownFileTransferId);
         if (storageContext is null)
         {
             throw new InvalidOperationException($"Missing storage context for file id {fileId}");
@@ -318,7 +324,18 @@ public class TusStorageResolver(
             .ToList();
         if (orderedBlocks.Count == 0)
         {
-            return null;
+            var fallbackBlocks = uncommittedBlocks
+                .OrderBy(static block => block.Name, StringComparer.Ordinal)
+                .ToList();
+            if (fallbackBlocks.Count == 0)
+            {
+                return null;
+            }
+
+            return new TusStagedBlocksSnapshot(
+                fallbackBlocks.Sum(static block => block.SizeLong),
+                fallbackBlocks.Select(static block => block.Name).ToList(),
+                fallbackBlocks.Count);
         }
 
         var blockIds = orderedBlocks.Select(entry => entry.Block.Name).ToList();
@@ -701,9 +718,11 @@ public class TusStorageResolver(
     private async Task<TusStorageContext?> ResolveStorageContextAsync(
         string fileId,
         CancellationToken cancellationToken,
-        TusUploadDebugTiming? timing = null)
+        TusUploadDebugTiming? timing = null,
+        Guid? knownFileTransferId = null)
     {
-        var fileTransferId = await ResolveFileTransferIdAsync(fileId, cancellationToken, timing);
+        var fileTransferId = knownFileTransferId
+            ?? await ResolveFileTransferIdAsync(fileId, cancellationToken, timing);
         if (fileTransferId is null)
         {
             timing?.Step("resolve.fileTransferIdNotFound");
@@ -742,7 +761,9 @@ public class TusStorageResolver(
             return mappedFileTransferId;
         }
 
-        if (Guid.TryParse(fileId, out var parsedFileTransferId))
+        // Partial upload ids are 32-char hex strings without dashes. Guid.TryParse accepts that
+        // format but the result is not the parent file transfer id.
+        if (fileId.Contains('-', StringComparison.Ordinal) && Guid.TryParse(fileId, out var parsedFileTransferId))
         {
             timing?.Step("resolve.fileTransferId.fromParse", parsedFileTransferId);
             return parsedFileTransferId;

@@ -63,6 +63,7 @@ public class BrokerTusStore(
 
         var chunk = chunkBuffer.ToArray();
         var chunkLength = chunk.Length;
+        var fileTransferId = await RequireFileTransferIdAsync(fileId, cancellationToken);
         var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         var expectedOffset = progress?.AcceptedOffset ?? state.AcceptedOffset;
 
@@ -120,7 +121,7 @@ public class BrokerTusStore(
         }
 
         timing.Step("assignBlock", blockId);
-        _ = Task.Run(() => UploadBlockAsync(fileId, state, blockId, chunk));
+        _ = Task.Run(() => UploadBlockAsync(fileId, fileTransferId, state, blockId, chunk));
         timing.Step("uploadBlock.scheduled", chunkLength);
 
         if (isFinalChunk)
@@ -778,13 +779,23 @@ public class BrokerTusStore(
         }
     }
 
-    private async Task UploadBlockAsync(string fileId, TusUploadState state, string blockId, byte[] chunk)
+    private async Task UploadBlockAsync(
+        string fileId,
+        Guid fileTransferId,
+        TusUploadState state,
+        string blockId,
+        byte[] chunk)
     {
         await state.ConcurrentUploader.WaitAsync();
         try
         {
             await using var chunkStream = new MemoryStream(chunk, writable: false);
-            await storageResolver.StageTusBlockAsync(fileId, blockId, chunkStream, CancellationToken.None);
+            await storageResolver.StageTusBlockAsync(
+                fileId,
+                blockId,
+                chunkStream,
+                CancellationToken.None,
+                fileTransferId);
             lock (state.SyncRoot)
             {
                 state.CommittedOffset += chunk.Length;
@@ -881,7 +892,12 @@ public class BrokerTusStore(
         var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
         if (stagedSnapshot is null || stagedSnapshot.BlockIds.Count == 0)
         {
-            throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
+            var stagedBytes = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+            var redisProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+            throw new TusStoreException(
+                $"Cannot finalize TUS upload for file id {fileId} because no blocks were staged. " +
+                $"Committed blob length={committedLength}, uncommitted staged bytes={stagedBytes}, " +
+                $"redis committed offset={redisProgress?.CommittedOffset ?? -1}, expected upload length={uploadLength}.");
         }
 
         if (stagedSnapshot.TotalLength != uploadLength)
@@ -934,6 +950,28 @@ public class BrokerTusStore(
         {
             await RenewExpirationAsync(fileId, cancellationToken);
         }
+    }
+
+    private async Task<Guid> RequireFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is not null
+            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
+        {
+            return routeFileTransferId;
+        }
+
+        if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
+        {
+            return mappedFileTransferId;
+        }
+
+        if (fileId.Contains('-', StringComparison.Ordinal) && Guid.TryParse(fileId, out var parsedFileTransferId))
+        {
+            return parsedFileTransferId;
+        }
+
+        throw new TusStoreException($"Unable to resolve file transfer id for tus file id {fileId}.");
     }
 
     private string GetFileTransferIdFromRoute()
