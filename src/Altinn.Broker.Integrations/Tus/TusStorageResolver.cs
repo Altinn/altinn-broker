@@ -123,18 +123,22 @@ public class TusStorageResolver(
         Stream blockData,
         CancellationToken cancellationToken)
     {
-        int? expectedBytes = null;
-        if (blockData.CanSeek)
+        long? knownLength = httpContextAccessor.HttpContext?.Request.ContentLength is long contentLength and >= 0
+            ? contentLength
+            : blockData.CanSeek
+                ? blockData.Length - blockData.Position
+                : null;
+
+        if (knownLength is null)
         {
-            var remaining = blockData.Length - blockData.Position;
-            if (remaining is >= 0 and <= int.MaxValue)
-            {
-                expectedBytes = (int)remaining;
-            }
+            throw new InvalidOperationException(
+                "Cannot stage TUS block without a known content length. Ensure the PATCH request includes Content-Length.");
         }
 
+        int? expectedBytes = knownLength <= int.MaxValue ? (int)knownLength : null;
+
         using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, expectedBytes);
-        var countingStream = new ByteCountingStream(blockData);
+        var countingStream = new ByteCountingStream(blockData, knownLength);
 
         var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
         if (storageContext is null)
