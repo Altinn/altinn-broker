@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 
 using Altinn.Broker.API.Configuration;
@@ -8,6 +9,7 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using tusdotnet;
@@ -106,10 +108,49 @@ public static class TusEndpointExtensions
             return;
         }
 
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnAuthorize");
+        var sw = logger.IsEnabled(LogLevel.Debug) ? Stopwatch.StartNew() : null;
+        long checkpointMs = 0;
+        void LogStep(string step, object? detail = null)
+        {
+            if (sw is null)
+            {
+                return;
+            }
+
+            var totalMs = sw.ElapsedMilliseconds;
+            var stepMs = totalMs - checkpointMs;
+            checkpointMs = totalMs;
+            if (detail is null)
+            {
+                logger.LogDebug(
+                    "TUS timing OnAuthorize {Step} +{StepMs}ms total {TotalMs}ms intent={Intent} fileId={FileId}",
+                    step,
+                    stepMs,
+                    totalMs,
+                    context.Intent,
+                    context.FileId);
+                return;
+            }
+
+            logger.LogDebug(
+                "TUS timing OnAuthorize {Step} +{StepMs}ms total {TotalMs}ms intent={Intent} fileId={FileId} detail={Detail}",
+                step,
+                stepMs,
+                totalMs,
+                context.Intent,
+                context.FileId,
+                detail);
+        }
+
+        LogStep("started");
+
         var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
             context.HttpContext,
             context.FileId,
             context.CancellationToken);
+        LogStep("resolveFileTransferId", resolved ? fileTransferId : "notFound");
         if (!resolved)
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
@@ -123,6 +164,7 @@ public static class TusEndpointExtensions
             MapAuthIntent(context.Intent),
             uploadLength: null,
             context.CancellationToken);
+        LogStep("authorize", error is null ? "ok" : "error");
 
         if (error is not null)
         {

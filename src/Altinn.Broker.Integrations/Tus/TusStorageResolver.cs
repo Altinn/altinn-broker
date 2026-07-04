@@ -13,6 +13,7 @@ using Azure.Storage.Sas;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 using Xtensible.TusDotNet.Azure;
 
@@ -58,7 +59,8 @@ public class TusStorageResolver(
     IHostEnvironment hostEnvironment,
     ITusExpirationDetailsStore expirationDetailsStore,
     ITusPartialUploadRegistry partialUploadRegistry,
-    IHttpContextAccessor httpContextAccessor) : ITusStorageResolver
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<TusStorageResolver> logger) : ITusStorageResolver
 {
     private const long MaxPutBlockFromUrlSize = 100L * 1024 * 1024;
 
@@ -117,18 +119,22 @@ public class TusStorageResolver(
 
     public async Task StageTusBlockAsync(string fileId, string blockId, byte[] blockData, CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, blockData.Length);
+
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
         if (storageContext is null)
         {
             throw new InvalidOperationException($"Missing storage context for file id {fileId}");
         }
 
+        timing.Step("getBlockBlobClient");
         var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
         await using var chunkStream = new MemoryStream(blockData, writable: false);
         await blockBlobClient.StageBlockAsync(
             blockId,
             chunkStream,
             cancellationToken: cancellationToken);
+        timing.Step("azure.stageBlock", blockData.Length);
     }
 
     public async Task CommitTusBlocksAsync(
@@ -681,18 +687,26 @@ public class TusStorageResolver(
     private static string BuildBlockBlobClientKey(TusStorageContext storageContext, string fileId)
         => $"{storageContext.StorageAccountName}:{fileId}";
 
-    private async Task<TusStorageContext?> ResolveStorageContextAsync(string fileId, CancellationToken cancellationToken)
+    private async Task<TusStorageContext?> ResolveStorageContextAsync(
+        string fileId,
+        CancellationToken cancellationToken,
+        TusUploadDebugTiming? timing = null)
     {
-        var fileTransferId = await ResolveFileTransferIdAsync(fileId, cancellationToken);
+        var fileTransferId = await ResolveFileTransferIdAsync(fileId, cancellationToken, timing);
         if (fileTransferId is null)
         {
+            timing?.Step("resolve.fileTransferIdNotFound");
             return null;
         }
 
-        return await ResolveStorageContextForFileTransferAsync(fileTransferId.Value, cancellationToken);
+        timing?.Step("resolve.fileTransferId", fileTransferId);
+        return await ResolveStorageContextForFileTransferAsync(fileTransferId.Value, cancellationToken, timing);
     }
 
-    private async Task<Guid?> ResolveFileTransferIdAsync(string fileId, CancellationToken cancellationToken)
+    private async Task<Guid?> ResolveFileTransferIdAsync(
+        string fileId,
+        CancellationToken cancellationToken,
+        TusUploadDebugTiming? timing = null)
     {
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
         var httpContext = httpContextAccessor.HttpContext;
@@ -701,21 +715,25 @@ public class TusStorageResolver(
         if (httpContext is not null
             && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
         {
+            timing?.Step("resolve.fileTransferId.fromRoute", routeFileTransferId);
             return routeFileTransferId;
         }
 
         if (TusRouteHelper.TryGetFileTransferIdFromPath(requestPath, out var pathFileTransferId))
         {
+            timing?.Step("resolve.fileTransferId.fromPath", pathFileTransferId);
             return pathFileTransferId;
         }
 
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
         {
+            timing?.Step("resolve.fileTransferId.fromPartialRegistry", mappedFileTransferId);
             return mappedFileTransferId;
         }
 
         if (Guid.TryParse(fileId, out var parsedFileTransferId))
         {
+            timing?.Step("resolve.fileTransferId.fromParse", parsedFileTransferId);
             return parsedFileTransferId;
         }
 
@@ -724,26 +742,33 @@ public class TusStorageResolver(
 
     private async Task<TusStorageContext?> ResolveStorageContextForFileTransferAsync(
         Guid fileTransferId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TusUploadDebugTiming? timing = null)
     {
         if (_storageContextsByFileTransferId.TryGetValue(fileTransferId, out var cachedContext))
         {
+            timing?.Step("resolve.contextCacheHit", cachedContext.StorageAccountName);
             return cachedContext;
         }
 
+        timing?.Step("resolve.contextCacheMiss");
+
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        timing?.Step("resolve.db.fileTransfer");
         if (fileTransfer is null)
         {
             return null;
         }
 
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
+        timing?.Step("resolve.db.resource");
         if (resource is null)
         {
             return null;
         }
 
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
+        timing?.Step("resolve.db.serviceOwner");
         if (serviceOwner is null)
         {
             return null;
@@ -752,6 +777,7 @@ public class TusStorageResolver(
         var storageProvider = serviceOwner.GetStorageProvider(fileTransfer.UseVirusScan);
         if (storageProvider is null)
         {
+            timing?.Step("resolve.storageProviderMissing");
             return null;
         }
 
@@ -764,6 +790,7 @@ public class TusStorageResolver(
 
         var context = new TusStorageContext(connectionString, authenticationMode, storageProvider.ResourceName);
         _storageContextsByFileTransferId.TryAdd(fileTransferId, context);
+        timing?.Step("resolve.contextBuilt", storageProvider.ResourceName);
         return context;
     }
 
