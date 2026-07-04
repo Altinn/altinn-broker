@@ -1,8 +1,11 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+
+using StackExchange.Redis;
 
 namespace Altinn.Broker.Integrations.Tus;
 
@@ -10,12 +13,21 @@ public sealed record TusUploadProgressSnapshot(
     long UploadLength,
     long AcceptedOffset,
     long CommittedOffset,
-    long NextBlockIndex,
-    List<string> BlockIds);
+    long NextBlockIndex);
 
 public interface ITusUploadProgressCache
 {
     Task<TusUploadProgressSnapshot?> GetAsync(string fileId, CancellationToken cancellationToken);
+
+    Task InitializeAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
+
+    Task<TusAcceptChunkResult> TryAcceptChunkAsync(
+        string fileId,
+        long expectedOffset,
+        int chunkLength,
+        CancellationToken cancellationToken);
+
+    Task IncrementCommittedOffsetAsync(string fileId, long chunkLength, CancellationToken cancellationToken);
 
     Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken);
 
@@ -24,58 +36,415 @@ public interface ITusUploadProgressCache
 
 public sealed class TusUploadProgressCache(
     IDistributedCache cache,
-    ILogger<TusUploadProgressCache> logger) : ITusUploadProgressCache
+    ILogger<TusUploadProgressCache> logger,
+    IConnectionMultiplexer? redis = null) : ITusUploadProgressCache
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private static string BuildKey(string fileId) => $"tus-upload-progress:{fileId}";
+    private static readonly ConcurrentDictionary<string, InMemoryProgressEntry> InMemoryProgress =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IDatabase? _database = redis?.GetDatabase();
+
+    private const string UploadLengthField = "uploadLength";
+    private const string AcceptedOffsetField = "acceptedOffset";
+    private const string CommittedOffsetField = "committedOffset";
+    private const string NextBlockIndexField = "nextBlockIndex";
+
+    private const string TryAcceptChunkScript = """
+        local expected = tonumber(ARGV[1])
+        local chunkLen = tonumber(ARGV[2])
+        local ttl = tonumber(ARGV[3])
+
+        local accepted = redis.call('HGET', KEYS[1], 'acceptedOffset')
+        if not accepted then
+            return {0, 0}
+        end
+
+        accepted = tonumber(accepted)
+        local uploadLen = tonumber(redis.call('HGET', KEYS[1], 'uploadLength'))
+
+        if accepted ~= expected then
+            return {2, accepted}
+        end
+
+        local newAccepted = accepted + chunkLen
+        if newAccepted > uploadLen then
+            return {3, accepted}
+        end
+
+        local blockIndex = tonumber(redis.call('HGET', KEYS[1], 'nextBlockIndex') or '0')
+        redis.call('HSET', KEYS[1], 'acceptedOffset', newAccepted, 'nextBlockIndex', blockIndex + 1)
+        redis.call('EXPIRE', KEYS[1], ttl)
+        return {1, accepted, newAccepted, blockIndex}
+        """;
 
     public async Task<TusUploadProgressSnapshot?> GetAsync(string fileId, CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
-        var json = await cache.GetStringAsync(BuildKey(fileId), cancellationToken);
-        var redisMs = sw.ElapsedMilliseconds;
-        if (string.IsNullOrWhiteSpace(json))
+        if (_database is not null)
         {
-            logger.LogDebug(
-                "TUS timing progressCache.Get +{RedisMs}ms total {TotalMs}ms fileId={FileId} hit=false",
-                redisMs,
-                sw.ElapsedMilliseconds,
-                fileId);
+            var snapshot = await ReadHashAsync(fileId, cancellationToken);
+            if (snapshot is not null)
+            {
+                LogGetHit(sw, fileId, snapshot.AcceptedOffset);
+                return snapshot;
+            }
+
+            var migrated = await TryMigrateLegacyJsonAsync(fileId, cancellationToken);
+            if (migrated is not null)
+            {
+                LogGetHit(sw, fileId, migrated.AcceptedOffset);
+                return migrated;
+            }
+
+            LogGetMiss(sw, fileId);
             return null;
         }
 
-        var snapshot = JsonSerializer.Deserialize<TusUploadProgressSnapshot>(json, JsonOptions);
-        logger.LogDebug(
-            "TUS timing progressCache.Get +{RedisMs}ms total {TotalMs}ms fileId={FileId} hit=true offset={Offset}",
-            redisMs,
-            sw.ElapsedMilliseconds,
-            fileId,
-            snapshot?.CommittedOffset);
-        return snapshot;
+        if (InMemoryProgress.TryGetValue(fileId, out var entry))
+        {
+            lock (entry.SyncRoot)
+            {
+                LogGetHit(sw, fileId, entry.AcceptedOffset);
+                return entry.ToSnapshot();
+            }
+        }
+
+        LogGetMiss(sw, fileId);
+        return null;
+    }
+
+    public Task InitializeAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            return InitializeRedisAsync(fileId, uploadLength, cancellationToken);
+        }
+
+        InMemoryProgress[fileId] = new InMemoryProgressEntry(uploadLength);
+        return Task.CompletedTask;
+    }
+
+    public Task<TusAcceptChunkResult> TryAcceptChunkAsync(
+        string fileId,
+        long expectedOffset,
+        int chunkLength,
+        CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            return TryAcceptChunkRedisAsync(fileId, expectedOffset, chunkLength, cancellationToken);
+        }
+
+        return Task.FromResult(TryAcceptChunkInMemory(fileId, expectedOffset, chunkLength));
+    }
+
+    public Task IncrementCommittedOffsetAsync(string fileId, long chunkLength, CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            return IncrementCommittedOffsetRedisAsync(fileId, chunkLength, cancellationToken);
+        }
+
+        if (InMemoryProgress.TryGetValue(fileId, out var entry))
+        {
+            lock (entry.SyncRoot)
+            {
+                entry.CommittedOffset += chunkLength;
+            }
+        }
+
+        return Task.CompletedTask;
     }
 
     public async Task SaveAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
     {
-        var sw = Stopwatch.StartNew();
-        await cache.SetStringAsync(
-            BuildKey(fileId),
-            JsonSerializer.Serialize(snapshot, JsonOptions),
-            new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = CacheExpiration
-            },
-            cancellationToken);
-        logger.LogDebug(
-            "TUS timing progressCache.Save +{RedisMs}ms total {TotalMs}ms fileId={FileId} offset={Offset} blockCount={BlockCount}",
-            sw.ElapsedMilliseconds,
-            sw.ElapsedMilliseconds,
+        if (_database is not null)
+        {
+            await WriteHashAsync(fileId, snapshot, cancellationToken);
+            return;
+        }
+
+        InMemoryProgress.AddOrUpdate(
             fileId,
-            snapshot.CommittedOffset,
-            snapshot.BlockIds.Count);
+            _ => InMemoryProgressEntry.FromSnapshot(snapshot),
+            (_, existing) =>
+            {
+                lock (existing.SyncRoot)
+                {
+                    existing.UploadLength = snapshot.UploadLength;
+                    existing.AcceptedOffset = snapshot.AcceptedOffset;
+                    existing.CommittedOffset = snapshot.CommittedOffset;
+                    existing.NextBlockIndex = snapshot.NextBlockIndex;
+                }
+
+                return existing;
+            });
     }
 
-    public Task RemoveAsync(string fileId, CancellationToken cancellationToken)
-        => cache.RemoveAsync(BuildKey(fileId), cancellationToken);
+    public async Task RemoveAsync(string fileId, CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            await _database.KeyDeleteAsync(BuildHashKey(fileId));
+            await cache.RemoveAsync(BuildLegacyKey(fileId), cancellationToken);
+            return;
+        }
+
+        InMemoryProgress.TryRemove(fileId, out _);
+        await cache.RemoveAsync(BuildLegacyKey(fileId), cancellationToken);
+    }
+
+    private async Task<TusUploadProgressSnapshot?> ReadHashAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var entries = await _database!.HashGetAllAsync(BuildHashKey(fileId));
+        if (entries.Length == 0)
+        {
+            return null;
+        }
+
+        return ParseHashEntries(entries);
+    }
+
+    private async Task WriteHashAsync(string fileId, TusUploadProgressSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        var sw = Stopwatch.StartNew();
+        var key = BuildHashKey(fileId);
+        var entries = new HashEntry[]
+        {
+            new(UploadLengthField, snapshot.UploadLength),
+            new(AcceptedOffsetField, snapshot.AcceptedOffset),
+            new(CommittedOffsetField, snapshot.CommittedOffset),
+            new(NextBlockIndexField, snapshot.NextBlockIndex)
+        };
+
+        await _database!.HashSetAsync(key, entries);
+        await _database.KeyExpireAsync(key, CacheExpiration);
+        logger.LogDebug(
+            "TUS timing progressCache.Save +{RedisMs}ms fileId={FileId} accepted={AcceptedOffset} committed={CommittedOffset}",
+            sw.ElapsedMilliseconds,
+            fileId,
+            snapshot.AcceptedOffset,
+            snapshot.CommittedOffset);
+    }
+
+    private async Task InitializeRedisAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    {
+        await WriteHashAsync(
+            fileId,
+            new TusUploadProgressSnapshot(uploadLength, 0, 0, 0),
+            cancellationToken);
+    }
+
+    private async Task<TusAcceptChunkResult> TryAcceptChunkRedisAsync(
+        string fileId,
+        long expectedOffset,
+        int chunkLength,
+        CancellationToken cancellationToken)
+    {
+        var sw = Stopwatch.StartNew();
+        var result = (RedisResult[]?)await _database!.ScriptEvaluateAsync(
+            TryAcceptChunkScript,
+            [BuildHashKey(fileId)],
+            [(RedisValue)expectedOffset, chunkLength, (int)CacheExpiration.TotalSeconds]);
+
+        var parsed = ParseAcceptChunkResult(result);
+        logger.LogDebug(
+            "TUS timing progressCache.TryAcceptChunk +{RedisMs}ms fileId={FileId} status={Status} expected={ExpectedOffset} new={NewOffset}",
+            sw.ElapsedMilliseconds,
+            fileId,
+            parsed.Status,
+            expectedOffset,
+            parsed.NewAcceptedOffset);
+        return parsed;
+    }
+
+    private async Task IncrementCommittedOffsetRedisAsync(
+        string fileId,
+        long chunkLength,
+        CancellationToken cancellationToken)
+    {
+        var key = BuildHashKey(fileId);
+        await _database!.HashIncrementAsync(key, CommittedOffsetField, chunkLength);
+        await _database.KeyExpireAsync(key, CacheExpiration);
+    }
+
+    private async Task<TusUploadProgressSnapshot?> TryMigrateLegacyJsonAsync(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        var json = await cache.GetStringAsync(BuildLegacyKey(fileId), cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            var snapshot = new TusUploadProgressSnapshot(
+                root.GetProperty("UploadLength").GetInt64(),
+                root.TryGetProperty("AcceptedOffset", out var accepted) ? accepted.GetInt64() : root.GetProperty("CommittedOffset").GetInt64(),
+                root.GetProperty("CommittedOffset").GetInt64(),
+                root.TryGetProperty("NextBlockIndex", out var nextBlockIndex) ? nextBlockIndex.GetInt64() : 0);
+
+            await WriteHashAsync(fileId, snapshot, cancellationToken);
+            await cache.RemoveAsync(BuildLegacyKey(fileId), cancellationToken);
+            return snapshot;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "Failed to migrate legacy TUS progress snapshot for file id {FileId}", fileId);
+            return null;
+        }
+    }
+
+    private static TusAcceptChunkResult TryAcceptChunkInMemory(
+        string fileId,
+        long expectedOffset,
+        int chunkLength)
+    {
+        var entry = InMemoryProgress.GetOrAdd(fileId, _ => new InMemoryProgressEntry(uploadLength: 0));
+        lock (entry.SyncRoot)
+        {
+            if (entry.UploadLength == 0)
+            {
+                return new TusAcceptChunkResult(TusAcceptChunkStatus.NotFound, 0, 0, 0);
+            }
+
+            if (entry.AcceptedOffset != expectedOffset)
+            {
+                return new TusAcceptChunkResult(
+                    TusAcceptChunkStatus.Conflict,
+                    entry.AcceptedOffset,
+                    entry.AcceptedOffset,
+                    entry.NextBlockIndex);
+            }
+
+            var newAccepted = entry.AcceptedOffset + chunkLength;
+            if (newAccepted > entry.UploadLength)
+            {
+                return new TusAcceptChunkResult(
+                    TusAcceptChunkStatus.Overflow,
+                    entry.AcceptedOffset,
+                    entry.AcceptedOffset,
+                    entry.NextBlockIndex);
+            }
+
+            var blockIndex = entry.NextBlockIndex;
+            entry.AcceptedOffset = newAccepted;
+            entry.NextBlockIndex++;
+            return new TusAcceptChunkResult(
+                TusAcceptChunkStatus.Accepted,
+                expectedOffset,
+                newAccepted,
+                blockIndex);
+        }
+    }
+
+    private static TusAcceptChunkResult ParseAcceptChunkResult(RedisResult[]? result)
+    {
+        if (result is null || result.Length == 0)
+        {
+            return new TusAcceptChunkResult(TusAcceptChunkStatus.NotFound, 0, 0, 0);
+        }
+
+        var statusCode = (int)result[0];
+        return statusCode switch
+        {
+            1 => new TusAcceptChunkResult(
+                TusAcceptChunkStatus.Accepted,
+                (long)result[1],
+                (long)result[2],
+                (long)result[3]),
+            2 => new TusAcceptChunkResult(TusAcceptChunkStatus.Conflict, (long)result[1], (long)result[1], 0),
+            3 => new TusAcceptChunkResult(TusAcceptChunkStatus.Overflow, (long)result[1], (long)result[1], 0),
+            _ => new TusAcceptChunkResult(TusAcceptChunkStatus.NotFound, 0, 0, 0)
+        };
+    }
+
+    private static TusUploadProgressSnapshot ParseHashEntries(HashEntry[] entries)
+    {
+        long uploadLength = 0;
+        long acceptedOffset = 0;
+        long committedOffset = 0;
+        long nextBlockIndex = 0;
+
+        foreach (var entry in entries)
+        {
+            if (!entry.Value.HasValue)
+            {
+                continue;
+            }
+
+            switch (entry.Name.ToString())
+            {
+                case UploadLengthField:
+                    uploadLength = (long)entry.Value;
+                    break;
+                case AcceptedOffsetField:
+                    acceptedOffset = (long)entry.Value;
+                    break;
+                case CommittedOffsetField:
+                    committedOffset = (long)entry.Value;
+                    break;
+                case NextBlockIndexField:
+                    nextBlockIndex = (long)entry.Value;
+                    break;
+            }
+        }
+
+        return new TusUploadProgressSnapshot(uploadLength, acceptedOffset, committedOffset, nextBlockIndex);
+    }
+
+    private static RedisKey BuildHashKey(string fileId) => $"tus-upload-progress:v2:{fileId}";
+
+    private static string BuildLegacyKey(string fileId) => $"tus-upload-progress:{fileId}";
+
+    private void LogGetHit(Stopwatch sw, string fileId, long offset)
+        => logger.LogDebug(
+            "TUS timing progressCache.Get +{RedisMs}ms fileId={FileId} hit=true offset={Offset}",
+            sw.ElapsedMilliseconds,
+            fileId,
+            offset);
+
+    private void LogGetMiss(Stopwatch sw, string fileId)
+        => logger.LogDebug(
+            "TUS timing progressCache.Get +{RedisMs}ms fileId={FileId} hit=false",
+            sw.ElapsedMilliseconds,
+            fileId);
+
+    private sealed class InMemoryProgressEntry
+    {
+        public InMemoryProgressEntry(long uploadLength)
+        {
+            UploadLength = uploadLength;
+        }
+
+        public object SyncRoot { get; } = new();
+
+        public long UploadLength { get; set; }
+
+        public long AcceptedOffset { get; set; }
+
+        public long CommittedOffset { get; set; }
+
+        public long NextBlockIndex { get; set; }
+
+        public TusUploadProgressSnapshot ToSnapshot()
+            => new(UploadLength, AcceptedOffset, CommittedOffset, NextBlockIndex);
+
+        public static InMemoryProgressEntry FromSnapshot(TusUploadProgressSnapshot snapshot)
+        {
+            return new InMemoryProgressEntry(snapshot.UploadLength)
+            {
+                AcceptedOffset = snapshot.AcceptedOffset,
+                CommittedOffset = snapshot.CommittedOffset,
+                NextBlockIndex = snapshot.NextBlockIndex
+            };
+        }
+    }
 }

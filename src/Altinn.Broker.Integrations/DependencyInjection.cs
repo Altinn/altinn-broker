@@ -16,7 +16,9 @@ using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 
 using StackExchange.Redis;
@@ -112,7 +114,11 @@ public static class DependencyInjection
         });
         services.AddSingleton<ITusPartialUploadRegistry, TusPartialUploadRegistry>();
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
-        services.AddSingleton<ITusUploadProgressCache, TusUploadProgressCache>();
+        services.AddSingleton<ITusUploadProgressCache>(serviceProvider =>
+            new TusUploadProgressCache(
+                serviceProvider.GetRequiredService<IDistributedCache>(),
+                serviceProvider.GetRequiredService<ILogger<TusUploadProgressCache>>(),
+                serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
