@@ -255,6 +255,11 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 return null;
             }
 
+            logger.LogInformation(
+                "TUS staging blob resolved for {FileTransferId}. StagingPath={StagingPath}",
+                fileTransferEntity.FileTransferId,
+                stagingBlobClient.Name);
+
             var stagingProperties = await stagingBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
             var contentLength = stagingProperties.Value.ContentLength;
             string? checksum = null;

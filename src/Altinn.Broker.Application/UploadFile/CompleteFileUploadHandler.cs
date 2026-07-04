@@ -44,6 +44,10 @@ public class CompleteFileUploadHandler(
 
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
+            logger.LogInformation(
+                "CompleteFileUpload skipped for file transfer {FileTransferId}: status already {CurrentStatus}",
+                request.FileTransferId,
+                fileTransfer.FileTransferStatusEntity.Status);
             return request.FileTransferId;
         }
 
@@ -69,6 +73,13 @@ public class CompleteFileUploadHandler(
         var userProvidedChecksum = !string.IsNullOrWhiteSpace(fileTransfer.Checksum);
         var requiresVirusScan = storageProvider.Type == StorageProviderType.Altinn3Azure;
 
+        logger.LogInformation(
+            "CompleteFileUpload processing file transfer {FileTransferId}. DeferChecksumValidation={DeferChecksumValidation} UserProvidedChecksum={UserProvidedChecksum} RequiresVirusScan={RequiresVirusScan}",
+            request.FileTransferId,
+            request.DeferChecksumValidation,
+            userProvidedChecksum,
+            requiresVirusScan);
+
         if (!request.DeferChecksumValidation
             && userProvidedChecksum
             && !string.Equals(request.Checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
@@ -92,6 +103,9 @@ public class CompleteFileUploadHandler(
                 {
                     if (userProvidedChecksum || requiresVirusScan)
                     {
+                        logger.LogInformation(
+                            "CompleteFileUpload setting status UploadProcessing for file transfer {FileTransferId} (defer checksum, virus scan or user checksum)",
+                            request.FileTransferId);
                         await fileTransferStatusRepository.InsertFileTransferStatus(
                             request.FileTransferId,
                             FileTransferStatus.UploadProcessing,
@@ -107,6 +121,9 @@ public class CompleteFileUploadHandler(
                     }
                     else
                     {
+                        logger.LogInformation(
+                            "CompleteFileUpload setting status Published for file transfer {FileTransferId} (defer checksum, no virus scan)",
+                            request.FileTransferId);
                         await fileTransferStatusRepository.InsertFileTransferStatus(
                             request.FileTransferId,
                             FileTransferStatus.Published,

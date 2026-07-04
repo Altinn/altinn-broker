@@ -260,14 +260,30 @@ public static class TusEndpointExtensions
 
     private static async Task OnFileCompleteAsync(FileCompleteContext context)
     {
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnFileComplete");
+
+        logger.LogInformation(
+            "TUS OnFileComplete invoked for tus file id {TusFileId}. RequestPath={RequestPath}",
+            context.FileId,
+            TusRouteHelper.GetRequestPath(context.HttpContext));
+
         var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
             context.HttpContext,
             context.FileId,
             context.CancellationToken);
         if (!resolved)
         {
+            logger.LogError(
+                "TUS OnFileComplete could not resolve file transfer id for tus file id {TusFileId}",
+                context.FileId);
             throw new TusStoreException("Invalid file transfer id");
         }
+
+        logger.LogInformation(
+            "TUS OnFileComplete resolved file transfer {FileTransferId} from tus file id {TusFileId}",
+            fileTransferId,
+            context.FileId);
 
         var tusUploadCompleteHandler = context.HttpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
         var result = await tusUploadCompleteHandler.Process(
@@ -277,8 +293,16 @@ public static class TusEndpointExtensions
 
         if (result.IsT1)
         {
+            logger.LogError(
+                "TUS OnFileComplete handler failed for file transfer {FileTransferId}: {ErrorMessage}",
+                fileTransferId,
+                result.AsT1.Message);
             throw new TusStoreException(result.AsT1.Message);
         }
+
+        logger.LogInformation(
+            "TUS OnFileComplete handler succeeded for file transfer {FileTransferId}. Cleaning up tus store state.",
+            fileTransferId);
 
         var store = context.HttpContext.RequestServices.GetRequiredService<BrokerTusStore>();
         await store.CleanupCompletedUploadAsync(fileTransferId.ToString(), context.CancellationToken);
