@@ -47,6 +47,16 @@ public class BrokerTusStore(
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
         timing.Step("getOrCreateUploadState");
 
+        using var chunkBuffer = new MemoryStream();
+        await stream.CopyToAsync(chunkBuffer, cancellationToken);
+        timing.Step("readRequestBody", chunkBuffer.Length);
+        if (chunkBuffer.Length == 0)
+        {
+            return 0;
+        }
+
+        chunkBuffer.Position = 0;
+
         string blockId;
         lock (state.SyncRoot)
         {
@@ -61,7 +71,7 @@ public class BrokerTusStore(
         }
 
         timing.Step("assignBlock", blockId);
-        var bytesUploaded = await UploadBlockAsync(fileId, state, blockId, stream, timing, cancellationToken);
+        var bytesUploaded = await UploadBlockAsync(fileId, state, blockId, chunkBuffer, timing, cancellationToken);
         timing.Step("uploadBlock", bytesUploaded);
         if (bytesUploaded == 0)
         {

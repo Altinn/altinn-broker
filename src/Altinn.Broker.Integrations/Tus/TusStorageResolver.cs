@@ -123,22 +123,14 @@ public class TusStorageResolver(
         Stream blockData,
         CancellationToken cancellationToken)
     {
-        long? knownLength = httpContextAccessor.HttpContext?.Request.ContentLength is long contentLength and >= 0
-            ? contentLength
-            : blockData.CanSeek
-                ? blockData.Length - blockData.Position
-                : null;
-
-        if (knownLength is null)
+        if (!blockData.CanSeek)
         {
-            throw new InvalidOperationException(
-                "Cannot stage TUS block without a known content length. Ensure the PATCH request includes Content-Length.");
+            throw new ArgumentException("Block data stream must be seekable.", nameof(blockData));
         }
 
-        int? expectedBytes = knownLength <= int.MaxValue ? (int)knownLength : null;
-
+        var blockBytes = blockData.Length - blockData.Position;
+        int? expectedBytes = blockBytes is >= 0 and <= int.MaxValue ? (int)blockBytes : null;
         using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, expectedBytes);
-        var countingStream = new ByteCountingStream(blockData, knownLength);
 
         var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
         if (storageContext is null)
@@ -150,10 +142,10 @@ public class TusStorageResolver(
         var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
         await blockBlobClient.StageBlockAsync(
             blockId,
-            countingStream,
+            blockData,
             cancellationToken: cancellationToken);
-        timing.Step("azure.stageBlock", countingStream.BytesRead);
-        return countingStream.BytesRead;
+        timing.Step("azure.stageBlock", blockBytes);
+        return blockBytes;
     }
 
     public async Task CommitTusBlocksAsync(
