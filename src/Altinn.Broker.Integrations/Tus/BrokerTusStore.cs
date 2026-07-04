@@ -325,14 +325,24 @@ public class BrokerTusStore(
                 SyncStateFromProgress(existingState!, cachedProgress);
             }
 
-            timing.Step("redisProgressOffset", cachedProgress.AcceptedOffset);
+            // HEAD/resume must reflect durable bytes (committed blocks), not in-flight accepted chunks.
+            timing.Step("redisProgressOffset", cachedProgress.CommittedOffset);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return cachedProgress.AcceptedOffset;
+            return cachedProgress.CommittedOffset;
         }
 
         timing.Step("redisProgressMiss");
 
         var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+        var durableOffset = committedLength + stagedLength;
+        if (durableOffset > 0)
+        {
+            timing.Step("durableStagingOffset", durableOffset);
+            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+            return durableOffset;
+        }
+
         if (committedLength > 0)
         {
             timing.Step("committedStagingLength", committedLength);

@@ -169,7 +169,88 @@ public static class TusEndpointExtensions
         if (error is not null)
         {
             context.FailRequest(error.StatusCode, error.Message);
+            return;
         }
+
+        if (context.Intent == IntentType.GetFileInfo)
+        {
+            await TryRecoverCompletedTusUploadAsync(
+                context.HttpContext,
+                fileTransferId,
+                context.FileId,
+                context.CancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// When staging holds the full file but OnFileComplete did not run (e.g. client missed the 204),
+    /// complete the file transfer on HEAD so clients can detect Published status.
+    /// </summary>
+    private static async Task TryRecoverCompletedTusUploadAsync(
+        HttpContext httpContext,
+        Guid fileTransferId,
+        string? tusFileId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(tusFileId))
+        {
+            return;
+        }
+
+        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.Recovery");
+
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null
+            || fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.UploadStarted)
+        {
+            return;
+        }
+
+        var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
+        var uploadLength = await store.GetUploadLengthAsync(tusFileId, cancellationToken);
+        if (uploadLength is null or <= 0)
+        {
+            return;
+        }
+
+        var uploadOffset = await store.GetUploadOffsetAsync(tusFileId, cancellationToken);
+        if (uploadOffset < uploadLength.Value)
+        {
+            return;
+        }
+
+        if (await store.GetUploadConcatAsync(tusFileId, cancellationToken) is FileConcatPartial)
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "Recovering TUS completion for file transfer {FileTransferId}. UploadOffset={UploadOffset} UploadLength={UploadLength}",
+            fileTransferId,
+            uploadOffset,
+            uploadLength.Value);
+
+        var tusUploadCompleteHandler = httpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
+        var result = await tusUploadCompleteHandler.Process(
+            fileTransferId,
+            httpContext.User,
+            cancellationToken);
+
+        if (result.IsT1)
+        {
+            logger.LogWarning(
+                "TUS completion recovery failed for file transfer {FileTransferId}: {ErrorMessage}",
+                fileTransferId,
+                result.AsT1.Message);
+            return;
+        }
+
+        await store.CleanupCompletedUploadAsync(fileTransferId.ToString(), cancellationToken);
+
+        var authorizationService = httpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
+        await authorizationService.InvalidateAsync(fileTransferId, httpContext.User, cancellationToken);
     }
 
     private static async Task OnBeforeCreateAsync(BeforeCreateContext context)

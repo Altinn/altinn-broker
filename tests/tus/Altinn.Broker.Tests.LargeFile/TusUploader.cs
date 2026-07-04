@@ -51,7 +51,7 @@ public static class TusUploader
                 throw new InvalidOperationException($"Source stream ended at offset {offset}.");
             }
 
-            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, uploadSize, cancellationToken);
             progress.Update(offset);
         }
 
@@ -262,7 +262,7 @@ public static class TusUploader
             }
 
             var chunkStartOffset = offset;
-            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, partLength, cancellationToken);
             onBytesUploaded(Math.Max(offset - chunkStartOffset, 0));
         }
     }
@@ -316,6 +316,7 @@ public static class TusUploader
         long offset,
         byte[] buffer,
         int bytesRead,
+        long uploadLength,
         CancellationToken cancellationToken)
     {
         HttpStatusCode? lastStatusCode = null;
@@ -323,6 +324,11 @@ public static class TusUploader
 
         for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
         {
+            if (offset >= uploadLength)
+            {
+                return offset;
+            }
+
             try
             {
                 using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
@@ -340,9 +346,17 @@ public static class TusUploader
                     return ParseUploadOffset(response.Headers);
                 }
 
-                if (response.StatusCode == HttpStatusCode.Conflict)
+                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.Conflict
+                    || IsUploadAlreadyCompleteResponse(response.StatusCode, lastResponseBody))
                 {
                     var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                    if (serverOffset >= uploadLength)
+                    {
+                        return serverOffset;
+                    }
+
                     if (serverOffset > offset)
                     {
                         return serverOffset;
@@ -359,8 +373,6 @@ public static class TusUploader
                     continue;
                 }
 
-                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
                 if (attempt == MaxPatchAttempts || !IsTransientStatusCode(response.StatusCode))
                 {
                     await EnsureSuccessAsync(response, $"TUS PATCH at offset {offset}");
@@ -368,12 +380,20 @@ public static class TusUploader
 
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (offset >= uploadLength)
+                {
+                    return offset;
+                }
             }
             catch (Exception ex) when (IsTransientRequestException(ex) && attempt < MaxPatchAttempts)
             {
                 lastResponseBody = ex.Message;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (offset >= uploadLength)
+                {
+                    return offset;
+                }
             }
         }
 
@@ -537,6 +557,11 @@ public static class TusUploader
             $"{label} completed for {fileTransferId}: " +
             $"{uploadSize / (1024.0 * 1024 * 1024):N2} GiB in {totalSeconds:N1}s (avg: {averageSpeedMbps:N2} MB/s)");
     }
+
+    private static bool IsUploadAlreadyCompleteResponse(HttpStatusCode statusCode, string? responseBody)
+        => statusCode == HttpStatusCode.BadRequest
+            && !string.IsNullOrWhiteSpace(responseBody)
+            && responseBody.Contains("already complete", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTransientRequestException(Exception exception)
         => exception is HttpRequestException or IOException or TaskCanceledException;
