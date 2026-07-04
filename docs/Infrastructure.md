@@ -3,7 +3,6 @@ Infrastructure-as-code (IaC) for Altinn Broker (formidlingstjenesten)
 
 # Environments
 
-* Test (https://altinn-dev-api.azure-api.net) - Used for testing during development and performance tests.
 * Staging (https://platform.tt02.altinn.no) - Used for external testers and for final manual tests before putting into production.
 * Production (https://platform.altinn.no) - Should run the latest image from the main branch of altinn-broker repo.
 

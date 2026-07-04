@@ -127,7 +127,7 @@ def _parse_altinn_exchange_token(body: str) -> str:
 
 def read_auth_options_from_environment() -> AuthOptions:
     return AuthOptions(
-        base_url=_read_env("BASE_URL", "https://altinn-dev-api.azure-api.net"),
+        base_url=_read_env("BASE_URL", "https://platform.tt02.altinn.no"),
         client_id=_require_env("CLIENT_ID"),
         client_kid=_require_env("CLIENT_KID"),
         client_private_key_pem=_read_private_key_pem(),

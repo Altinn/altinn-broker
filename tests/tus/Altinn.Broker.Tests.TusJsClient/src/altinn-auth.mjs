@@ -112,7 +112,7 @@ function parseAltinnExchangeToken(body) {
 
 export function readAuthOptionsFromEnvironment() {
   return {
-    baseUrl: readEnv('BASE_URL', 'https://altinn-dev-api.azure-api.net'),
+    baseUrl: readEnv('BASE_URL', 'https://platform.tt02.altinn.no'),
     clientId: requireEnv('CLIENT_ID'),
     clientKid: requireEnv('CLIENT_KID'),
     clientPrivateKeyPem: readPrivateKeyPem(),

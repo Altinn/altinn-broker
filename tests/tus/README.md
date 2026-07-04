@@ -21,7 +21,7 @@ All three clients share the same environment variables and defaults:
 | `CLIENT_SECRET` | yes | — |
 | `RESOURCE_ID` | yes | — |
 | `ORG_NO` | yes | — |
-| `BASE_URL` | no | `https://altinn-dev-api.azure-api.net` |
+| `BASE_URL` | no | `https://platform.tt02.altinn.no` |
 | `CHUNK_SIZE_MB` | no | `8` |
 | `TUS_PARALLEL_PARTIAL_UPLOADS` | no | `4` |
 | `GIGABYTES_TO_UPLOAD` | no | **64 MiB** smoke-test size when unset |

@@ -23,7 +23,7 @@ pip install -r requirements.txt
 ## Run
 
 ```bash
-export BASE_URL="https://altinn-dev-api.azure-api.net"
+export BASE_URL="https://platform.tt02.altinn.no"
 export CLIENT_ID="your-maskinporten-client-id"
 export CLIENT_KID="your-key-id"
 export CLIENT_SECRET="$(cat /path/to/private-key.pem)"

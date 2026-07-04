@@ -27,7 +27,7 @@ public static class AltinnAuthClient
     public static AltinnAuthOptions ReadOptionsFromEnvironment()
     {
         return new AltinnAuthOptions(
-            BaseUrl: ReadEnv("BASE_URL", "https://altinn-dev-api.azure-api.net"),
+            BaseUrl: ReadEnv("BASE_URL", "https://platform.tt02.altinn.no"),
             ClientId: RequireEnv("CLIENT_ID"),
             ClientKid: RequireEnv("CLIENT_KID"),
             ClientPrivateKeyPem: ReadPrivateKeyPem(),
