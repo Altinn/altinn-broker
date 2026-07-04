@@ -201,7 +201,7 @@ public class BrokerTusStore(
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
-        var durableOffset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
+        long offset;
 
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
@@ -212,12 +212,22 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                durableOffset = Math.Max(durableOffset, state.CommittedOffset);
+                offset = state.CommittedOffset;
             }
+
+            var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+            if (cachedProgress is not null)
+            {
+                offset = Math.Max(offset, cachedProgress.CommittedOffset);
+            }
+        }
+        else
+        {
+            offset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
         }
 
         await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-        return durableOffset;
+        return offset;
     }
 
     public async Task<string> CreateFileAsync(long uploadLength, string metadata, CancellationToken cancellationToken)
@@ -584,7 +594,6 @@ public class BrokerTusStore(
         }
 
         await uploadProgressCache.SaveAsync(fileId, snapshot, cancellationToken);
-        await RefreshPartialRegistryAsync(fileId, snapshot.UploadLength, cancellationToken);
         await RecordUploadActivityAsync(fileId, cancellationToken);
     }
 

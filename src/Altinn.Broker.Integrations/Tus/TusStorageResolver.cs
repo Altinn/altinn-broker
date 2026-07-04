@@ -63,6 +63,10 @@ public class TusStorageResolver(
     private const long MaxPutBlockFromUrlSize = 100L * 1024 * 1024;
 
     private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<Guid, TusStorageContext> _storageContextsByFileTransferId = new();
+    private readonly ConcurrentDictionary<string, BlobContainerClient> _containerClients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, BlockBlobClient> _blockBlobClients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DefaultAzureCredential _azureCredential = new();
 
     public async Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -119,9 +123,7 @@ public class TusStorageResolver(
             throw new InvalidOperationException($"Missing storage context for file id {fileId}");
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
         await using var chunkStream = new MemoryStream(blockData, writable: false);
         await blockBlobClient.StageBlockAsync(
             blockId,
@@ -347,38 +349,11 @@ public class TusStorageResolver(
         return null;
     }
 
-    public async Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    public Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
     {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
-        if (await blockBlobClient.ExistsAsync(cancellationToken))
-        {
-            await SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
-            return;
-        }
-
-        await using var emptyStream = new MemoryStream();
-        await blockBlobClient.UploadAsync(
-            emptyStream,
-            new BlobUploadOptions
-            {
-                Metadata = new Dictionary<string, string>
-                {
-                    [AzureStorageConstants.TusUploadLengthMetadataKey] = uploadLength.ToString()
-                },
-                HttpHeaders = new BlobHttpHeaders
-                {
-                    ContentType = "application/octet-stream"
-                }
-            },
-            cancellationToken);
+        // Upload length is tracked in the partial upload registry and progress cache.
+        // The first Put Block creates staged content without a separate empty blob upload.
+        return Task.CompletedTask;
     }
 
     public async Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
@@ -619,9 +594,8 @@ public class TusStorageResolver(
             return;
         }
 
-        var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = containerClient.GetBlockBlobClient(
-            Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId));
+        _blockBlobClients.TryRemove(BuildBlockBlobClientKey(storageContext, fileId), out _);
+        var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
         await blockBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
@@ -659,16 +633,28 @@ public class TusStorageResolver(
 
     private BlobContainerClient GetBlobContainerClient(TusStorageContext storageContext)
     {
-        if (hostEnvironment.IsDevelopment())
+        return _containerClients.GetOrAdd(storageContext.StorageAccountName, _ =>
         {
-            return new BlobServiceClient(AzureConstants.AzuriteUrl)
-                .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
-        }
+            if (hostEnvironment.IsDevelopment())
+            {
+                return new BlobServiceClient(AzureConstants.AzuriteUrl)
+                    .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
+            }
 
-        var storageUri = new Uri(storageContext.ConnectionString);
-        return new BlobServiceClient(storageUri, new DefaultAzureCredential())
-            .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
+            var storageUri = new Uri(storageContext.ConnectionString);
+            return new BlobServiceClient(storageUri, _azureCredential)
+                .GetBlobContainerClient(AzureStorageConstants.BrokerFilesContainerName);
+        });
     }
+
+    private BlockBlobClient GetBlockBlobClient(TusStorageContext storageContext, string fileId)
+        => _blockBlobClients.GetOrAdd(
+            BuildBlockBlobClientKey(storageContext, fileId),
+            _ => GetBlobContainerClient(storageContext).GetBlockBlobClient(
+                Path.Combine(AzureStorageConstants.TusBlockStagingBlobPath, fileId)));
+
+    private static string BuildBlockBlobClientKey(TusStorageContext storageContext, string fileId)
+        => $"{storageContext.StorageAccountName}:{fileId}";
 
     private async Task<TusStorageContext?> ResolveStorageContextAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -686,31 +672,24 @@ public class TusStorageResolver(
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
         var httpContext = httpContextAccessor.HttpContext;
         var requestPath = httpContext?.Request.Path.Value;
-        var isPartialRequest = TusRouteHelper.IsPartialUploadRequest(httpContext, fileId);
-
-        if (isPartialRequest
-            && TusRouteHelper.TryGetFileTransferIdFromPath(requestPath, out var pathFileTransferId)
-            && await FileTransferExistsAsync(pathFileTransferId, cancellationToken))
-        {
-            return pathFileTransferId;
-        }
-
-        if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId
-            && await FileTransferExistsAsync(mappedFileTransferId, cancellationToken))
-        {
-            return mappedFileTransferId;
-        }
 
         if (httpContext is not null
-            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId)
-            && await FileTransferExistsAsync(routeFileTransferId, cancellationToken))
+            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
         {
             return routeFileTransferId;
         }
 
-        if (!isPartialRequest
-            && Guid.TryParse(fileId, out var parsedFileTransferId)
-            && await FileTransferExistsAsync(parsedFileTransferId, cancellationToken))
+        if (TusRouteHelper.TryGetFileTransferIdFromPath(requestPath, out var pathFileTransferId))
+        {
+            return pathFileTransferId;
+        }
+
+        if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
+        {
+            return mappedFileTransferId;
+        }
+
+        if (Guid.TryParse(fileId, out var parsedFileTransferId))
         {
             return parsedFileTransferId;
         }
@@ -718,13 +697,15 @@ public class TusStorageResolver(
         return null;
     }
 
-    private async Task<bool> FileTransferExistsAsync(Guid fileTransferId, CancellationToken cancellationToken)
-        => await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken) is not null;
-
     private async Task<TusStorageContext?> ResolveStorageContextForFileTransferAsync(
         Guid fileTransferId,
         CancellationToken cancellationToken)
     {
+        if (_storageContextsByFileTransferId.TryGetValue(fileTransferId, out var cachedContext))
+        {
+            return cachedContext;
+        }
+
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
@@ -756,7 +737,9 @@ public class TusStorageResolver(
             ? AzureBlobTusStoreAuthenticationMode.ConnectionString
             : AzureBlobTusStoreAuthenticationMode.SystemAssignedManagedIdentity;
 
-        return new TusStorageContext(connectionString, authenticationMode, storageProvider.ResourceName);
+        var context = new TusStorageContext(connectionString, authenticationMode, storageProvider.ResourceName);
+        _storageContextsByFileTransferId.TryAdd(fileTransferId, context);
+        return context;
     }
 
     private static string BuildBlockId(long blockIndex)
