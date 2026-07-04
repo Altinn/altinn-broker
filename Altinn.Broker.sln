@@ -21,7 +21,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Altinn.Broker.Application",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Altinn.Broker.API", "src\Altinn.Broker.API\Altinn.Broker.API.csproj", "{F438A504-54BD-4256-A4A5-705A8279534D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Altinn.Broker.Tests.LargeFile", "tests\Altinn.Broker.Tests.LargeFile\Altinn.Broker.Tests.LargeFile.csproj", "{B7FDAE82-214C-46D1-9342-7A64A1E1B26F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Altinn.Broker.Tests.LargeFile", "tests\tus\Altinn.Broker.Tests.LargeFile\Altinn.Broker.Tests.LargeFile.csproj", "{B7FDAE82-214C-46D1-9342-7A64A1E1B26F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Altinn.Broker.Common", "src\Altinn.Broker.Common\Altinn.Broker.Common.csproj", "{AFD5149F-6A79-47CA-AE68-5662239D1727}"
 EndProject
