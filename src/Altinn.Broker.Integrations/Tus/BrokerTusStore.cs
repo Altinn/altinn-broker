@@ -174,10 +174,22 @@ public class BrokerTusStore(
 
         if (!tusdotnetWillComplete)
         {
-            logger.LogWarning(
-                "TUS OnFileComplete may be skipped for file id {FileId}. tusdotnet requires StoreOffset to match StoreLength after PATCH and skips partial uploads. PatchNewOffset would be {PatchNewOffset} (Upload-Offset + chunk bytes).",
-                fileId,
-                acceptedOffset);
+            if (uploadConcat is FileConcatPartial)
+            {
+                logger.LogInformation(
+                    "TUS partial upload finished for file id {FileId}. OnFileComplete is not expected on partial PATCH; client must POST Upload-Concat final.",
+                    fileId);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "TUS OnFileComplete may be skipped for file id {FileId}. tusdotnet requires StoreOffset to match StoreLength after PATCH and skips partial uploads. PatchNewOffset={PatchNewOffset} StoreOffset={StoreOffset} StoreLength={StoreLength} UploadConcat={UploadConcat}",
+                    fileId,
+                    acceptedOffset,
+                    storeOffset,
+                    storeLength,
+                    DescribeUploadConcat(uploadConcat));
+            }
         }
     }
 
@@ -746,7 +758,9 @@ public class BrokerTusStore(
         }
 
         var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext is null || !TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+        if (httpContext is null
+            || !TusRouteHelper.IsPartialUploadPath(TusRouteHelper.GetRequestPath(httpContext))
+            || !TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
         {
             return;
         }
