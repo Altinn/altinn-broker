@@ -1,0 +1,23 @@
+meta {
+  name: Terminate upload
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{tus_upload_url}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Tus-Resumable: 1.0.0
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+docs {
+  Abort an **incomplete** TUS upload. Do not run after a successful PATCH — the upload is already finalized.
+}

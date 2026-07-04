@@ -1,0 +1,27 @@
+meta {
+  name: Head upload
+  type: http
+  seq: 3
+}
+
+head {
+  url: {{tus_upload_url}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Tus-Resumable: 1.0.0
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+script:post-response {
+  const offset = res.getHeader("upload-offset");
+  if (offset !== undefined && offset !== null) {
+    bru.setVar("upload_offset", offset);
+    console.log("Upload-Offset:", offset);
+  }
+}
