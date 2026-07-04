@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlparse
 
@@ -34,19 +35,12 @@ def _require_env(name: str) -> str:
 
 
 def _read_private_key_pem() -> str:
-    file_path = os.environ.get("CLIENT_SECRET_FILE") or os.environ.get("CLIENT_PEM_FILE")
-    if file_path:
-        with open(file_path, encoding="utf-8") as pem_file:
-            return pem_file.read()
+    file_path = _require_env("CLIENT_PEM_FILE")
+    resolved_path = Path(file_path).expanduser().resolve()
+    if not resolved_path.is_file():
+        raise RuntimeError(f"CLIENT_PEM_FILE does not exist or is not a file: {file_path}")
 
-    pem = os.environ.get("CLIENT_SECRET") or os.environ.get("CLIENT_PEM")
-    if not pem:
-        raise RuntimeError(
-            "Missing required environment variable: CLIENT_SECRET (Maskinporten private key PEM). "
-            "CLIENT_PEM is also accepted. Use CLIENT_SECRET_FILE for a PEM file path."
-        )
-
-    return pem.replace("\\n", "\n")
+    return resolved_path.read_text(encoding="utf-8")
 
 
 def _is_production_platform(base_url: str) -> bool:

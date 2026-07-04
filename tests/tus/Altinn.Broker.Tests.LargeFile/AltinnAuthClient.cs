@@ -201,23 +201,15 @@ public static class AltinnAuthClient
 
     private static string ReadPrivateKeyPem()
     {
-        var filePath = Environment.GetEnvironmentVariable("CLIENT_SECRET_FILE")
-            ?? Environment.GetEnvironmentVariable("CLIENT_PEM_FILE");
-        if (!string.IsNullOrWhiteSpace(filePath))
-        {
-            return File.ReadAllText(filePath);
-        }
-
-        var pem = Environment.GetEnvironmentVariable("CLIENT_SECRET")
-            ?? Environment.GetEnvironmentVariable("CLIENT_PEM");
-        if (string.IsNullOrWhiteSpace(pem))
+        var filePath = RequireEnv("CLIENT_PEM_FILE");
+        var resolvedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(filePath));
+        if (!File.Exists(resolvedPath))
         {
             throw new InvalidOperationException(
-                "Missing required environment variable: CLIENT_SECRET (Maskinporten private key PEM). " +
-                "CLIENT_PEM is also accepted. Use CLIENT_SECRET_FILE for a PEM file path.");
+                $"CLIENT_PEM_FILE does not exist or is not a file: {filePath}");
         }
 
-        return pem.Replace("\\n", "\n", StringComparison.Ordinal);
+        return File.ReadAllText(resolvedPath);
     }
 
     private static string ReadEnv(string name, string fallback)

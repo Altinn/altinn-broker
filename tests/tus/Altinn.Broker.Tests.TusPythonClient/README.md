@@ -6,7 +6,7 @@ Small Python harness that mirrors `Altinn.Broker.Tests.LargeFile`, but uses [tus
 
 - Python 3.10+
 - Git (required to install tus-py-client from GitHub; see note below)
-- Maskinporten client credentials (`CLIENT_ID`, `CLIENT_KID`, `CLIENT_SECRET`)
+- Maskinporten client credentials (`CLIENT_ID`, `CLIENT_KID`, `CLIENT_PEM_FILE`)
 - A [system user for your `ORG_NO`](https://docs.altinn.studio/en/authorization/getting-started/systemuser/) linked to that client
 
 ## Setup
@@ -15,7 +15,7 @@ Small Python harness that mirrors `Altinn.Broker.Tests.LargeFile`, but uses [tus
 cd tests/tus/Altinn.Broker.Tests.TusPythonClient
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 **Note:** Parallel upload concatenation is not in the current PyPI release of `tuspy` (1.1.0). This harness installs tus-py-client from the Git commit that added `parallel_uploads` support. When a newer PyPI release ships with that feature, you can switch `requirements.txt` to a normal `tuspy>=…` pin.
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 export BASE_URL="https://platform.tt02.altinn.no"
 export CLIENT_ID="your-maskinporten-client-id"
 export CLIENT_KID="your-key-id"
-export CLIENT_SECRET="$(cat /path/to/private-key.pem)"
+export CLIENT_PEM_FILE="/path/to/private-key.pem"
 export RESOURCE_ID="your-resource-id"
 export ORG_NO="your-org-number"
 
@@ -50,7 +50,7 @@ Set `UPLOAD_FILE_PATH` to upload an existing file instead. The file size is take
 $env:BASE_URL = "https://platform.tt02.altinn.no"
 $env:CLIENT_ID = "..."
 $env:CLIENT_KID = "..."
-$env:CLIENT_SECRET = Get-Content -Raw -Path "C:\path\to\private-key.pem"
+$env:CLIENT_PEM_FILE = "C:\path\to\private-key.pem"
 $env:RESOURCE_ID = "bruno-broker"
 $env:ORG_NO = "991825827"
 

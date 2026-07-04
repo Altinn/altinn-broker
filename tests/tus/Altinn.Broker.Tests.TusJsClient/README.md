@@ -5,7 +5,7 @@ Small Node.js harness that mirrors `Altinn.Broker.Tests.LargeFile`, but uses the
 ## Prerequisites
 
 - Node.js 20+
-- Maskinporten client credentials (`CLIENT_ID`, `CLIENT_KID`, `CLIENT_SECRET`)
+- Maskinporten client credentials (`CLIENT_ID`, `CLIENT_KID`, `CLIENT_PEM_FILE`)
 - A [system user for your `ORG_NO`](https://docs.altinn.studio/en/authorization/getting-started/systemuser/) linked to that client
 
 ## Setup
@@ -21,7 +21,7 @@ npm install
 export BASE_URL="https://platform.tt02.altinn.no"
 export CLIENT_ID="your-maskinporten-client-id"
 export CLIENT_KID="your-key-id"
-export CLIENT_SECRET="$(cat /path/to/private-key.pem)"
+export CLIENT_PEM_FILE="/path/to/private-key.pem"
 export RESOURCE_ID="your-resource-id"
 export ORG_NO="your-org-number"
 
@@ -45,7 +45,7 @@ Set `UPLOAD_FILE_PATH` to upload an existing file instead. The file size is take
 $env:BASE_URL = "https://platform.tt02.altinn.no"
 $env:CLIENT_ID = "..."
 $env:CLIENT_KID = "..."
-$env:CLIENT_SECRET = Get-Content -Raw -Path "C:\path\to\private-key.pem"
+$env:CLIENT_PEM_FILE = "C:\path\to\private-key.pem"
 $env:RESOURCE_ID = "bruno-broker"
 $env:ORG_NO = "991825827"
 

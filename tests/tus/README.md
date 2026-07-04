@@ -18,7 +18,7 @@ All three clients share the same environment variables and defaults:
 | --- | --- | --- |
 | `CLIENT_ID` | yes | — |
 | `CLIENT_KID` | yes | — |
-| `CLIENT_SECRET` | yes | — |
+| `CLIENT_PEM_FILE` | yes | — |
 | `RESOURCE_ID` | yes | — |
 | `ORG_NO` | yes | — |
 | `BASE_URL` | no | `https://platform.tt02.altinn.no` |
@@ -31,16 +31,13 @@ All three clients share the same environment variables and defaults:
 
 Clients authenticate like the Bruno requests in `.bruno/Authentication/`:
 
-1. Sign a short-lived JWT with `CLIENT_ID`, `CLIENT_KID`, `CLIENT_SECRET`, and `ORG_NO` (Maskinporten private key PEM)
+1. Sign a short-lived JWT with `CLIENT_ID`, `CLIENT_KID`, `CLIENT_PEM_FILE`, and `ORG_NO`
 2. Exchange it for a Maskinporten access token at `test.maskinporten.no/token` (or prod)
 3. Exchange that token for a 1-hour Altinn token at `{BASE_URL}/authentication/api/v1/exchange/maskinporten`
 
 `ORG_NO` is the organisation number for the system user tied to your `CLIENT_ID` (used in the Maskinporten JWT and as the file-transfer sender). You must [set up a system user for that organisation](https://docs.altinn.studio/en/authorization/getting-started/systemuser/) before running the clients.
 
-`CLIENT_SECRET` is the RSA private key PEM (same as Bruno's `client_pem`). Alternatives:
-
-- `CLIENT_PEM` — alias for `CLIENT_SECRET`
-- `CLIENT_SECRET_FILE` / `CLIENT_PEM_FILE` — path to a PEM file
+`CLIENT_PEM_FILE` is the path to your RSA private key PEM file (same key as Bruno's `client_pem`).
 
 Optional: `MASKINPORTEN_TOKEN_URL` (override token endpoint).
 

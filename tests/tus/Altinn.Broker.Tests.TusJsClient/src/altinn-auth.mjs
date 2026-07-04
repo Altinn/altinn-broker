@@ -1,5 +1,6 @@
 import { createSign } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const BROKER_WRITE_SCOPE = 'altinn:broker.write';
 
@@ -18,20 +19,13 @@ function requireEnv(name) {
 }
 
 function readPrivateKeyPem() {
-  const filePath = process.env.CLIENT_SECRET_FILE ?? process.env.CLIENT_PEM_FILE;
-  if (filePath) {
-    return readFileSync(filePath, 'utf8');
+  const filePath = requireEnv('CLIENT_PEM_FILE');
+  const resolvedPath = resolve(filePath);
+  if (!existsSync(resolvedPath)) {
+    throw new Error(`CLIENT_PEM_FILE does not exist or is not a file: ${filePath}`);
   }
 
-  const pem = process.env.CLIENT_SECRET ?? process.env.CLIENT_PEM;
-  if (!pem) {
-    throw new Error(
-      'Missing required environment variable: CLIENT_SECRET (Maskinporten private key PEM). ' +
-        'CLIENT_PEM is also accepted. Use CLIENT_SECRET_FILE for a PEM file path.',
-    );
-  }
-
-  return pem.replace(/\\n/g, '\n');
+  return readFileSync(resolvedPath, 'utf8');
 }
 
 function isProductionPlatform(baseUrl) {
