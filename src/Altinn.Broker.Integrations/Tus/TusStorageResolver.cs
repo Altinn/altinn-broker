@@ -28,7 +28,7 @@ public interface ITusStorageResolver
 {
     Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
     Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
-    Task StageTusBlockAsync(string fileId, string blockId, byte[] blockData, CancellationToken cancellationToken);
+    Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
     Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
@@ -117,9 +117,24 @@ public class TusStorageResolver(
         await appendBlobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
     }
 
-    public async Task StageTusBlockAsync(string fileId, string blockId, byte[] blockData, CancellationToken cancellationToken)
+    public async Task<long> StageTusBlockAsync(
+        string fileId,
+        string blockId,
+        Stream blockData,
+        CancellationToken cancellationToken)
     {
-        using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, blockData.Length);
+        int? expectedBytes = null;
+        if (blockData.CanSeek)
+        {
+            var remaining = blockData.Length - blockData.Position;
+            if (remaining is >= 0 and <= int.MaxValue)
+            {
+                expectedBytes = (int)remaining;
+            }
+        }
+
+        using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlock", fileId, expectedBytes);
+        var countingStream = new ByteCountingStream(blockData);
 
         var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
         if (storageContext is null)
@@ -129,12 +144,12 @@ public class TusStorageResolver(
 
         timing.Step("getBlockBlobClient");
         var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
-        await using var chunkStream = new MemoryStream(blockData, writable: false);
         await blockBlobClient.StageBlockAsync(
             blockId,
-            chunkStream,
+            countingStream,
             cancellationToken: cancellationToken);
-        timing.Step("azure.stageBlock", blockData.Length);
+        timing.Step("azure.stageBlock", countingStream.BytesRead);
+        return countingStream.BytesRead;
     }
 
     public async Task CommitTusBlocksAsync(

@@ -47,19 +47,7 @@ public class BrokerTusStore(
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
         timing.Step("getOrCreateUploadState");
 
-        using var chunkBuffer = new MemoryStream();
-        await stream.CopyToAsync(chunkBuffer, cancellationToken);
-        var chunk = chunkBuffer.ToArray();
-        timing.Step("readChunk", chunk.Length);
-        if (chunk.Length == 0)
-        {
-            return 0;
-        }
-
         string blockId;
-        long acceptedOffset;
-        bool isFinalChunk;
-
         lock (state.SyncRoot)
         {
             if (state.Fault is not null)
@@ -72,7 +60,16 @@ public class BrokerTusStore(
             state.PendingUploads++;
         }
 
-        await UploadBlockAsync(fileId, state, blockId, chunk, timing, cancellationToken);
+        timing.Step("assignBlock", blockId);
+        var bytesUploaded = await UploadBlockAsync(fileId, state, blockId, stream, timing, cancellationToken);
+        timing.Step("uploadBlock", bytesUploaded);
+        if (bytesUploaded == 0)
+        {
+            return 0;
+        }
+
+        long acceptedOffset;
+        bool isFinalChunk;
 
         lock (state.SyncRoot)
         {
@@ -93,7 +90,7 @@ public class BrokerTusStore(
             timing.Step("cleanupUploadState");
         }
 
-        return chunk.Length;
+        return bytesUploaded;
     }
 
     public async Task<bool> FileExistAsync(string fileId, CancellationToken cancellationToken)
@@ -762,23 +759,36 @@ public class BrokerTusStore(
         }
     }
 
-    private async Task UploadBlockAsync(
+    private async Task<long> UploadBlockAsync(
         string fileId,
         TusUploadState state,
         string blockId,
-        byte[] chunk,
+        Stream chunkStream,
         TusUploadDebugTiming? timing,
         CancellationToken cancellationToken)
     {
         await state.ConcurrentUploader.WaitAsync(cancellationToken);
-        timing?.Step("uploadBlock.semaphoreAcquired", chunk.Length);
+        timing?.Step("uploadBlock.semaphoreAcquired");
         try
         {
-            await storageResolver.StageTusBlockAsync(fileId, blockId, chunk, cancellationToken);
-            timing?.Step("uploadBlock.stageBlock", chunk.Length);
+            var bytesUploaded = await storageResolver.StageTusBlockAsync(
+                fileId,
+                blockId,
+                chunkStream,
+                cancellationToken);
+            timing?.Step("uploadBlock.stageBlock", bytesUploaded);
+
             lock (state.SyncRoot)
             {
-                state.CommittedOffset += chunk.Length;
+                if (bytesUploaded == 0)
+                {
+                    state.PendingUploads--;
+                    state.BlockIds.Remove(blockId);
+                    state.NextBlockIndex--;
+                    return 0;
+                }
+
+                state.CommittedOffset += bytesUploaded;
                 state.AcceptedOffset = state.CommittedOffset;
                 state.PendingUploads--;
                 var previousProgress = state.ProgressSignal;
@@ -787,6 +797,7 @@ public class BrokerTusStore(
             }
 
             timing?.Step("uploadBlock.updateState", state.CommittedOffset);
+            return bytesUploaded;
         }
         catch (Exception ex)
         {
