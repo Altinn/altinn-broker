@@ -245,10 +245,11 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
 
         try
         {
-            var stagingBlobClient = await blockStagingBlobClient.ExistsAsync(cancellationToken)
-                ? blockStagingBlobClient
-                : appendStagingBlobClient;
-            if (!await stagingBlobClient.ExistsAsync(cancellationToken))
+            var stagingBlobClient = await ResolveTusStagingBlobClientAsync(
+                blockStagingBlobClient,
+                appendStagingBlobClient,
+                cancellationToken);
+            if (stagingBlobClient is null)
             {
                 logger.LogError("TUS staging blob not found for {fileTransferId}", fileTransferEntity.FileTransferId);
                 return null;
@@ -313,6 +314,27 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             throw;
         }
     }
+
+    private static async Task<BlobClient?> ResolveTusStagingBlobClientAsync(
+        BlobClient blockStagingBlobClient,
+        BlobClient appendStagingBlobClient,
+        CancellationToken cancellationToken)
+    {
+        foreach (var candidate in new[] { blockStagingBlobClient, appendStagingBlobClient })
+        {
+            try
+            {
+                await candidate.GetPropertiesAsync(cancellationToken: cancellationToken);
+                return candidate;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 404)
+            {
+            }
+        }
+
+        return null;
+    }
+
         public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
     {
         try

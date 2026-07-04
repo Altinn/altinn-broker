@@ -260,7 +260,11 @@ public static class TusEndpointExtensions
 
     private static async Task OnFileCompleteAsync(FileCompleteContext context)
     {
-        if (!Guid.TryParse(context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             throw new TusStoreException("Invalid file transfer id");
         }
@@ -275,6 +279,9 @@ public static class TusEndpointExtensions
         {
             throw new TusStoreException(result.AsT1.Message);
         }
+
+        var store = context.HttpContext.RequestServices.GetRequiredService<BrokerTusStore>();
+        await store.CleanupCompletedUploadAsync(fileTransferId.ToString(), context.CancellationToken);
 
         var authorizationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
         await authorizationService.InvalidateAsync(fileTransferId, context.HttpContext.User, context.CancellationToken);
