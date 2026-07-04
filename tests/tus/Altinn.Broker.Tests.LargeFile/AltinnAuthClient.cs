@@ -197,8 +197,7 @@ public static class AltinnAuthClient
     }
 
     private static bool IsProductionPlatform(string baseUrl)
-        => baseUrl.Contains("platform.altinn.no", StringComparison.OrdinalIgnoreCase)
-            && !baseUrl.Contains("tt02", StringComparison.OrdinalIgnoreCase);
+        => baseUrl.Contains("platform.altinn.no", StringComparison.OrdinalIgnoreCase);
 
     private static string ReadPrivateKeyPem()
     {
