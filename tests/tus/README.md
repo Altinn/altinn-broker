@@ -27,7 +27,7 @@ All three clients share the same environment variables and defaults:
 | `GIGABYTES_TO_UPLOAD` | no | **64 MiB** smoke-test size when unset |
 | `UPLOAD_FILE_PATH` | no | — (use with `generate-file.ps1`; ignores `GIGABYTES_TO_UPLOAD`) |
 
-\* Provide `CLIENT_PEM_FILE` for local runs, or `CLIENT_PEM` with the PEM content inline (`.NET` LargeFile only — for Azure Container Apps and similar).
+\* Provide `CLIENT_PEM_FILE` for local runs, or `CLIENT_PEM` with the PEM file **base64-encoded** (`.NET` LargeFile only — for Azure Container Apps and similar).
 
 ### Authentication
 
@@ -39,7 +39,7 @@ Clients authenticate like the Bruno requests in `.bruno/Authentication/`:
 
 `ORG_NO` is the organisation number for the system user tied to your `CLIENT_ID` (used in the Maskinporten JWT and as the file-transfer sender). You must [set up a system user for that organisation](https://docs.altinn.studio/en/authorization/getting-started/systemuser/) before running the clients.
 
-`CLIENT_PEM_FILE` is the path to your RSA private key PEM file (same key as Bruno's `client_pem`). For the `.NET` LargeFile client in Azure Container Apps, set `CLIENT_PEM` to the PEM content directly instead (secret/env injection).
+`CLIENT_PEM_FILE` is the path to your RSA private key PEM file (same key as Bruno's `client_pem`). For the `.NET` LargeFile client in Azure Container Apps, set `CLIENT_PEM` to the **base64-encoded** PEM file content (secret/env injection). Encode with e.g. `base64 -w0 private-key.pem` or PowerShell: `[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content -Raw key.pem)))`.
 
 Optional: `MASKINPORTEN_TOKEN_URL` (override token endpoint).
 

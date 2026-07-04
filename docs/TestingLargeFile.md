@@ -22,13 +22,14 @@ docker run --rm \
   altinn-broker-largefile
 ```
 
-**Azure Container App** — inject the PEM as a secret/env var (`CLIENT_PEM`); no file mount required:
+**Azure Container App** — inject the base64-encoded PEM as a secret/env var (`CLIENT_PEM`); no file mount required:
 
 ```bash
+# Prepare once: base64 -w0 private-key.pem
 docker run --rm \
   -e CLIENT_ID=... \
   -e CLIENT_KID=... \
-  -e CLIENT_PEM="-----BEGIN PRIVATE KEY-----\n..." \
+  -e CLIENT_PEM=LS0tLS1CRUdJTi... \
   -e ORG_NO=... \
   -e RESOURCE_ID=... \
   -e BASE_URL=... \

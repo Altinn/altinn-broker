@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -201,17 +202,17 @@ public static class AltinnAuthClient
 
     private static string ReadPrivateKeyPem()
     {
-        var inlinePem = Environment.GetEnvironmentVariable("CLIENT_PEM");
-        if (!string.IsNullOrWhiteSpace(inlinePem))
+        var base64Pem = Environment.GetEnvironmentVariable("CLIENT_PEM");
+        if (!string.IsNullOrWhiteSpace(base64Pem))
         {
-            return inlinePem.Replace("\\n", "\n", StringComparison.Ordinal);
+            return DecodeBase64Pem(base64Pem);
         }
 
         var filePath = Environment.GetEnvironmentVariable("CLIENT_PEM_FILE");
         if (string.IsNullOrWhiteSpace(filePath))
         {
             throw new InvalidOperationException(
-                "Missing Maskinporten private key. Set CLIENT_PEM (inline PEM) or CLIENT_PEM_FILE (path to PEM file).");
+                "Missing Maskinporten private key. Set CLIENT_PEM (base64-encoded PEM) or CLIENT_PEM_FILE (path to PEM file).");
         }
 
         var resolvedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(filePath));
@@ -222,6 +223,20 @@ public static class AltinnAuthClient
         }
 
         return File.ReadAllText(resolvedPath);
+    }
+
+    private static string DecodeBase64Pem(string base64Pem)
+    {
+        try
+        {
+            var normalized = string.Concat(base64Pem.Where(static c => !char.IsWhiteSpace(c)));
+            return Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidOperationException(
+                "CLIENT_PEM must be the base64-encoded PEM file content.", ex);
+        }
     }
 
     private static string ReadEnv(string name, string fallback)
