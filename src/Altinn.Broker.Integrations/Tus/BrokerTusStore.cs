@@ -82,7 +82,7 @@ public class BrokerTusStore(
             await CleanupUploadState(fileId, cancellationToken);
         }
 
-        return chunkLength;
+        return chunk.Length;
     }
 
     public async Task<bool> FileExistAsync(string fileId, CancellationToken cancellationToken)
