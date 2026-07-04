@@ -318,6 +318,9 @@ public static class TusUploader
         int bytesRead,
         CancellationToken cancellationToken)
     {
+        HttpStatusCode? lastStatusCode = null;
+        string? lastResponseBody = null;
+
         for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
         {
             try
@@ -331,6 +334,7 @@ public static class TusUploader
                 request.Content = chunkContent;
 
                 using var response = await httpClient.SendAsync(request, cancellationToken);
+                lastStatusCode = response.StatusCode;
                 if (response.StatusCode == HttpStatusCode.NoContent)
                 {
                     return ParseUploadOffset(response.Headers);
@@ -344,9 +348,18 @@ public static class TusUploader
                         return serverOffset;
                     }
 
-                    offset = serverOffset;
+                    if (serverOffset < offset)
+                    {
+                        // Server has not caught up with the previous chunk yet (common with multi-replica).
+                        await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                        continue;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                     continue;
                 }
+
+                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken);
 
                 if (attempt == MaxPatchAttempts || !IsTransientStatusCode(response.StatusCode))
                 {
@@ -358,12 +371,20 @@ public static class TusUploader
             }
             catch (Exception ex) when (IsTransientRequestException(ex) && attempt < MaxPatchAttempts)
             {
+                lastResponseBody = ex.Message;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
             }
         }
 
-        throw new InvalidOperationException($"TUS PATCH at offset {offset} failed after {MaxPatchAttempts} attempts.");
+        var statusSuffix = lastStatusCode is null
+            ? string.Empty
+            : $" Last status: {(int)lastStatusCode.Value} {lastStatusCode.Value}.";
+        var bodySuffix = string.IsNullOrWhiteSpace(lastResponseBody)
+            ? string.Empty
+            : $" Response: {lastResponseBody}";
+        throw new InvalidOperationException(
+            $"TUS PATCH at offset {offset} failed after {MaxPatchAttempts} attempts.{statusSuffix}{bodySuffix}");
     }
 
     private static async Task<long> GetUploadOffsetAsync(
@@ -371,9 +392,23 @@ public static class TusUploader
         Uri uploadUri,
         CancellationToken cancellationToken)
     {
-        using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, uploadUri, cancellationToken);
-        await EnsureSuccessAsync(response, "TUS HEAD", requestUri: uploadUri);
-        return ParseUploadOffset(response.Headers);
+        for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
+        {
+            using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, uploadUri, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return ParseUploadOffset(response.Headers);
+            }
+
+            if (attempt == MaxPatchAttempts || !IsTransientStatusCode(response.StatusCode))
+            {
+                await EnsureSuccessAsync(response, "TUS HEAD", requestUri: uploadUri);
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+        }
+
+        throw new InvalidOperationException($"TUS HEAD failed for {uploadUri} after {MaxPatchAttempts} attempts.");
     }
 
     private static Task<HttpResponseMessage> SendTusRequestAsync(
@@ -507,7 +542,8 @@ public static class TusUploader
         => exception is HttpRequestException or IOException or TaskCanceledException;
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
-        => statusCode is HttpStatusCode.RequestTimeout
+        => statusCode is HttpStatusCode.NotFound
+            or HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
             or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway

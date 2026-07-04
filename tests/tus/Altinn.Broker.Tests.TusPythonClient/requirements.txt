@@ -1,0 +1,5 @@
+# Parallel upload concat is not in the PyPI release yet; pin the commit that added it.
+tuspy @ git+https://github.com/tus/tus-py-client.git@a9ad82282c51d590fc981de57c06b039145f872d
+requests>=2.18.4
+PyJWT>=2.8.0
+cryptography>=41.0.0
