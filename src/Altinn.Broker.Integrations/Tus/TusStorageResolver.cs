@@ -349,11 +349,36 @@ public class TusStorageResolver(
         return null;
     }
 
-    public Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
+    public async Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
     {
-        // Upload length is tracked in the partial upload registry and progress cache.
-        // The first Put Block creates staged content without a separate empty blob upload.
-        return Task.CompletedTask;
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        var blockBlobClient = GetBlockBlobClient(storageContext, fileId);
+        if (await blockBlobClient.ExistsAsync(cancellationToken))
+        {
+            await SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+            return;
+        }
+
+        await using var emptyStream = new MemoryStream();
+        await blockBlobClient.UploadAsync(
+            emptyStream,
+            new BlobUploadOptions
+            {
+                Metadata = new Dictionary<string, string>
+                {
+                    [AzureStorageConstants.TusUploadLengthMetadataKey] = uploadLength.ToString()
+                },
+                HttpHeaders = new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream"
+                }
+            },
+            cancellationToken);
     }
 
     public async Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)

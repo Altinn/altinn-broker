@@ -79,6 +79,7 @@ public class BrokerTusStore(
         {
             await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
             await FinalizeUploadAsync(fileId, state, cancellationToken);
+            await PersistProgressAsync(fileId, state, cancellationToken);
             await CleanupUploadState(fileId, cancellationToken);
         }
 
@@ -201,7 +202,7 @@ public class BrokerTusStore(
     public async Task<long> GetUploadOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
-        long offset;
+        var offset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
 
         if (uploadStateRegistry.TryGet(fileId, out var state))
         {
@@ -212,18 +213,14 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                offset = state.CommittedOffset;
-            }
-
-            var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-            if (cachedProgress is not null)
-            {
-                offset = Math.Max(offset, cachedProgress.CommittedOffset);
+                offset = Math.Max(offset, state.CommittedOffset);
             }
         }
-        else
+
+        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (cachedProgress is not null)
         {
-            offset = await GetDurableUploadOffsetAsync(fileId, cancellationToken);
+            offset = Math.Max(offset, cachedProgress.CommittedOffset);
         }
 
         await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
@@ -309,6 +306,9 @@ public class BrokerTusStore(
         foreach (var partialFileId in normalizedPartialFileIds)
         {
             await partialUploadRegistry.RemovePartialAsync(partialFileId, cancellationToken);
+            await uploadProgressCache.RemoveAsync(partialFileId, cancellationToken);
+            uploadStateRegistry.Remove(partialFileId);
+            _uploadLengths.TryRemove(partialFileId, out _);
         }
 
         return finalFileId;
@@ -594,6 +594,7 @@ public class BrokerTusStore(
         }
 
         await uploadProgressCache.SaveAsync(fileId, snapshot, cancellationToken);
+        await RefreshPartialRegistryAsync(fileId, snapshot.UploadLength, cancellationToken);
         await RecordUploadActivityAsync(fileId, cancellationToken);
     }
 
@@ -822,12 +823,14 @@ public class BrokerTusStore(
     private async Task CleanupUploadState(string fileId, CancellationToken cancellationToken)
     {
         uploadStateRegistry.Remove(fileId);
-        await uploadProgressCache.RemoveAsync(fileId, cancellationToken);
 
-        if (!await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
+        if (await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
-            _uploadLengths.TryRemove(fileId, out _);
+            return;
         }
+
+        await uploadProgressCache.RemoveAsync(fileId, cancellationToken);
+        _uploadLengths.TryRemove(fileId, out _);
     }
 
     private async Task<bool> HasDurableUploadStateAsync(string fileId, CancellationToken cancellationToken)
