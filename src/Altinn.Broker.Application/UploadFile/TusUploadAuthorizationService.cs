@@ -1,11 +1,10 @@
 using System.Diagnostics;
 using System.Security.Claims;
 
-using Altinn.Broker.Application;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Services;
 
-using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +19,7 @@ public enum TusUploadAuthIntent
 }
 
 public class TusUploadAuthorizationService(
-    HybridCache cache,
+    IDistributedCache distributedCache,
     ITusUploadActivityCache uploadActivityCache,
     TusUploadValidationService validationService,
     IConfiguration configuration,
@@ -83,7 +82,7 @@ public class TusUploadAuthorizationService(
 
         if (uploadError is null && intent is TusUploadAuthIntent.Delete && hasCacheKey)
         {
-            await cache.RemoveAsync(cacheKey, cancellationToken);
+            await distributedCache.RemoveAsync(cacheKey, cancellationToken);
             timing?.Step("removeSessionCache");
         }
 
@@ -107,7 +106,7 @@ public class TusUploadAuthorizationService(
             return Task.CompletedTask;
         }
 
-        return cache.RemoveKeyAsync(cacheKey, cancellationToken);
+        return distributedCache.RemoveAsync(cacheKey, cancellationToken);
     }
 
     private async Task<(bool Handled, Error? Error)> TryAuthorizeActiveUploadAsync(
@@ -116,13 +115,10 @@ public class TusUploadAuthorizationService(
         CancellationToken cancellationToken,
         TusAuthDebugTiming? timing = null)
     {
-        if (!TryBuildCacheKey(fileTransferId, user, out var cacheKey))
-        {
-            timing?.Step("activeUpload.noCacheKey");
-            return (false, null);
-        }
+        var hasCacheKey = TryBuildCacheKey(fileTransferId, user, out var cacheKey);
 
-        if (await cache.GetOptionalStringAsync(cacheKey, cancellationToken: cancellationToken) == CacheValue)
+        if (hasCacheKey
+            && await distributedCache.GetStringAsync(cacheKey, cancellationToken) == CacheValue)
         {
             timing?.Step("activeUpload.sessionCacheHit");
             await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
@@ -132,7 +128,7 @@ public class TusUploadAuthorizationService(
             return (true, inProgressError);
         }
 
-        timing?.Step("activeUpload.sessionCacheMiss");
+        timing?.Step(hasCacheKey ? "activeUpload.sessionCacheMiss" : "activeUpload.noCacheKey");
 
         if (!await uploadActivityCache.HasRecentActivityAsync(fileTransferId, GetCacheExpiration(), cancellationToken))
         {
@@ -152,8 +148,12 @@ public class TusUploadAuthorizationService(
             return (false, null);
         }
 
-        await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
-        timing?.Step("activeUpload.refreshSessionCache");
+        if (hasCacheKey)
+        {
+            await RefreshUploadSessionCacheAsync(cacheKey, cancellationToken);
+            timing?.Step("activeUpload.refreshSessionCache");
+        }
+
         var uploadInProgressError = await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
         timing?.Step("activeUpload.validateInProgress", uploadInProgressError is null ? "ok" : "error");
         return (true, uploadInProgressError);
@@ -178,13 +178,12 @@ public class TusUploadAuthorizationService(
     private Task RefreshUploadSessionCacheAsync(string cacheKey, CancellationToken cancellationToken)
     {
         var expiration = GetCacheExpiration();
-        return cache.SetStringAsync(
+        return distributedCache.SetStringAsync(
             cacheKey,
             CacheValue,
-            new HybridCacheEntryOptions
+            new DistributedCacheEntryOptions
             {
-                Expiration = expiration,
-                LocalCacheExpiration = expiration
+                AbsoluteExpirationRelativeToNow = expiration
             },
             cancellationToken);
     }

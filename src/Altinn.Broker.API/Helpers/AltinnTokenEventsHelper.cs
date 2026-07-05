@@ -24,7 +24,6 @@ public class AltinnTokenEventsHelper
 
         var principal = await sessionHelper.TryValidateExpiredTokenForActiveUploadAsync(
             context.HttpContext,
-            context.Scheme.Name,
             context.HttpContext.RequestAborted);
         if (principal is null)
         {

@@ -122,6 +122,7 @@ public class BrokerTusStore(
         timing.Step("assignBlock", blockId);
         _ = Task.Run(() => UploadBlockAsync(fileId, state, blockId, chunk));
         timing.Step("uploadBlock.scheduled", chunkLength);
+        await RecordUploadActivityAsync(fileId, cancellationToken);
 
         if (isFinalChunk)
         {

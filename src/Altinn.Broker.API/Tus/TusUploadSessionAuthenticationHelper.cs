@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Integrations.Tus;
 
@@ -22,7 +23,6 @@ public sealed class TusUploadSessionAuthenticationHelper(
 {
     public async Task<ClaimsPrincipal?> TryValidateExpiredTokenForActiveUploadAsync(
         HttpContext httpContext,
-        string authenticationScheme,
         CancellationToken cancellationToken)
     {
         if (!IsTusUploadDataRequest(httpContext.Request))
@@ -36,7 +36,7 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return null;
         }
 
-        var principal = ValidateTokenWithoutLifetime(authenticationScheme, token);
+        var principal = ValidateTokenWithoutLifetime(token);
         if (principal is null)
         {
             return null;
@@ -85,21 +85,30 @@ public sealed class TusUploadSessionAuthenticationHelper(
         return headerValue[bearerPrefix.Length..].Trim();
     }
 
-    private ClaimsPrincipal? ValidateTokenWithoutLifetime(string authenticationScheme, string token)
+    private ClaimsPrincipal? ValidateTokenWithoutLifetime(string token)
     {
-        var jwtOptions = jwtOptionsMonitor.Get(authenticationScheme);
-        var validationParameters = jwtOptions.TokenValidationParameters.Clone();
-        validationParameters.ValidateLifetime = false;
-
         var handler = new JwtSecurityTokenHandler();
-        try
+        foreach (var authenticationScheme in new[]
+                 {
+                     JwtBearerDefaults.AuthenticationScheme,
+                     AuthorizationConstants.LegacyAndMaskinporten
+                 })
         {
-            return handler.ValidateToken(token, validationParameters, out _);
+            var jwtOptions = jwtOptionsMonitor.Get(authenticationScheme);
+            var validationParameters = jwtOptions.TokenValidationParameters.Clone();
+            validationParameters.ValidateLifetime = false;
+
+            try
+            {
+                return handler.ValidateToken(token, validationParameters, out _);
+            }
+            catch (SecurityTokenException)
+            {
+                // Try the other JWT scheme (Altinn vs Maskinporten).
+            }
         }
-        catch (SecurityTokenException)
-        {
-            return null;
-        }
+
+        return null;
     }
 
     private async Task<Guid?> TryResolveFileTransferIdAsync(HttpContext httpContext, CancellationToken cancellationToken)

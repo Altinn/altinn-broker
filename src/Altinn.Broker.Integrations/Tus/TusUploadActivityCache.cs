@@ -1,23 +1,21 @@
-using Altinn.Broker.Application;
 using Altinn.Broker.Core.Services;
 
-using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Altinn.Broker.Integrations.Tus;
 
-public sealed class TusUploadActivityCache(HybridCache cache) : ITusUploadActivityCache
+public sealed class TusUploadActivityCache(IDistributedCache distributedCache) : ITusUploadActivityCache
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(25);
-    private static readonly HybridCacheEntryOptions CacheOptions = new()
+    private static readonly DistributedCacheEntryOptions CacheOptions = new()
     {
-        Expiration = CacheExpiration,
-        Flags = HybridCacheEntryFlags.DisableLocalCache
+        AbsoluteExpirationRelativeToNow = CacheExpiration
     };
 
     private static string BuildKey(Guid fileTransferId) => $"tus-upload-activity:{fileTransferId:D}";
 
     public Task RecordActivityAsync(Guid fileTransferId, CancellationToken cancellationToken = default)
-        => cache.SetStringAsync(
+        => distributedCache.SetStringAsync(
             BuildKey(fileTransferId),
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(),
             CacheOptions,
@@ -28,7 +26,7 @@ public sealed class TusUploadActivityCache(HybridCache cache) : ITusUploadActivi
         TimeSpan window,
         CancellationToken cancellationToken = default)
     {
-        var value = await cache.GetOptionalStringAsync(BuildKey(fileTransferId), CacheOptions, cancellationToken);
+        var value = await distributedCache.GetStringAsync(BuildKey(fileTransferId), cancellationToken);
         if (!long.TryParse(value, out var lastActivityMs))
         {
             return false;
