@@ -40,7 +40,7 @@ public class TusUploadAuthorizationService(
 
         if (intent is TusUploadAuthIntent.GetInfo or TusUploadAuthIntent.WriteChunk)
         {
-            var (handled, activeUploadError) = await TryAuthorizeActiveUploadAsync(
+            var (handled, activeUploadError, _) = await TryAuthorizeActiveUploadAsync(
                 user,
                 fileTransferId,
                 cancellationToken,
@@ -95,8 +95,31 @@ public class TusUploadAuthorizationService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var (handled, error) = await TryAuthorizeActiveUploadAsync(user, fileTransferId, cancellationToken);
-        return handled && error is null;
+        var (isActive, _) = await EvaluateActiveUploadSessionAsync(fileTransferId, user, cancellationToken);
+        return isActive;
+    }
+
+    public async Task<(bool IsActive, string? InactiveReason)> EvaluateActiveUploadSessionAsync(
+        Guid fileTransferId,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken)
+    {
+        var (handled, error, inactiveReason) = await TryAuthorizeActiveUploadAsync(user, fileTransferId, cancellationToken);
+        if (!handled)
+        {
+            return (false, inactiveReason ?? "noActiveUploadSession");
+        }
+
+        if (error is not null)
+        {
+            logger.LogWarning(
+                "Active TUS upload session rejected. FileTransferId={FileTransferId} Reason={Reason}",
+                fileTransferId,
+                error.Message);
+            return (false, $"uploadNotInProgress:{error.Message}");
+        }
+
+        return (true, null);
     }
 
     public Task InvalidateAsync(Guid fileTransferId, ClaimsPrincipal user, CancellationToken cancellationToken)
@@ -109,7 +132,7 @@ public class TusUploadAuthorizationService(
         return distributedCache.RemoveAsync(cacheKey, cancellationToken);
     }
 
-    private async Task<(bool Handled, Error? Error)> TryAuthorizeActiveUploadAsync(
+    private async Task<(bool Handled, Error? Error, string? InactiveReason)> TryAuthorizeActiveUploadAsync(
         ClaimsPrincipal user,
         Guid fileTransferId,
         CancellationToken cancellationToken,
@@ -125,7 +148,7 @@ public class TusUploadAuthorizationService(
             timing?.Step("activeUpload.refreshSessionCache");
             var inProgressError = await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
             timing?.Step("activeUpload.validateInProgress", inProgressError is null ? "ok" : "error");
-            return (true, inProgressError);
+            return (true, inProgressError, null);
         }
 
         timing?.Step(hasCacheKey ? "activeUpload.sessionCacheMiss" : "activeUpload.noCacheKey");
@@ -133,7 +156,7 @@ public class TusUploadAuthorizationService(
         if (!await uploadActivityCache.HasRecentActivityAsync(fileTransferId, GetCacheExpiration(), cancellationToken))
         {
             timing?.Step("activeUpload.noRecentActivity");
-            return (false, null);
+            return (false, null, hasCacheKey ? "noRecentActivity" : "noSessionCacheKeyOrActivity");
         }
 
         timing?.Step("activeUpload.recentActivity");
@@ -145,7 +168,7 @@ public class TusUploadAuthorizationService(
         timing?.Step("activeUpload.validateSender", senderError is null ? "ok" : "error");
         if (senderError is not null)
         {
-            return (false, null);
+            return (false, null, "senderMismatch");
         }
 
         if (hasCacheKey)
@@ -156,13 +179,14 @@ public class TusUploadAuthorizationService(
 
         var uploadInProgressError = await validationService.ValidateUploadInProgressAsync(fileTransferId, cancellationToken);
         timing?.Step("activeUpload.validateInProgress", uploadInProgressError is null ? "ok" : "error");
-        return (true, uploadInProgressError);
+        return (true, uploadInProgressError, null);
     }
 
     private static bool TryBuildCacheKey(Guid fileTransferId, ClaimsPrincipal user, out string cacheKey)
     {
         var subject = user.FindFirst("sid")?.Value
-            ?? user.FindFirst("client_id")?.Value;
+            ?? user.FindFirst("client_id")?.Value
+            ?? user.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(subject))
         {

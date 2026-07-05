@@ -19,12 +19,14 @@ namespace Altinn.Broker.API.Tus;
 public sealed class TusUploadSessionAuthenticationHelper(
     IOptionsMonitor<JwtBearerOptions> jwtOptionsMonitor,
     ITusPartialUploadRegistry partialUploadRegistry,
-    TusUploadAuthorizationService tusUploadAuthorizationService)
+    TusUploadAuthorizationService tusUploadAuthorizationService,
+    ILogger<TusUploadSessionAuthenticationHelper> logger)
 {
     public async Task<ClaimsPrincipal?> TryValidateExpiredTokenForActiveUploadAsync(
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
         if (!IsTusUploadDataRequest(httpContext.Request))
         {
             return null;
@@ -33,32 +35,64 @@ public sealed class TusUploadSessionAuthenticationHelper(
         var token = ExtractBearerToken(httpContext.Request);
         if (string.IsNullOrWhiteSpace(token))
         {
+            LogRejection(httpContext, requestPath, "missingBearerToken", fileTransferId: null);
+            return null;
+        }
+
+        if (!IsExpiredToken(token))
+        {
             return null;
         }
 
         var principal = ValidateTokenWithoutLifetime(token);
         if (principal is null)
         {
+            LogRejection(httpContext, requestPath, "tokenValidationFailed", fileTransferId: null);
             return null;
         }
 
         var fileTransferId = await TryResolveFileTransferIdAsync(httpContext, cancellationToken);
         if (fileTransferId is null)
         {
+            LogRejection(httpContext, requestPath, "fileTransferIdNotResolved", fileTransferId: null);
             return null;
         }
 
-        var hasActiveSession = await tusUploadAuthorizationService.HasActiveUploadSessionAsync(
+        var (isActive, inactiveReason) = await tusUploadAuthorizationService.EvaluateActiveUploadSessionAsync(
             fileTransferId.Value,
             principal,
             cancellationToken);
-        return hasActiveSession ? principal : null;
+        if (!isActive)
+        {
+            LogRejection(
+                httpContext,
+                requestPath,
+                inactiveReason ?? "noActiveUploadSession",
+                fileTransferId);
+            return null;
+        }
+
+        var authenticatedPrincipal = new ClaimsPrincipal(
+            new ClaimsIdentity(principal.Claims, JwtBearerDefaults.AuthenticationScheme));
+
+        logger.LogInformation(
+            "Accepted expired bearer token for active TUS upload. Method={Method} Path={Path} FileTransferId={FileTransferId}",
+            httpContext.Request.Method,
+            requestPath,
+            fileTransferId);
+
+        return authenticatedPrincipal;
     }
 
     private static bool IsTusUploadDataRequest(HttpRequest request)
     {
         var path = TusRouteHelper.GetRequestPath(request.HttpContext);
-        if (path?.StartsWith(TusRouteHelper.TusMapPath, StringComparison.OrdinalIgnoreCase) != true)
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        if (!path.Contains("/filetransfer/upload/tus", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -83,6 +117,19 @@ public sealed class TusUploadSessionAuthenticationHelper(
         }
 
         return headerValue[bearerPrefix.Length..].Trim();
+    }
+
+    private static bool IsExpiredToken(string token)
+    {
+        try
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            return jwt.ValidTo < DateTime.UtcNow;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private ClaimsPrincipal? ValidateTokenWithoutLifetime(string token)
@@ -146,5 +193,24 @@ public sealed class TusUploadSessionAuthenticationHelper(
         }
 
         return null;
+    }
+
+    private void LogRejection(
+        HttpContext httpContext,
+        string? requestPath,
+        string reason,
+        Guid? fileTransferId)
+    {
+        if (!logger.IsEnabled(LogLevel.Warning))
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Rejected expired-token TUS session auth. Reason={Reason} Method={Method} Path={Path} FileTransferId={FileTransferId}",
+            reason,
+            httpContext.Request.Method,
+            requestPath,
+            fileTransferId);
     }
 }
