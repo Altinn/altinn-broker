@@ -172,9 +172,9 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (context.Intent == IntentType.GetFileInfo)
+        if (context.Intent is IntentType.GetFileInfo or IntentType.WriteFile)
         {
-            await TryRecoverCompletedTusUploadAsync(
+            await TryEnqueueFinalizeIfNeededAsync(
                 context.HttpContext,
                 fileTransferId,
                 context.FileId,
@@ -183,10 +183,10 @@ public static class TusEndpointExtensions
     }
 
     /// <summary>
-    /// When staging holds the full file but OnFileComplete did not run (e.g. client missed the 204),
-    /// complete the file transfer on HEAD so clients can detect Published status.
+    /// When all bytes are accepted but publish did not run (e.g. client timed out on the final PATCH),
+    /// enqueue background finalization so HEAD/PATCH recovery can complete the transfer.
     /// </summary>
-    private static async Task TryRecoverCompletedTusUploadAsync(
+    private static async Task TryEnqueueFinalizeIfNeededAsync(
         HttpContext httpContext,
         Guid fileTransferId,
         string? tusFileId,
@@ -208,49 +208,19 @@ public static class TusEndpointExtensions
             return;
         }
 
-        var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
-        var uploadLength = await store.GetUploadLengthAsync(tusFileId, cancellationToken);
-        if (uploadLength is null or <= 0)
-        {
-            return;
-        }
-
-        var uploadOffset = await store.GetUploadOffsetAsync(tusFileId, cancellationToken);
-        if (uploadOffset < uploadLength.Value)
-        {
-            return;
-        }
-
-        if (await store.GetUploadConcatAsync(tusFileId, cancellationToken) is FileConcatPartial)
+        var finalizationService = httpContext.RequestServices.GetRequiredService<ITusUploadFinalizationService>();
+        if (!await finalizationService.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken))
         {
             return;
         }
 
         logger.LogInformation(
-            "Recovering TUS completion for file transfer {FileTransferId}. UploadOffset={UploadOffset} UploadLength={UploadLength}",
+            "Enqueueing TUS finalize job for file transfer {FileTransferId}. TusFileId={TusFileId}",
             fileTransferId,
-            uploadOffset,
-            uploadLength.Value);
+            tusFileId);
 
-        var tusUploadCompleteHandler = httpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
-        var result = await tusUploadCompleteHandler.Process(
-            fileTransferId,
-            httpContext.User,
-            cancellationToken);
-
-        if (result.IsT1)
-        {
-            logger.LogWarning(
-                "TUS completion recovery failed for file transfer {FileTransferId}: {ErrorMessage}",
-                fileTransferId,
-                result.AsT1.Message);
-            return;
-        }
-
-        await store.CleanupCompletedUploadAsync(fileTransferId.ToString(), cancellationToken);
-
-        var authorizationService = httpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
-        await authorizationService.InvalidateAsync(fileTransferId, httpContext.User, cancellationToken);
+        var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
+        enqueuer.Enqueue(fileTransferId, tusFileId);
     }
 
     private static async Task OnBeforeCreateAsync(BeforeCreateContext context)
@@ -362,34 +332,12 @@ public static class TusEndpointExtensions
         }
 
         logger.LogInformation(
-            "TUS OnFileComplete resolved file transfer {FileTransferId} from tus file id {TusFileId}",
+            "TUS OnFileComplete resolved file transfer {FileTransferId} from tus file id {TusFileId}. Enqueueing finalize job.",
             fileTransferId,
             context.FileId);
 
-        var tusUploadCompleteHandler = context.HttpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
-        var result = await tusUploadCompleteHandler.Process(
-            fileTransferId,
-            context.HttpContext.User,
-            context.CancellationToken);
-
-        if (result.IsT1)
-        {
-            logger.LogError(
-                "TUS OnFileComplete handler failed for file transfer {FileTransferId}: {ErrorMessage}",
-                fileTransferId,
-                result.AsT1.Message);
-            throw new TusStoreException(result.AsT1.Message);
-        }
-
-        logger.LogInformation(
-            "TUS OnFileComplete handler succeeded for file transfer {FileTransferId}. Cleaning up tus store state.",
-            fileTransferId);
-
-        var store = context.HttpContext.RequestServices.GetRequiredService<BrokerTusStore>();
-        await store.CleanupCompletedUploadAsync(fileTransferId.ToString(), context.CancellationToken);
-
-        var authorizationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
-        await authorizationService.InvalidateAsync(fileTransferId, context.HttpContext.User, context.CancellationToken);
+        var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
+        enqueuer.Enqueue(fileTransferId, context.FileId);
     }
 
     private static TusUploadAuthIntent MapAuthIntent(IntentType intent) => intent switch

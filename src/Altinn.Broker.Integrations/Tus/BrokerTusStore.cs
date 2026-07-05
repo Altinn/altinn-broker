@@ -134,12 +134,17 @@ public class BrokerTusStore(
                 acceptedOffset,
                 state.UploadLength);
 
-            await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
-            timing.Step("waitForCommittedOffset");
-            await FinalizeUploadAsync(fileId, state, cancellationToken);
-            timing.Step("finalizeUpload");
-            await RunProgressSideEffectsAsync(fileId, state.UploadLength, cancellationToken);
-            timing.Step("persist.sideEffects");
+            var isPartial = await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken);
+            if (isPartial)
+            {
+                await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
+                timing.Step("waitForCommittedOffset");
+                await FinalizeUploadAsync(fileId, state, cancellationToken);
+                timing.Step("finalizeUpload");
+                await RunProgressSideEffectsAsync(fileId, state.UploadLength, cancellationToken);
+                timing.Step("persist.sideEffects");
+            }
+
             await LogUploadCompletionProbeAsync(fileId, acceptedOffset, chunkLength, cancellationToken);
         }
 
@@ -877,6 +882,35 @@ public class BrokerTusStore(
         }
     }
 
+    private async Task WaitForDurableCommittedOffsetAsync(
+        string fileId,
+        long uploadLength,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.AddHours(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+            if (progress is not null && progress.CommittedOffset >= uploadLength)
+            {
+                return;
+            }
+
+            var committedStagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            if (committedStagingLength >= uploadLength)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+
+        throw new TusStoreException(
+            $"Timed out waiting for TUS blocks to stage for file id {fileId}. Expected {uploadLength} bytes.");
+    }
+
     private async Task FinalizeUploadAsync(string fileId, TusUploadState state, CancellationToken cancellationToken)
     {
         lock (state.SyncRoot)
@@ -941,6 +975,76 @@ public class BrokerTusStore(
             uploadLength);
 
         await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
+        await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+    }
+
+    public async Task<bool> IsReadyForTransferCompletionAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
+        if (await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
+        {
+            return false;
+        }
+
+        if (await GetUploadConcatAsync(fileId, cancellationToken) is FileConcatPartial)
+        {
+            return false;
+        }
+
+        var uploadLength = await GetUploadLengthAsync(fileId, cancellationToken);
+        if (uploadLength is null or <= 0)
+        {
+            return false;
+        }
+
+        var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (progress is not null)
+        {
+            return progress.AcceptedOffset >= uploadLength.Value;
+        }
+
+        var committedStagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        return committedStagingLength >= uploadLength.Value;
+    }
+
+    public async Task FinalizeStagingFromDurableStateAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
+        var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+        await WaitForDurableCommittedOffsetAsync(fileId, uploadLength, cancellationToken);
+
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (committedLength >= uploadLength)
+        {
+            logger.LogInformation(
+                "TUS staging already committed for file id {FileId}. CommittedLength={CommittedLength} UploadLength={UploadLength}",
+                fileId,
+                committedLength,
+                uploadLength);
+            await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+            return;
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
+        if (stagedSnapshot is not { BlockIds.Count: > 0 })
+        {
+            throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
+        }
+
+        if (stagedSnapshot.TotalLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Cannot finalize TUS upload for file id {fileId}. Staged {stagedSnapshot.TotalLength} bytes, expected {uploadLength}.");
+        }
+
+        logger.LogInformation(
+            "TUS committing staged blocks for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
+            fileId,
+            stagedSnapshot.BlockIds.Count,
+            stagedSnapshot.TotalLength,
+            uploadLength);
+
+        await storageResolver.CommitTusBlocksAsync(fileId, stagedSnapshot.BlockIds, cancellationToken);
         await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
     }
 

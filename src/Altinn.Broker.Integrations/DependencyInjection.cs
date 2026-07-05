@@ -1,6 +1,7 @@
 ﻿using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.ApiClients.Maskinporten.Extensions;
 using Altinn.ApiClients.Maskinporten.Services;
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -122,5 +123,6 @@ public static class DependencyInjection
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
+        services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
     }
 }
