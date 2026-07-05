@@ -339,12 +339,24 @@ public class TusStorageResolver(
         try
         {
             var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(blockId));
-            return long.TryParse(decoded, out var index) ? index : null;
+            if (long.TryParse(decoded, out var index))
+            {
+                return index;
+            }
+
+            if (decoded.Length == 12
+                && int.TryParse(decoded[..6], out var partialIndex)
+                && int.TryParse(decoded[6..], out var chunkIndex))
+            {
+                return (partialIndex * 1_000_000L) + chunkIndex;
+            }
         }
         catch (FormatException)
         {
             return null;
         }
+
+        return null;
     }
 
     public async Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken)

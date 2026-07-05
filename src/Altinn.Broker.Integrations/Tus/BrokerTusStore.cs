@@ -924,17 +924,6 @@ public class BrokerTusStore(
     {
         while (true)
         {
-            var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
-            if (progress?.CommittedOffset >= targetOffset)
-            {
-                lock (state.SyncRoot)
-                {
-                    state.CommittedOffset = Math.Max(state.CommittedOffset, progress.CommittedOffset);
-                }
-
-                return;
-            }
-
             Task waitTask;
             lock (state.SyncRoot)
             {
@@ -943,7 +932,7 @@ public class BrokerTusStore(
                     throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
                 }
 
-                if (state.CommittedOffset >= targetOffset)
+                if (state.CommittedOffset >= targetOffset && state.PendingUploads == 0)
                 {
                     return;
                 }
@@ -984,25 +973,41 @@ public class BrokerTusStore(
         }
 
         var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
-        if (stagedSnapshot is null || stagedSnapshot.BlockIds.Count == 0)
+        IReadOnlyList<string> blockIds;
+        long stagedTotalLength;
+        if (stagedSnapshot is { BlockIds.Count: > 0 })
         {
-            throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
+            blockIds = stagedSnapshot.BlockIds;
+            stagedTotalLength = stagedSnapshot.TotalLength;
+        }
+        else
+        {
+            lock (state.SyncRoot)
+            {
+                if (state.BlockIds.Count == 0)
+                {
+                    throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
+                }
+
+                blockIds = state.BlockIds.ToList();
+                stagedTotalLength = state.CommittedOffset;
+            }
         }
 
-        if (stagedSnapshot.TotalLength != uploadLength)
+        if (stagedTotalLength != uploadLength)
         {
             throw new TusStoreException(
-                $"Cannot finalize TUS upload for file id {fileId}. Staged {stagedSnapshot.TotalLength} bytes, expected {uploadLength}.");
+                $"Cannot finalize TUS upload for file id {fileId}. Staged {stagedTotalLength} bytes, expected {uploadLength}.");
         }
 
         logger.LogInformation(
             "TUS committing staged blocks for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
             fileId,
-            stagedSnapshot.BlockIds.Count,
-            stagedSnapshot.TotalLength,
+            blockIds.Count,
+            stagedTotalLength,
             uploadLength);
 
-        await storageResolver.CommitTusBlocksAsync(fileId, stagedSnapshot.BlockIds, cancellationToken);
+        await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
         await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
     }
 
