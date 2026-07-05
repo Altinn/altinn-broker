@@ -333,7 +333,17 @@ public sealed class TusUploadProgressCache(
         CancellationToken cancellationToken)
     {
         var key = BuildHashKey(fileId);
-        await _database!.HashIncrementAsync(key, CommittedOffsetField, chunkLength);
+        if (!await _database!.KeyExistsAsync(key))
+        {
+            return;
+        }
+
+        if (!await _database.HashExistsAsync(key, UploadLengthField))
+        {
+            return;
+        }
+
+        await _database.HashIncrementAsync(key, CommittedOffsetField, chunkLength);
         await _database.KeyExpireAsync(key, CacheExpiration);
     }
 
@@ -351,11 +361,11 @@ public sealed class TusUploadProgressCache(
         {
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
-            var snapshot = new TusUploadProgressSnapshot(
-                root.GetProperty("UploadLength").GetInt64(),
-                root.TryGetProperty("AcceptedOffset", out var accepted) ? accepted.GetInt64() : root.GetProperty("CommittedOffset").GetInt64(),
-                root.GetProperty("CommittedOffset").GetInt64(),
-                root.TryGetProperty("NextBlockIndex", out var nextBlockIndex) ? nextBlockIndex.GetInt64() : 0);
+            if (!TryParseLegacySnapshot(root, out var snapshot))
+            {
+                logger.LogWarning("Failed to migrate legacy TUS progress snapshot for file id {FileId}", fileId);
+                return null;
+            }
 
             await WriteHashAsync(fileId, snapshot, cancellationToken);
             await hybridCache.RemoveAsync(BuildLegacyKey(fileId), cancellationToken);
@@ -366,6 +376,45 @@ public sealed class TusUploadProgressCache(
             logger.LogWarning(ex, "Failed to migrate legacy TUS progress snapshot for file id {FileId}", fileId);
             return null;
         }
+    }
+
+    private static bool TryParseLegacySnapshot(JsonElement root, out TusUploadProgressSnapshot snapshot)
+    {
+        snapshot = default!;
+        if (!root.TryGetProperty("UploadLength", out var uploadLengthElement)
+            || !uploadLengthElement.TryGetInt64(out var uploadLength))
+        {
+            return false;
+        }
+
+        if (!root.TryGetProperty("CommittedOffset", out var committedOffsetElement)
+            || !committedOffsetElement.TryGetInt64(out var committedOffset))
+        {
+            return false;
+        }
+
+        long acceptedOffset;
+        if (root.TryGetProperty("AcceptedOffset", out var acceptedOffsetElement))
+        {
+            if (!acceptedOffsetElement.TryGetInt64(out acceptedOffset))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            acceptedOffset = committedOffset;
+        }
+
+        var nextBlockIndex = 0L;
+        if (root.TryGetProperty("NextBlockIndex", out var nextBlockIndexElement)
+            && !nextBlockIndexElement.TryGetInt64(out nextBlockIndex))
+        {
+            return false;
+        }
+
+        snapshot = new TusUploadProgressSnapshot(uploadLength, acceptedOffset, committedOffset, nextBlockIndex);
+        return true;
     }
 
     private static TusAcceptChunkResult TryAcceptChunkInMemory(

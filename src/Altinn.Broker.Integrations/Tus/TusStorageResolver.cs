@@ -5,6 +5,7 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
 using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -535,18 +536,19 @@ public class TusStorageResolver(
         }
 
         var chunkCount = (int)((partialLength + MaxPutBlockFromUrlSize - 1) / MaxPutBlockFromUrlSize);
-        var sourceUri = GetReadableBlobUri(partialBlobClient);
+        var (sourceUri, sourceAuthentication) = await ResolveSourceBlobAccessAsync(partialBlobClient, cancellationToken);
         var blockIds = new List<string>(chunkCount);
         var offset = 0L;
 
         for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
             var chunkLength = Math.Min(MaxPutBlockFromUrlSize, partialLength - offset);
-            var blockId = BuildConcatBlockId(partialIndex, chunkIndex, chunkCount);
+            var blockId = BuildConcatBlockId(partialIndex, chunkIndex);
             await StagePartialChunkForConcatenationAsync(
                 finalBlobClient,
                 partialBlobClient,
                 sourceUri,
+                sourceAuthentication,
                 blockId,
                 offset,
                 chunkLength,
@@ -562,6 +564,7 @@ public class TusStorageResolver(
         BlockBlobClient finalBlobClient,
         BlockBlobClient partialBlobClient,
         Uri sourceUri,
+        HttpAuthorization? sourceAuthentication,
         string blockId,
         long sourceOffset,
         long chunkLength,
@@ -574,7 +577,8 @@ public class TusStorageResolver(
                 blockId,
                 new StageBlockFromUriOptions
                 {
-                    SourceRange = new HttpRange(sourceOffset, chunkLength)
+                    SourceRange = new HttpRange(sourceOffset, chunkLength),
+                    SourceAuthentication = sourceAuthentication
                 },
                 cancellationToken: cancellationToken);
         }
@@ -622,14 +626,37 @@ public class TusStorageResolver(
         await finalBlobClient.StageBlockAsync(blockId, chunkStream, cancellationToken: cancellationToken);
     }
 
-    private static Uri GetReadableBlobUri(BlockBlobClient blobClient)
+    private async Task<(Uri SourceUri, HttpAuthorization? SourceAuthentication)> ResolveSourceBlobAccessAsync(
+        BlockBlobClient blobClient,
+        CancellationToken cancellationToken)
     {
         if (blobClient.CanGenerateSasUri)
         {
-            return blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+            return (
+                blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1)),
+                null);
         }
 
-        return blobClient.Uri;
+        if (hostEnvironment.IsDevelopment())
+        {
+            return (blobClient.Uri, null);
+        }
+
+        var serviceClient = blobClient.GetParentBlobContainerClient().GetParentBlobServiceClient();
+        var startsOn = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
+        var userDelegationKey = await serviceClient.GetUserDelegationKeyAsync(startsOn, expiresOn, cancellationToken);
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = blobClient.BlobContainerName,
+            BlobName = blobClient.Name,
+            Resource = "b",
+            StartsOn = startsOn,
+            ExpiresOn = expiresOn
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        return (blobClient.GenerateUserDelegationSasUri(sasBuilder, userDelegationKey.Value), null);
     }
 
     public async Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken)
@@ -809,23 +836,11 @@ public class TusStorageResolver(
         return context;
     }
 
-    private static string BuildBlockId(long blockIndex)
-    {
-        var blockId = blockIndex.ToString("D12");
-        return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blockId));
-    }
-
     /// <summary>
-    /// Single-chunk partials keep the original per-partial block id. Multi-chunk partials encode
-    /// both partial and chunk indices so block ids stay unique across the final commit list.
+    /// Encodes both partial and chunk indices so block ids stay unique across the final commit list.
     /// </summary>
-    private static string BuildConcatBlockId(int partialIndex, int chunkIndex, int chunkCount)
+    private static string BuildConcatBlockId(int partialIndex, int chunkIndex)
     {
-        if (chunkCount == 1)
-        {
-            return BuildBlockId(partialIndex);
-        }
-
         var blockId = $"{partialIndex:D6}{chunkIndex:D6}";
         return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blockId));
     }

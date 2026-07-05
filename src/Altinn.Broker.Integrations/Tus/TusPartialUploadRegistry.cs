@@ -42,7 +42,7 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
     private static readonly HybridCacheEntryOptions CacheOptions = new()
     {
         Expiration = CacheExpiration,
-        LocalCacheExpiration = CacheExpiration
+        Flags = HybridCacheEntryFlags.DisableLocalCache
     };
 
     private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{NormalizeId(partialFileId)}";
