@@ -98,7 +98,8 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return false;
         }
 
-        return HttpMethods.IsPatch(request.Method)
+        return HttpMethods.IsPost(request.Method)
+            || HttpMethods.IsPatch(request.Method)
             || HttpMethods.IsHead(request.Method)
             || HttpMethods.IsDelete(request.Method);
     }
