@@ -12,6 +12,7 @@ public sealed class TusPartialPathRewriteMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context)
     {
         TryRewriteConcatPartialPath(context);
+        TusRouteHelper.TrySetFileTransferIdItemFromPartialPath(context);
         await next(context);
     }
 

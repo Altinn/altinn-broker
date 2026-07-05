@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 
 using Altinn.Broker.API.Configuration;
@@ -8,6 +9,7 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using tusdotnet;
@@ -65,20 +67,37 @@ public static class TusEndpointExtensions
         });
     }
 
-    private static bool TryResolveFileTransferId(HttpContext httpContext, string? tusFileId, out Guid fileTransferId)
+    private static async Task<(bool Resolved, Guid FileTransferId)> TryResolveFileTransferIdAsync(
+        HttpContext httpContext,
+        string? tusFileId,
+        CancellationToken cancellationToken)
     {
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
+
+        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
+        {
+            return (true, fileTransferId);
+        }
+
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        if (!string.IsNullOrEmpty(tusFileId) && partialUploadRegistry.TryGetFileTransferId(tusFileId, out fileTransferId))
+        var normalizedTusFileId = string.IsNullOrWhiteSpace(tusFileId)
+            ? tusFileId
+            : TusRouteHelper.NormalizePartialFileId(tusFileId);
+
+        if (!string.IsNullOrEmpty(normalizedTusFileId)
+            && await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedTusFileId, cancellationToken) is Guid mappedFileTransferId)
         {
-            return true;
+            return (true, mappedFileTransferId);
         }
 
-        if (TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out fileTransferId))
+        if (!TusRouteHelper.IsPartialUploadPath(requestPath)
+            && !string.IsNullOrEmpty(tusFileId)
+            && Guid.TryParse(tusFileId, out fileTransferId))
         {
-            return true;
+            return (true, fileTransferId);
         }
 
-        return Guid.TryParse(tusFileId, out fileTransferId);
+        return (false, default);
     }
 
     private static async Task OnAuthorizeAsync(AuthorizeContext context)
@@ -89,7 +108,50 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnAuthorize");
+        var sw = logger.IsEnabled(LogLevel.Debug) ? Stopwatch.StartNew() : null;
+        long checkpointMs = 0;
+        void LogStep(string step, object? detail = null)
+        {
+            if (sw is null)
+            {
+                return;
+            }
+
+            var totalMs = sw.ElapsedMilliseconds;
+            var stepMs = totalMs - checkpointMs;
+            checkpointMs = totalMs;
+            if (detail is null)
+            {
+                logger.LogDebug(
+                    "TUS timing OnAuthorize {Step} +{StepMs}ms total {TotalMs}ms intent={Intent} fileId={FileId}",
+                    step,
+                    stepMs,
+                    totalMs,
+                    context.Intent,
+                    context.FileId);
+                return;
+            }
+
+            logger.LogDebug(
+                "TUS timing OnAuthorize {Step} +{StepMs}ms total {TotalMs}ms intent={Intent} fileId={FileId} detail={Detail}",
+                step,
+                stepMs,
+                totalMs,
+                context.Intent,
+                context.FileId,
+                detail);
+        }
+
+        LogStep("started");
+
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        LogStep("resolveFileTransferId", resolved ? fileTransferId : "notFound");
+        if (!resolved)
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             return;
@@ -102,10 +164,21 @@ public static class TusEndpointExtensions
             MapAuthIntent(context.Intent),
             uploadLength: null,
             context.CancellationToken);
+        LogStep("authorize", error is null ? "ok" : "error");
 
         if (error is not null)
         {
             context.FailRequest(error.StatusCode, error.Message);
+            return;
+        }
+
+        if (context.Intent is IntentType.GetFileInfo or IntentType.WriteFile)
+        {
+            await TusFinalizeRecovery.TryEnqueueFinalizeIfNeededAsync(
+                context.HttpContext,
+                fileTransferId,
+                context.FileId,
+                context.CancellationToken);
         }
     }
 
@@ -114,7 +187,11 @@ public static class TusEndpointExtensions
         if (context.FileConcatenation is FileConcatFinal)
         {
             // TUS concatenation final requests must not include Upload-Length.
-            if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out _))
+            var (finalResolved, _) = await TryResolveFileTransferIdAsync(
+                context.HttpContext,
+                context.FileId,
+                context.CancellationToken);
+            if (!finalResolved)
             {
                 context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             }
@@ -128,7 +205,11 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
             return;
@@ -154,54 +235,86 @@ public static class TusEndpointExtensions
 
     private static async Task OnCreateCompleteAsync(CreateCompleteContext context)
     {
-        if (!TryResolveFileTransferId(context.HttpContext, context.FileId, out var fileTransferId))
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
             throw new TusStoreException("Invalid file transfer id");
         }
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
-        var uploadPath = partialUploadRegistry.IsPartial(context.FileId)
-            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{context.FileId}"
+        var partialFileId = TusRouteHelper.NormalizePartialFileId(context.FileId);
+        var uploadPath = await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken)
+            ? $"{TusMapPath}/{fileTransferId}/{PartialPathSegment}/{partialFileId}"
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 
-        if (partialUploadRegistry.IsPartial(context.FileId))
+        await MarkUploadStartedIfNeededAsync(
+            context.HttpContext,
+            fileTransferId,
+            context.CancellationToken);
+    }
+
+    private static async Task MarkUploadStartedIfNeededAsync(
+        HttpContext httpContext,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            throw new TusStoreException("Invalid file transfer id");
+        }
+
+        if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Initialized)
         {
             return;
         }
 
-        var fileTransferStatusRepository = context.HttpContext.RequestServices
+        var fileTransferStatusRepository = httpContext.RequestServices
             .GetRequiredService<IFileTransferStatusRepository>();
-        var uploaderVendor = context.HttpContext.User.GetCallerVendorId()?.WithPrefix();
+        var uploaderVendor = httpContext.User.GetCallerVendorId()?.WithPrefix();
 
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadStarted,
             timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
-            cancellationToken: context.CancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     private static async Task OnFileCompleteAsync(FileCompleteContext context)
     {
-        if (!Guid.TryParse(context.FileId, out var fileTransferId))
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnFileComplete");
+
+        logger.LogInformation(
+            "TUS OnFileComplete invoked for tus file id {TusFileId}. RequestPath={RequestPath}",
+            context.FileId,
+            TusRouteHelper.GetRequestPath(context.HttpContext));
+
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (!resolved)
         {
+            logger.LogError(
+                "TUS OnFileComplete could not resolve file transfer id for tus file id {TusFileId}",
+                context.FileId);
             throw new TusStoreException("Invalid file transfer id");
         }
 
-        var tusUploadCompleteHandler = context.HttpContext.RequestServices.GetRequiredService<TusUploadCompleteHandler>();
-        var result = await tusUploadCompleteHandler.Process(
+        logger.LogInformation(
+            "TUS OnFileComplete resolved file transfer {FileTransferId} from tus file id {TusFileId}. Enqueueing finalize job.",
             fileTransferId,
-            context.HttpContext.User,
-            context.CancellationToken);
+            context.FileId);
 
-        if (result.IsT1)
-        {
-            throw new TusStoreException(result.AsT1.Message);
-        }
-
-        var authorizationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadAuthorizationService>();
-        await authorizationService.InvalidateAsync(fileTransferId, context.HttpContext.User, context.CancellationToken);
+        var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
+        enqueuer.Enqueue(fileTransferId, context.FileId);
     }
 
     private static TusUploadAuthIntent MapAuthIntent(IntentType intent) => intent switch

@@ -24,9 +24,12 @@ public static class DependencyInjection
         services.AddScoped<InitializeFileTransferHandler>();
         services.AddScoped<UploadFileHandler>();
         services.AddScoped<CompleteFileUploadHandler>();
+        services.AddScoped<TusChecksumProcessingHandler>();
         services.AddScoped<TusUploadValidationService>();
         services.AddScoped<TusUploadAuthorizationService>();
         services.AddScoped<TusUploadCompleteHandler>();
+        services.AddScoped<TusFinalizeUploadHandler>();
+        services.AddSingleton<ITusFinalizeUploadEnqueuer, TusFinalizeUploadEnqueuer>();
         services.AddScoped<GetFileTransferOverviewHandler>();
         services.AddScoped<GetFileTransferDetailsHandler>();
         services.AddScoped<DownloadFileHandler>();

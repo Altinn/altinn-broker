@@ -5,8 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <DockerfileContext>..\..</DockerfileContext>
+    <DockerfileContext>..\..\..</DockerfileContext>
+    <DockerfileFile>Dockerfile</DockerfileFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="Dockerfile" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.14.2" />
     <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />
@@ -15,7 +19,7 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Altinn.Broker.API\Altinn.Broker.API.csproj" />
+    <ProjectReference Include="..\..\..\src\Altinn.Broker.API\Altinn.Broker.API.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

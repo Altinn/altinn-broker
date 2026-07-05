@@ -1,5 +1,10 @@
 {
   "version": "1",
   "name": "Altinn.Broker",
-  "type": "collection"
+  "type": "collection",
+  "scripts": {
+    "filesystemAccess": {
+      "allow": true
+    }
+  }
 }

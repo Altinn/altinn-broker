@@ -44,6 +44,10 @@ public class CompleteFileUploadHandler(
 
         if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
         {
+            logger.LogInformation(
+                "CompleteFileUpload skipped for file transfer {FileTransferId}: status already {CurrentStatus}",
+                request.FileTransferId,
+                fileTransfer.FileTransferStatusEntity.Status);
             return request.FileTransferId;
         }
 
@@ -66,7 +70,18 @@ public class CompleteFileUploadHandler(
         }
 
         var finishedUploadTimestamp = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(fileTransfer.Checksum)
+        var userProvidedChecksum = !string.IsNullOrWhiteSpace(fileTransfer.Checksum);
+        var requiresVirusScan = storageProvider.Type == StorageProviderType.Altinn3Azure;
+
+        logger.LogInformation(
+            "CompleteFileUpload processing file transfer {FileTransferId}. DeferChecksumValidation={DeferChecksumValidation} UserProvidedChecksum={UserProvidedChecksum} RequiresVirusScan={RequiresVirusScan}",
+            request.FileTransferId,
+            request.DeferChecksumValidation,
+            userProvidedChecksum,
+            requiresVirusScan);
+
+        if (!request.DeferChecksumValidation
+            && userProvidedChecksum
             && !string.Equals(request.Checksum, fileTransfer.Checksum, StringComparison.InvariantCultureIgnoreCase))
         {
             await fileTransferStatusRepository.InsertFileTransferStatus(
@@ -84,58 +99,114 @@ public class CompleteFileUploadHandler(
         {
             await TransactionWithRetriesPolicy.Execute<Task>(async ct =>
             {
-                if (storageProvider.Type == StorageProviderType.Altinn3Azure)
+                if (request.DeferChecksumValidation)
                 {
-                    await fileTransferStatusRepository.InsertFileTransferStatus(
-                        request.FileTransferId,
-                        FileTransferStatus.UploadProcessing,
-                        timestamp: finishedUploadTimestamp,
-                        cancellationToken: ct);
-                    backgroundJobClient.Enqueue(() => eventBus.Publish(
-                        AltinnEventType.UploadProcessing,
-                        fileTransfer.ResourceId,
-                        request.FileTransferId.ToString(),
-                        fileTransfer.Sender.ActorExternalId,
-                        Guid.NewGuid(),
-                        AltinnEventSubjectRole.Sender));
-                }
-                else if (storageProvider.Type == StorageProviderType.Altinn3AzureWithoutVirusScan
-                         && !generalSettings.Value.SimulateMalwareScan)
-                {
-                    await fileTransferStatusRepository.InsertFileTransferStatus(
-                        request.FileTransferId,
-                        FileTransferStatus.Published,
-                        timestamp: finishedUploadTimestamp,
-                        cancellationToken: ct);
-                    backgroundJobClient.Enqueue(() => eventBus.Publish(
-                        AltinnEventType.Published,
-                        fileTransfer.ResourceId,
-                        request.FileTransferId.ToString(),
-                        fileTransfer.Sender.ActorExternalId,
-                        Guid.NewGuid(),
-                        AltinnEventSubjectRole.Sender));
-                    foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                    if (userProvidedChecksum || requiresVirusScan)
                     {
+                        logger.LogInformation(
+                            "CompleteFileUpload setting status UploadProcessing for file transfer {FileTransferId} (defer checksum, virus scan or user checksum)",
+                            request.FileTransferId);
+                        await fileTransferStatusRepository.InsertFileTransferStatus(
+                            request.FileTransferId,
+                            FileTransferStatus.UploadProcessing,
+                            timestamp: finishedUploadTimestamp,
+                            cancellationToken: ct);
+                        backgroundJobClient.Enqueue(() => eventBus.Publish(
+                            AltinnEventType.UploadProcessing,
+                            fileTransfer.ResourceId,
+                            request.FileTransferId.ToString(),
+                            fileTransfer.Sender.ActorExternalId,
+                            Guid.NewGuid(),
+                            AltinnEventSubjectRole.Sender));
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "CompleteFileUpload setting status Published for file transfer {FileTransferId} (defer checksum, no virus scan)",
+                            request.FileTransferId);
+                        await fileTransferStatusRepository.InsertFileTransferStatus(
+                            request.FileTransferId,
+                            FileTransferStatus.Published,
+                            timestamp: finishedUploadTimestamp,
+                            cancellationToken: ct);
                         backgroundJobClient.Enqueue(() => eventBus.Publish(
                             AltinnEventType.Published,
                             fileTransfer.ResourceId,
                             request.FileTransferId.ToString(),
-                            recipient.Actor.ActorExternalId,
+                            fileTransfer.Sender.ActorExternalId,
                             Guid.NewGuid(),
-                            AltinnEventSubjectRole.Recipient));
+                            AltinnEventSubjectRole.Sender));
+                        foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                        {
+                            backgroundJobClient.Enqueue(() => eventBus.Publish(
+                                AltinnEventType.Published,
+                                fileTransfer.ResourceId,
+                                request.FileTransferId.ToString(),
+                                recipient.Actor.ActorExternalId,
+                                Guid.NewGuid(),
+                                AltinnEventSubjectRole.Recipient));
+                        }
                     }
+
+                    await fileTransferRepository.SetStorageDetails(
+                        request.FileTransferId,
+                        storageProvider.Id,
+                        request.FileTransferId.ToString(),
+                        request.UploadLength,
+                        ct);
+
+                    backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
+                        handler.Process(request.FileTransferId, CancellationToken.None));
                 }
-
-                await fileTransferRepository.SetStorageDetails(
-                    request.FileTransferId,
-                    storageProvider.Id,
-                    request.FileTransferId.ToString(),
-                    request.UploadLength,
-                    ct);
-
-                if (string.IsNullOrWhiteSpace(fileTransfer.Checksum))
+                else
                 {
-                    await fileTransferRepository.SetChecksum(request.FileTransferId, request.Checksum, ct);
+                    if (requiresVirusScan)
+                    {
+                        await fileTransferStatusRepository.InsertFileTransferStatus(
+                            request.FileTransferId,
+                            FileTransferStatus.UploadProcessing,
+                            timestamp: finishedUploadTimestamp,
+                            cancellationToken: ct);
+                        backgroundJobClient.Enqueue(() => eventBus.Publish(
+                            AltinnEventType.UploadProcessing,
+                            fileTransfer.ResourceId,
+                            request.FileTransferId.ToString(),
+                            fileTransfer.Sender.ActorExternalId,
+                            Guid.NewGuid(),
+                            AltinnEventSubjectRole.Sender));
+                    }
+                    else if (!generalSettings.Value.SimulateMalwareScan)
+                    {
+                        await fileTransferStatusRepository.InsertFileTransferStatus(
+                            request.FileTransferId,
+                            FileTransferStatus.Published,
+                            timestamp: finishedUploadTimestamp,
+                            cancellationToken: ct);
+                        backgroundJobClient.Enqueue(() => eventBus.Publish(
+                            AltinnEventType.Published,
+                            fileTransfer.ResourceId,
+                            request.FileTransferId.ToString(),
+                            fileTransfer.Sender.ActorExternalId,
+                            Guid.NewGuid(),
+                            AltinnEventSubjectRole.Sender));
+                        foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
+                        {
+                            backgroundJobClient.Enqueue(() => eventBus.Publish(
+                                AltinnEventType.Published,
+                                fileTransfer.ResourceId,
+                                request.FileTransferId.ToString(),
+                                recipient.Actor.ActorExternalId,
+                                Guid.NewGuid(),
+                                AltinnEventSubjectRole.Recipient));
+                        }
+                    }
+
+                    await fileTransferRepository.SetStorageDetails(
+                        request.FileTransferId,
+                        storageProvider.Id,
+                        request.FileTransferId.ToString(),
+                        request.UploadLength,
+                        ct);
                 }
 
                 return Task.CompletedTask;
@@ -166,7 +237,11 @@ public class CompleteFileUploadHandler(
             }, logger, cancellationToken);
         }
 
-        if (hostEnvironment.IsDevelopment() && generalSettings.Value.SimulateMalwareScan)
+        var simulateMalwareScanNow = hostEnvironment.IsDevelopment()
+            && generalSettings.Value.SimulateMalwareScan
+            && (!request.DeferChecksumValidation || !userProvidedChecksum);
+
+        if (simulateMalwareScanNow)
         {
             await SimulateMalwareScanResult(request.FileTransferId);
             backgroundJobClient.Enqueue(() => eventBus.Publish(
@@ -186,6 +261,14 @@ public class CompleteFileUploadHandler(
                     Guid.NewGuid(),
                     AltinnEventSubjectRole.Recipient));
             }
+        }
+
+        if (!request.DeferChecksumValidation
+            && !userProvidedChecksum
+            && !string.IsNullOrWhiteSpace(request.Checksum)
+            && (!requiresVirusScan || simulateMalwareScanNow))
+        {
+            await fileTransferRepository.SetChecksum(request.FileTransferId, request.Checksum!, cancellationToken);
         }
 
         return request.FileTransferId;

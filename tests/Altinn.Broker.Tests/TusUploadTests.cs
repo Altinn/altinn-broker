@@ -112,6 +112,12 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var uploadPath = uploadUrl.IsAbsoluteUri ? uploadUrl.AbsolutePath : uploadUrl.ToString();
         Assert.Contains($"/{fileTransferId}/partial/", uploadPath, StringComparison.OrdinalIgnoreCase);
 
+        var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>(
+            $"broker/api/v1/filetransfer/{fileTransferId}",
+            _responseSerializerOptions);
+        Assert.NotNull(overview);
+        Assert.Equal(FileTransferStatusExt.UploadStarted, overview.FileTransferStatus);
+
         var headRequest = new HttpRequestMessage(HttpMethod.Head, uploadUrl);
         headRequest.Headers.Add("Tus-Resumable", "1.0.0");
         var headResponse = await _senderClient.SendAsync(headRequest);

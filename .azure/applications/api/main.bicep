@@ -36,19 +36,21 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing 
   name: resourceGroupName
 }
 
-module appIdentity '../../modules/identity/create.bicep' = {
-  name: 'appIdentity'
+resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: '${namePrefix}-app-identity'
   scope: resourceGroup
-  params: {
-    namePrefix: namePrefix
-    location: location
-  }
 }
+
+var appIdentityId = appIdentity.id
+var appIdentityClientId = appIdentity.properties.clientId
+var appIdentityPrincipalId = appIdentity.properties.principalId
+var appIdentityTenantId = appIdentity.properties.tenantId
+var appIdentityName = appIdentity.name
 
 module appDeployToAzureAccess '../../modules/identity/addDeploymentRoles.bicep' = { 
   name: 'appDeployToAzureAccess'
   params: {
-    userAssignedIdentityPrincipalId: appIdentity.outputs.principalId
+    userAssignedIdentityPrincipalId: appIdentityPrincipalId
   }
 }
 
@@ -57,7 +59,7 @@ module keyvaultAddReaderRolesAppIdentity '../../modules/keyvault/addReaderRoles.
   scope: resourceGroup
   params: {
     keyvaultName: sourceKeyVaultName
-    principals: [{objectId: appIdentity.outputs.principalId, principalType: 'ServicePrincipal'}]
+    principals: [{objectId: appIdentityPrincipalId, principalType: 'ServicePrincipal'}]
   }
 }
 
@@ -66,7 +68,7 @@ module keyvaultAddSecretsOfficerRoleAppIdentity '../../modules/keyvault/addSecre
   scope: resourceGroup
   params: {
     keyvaultName: sourceKeyVaultName
-    principalObjectId: appIdentity.outputs.principalId
+    principalObjectId: appIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -78,10 +80,10 @@ module databaseAccess '../../modules/postgreSql/AddAdministrationAccess.bicep' =
     keyvaultAddReaderRolesAppIdentity // Timing issue
   ]
   params: {
-    tenantId: appIdentity.outputs.tenantId
-    principalId: appIdentity.outputs.principalId
+    tenantId: appIdentityTenantId
+    principalId: appIdentityPrincipalId
     principalType: 'ServicePrincipal'
-    appName: appIdentity.outputs.name
+    appName: appIdentityName
     namePrefix: namePrefix
   }
 }
@@ -97,7 +99,7 @@ module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bic
   dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
   params: {
     location: location
-    principal_id: appIdentity.outputs.id
+    principal_id: appIdentityId
   }
 }
 
@@ -117,11 +119,11 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     environment: environment
     apimIp: apimIp
     subscription_id: subscription().subscriptionId
-    principal_id: appIdentity.outputs.id
+    principal_id: appIdentityId
     platform_base_url: platform_base_url
     keyVaultUrl: keyVaultUrl
     maskinporten_environment: maskinporten_environment
-    userIdentityClientId: appIdentity.outputs.clientId
+    userIdentityClientId: appIdentityClientId
     containerAppEnvId: keyvault.getSecret('container-app-env-id')
   }
 }

@@ -19,10 +19,12 @@ using Altinn.Common.PEP.Authorization;
 using Altinn.Broker.API.Swagger;
 using Hangfire;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
 
@@ -48,8 +50,10 @@ static void BuildAndRun(string[] args)
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
-        .AddJsonFile("appsettings.local.json", true, true);
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+        .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables();
+
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
     var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
     bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
@@ -70,6 +74,7 @@ static void BuildAndRun(string[] args)
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
+    app.UseMiddleware<TusIdempotentCompletePatchMiddleware>();
 
     app.MapControllers();
     app.MapBrokerTusUploads();
@@ -134,12 +139,24 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         services.AddDistributedMemoryCache();
     }
 
+    services.AddHybridCache(options =>
+    {
+        options.DefaultEntryOptions = new HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromHours(24),
+            LocalCacheExpiration = TimeSpan.FromMinutes(5)
+        };
+    });
+
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();
 
     services.ConfigureHangfire();
 
     services.AddAuthentication()
+        .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
+            AuthorizationConstants.TusUploadSession,
+            _ => { })
         .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             var altinnOptions = new AltinnOptions();
@@ -181,12 +198,19 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateLifetime = !hostEnvironment.IsDevelopment(),
                 ClockSkew = TimeSpan.Zero
             };
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = AltinnTokenEventsHelper.OnAuthenticationFailed,
+                OnChallenge = AltinnTokenEventsHelper.OnChallenge
+            };
         });
+
+    services.AddScoped<TusUploadSessionAuthenticationHelper>();
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(AuthorizationConstants.TusUploadSession, JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));
