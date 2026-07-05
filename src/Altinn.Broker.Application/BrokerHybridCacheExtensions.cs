@@ -58,24 +58,14 @@ public static class BrokerHybridCacheExtensions
 
     private static HybridCacheEntryOptions CreateTryGetEntryOptions(HybridCacheEntryOptions? options)
     {
-        if (options is null)
-        {
-            return TryGetEntryOptions;
-        }
-
-        var flags = HybridCacheEntryFlags.DisableLocalCacheWrite
-            | HybridCacheEntryFlags.DisableDistributedCacheWrite;
-
-        if (options.Flags is HybridCacheEntryFlags optionFlags)
-        {
-            flags |= optionFlags;
-        }
-
+        // Do not copy write flags (e.g. DisableLocalCache) into read options. Writes that skip L1
+        // still need reads to reach the distributed cache on miss.
         return new HybridCacheEntryOptions
         {
-            Expiration = options.Expiration,
-            LocalCacheExpiration = options.LocalCacheExpiration,
-            Flags = flags
+            Expiration = options?.Expiration,
+            LocalCacheExpiration = options?.LocalCacheExpiration,
+            Flags = HybridCacheEntryFlags.DisableLocalCacheWrite
+                | HybridCacheEntryFlags.DisableDistributedCacheWrite
         };
     }
 

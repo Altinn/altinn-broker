@@ -7,22 +7,40 @@ using StackExchange.Redis;
 
 namespace Altinn.Broker.Tests.Tus;
 
-internal static class TestHybridCacheFactory
+internal sealed class HybridCacheTestScope : IAsyncDisposable
 {
-    public static HybridCache CreateHybridCache()
+    private readonly ServiceProvider _provider;
+
+    public HybridCache Cache { get; }
+
+    private HybridCacheTestScope(ServiceProvider provider, HybridCache cache)
+    {
+        _provider = provider;
+        Cache = cache;
+    }
+
+    public static HybridCacheTestScope Create()
     {
         var services = new ServiceCollection();
         services.AddDistributedMemoryCache();
         services.AddHybridCache();
-        return services.BuildServiceProvider().GetRequiredService<HybridCache>();
+        var provider = services.BuildServiceProvider();
+        return new HybridCacheTestScope(provider, provider.GetRequiredService<HybridCache>());
     }
 
-    public static TusUploadProgressCache CreateProgressCache(IConnectionMultiplexer? redis = null)
+    public TusPartialUploadRegistry CreatePartialUploadRegistry()
+        => new(_provider.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>());
+
+    public TusUploadProgressCache CreateProgressCache(IConnectionMultiplexer? redis = null)
         => new(
-            CreateHybridCache(),
+            Cache,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<TusUploadProgressCache>.Instance,
             redis);
 
-    public static TusPartialUploadRegistry CreatePartialUploadRegistry()
-        => new(CreateHybridCache());
+    public async ValueTask DisposeAsync() => await _provider.DisposeAsync();
+}
+
+internal static class TestHybridCacheFactory
+{
+    public static HybridCacheTestScope CreateScope() => HybridCacheTestScope.Create();
 }

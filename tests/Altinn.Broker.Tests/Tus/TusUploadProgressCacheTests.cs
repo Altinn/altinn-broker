@@ -9,7 +9,8 @@ public class TusUploadProgressCacheTests
     [Fact]
     public async Task TryAcceptChunk_IsAtomicWithoutAffinity()
     {
-        var cache = TestHybridCacheFactory.CreateProgressCache();
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var cache = scope.CreateProgressCache();
 
         const string fileId = "partial-1";
         await cache.InitializeAsync(fileId, uploadLength: 128 * 1024 * 1024, CancellationToken.None);
@@ -38,7 +39,8 @@ public class TusUploadProgressCacheTests
     [Fact]
     public async Task IncrementCommittedOffset_UpdatesProgress()
     {
-        var cache = TestHybridCacheFactory.CreateProgressCache();
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var cache = scope.CreateProgressCache();
 
         const string fileId = "partial-2";
         await cache.InitializeAsync(fileId, uploadLength: 64 * 1024 * 1024, CancellationToken.None);
@@ -55,7 +57,8 @@ public class TusUploadProgressCacheTests
     [Fact]
     public async Task GetAsync_UsesHybridCacheAfterFirstRead()
     {
-        var cache = TestHybridCacheFactory.CreateProgressCache();
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var cache = scope.CreateProgressCache();
 
         const string fileId = "partial-3";
         await cache.InitializeAsync(fileId, uploadLength: 32 * 1024 * 1024, CancellationToken.None);

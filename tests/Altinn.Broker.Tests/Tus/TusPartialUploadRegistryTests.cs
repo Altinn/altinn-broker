@@ -1,5 +1,3 @@
-using Altinn.Broker.Integrations.Tus;
-
 using Xunit;
 
 namespace Altinn.Broker.Tests.Tus;
@@ -9,13 +7,11 @@ public class TusPartialUploadRegistryTests
     private const string FileTransferId = "c28803a5-c986-4bb6-ac28-b47aafffad16";
     private const string PartialUploadId = "43b05d2efb1c444eaff5c53e1cbee918";
 
-    private static TusPartialUploadRegistry CreateRegistry()
-        => TestHybridCacheFactory.CreatePartialUploadRegistry();
-
     [Fact]
     public async Task TryGetFileTransferIdAsync_UnknownPartialId_DoesNotReturnPartialIdAsFileTransferId()
     {
-        var registry = CreateRegistry();
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
 
         var fileTransferId = await registry.TryGetFileTransferIdAsync(PartialUploadId, CancellationToken.None);
 
@@ -25,7 +21,8 @@ public class TusPartialUploadRegistryTests
     [Fact]
     public async Task TryGetFileTransferIdAsync_RegisteredPartial_ReturnsParentFileTransferId()
     {
-        var registry = CreateRegistry();
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
         await registry.RegisterPartialAsync(
             PartialUploadId,
             Guid.Parse(FileTransferId),

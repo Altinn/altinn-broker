@@ -1,8 +1,6 @@
 using System.Text.Json;
 
-using Altinn.Broker.Application;
-
-using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Altinn.Broker.Integrations.Tus;
 
@@ -35,14 +33,13 @@ public interface ITusPartialUploadRegistry
     Task RemoveFinalConcatAsync(string fileId, CancellationToken cancellationToken);
 }
 
-public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUploadRegistry
+public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache) : ITusPartialUploadRegistry
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-    private static readonly HybridCacheEntryOptions CacheOptions = new()
+    private static readonly DistributedCacheEntryOptions CacheOptions = new()
     {
-        Expiration = CacheExpiration,
-        Flags = HybridCacheEntryFlags.DisableLocalCache
+        AbsoluteExpirationRelativeToNow = CacheExpiration
     };
 
     private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{NormalizeId(partialFileId)}";
@@ -71,7 +68,7 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
 
     public async Task<PartialUploadInfo?> TryGetPartialInfoAsync(string partialFileId, CancellationToken cancellationToken)
     {
-        var json = await cache.GetOptionalStringAsync(PartialInfoKey(partialFileId), CacheOptions, cancellationToken);
+        var json = await distributedCache.GetStringAsync(PartialInfoKey(partialFileId), cancellationToken);
         if (string.IsNullOrWhiteSpace(json))
         {
             return null;
@@ -83,7 +80,7 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
 
     public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
     {
-        var value = await cache.GetOptionalStringAsync(UploadLengthKey(fileId), CacheOptions, cancellationToken);
+        var value = await distributedCache.GetStringAsync(UploadLengthKey(fileId), cancellationToken);
         return long.TryParse(value, out var uploadLength) ? uploadLength : null;
     }
 
@@ -95,8 +92,7 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
 
     public async Task<Guid?> TryGetFileTransferIdAsync(string tusFileId, CancellationToken cancellationToken)
     {
-        var normalizedId = NormalizeId(tusFileId);
-        var partialInfo = await TryGetPartialInfoAsync(normalizedId, cancellationToken);
+        var partialInfo = await TryGetPartialInfoAsync(tusFileId, cancellationToken);
         return partialInfo?.FileTransferId;
     }
 
@@ -108,7 +104,7 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
 
     public async Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken)
     {
-        var json = await cache.GetOptionalStringAsync(FinalConcatKey(fileId), CacheOptions, cancellationToken);
+        var json = await distributedCache.GetStringAsync(FinalConcatKey(fileId), cancellationToken);
         if (string.IsNullOrWhiteSpace(json))
         {
             return null;
@@ -119,17 +115,17 @@ public sealed class TusPartialUploadRegistry(HybridCache cache) : ITusPartialUpl
 
     public Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken)
         => Task.WhenAll(
-            cache.RemoveKeyAsync(PartialInfoKey(partialFileId), cancellationToken),
-            cache.RemoveKeyAsync(UploadLengthKey(partialFileId), cancellationToken));
+            distributedCache.RemoveAsync(PartialInfoKey(partialFileId), cancellationToken),
+            distributedCache.RemoveAsync(UploadLengthKey(partialFileId), cancellationToken));
 
     public Task RemoveUploadAsync(string fileId, CancellationToken cancellationToken)
-        => cache.RemoveKeyAsync(UploadLengthKey(fileId), cancellationToken);
+        => distributedCache.RemoveAsync(UploadLengthKey(fileId), cancellationToken);
 
     public Task RemoveFinalConcatAsync(string fileId, CancellationToken cancellationToken)
-        => cache.RemoveKeyAsync(FinalConcatKey(fileId), cancellationToken);
+        => distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken);
 
     private Task SetCachedValueAsync(string key, string value, CancellationToken cancellationToken)
-        => cache.SetStringAsync(key, value, CacheOptions, cancellationToken);
+        => distributedCache.SetStringAsync(key, value, CacheOptions, cancellationToken);
 
     private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength);
 }
