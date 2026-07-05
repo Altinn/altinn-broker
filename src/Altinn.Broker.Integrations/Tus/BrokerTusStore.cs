@@ -139,6 +139,9 @@ public class BrokerTusStore(
             var isPartial = await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken);
             if (isPartial)
             {
+                await WaitForDurableCommittedOffsetAsync(fileId, state.UploadLength, cancellationToken);
+                timing.Step("waitForDurableCommittedOffset");
+
                 var fileTransferId = await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken);
                 if (fileTransferId is Guid mappedFileTransferId)
                 {
