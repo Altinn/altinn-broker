@@ -6,6 +6,12 @@ namespace Altinn.Broker.Integrations.Tus;
 
 public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength);
 
+public enum TusConcatStatus
+{
+    Pending,
+    Complete
+}
+
 public interface ITusPartialUploadRegistry
 {
     Task RegisterPartialAsync(string partialFileId, Guid fileTransferId, long uploadLength, CancellationToken cancellationToken);
@@ -25,6 +31,10 @@ public interface ITusPartialUploadRegistry
     Task RegisterFinalConcatAsync(string fileId, IReadOnlyList<string> partialFileIds, CancellationToken cancellationToken);
 
     Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken);
+
+    Task<TusConcatStatus?> TryGetConcatStatusAsync(string fileId, CancellationToken cancellationToken);
+
+    Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken);
 
     Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken);
 
@@ -47,6 +57,8 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
     private static string UploadLengthKey(string fileId) => $"tus-upload-length:{NormalizeId(fileId)}";
 
     private static string FinalConcatKey(string fileId) => $"tus-final-concat:{NormalizeId(fileId)}";
+
+    private static string ConcatStatusKey(string fileId) => $"tus-concat-status:{NormalizeId(fileId)}";
 
     private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
@@ -96,11 +108,14 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         return partialInfo?.FileTransferId;
     }
 
-    public Task RegisterFinalConcatAsync(
+    public async Task RegisterFinalConcatAsync(
         string fileId,
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken)
-        => SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
+    {
+        await SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
+        await SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Pending.ToString(), cancellationToken);
+    }
 
     public async Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -113,6 +128,15 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         return JsonSerializer.Deserialize<string[]>(json, JsonOptions);
     }
 
+    public async Task<TusConcatStatus?> TryGetConcatStatusAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var value = await distributedCache.GetStringAsync(ConcatStatusKey(fileId), cancellationToken);
+        return Enum.TryParse<TusConcatStatus>(value, ignoreCase: true, out var status) ? status : null;
+    }
+
+    public Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken)
+        => SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Complete.ToString(), cancellationToken);
+
     public Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken)
         => Task.WhenAll(
             distributedCache.RemoveAsync(PartialInfoKey(partialFileId), cancellationToken),
@@ -122,7 +146,9 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         => distributedCache.RemoveAsync(UploadLengthKey(fileId), cancellationToken);
 
     public Task RemoveFinalConcatAsync(string fileId, CancellationToken cancellationToken)
-        => distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken);
+        => Task.WhenAll(
+            distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken),
+            distributedCache.RemoveAsync(ConcatStatusKey(fileId), cancellationToken));
 
     private Task SetCachedValueAsync(string key, string value, CancellationToken cancellationToken)
         => distributedCache.SetStringAsync(key, value, CacheOptions, cancellationToken);

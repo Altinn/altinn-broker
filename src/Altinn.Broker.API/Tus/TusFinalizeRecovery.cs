@@ -31,6 +31,7 @@ internal static class TusFinalizeRecovery
         }
 
         var finalizationService = httpContext.RequestServices.GetRequiredService<ITusUploadFinalizationService>();
+        var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
         var isPartial = await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken);
         var currentStatus = fileTransfer.FileTransferStatusEntity.Status;
 
@@ -46,9 +47,16 @@ internal static class TusFinalizeRecovery
                 return;
             }
         }
+        else if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(tusFileId, cancellationToken) is not null)
+        {
+            if (currentStatus is not (FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing))
+            {
+                return;
+            }
+        }
         else
         {
-            if (currentStatus != FileTransferStatus.UploadStarted)
+            if (currentStatus is not (FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing))
             {
                 return;
             }

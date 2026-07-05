@@ -6,6 +6,9 @@ public sealed class TusUploadFinalizationService(
     BrokerTusStore store,
     ITusPartialUploadRegistry partialUploadRegistry) : ITusUploadFinalizationService
 {
+    public Task EnsureFinalConcatenatedAsync(string tusFileId, CancellationToken cancellationToken)
+        => store.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
+
     public Task FinalizeStagingAsync(string tusFileId, CancellationToken cancellationToken)
         => store.FinalizeStagingFromDurableStateAsync(tusFileId, cancellationToken);
 

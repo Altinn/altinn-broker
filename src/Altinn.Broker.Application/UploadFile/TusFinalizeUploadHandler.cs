@@ -26,6 +26,7 @@ public class TusFinalizeUploadHandler(
             return;
         }
 
+        await tusUploadFinalizationService.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
         await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
 
         var result = await tusUploadCompleteHandler.Process(fileTransferId, user: null, cancellationToken);

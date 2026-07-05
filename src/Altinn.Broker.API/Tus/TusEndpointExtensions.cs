@@ -313,8 +313,46 @@ public static class TusEndpointExtensions
             fileTransferId,
             context.FileId);
 
+        var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(context.FileId, context.CancellationToken) is not null)
+        {
+            await MarkUploadProcessingIfNeededAsync(
+                context.HttpContext,
+                fileTransferId,
+                context.CancellationToken);
+        }
+
         var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
         enqueuer.Enqueue(fileTransferId, context.FileId);
+    }
+
+    private static async Task MarkUploadProcessingIfNeededAsync(
+        HttpContext httpContext,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            throw new TusStoreException("Invalid file transfer id");
+        }
+
+        if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.UploadStarted)
+        {
+            return;
+        }
+
+        var fileTransferStatusRepository = httpContext.RequestServices
+            .GetRequiredService<IFileTransferStatusRepository>();
+        var uploaderVendor = httpContext.User.GetCallerVendorId()?.WithPrefix();
+
+        await fileTransferStatusRepository.InsertFileTransferStatus(
+            fileTransferId,
+            FileTransferStatus.UploadProcessing,
+            timestamp: DateTime.UtcNow,
+            vendor: uploaderVendor,
+            cancellationToken: cancellationToken);
     }
 
     private static TusUploadAuthIntent MapAuthIntent(IntentType intent) => intent switch
