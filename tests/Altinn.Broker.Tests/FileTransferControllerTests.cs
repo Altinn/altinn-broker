@@ -17,6 +17,7 @@ using Altinn.Broker.Tests.Factories;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
+using Hangfire.Common;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -731,9 +732,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var gracePeriod = XmlConvert.ToTimeSpan("PT24H");
 
         Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
-            j.Value.Job.Method.Name == "Process" &&
-            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId &&
-            ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
+            IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.AllConfirmedDownloaded) &&
             j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) &&
             j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
     }
@@ -1008,7 +1007,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
 
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.FileTransferExpiry).Value);
+        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+            IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.FileTransferExpiry)).Value);
         var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
         var confirmedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
 
@@ -1016,9 +1016,33 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j => j.Value.Job.Method.Name == "Process" && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).FileTransferId.ToString() == fileTransferId && ((PurgeFileTransferRequest)j.Value.Job.Args[0]).PurgeTrigger == PurgeTrigger.AllConfirmedDownloaded &&
-        j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) && j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
+        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+            IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.AllConfirmedDownloaded) &&
+            j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) &&
+            j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
 
+    }
+
+    private static bool IsScheduledPurgeJob(KeyValuePair<string, Hangfire.Storage.Monitoring.ScheduledJobDto> scheduledJob, string fileTransferId, PurgeTrigger purgeTrigger)
+    {
+        if (!TryGetPurgeFileTransferRequest(scheduledJob.Value.Job, out var request))
+        {
+            return false;
+        }
+
+        return request.FileTransferId.ToString() == fileTransferId && request.PurgeTrigger == purgeTrigger;
+    }
+
+    private static bool TryGetPurgeFileTransferRequest(Job job, out PurgeFileTransferRequest request)
+    {
+        request = null!;
+        if (job.Type != typeof(PurgeFileTransferHandler) || job.Args[0] is not PurgeFileTransferRequest purgeRequest)
+        {
+            return false;
+        }
+
+        request = purgeRequest;
+        return true;
     }
 
     [Fact]
