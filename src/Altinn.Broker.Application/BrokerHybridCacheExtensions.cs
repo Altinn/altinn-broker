@@ -1,3 +1,5 @@
+#pragma warning disable EXTEXP0018 // HybridCache APIs are experimental in Microsoft.Extensions.Caching.Hybrid
+
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Altinn.Broker.Application;
@@ -91,3 +93,5 @@ public static class BrokerHybridCacheExtensions
         CancellationToken cancellationToken = default)
         => cache.RemoveAsync(key, cancellationToken).AsTask();
 }
+
+#pragma warning restore EXTEXP0018

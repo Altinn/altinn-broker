@@ -2,9 +2,8 @@ param location string
 param namePrefix string
 param keyVaultName string
 param environment string
+param appIdentityPrincipalId string
 
-// Azure Managed Redis (Microsoft.Cache/redisEnterprise).
-// See https://learn.microsoft.com/azure/redis/overview
 var redisSkuName = environment == 'test'
   ? 'Balanced_B0'
   : environment == 'staging'
@@ -30,6 +29,17 @@ resource redisDatabase 'Microsoft.Cache/redisEnterprise/databases@2025-07-01' = 
   properties: {
     clientProtocol: 'Encrypted'
     accessKeysAuthentication: 'Enabled'
+  }
+}
+
+resource appIdentityRedisAccessPolicy 'Microsoft.Cache/redisEnterprise/databases/accessPolicyAssignments@2025-07-01' = {
+  parent: redisDatabase
+  name: 'appidentity'
+  properties: {
+    accessPolicyName: 'default'
+    user: {
+      objectId: appIdentityPrincipalId
+    }
   }
 }
 
