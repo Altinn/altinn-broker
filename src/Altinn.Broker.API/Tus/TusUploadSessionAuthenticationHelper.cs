@@ -7,6 +7,7 @@ using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Altinn.Broker.API.Tus;
@@ -44,10 +45,10 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return null;
         }
 
-        var principal = ValidateTokenWithoutLifetime(token);
+        var (principal, validationFailure) = await ValidateTokenWithoutLifetimeAsync(token, cancellationToken);
         if (principal is null)
         {
-            LogRejection(httpContext, requestPath, "tokenValidationFailed", fileTransferId: null);
+            LogRejection(httpContext, requestPath, validationFailure ?? "tokenValidationFailed", fileTransferId: null);
             return null;
         }
 
@@ -132,9 +133,13 @@ public sealed class TusUploadSessionAuthenticationHelper(
         }
     }
 
-    private ClaimsPrincipal? ValidateTokenWithoutLifetime(string token)
+    private async Task<(ClaimsPrincipal? Principal, string? FailureReason)> ValidateTokenWithoutLifetimeAsync(
+        string token,
+        CancellationToken cancellationToken)
     {
         var handler = new JwtSecurityTokenHandler();
+        string? lastFailure = null;
+
         foreach (var authenticationScheme in new[]
                  {
                      JwtBearerDefaults.AuthenticationScheme,
@@ -145,17 +150,51 @@ public sealed class TusUploadSessionAuthenticationHelper(
             var validationParameters = jwtOptions.TokenValidationParameters.Clone();
             validationParameters.ValidateLifetime = false;
 
+            if (jwtOptions.ConfigurationManager is not null)
+            {
+                try
+                {
+                    var configuration = await jwtOptions.ConfigurationManager.GetConfigurationAsync(cancellationToken);
+                    validationParameters.IssuerSigningKeys = configuration.SigningKeys;
+                    if (validationParameters.ValidateIssuer)
+                    {
+                        validationParameters.ValidIssuer = configuration.Issuer;
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidConfigurationException or IOException)
+                {
+                    lastFailure = $"openidConfigUnavailable:{authenticationScheme}:{ex.GetType().Name}";
+                    logger.LogWarning(
+                        ex,
+                        "Failed to load OpenID configuration for expired TUS token validation. Scheme={Scheme}",
+                        authenticationScheme);
+                    continue;
+                }
+            }
+
             try
             {
-                return handler.ValidateToken(token, validationParameters, out _);
+                var principal = handler.ValidateToken(token, validationParameters, out _);
+                return (principal, null);
             }
-            catch (SecurityTokenException)
+            catch (SecurityTokenException ex)
             {
-                // Try the other JWT scheme (Altinn vs Maskinporten).
+                lastFailure = $"tokenValidationFailed:{authenticationScheme}:{ex.GetType().Name}";
+                logger.LogDebug(
+                    ex,
+                    "Expired TUS token validation failed for scheme {Scheme}",
+                    authenticationScheme);
             }
         }
 
-        return null;
+        if (lastFailure is not null)
+        {
+            logger.LogWarning(
+                "Expired TUS token validation failed for all JWT schemes. Failure={Failure}",
+                lastFailure);
+        }
+
+        return (null, lastFailure);
     }
 
     private async Task<Guid?> TryResolveFileTransferIdAsync(HttpContext httpContext, CancellationToken cancellationToken)
