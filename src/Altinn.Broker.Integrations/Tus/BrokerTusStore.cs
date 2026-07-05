@@ -9,6 +9,7 @@ using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 
@@ -23,6 +24,7 @@ public class BrokerTusStore(
     ITusUploadStateRegistry uploadStateRegistry,
     ITusUploadProgressCache uploadProgressCache,
     ITusUploadActivityCache uploadActivityCache,
+    ITusFinalizeUploadEnqueuer tusFinalizeUploadEnqueuer,
     IHttpContextAccessor httpContextAccessor,
     ILogger<BrokerTusStore> logger,
     IOptions<AzureStorageOptions> azureStorageOptions,
@@ -137,12 +139,14 @@ public class BrokerTusStore(
             var isPartial = await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken);
             if (isPartial)
             {
-                await WaitForCommittedOffsetAsync(fileId, state, acceptedOffset, cancellationToken);
-                timing.Step("waitForCommittedOffset");
-                await FinalizeUploadAsync(fileId, state, cancellationToken);
-                timing.Step("finalizeUpload");
-                await RunProgressSideEffectsAsync(fileId, state.UploadLength, cancellationToken);
-                timing.Step("persist.sideEffects");
+                var fileTransferId = await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken);
+                if (fileTransferId is Guid mappedFileTransferId)
+                {
+                    logger.LogInformation(
+                        "TUS partial final chunk accepted for file id {FileId}. Enqueueing staging finalize job.",
+                        fileId);
+                    tusFinalizeUploadEnqueuer.Enqueue(mappedFileTransferId, fileId);
+                }
             }
 
             await LogUploadCompletionProbeAsync(fileId, acceptedOffset, chunkLength, cancellationToken);
@@ -324,6 +328,17 @@ public class BrokerTusStore(
                 SyncStateFromProgress(existingState!, cachedProgress);
             }
 
+            if (reportDurableOffset)
+            {
+                var durableOffset = await GetDurableStagingOffsetAsync(fileId, cancellationToken);
+                if (durableOffset > 0)
+                {
+                    timing.Step("durableStagingOffset", durableOffset);
+                    await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+                    return durableOffset;
+                }
+            }
+
             var offset = reportDurableOffset
                 ? cachedProgress.CommittedOffset
                 : cachedProgress.AcceptedOffset;
@@ -429,7 +444,10 @@ public class BrokerTusStore(
                 throw new TusStoreException($"Partial upload {partialFileId} does not belong to file transfer {fileTransferId}.");
             }
 
-            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(partialFileId, cancellationToken);
+            var committedLength = await WaitForPartialStagingCommittedAsync(
+                partialFileId,
+                partialLength,
+                cancellationToken);
             if (committedLength != partialLength)
             {
                 throw new TusStoreException(
@@ -854,6 +872,56 @@ public class BrokerTusStore(
     private static TaskCompletionSource<long> NewProgressSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private async Task<long> GetDurableStagingOffsetAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
+        return committedLength + stagedLength;
+    }
+
+    private async Task<long> WaitForPartialStagingCommittedAsync(
+        string partialFileId,
+        long partialLength,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.AddHours(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(partialFileId, cancellationToken);
+            if (committedLength >= partialLength)
+            {
+                return committedLength;
+            }
+
+            if (await IsReadyForStagingFinalizeAsync(partialFileId, cancellationToken))
+            {
+                try
+                {
+                    await FinalizeStagingFromDurableStateAsync(partialFileId, cancellationToken);
+                    committedLength = await storageResolver.GetCommittedStagingLengthAsync(partialFileId, cancellationToken);
+                    if (committedLength >= partialLength)
+                    {
+                        return committedLength;
+                    }
+                }
+                catch (TusStoreException ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "TUS inline partial staging finalize failed for file id {FileId}. Will retry.",
+                        partialFileId);
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+
+        throw new TusStoreException(
+            $"Partial upload {partialFileId} did not commit within the allowed time. Expected {partialLength} bytes.");
+    }
+
     private async Task WaitForCommittedOffsetAsync(
         string fileId,
         TusUploadState state,
@@ -976,6 +1044,25 @@ public class BrokerTusStore(
 
         await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
         await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+    }
+
+    public async Task<bool> IsReadyForStagingFinalizeAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
+        var uploadLength = await GetUploadLengthAsync(fileId, cancellationToken);
+        if (uploadLength is null or <= 0)
+        {
+            return false;
+        }
+
+        var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (progress is null || progress.AcceptedOffset < uploadLength.Value)
+        {
+            return false;
+        }
+
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        return committedLength < uploadLength.Value;
     }
 
     public async Task<bool> IsReadyForTransferCompletionAsync(string fileId, CancellationToken cancellationToken)

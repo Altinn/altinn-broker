@@ -6,6 +6,8 @@ public interface ITusUploadFinalizationService
 
     Task<bool> IsReadyForTransferCompletionAsync(string tusFileId, CancellationToken cancellationToken);
 
+    Task<bool> IsReadyForStagingFinalizeAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task<bool> IsPartialUploadAsync(string tusFileId, CancellationToken cancellationToken);
 
     Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken);

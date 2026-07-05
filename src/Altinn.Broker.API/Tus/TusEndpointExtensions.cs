@@ -174,53 +174,12 @@ public static class TusEndpointExtensions
 
         if (context.Intent is IntentType.GetFileInfo or IntentType.WriteFile)
         {
-            await TryEnqueueFinalizeIfNeededAsync(
+            await TusFinalizeRecovery.TryEnqueueFinalizeIfNeededAsync(
                 context.HttpContext,
                 fileTransferId,
                 context.FileId,
                 context.CancellationToken);
         }
-    }
-
-    /// <summary>
-    /// When all bytes are accepted but publish did not run (e.g. client timed out on the final PATCH),
-    /// enqueue background finalization so HEAD/PATCH recovery can complete the transfer.
-    /// </summary>
-    private static async Task TryEnqueueFinalizeIfNeededAsync(
-        HttpContext httpContext,
-        Guid fileTransferId,
-        string? tusFileId,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(tusFileId))
-        {
-            return;
-        }
-
-        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("Altinn.Broker.API.Tus.Recovery");
-
-        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
-        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
-        if (fileTransfer is null
-            || fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.UploadStarted)
-        {
-            return;
-        }
-
-        var finalizationService = httpContext.RequestServices.GetRequiredService<ITusUploadFinalizationService>();
-        if (!await finalizationService.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken))
-        {
-            return;
-        }
-
-        logger.LogInformation(
-            "Enqueueing TUS finalize job for file transfer {FileTransferId}. TusFileId={TusFileId}",
-            fileTransferId,
-            tusFileId);
-
-        var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
-        enqueuer.Enqueue(fileTransferId, tusFileId);
     }
 
     private static async Task OnBeforeCreateAsync(BeforeCreateContext context)
@@ -292,21 +251,39 @@ public static class TusEndpointExtensions
             : $"{TusMapPath}/{context.FileId}";
         context.SetUploadUrl(new Uri(uploadPath, UriKind.Relative));
 
-        if (await partialUploadRegistry.IsPartialAsync(partialFileId, context.CancellationToken))
+        await MarkUploadStartedIfNeededAsync(
+            context.HttpContext,
+            fileTransferId,
+            context.CancellationToken);
+    }
+
+    private static async Task MarkUploadStartedIfNeededAsync(
+        HttpContext httpContext,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
+        if (fileTransfer is null)
+        {
+            throw new TusStoreException("Invalid file transfer id");
+        }
+
+        if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Initialized)
         {
             return;
         }
 
-        var fileTransferStatusRepository = context.HttpContext.RequestServices
+        var fileTransferStatusRepository = httpContext.RequestServices
             .GetRequiredService<IFileTransferStatusRepository>();
-        var uploaderVendor = context.HttpContext.User.GetCallerVendorId()?.WithPrefix();
+        var uploaderVendor = httpContext.User.GetCallerVendorId()?.WithPrefix();
 
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadStarted,
             timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
-            cancellationToken: context.CancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     private static async Task OnFileCompleteAsync(FileCompleteContext context)

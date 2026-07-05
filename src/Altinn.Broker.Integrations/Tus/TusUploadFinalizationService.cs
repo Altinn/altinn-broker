@@ -12,6 +12,9 @@ public sealed class TusUploadFinalizationService(
     public Task<bool> IsReadyForTransferCompletionAsync(string tusFileId, CancellationToken cancellationToken)
         => store.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken);
 
+    public Task<bool> IsReadyForStagingFinalizeAsync(string tusFileId, CancellationToken cancellationToken)
+        => store.IsReadyForStagingFinalizeAsync(tusFileId, cancellationToken);
+
     public async Task<bool> IsPartialUploadAsync(string tusFileId, CancellationToken cancellationToken)
         => await partialUploadRegistry.IsPartialAsync(TusRouteHelper.NormalizePartialFileId(tusFileId), cancellationToken);
 

@@ -74,6 +74,7 @@ static void BuildAndRun(string[] args)
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
+    app.UseMiddleware<TusIdempotentCompletePatchMiddleware>();
 
     app.MapControllers();
     app.MapBrokerTusUploads();

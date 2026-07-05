@@ -151,4 +151,25 @@ public static class TusRouteHelper
 
         return trimmedReference.TrimEnd('/').Split('/').Last();
     }
+
+    public static bool TryGetTusStoreFileIdFromPath(string? requestPath, out string tusFileId)
+    {
+        tusFileId = string.Empty;
+        if (TryGetPartialUploadIdFromPath(requestPath, out tusFileId))
+        {
+            return true;
+        }
+
+        if (TryGetFileTransferIdFromPath(requestPath, out var fileTransferId))
+        {
+            tusFileId = fileTransferId.ToString();
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsTusUploadPath(string? requestPath)
+        => !string.IsNullOrWhiteSpace(requestPath)
+            && requestPath.Contains(TusMapPath, StringComparison.OrdinalIgnoreCase);
 }
