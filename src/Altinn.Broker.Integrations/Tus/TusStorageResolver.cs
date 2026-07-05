@@ -16,8 +16,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-using Xtensible.TusDotNet.Azure;
-
 namespace Altinn.Broker.Integrations.Tus;
 
 public sealed record TusStagedBlocksSnapshot(
@@ -27,8 +25,6 @@ public sealed record TusStagedBlocksSnapshot(
 
 public interface ITusStorageResolver
 {
-    Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken);
-    Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken);
     Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
     Task CommitTusBlocksAsync(
         string fileId,
@@ -58,65 +54,16 @@ public class TusStorageResolver(
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IHostEnvironment hostEnvironment,
-    ITusExpirationDetailsStore expirationDetailsStore,
     ITusPartialUploadRegistry partialUploadRegistry,
     IHttpContextAccessor httpContextAccessor,
     ILogger<TusStorageResolver> logger) : ITusStorageResolver
 {
     private const long MaxPutBlockFromUrlSize = 100L * 1024 * 1024;
 
-    private readonly ConcurrentDictionary<string, AzureBlobTusStore> _stores = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<Guid, TusStorageContext> _storageContextsByFileTransferId = new();
     private readonly ConcurrentDictionary<string, BlobContainerClient> _containerClients = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BlockBlobClient> _blockBlobClients = new(StringComparer.OrdinalIgnoreCase);
     private readonly DefaultAzureCredential _azureCredential = new();
-
-    public async Task<AzureBlobTusStore?> GetStoreForFileAsync(string fileId, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return null;
-        }
-
-        return _stores.GetOrAdd(storageContext.StorageAccountName, _ => new AzureBlobTusStore(
-            storageContext.ConnectionString,
-            AzureStorageConstants.BrokerFilesContainerName,
-            new AzureBlobTusStoreOptions
-            {
-                BlobPath = AzureStorageConstants.TusStagingBlobPath,
-                AuthenticationMode = storageContext.AuthenticationMode,
-                ExpirationDetailsStore = expirationDetailsStore,
-                FileIdGeneratorAsync = _ =>
-                {
-                    var httpContext = httpContextAccessor.HttpContext
-                        ?? throw new InvalidOperationException("Missing HTTP context");
-                    if (!TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var fileTransferId))
-                    {
-                        throw new InvalidOperationException("Missing file transfer id in route");
-                    }
-
-                    return Task.FromResult(fileTransferId.ToString());
-                }
-            }));
-    }
-
-    public async Task SetStagingBlobMd5ChecksumAsync(string fileId, byte[] md5Hash, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return;
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var appendBlobClient = containerClient.GetAppendBlobClient(
-            Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileId));
-        var properties = await appendBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-        var metadata = properties.Value.Metadata.ToDictionary(static k => k.Key, static v => v.Value);
-        metadata[AzureStorageConstants.TusMd5ChecksumMetadataKey] = Convert.ToBase64String(md5Hash);
-        await appendBlobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
-    }
 
     public async Task<long> StageTusBlockAsync(
         string fileId,
@@ -838,11 +785,8 @@ public class TusStorageResolver(
         var connectionString = hostEnvironment.IsDevelopment()
             ? AzureConstants.AzuriteUrl
             : $"https://{storageProvider.ResourceName}.blob.core.windows.net";
-        var authenticationMode = hostEnvironment.IsDevelopment()
-            ? AzureBlobTusStoreAuthenticationMode.ConnectionString
-            : AzureBlobTusStoreAuthenticationMode.SystemAssignedManagedIdentity;
 
-        var context = new TusStorageContext(connectionString, authenticationMode, storageProvider.ResourceName);
+        var context = new TusStorageContext(connectionString, storageProvider.ResourceName);
         _storageContextsByFileTransferId.TryAdd(fileTransferId, context);
         timing?.Step("resolve.contextBuilt", storageProvider.ResourceName);
         return context;
@@ -859,6 +803,5 @@ public class TusStorageResolver(
 
     private sealed record TusStorageContext(
         string ConnectionString,
-        AzureBlobTusStoreAuthenticationMode AuthenticationMode,
         string StorageAccountName);
 }

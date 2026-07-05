@@ -11,6 +11,7 @@ using tusdotnet.Models.Concatenation;
 
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
+
 using Xtensible.TusDotNet.Azure;
 
 namespace Altinn.Broker.Integrations.Tus;
@@ -246,8 +247,7 @@ public class BrokerTusStore(
             return true;
         }
 
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        return legacyStore is not null;
+        return false;
     }
 
     public async Task<long?> GetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
@@ -284,14 +284,6 @@ public class BrokerTusStore(
             await TouchUploadLengthAsync(fileId, stagingUploadLength.Value, cancellationToken);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return stagingUploadLength;
-        }
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            var legacyLength = await legacyStore.GetUploadLengthAsync(fileId, cancellationToken);
-            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return legacyLength;
         }
 
         var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
@@ -377,15 +369,6 @@ public class BrokerTusStore(
             timing.Step("destinationLength", destinationLength);
             await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
             return destinationLength;
-        }
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            var legacyOffset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
-            timing.Step("legacyOffset", legacyOffset);
-            await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
-            return legacyOffset;
         }
 
         timing.Step("zero");
@@ -522,29 +505,12 @@ public class BrokerTusStore(
             return metadata;
         }
 
-        if (await partialUploadRegistry.IsKnownUploadAsync(fileId, cancellationToken))
-        {
-            return string.Empty;
-        }
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            return await legacyStore.GetUploadMetadataAsync(fileId, cancellationToken);
-        }
-
         return string.Empty;
     }
 
-    public async Task<ITusFile> GetFileAsync(string fileId, CancellationToken cancellationToken)
+    public Task<ITusFile> GetFileAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            return await legacyStore.GetFileAsync(fileId, cancellationToken);
-        }
-
         throw new TusStoreException($"No TUS file found for file id {fileId}");
     }
 
@@ -552,12 +518,6 @@ public class BrokerTusStore(
     {
         fileId = ResolveStoreFileId(fileId);
         await storageResolver.DeleteStagingBlobAsync(fileId, cancellationToken);
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            await legacyStore.DeleteFileAsync(fileId, cancellationToken);
-        }
 
         await partialUploadRegistry.RemovePartialAsync(fileId, cancellationToken);
         await partialUploadRegistry.RemoveUploadAsync(fileId, cancellationToken);
@@ -613,29 +573,10 @@ public class BrokerTusStore(
     public Task<IEnumerable<string>> GetSupportedAlgorithmsAsync(CancellationToken cancellationToken)
         => Task.FromResult<IEnumerable<string>>(new[] { "md5" });
 
-    public async Task<bool> VerifyChecksumAsync(string fileId, string algorithm, byte[] checksum, CancellationToken cancellationToken)
+    public Task<bool> VerifyChecksumAsync(string fileId, string algorithm, byte[] checksum, CancellationToken cancellationToken)
     {
-        fileId = ResolveStoreFileId(fileId);
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            return await legacyStore.VerifyChecksumAsync(fileId, algorithm, checksum, cancellationToken);
-        }
-
-        return false;
-    }
-
-    private async Task<AzureBlobTusStore?> GetLegacyAppendBlobStoreIfExistsAsync(
-        string fileId,
-        CancellationToken cancellationToken)
-    {
-        var store = await storageResolver.GetStoreForFileAsync(fileId, cancellationToken);
-        if (store is null || !await store.FileExistAsync(fileId, cancellationToken))
-        {
-            return null;
-        }
-
-        return store;
+        ResolveStoreFileId(fileId);
+        return Task.FromResult(false);
     }
 
     private async Task<long> GetCachedUploadLengthAsync(string fileId, CancellationToken cancellationToken)
@@ -712,14 +653,6 @@ public class BrokerTusStore(
         {
             timing?.Step("durable.destinationLength", destinationLength);
             return destinationLength;
-        }
-
-        var legacyStore = await GetLegacyAppendBlobStoreIfExistsAsync(fileId, cancellationToken);
-        if (legacyStore is not null)
-        {
-            var legacyOffset = await legacyStore.GetUploadOffsetAsync(fileId, cancellationToken);
-            timing?.Step("durable.legacyStore", legacyOffset);
-            return legacyOffset;
         }
 
         timing?.Step("durable.zero");
