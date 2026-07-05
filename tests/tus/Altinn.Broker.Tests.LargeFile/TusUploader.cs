@@ -216,42 +216,21 @@ public static class TusUploader
         Uri partialUploadUri,
         CancellationToken cancellationToken)
     {
-        if (!await TryGetPartialUploadLengthAsync(httpClient, partialUploadUri, cancellationToken, out var uploadLength))
+        using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, partialUploadUri, cancellationToken);
+        await EnsureSuccessAsync(response, "TUS partial HEAD", requestUri: partialUploadUri);
+
+        if (!response.Headers.TryGetValues("Upload-Length", out var lengthValues)
+            || !long.TryParse(lengthValues.FirstOrDefault(), out var uploadLength))
         {
             throw new InvalidOperationException("Partial upload HEAD did not return Upload-Length.");
         }
 
-        var deadline = DateTime.UtcNow.AddMinutes(30);
-        while (DateTime.UtcNow < deadline)
+        var uploadOffset = ParseUploadOffset(response.Headers);
+        if (uploadOffset != uploadLength)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var uploadOffset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
-            if (uploadOffset >= uploadLength)
-            {
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            throw new InvalidOperationException(
+                $"Partial upload is incomplete ({uploadOffset} / {uploadLength} bytes).");
         }
-
-        var finalOffset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
-        throw new InvalidOperationException(
-            $"Partial upload is incomplete ({finalOffset} / {uploadLength} bytes).");
-    }
-
-    private static async Task<bool> TryGetPartialUploadLengthAsync(
-        HttpClient httpClient,
-        Uri partialUploadUri,
-        CancellationToken cancellationToken,
-        out long uploadLength)
-    {
-        uploadLength = 0;
-        using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, partialUploadUri, cancellationToken);
-        await EnsureSuccessAsync(response, "TUS partial HEAD", requestUri: partialUploadUri);
-
-        return response.Headers.TryGetValues("Upload-Length", out var lengthValues)
-            && long.TryParse(lengthValues.FirstOrDefault(), out uploadLength);
     }
 
     private static string ToTusConcatReference(Uri partialUploadUri)
