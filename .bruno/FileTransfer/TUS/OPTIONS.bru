@@ -1,0 +1,19 @@
+meta {
+  name: OPTIONS
+  type: http
+  seq: 1
+}
+
+options {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer/upload/tus/{{fileTransferId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Tus-Resumable: 1.0.0
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}

@@ -14,6 +14,8 @@ public static class TusUploader
     private const string TusUploadPath = "/broker/api/v1/filetransfer/upload/tus";
     private const string PartialPathSegment = "partial";
     private const int MaxPatchAttempts = 5;
+    private const int MaxPostAttempts = 5;
+    private static readonly TimeSpan UploadVerificationTimeout = TimeSpan.FromMinutes(30);
 
     public static async Task UploadAsync(
         HttpClient httpClient,
@@ -51,7 +53,7 @@ public static class TusUploader
                 throw new InvalidOperationException($"Source stream ended at offset {offset}.");
             }
 
-            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, uploadUri, offset, buffer, bytesRead, uploadSize, cancellationToken);
             progress.Update(offset);
         }
 
@@ -104,7 +106,8 @@ public static class TusUploader
                 ct);
         });
 
-        await CreateFinalUploadAsync(httpClient, tusEndpoint, partialUris, cancellationToken);
+        var finalUri = await CreateFinalUploadAsync(httpClient, tusEndpoint, partialUris, uploadSize, cancellationToken);
+        await EnsureFinalUploadCompleteAsync(httpClient, finalUri, uploadSize, cancellationToken);
         LogCompletion("TUS concatenation upload", fileTransferId, uploadSize, totalStopwatch.Elapsed);
     }
 
@@ -191,10 +194,11 @@ public static class TusUploader
             ?? throw new InvalidOperationException("TUS partial POST succeeded but no Location header was returned.");
     }
 
-    private static async Task CreateFinalUploadAsync(
+    private static async Task<Uri> CreateFinalUploadAsync(
         HttpClient httpClient,
         Uri tusEndpoint,
         IReadOnlyList<Uri> partialUris,
+        long totalUploadLength,
         CancellationToken cancellationToken)
     {
         foreach (var partialUri in partialUris)
@@ -202,13 +206,29 @@ public static class TusUploader
             await EnsurePartialUploadCompleteAsync(httpClient, partialUri, cancellationToken);
         }
 
+        // Refresh upload activity before concat-final POST (helps expired-token session auth).
+        await GetUploadOffsetAsync(httpClient, partialUris[^1], cancellationToken);
+
         var partialReferences = string.Join(' ', partialUris.Select(ToTusConcatReference));
         using var request = new HttpRequestMessage(HttpMethod.Post, tusEndpoint);
         request.Headers.TryAddWithoutValidation("Tus-Resumable", TusVersion);
         request.Headers.TryAddWithoutValidation("Upload-Concat", $"final;{partialReferences}");
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, "TUS final POST", HttpStatusCode.Created, requestUri: tusEndpoint);
+        using var response = await SendTusPostWithRetryAsync(
+            httpClient,
+            request,
+            "TUS final POST",
+            HttpStatusCode.Created,
+            tusEndpoint,
+            cancellationToken);
+
+        var finalUri = ResolveUploadUri(tusEndpoint, response.Headers.Location)
+            ?? tusEndpoint;
+
+        Console.WriteLine(
+            $"TUS concat-final POST succeeded. TotalLength={totalUploadLength:N0} FinalUrl={finalUri}");
+
+        return finalUri;
     }
 
     private static async Task EnsurePartialUploadCompleteAsync(
@@ -216,21 +236,147 @@ public static class TusUploader
         Uri partialUploadUri,
         CancellationToken cancellationToken)
     {
+        var uploadLength = await GetPartialUploadLengthAsync(httpClient, partialUploadUri, cancellationToken)
+            ?? throw new InvalidOperationException("Partial upload HEAD did not return Upload-Length.");
+
+        var deadline = DateTime.UtcNow.Add(UploadVerificationTimeout);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var uploadOffset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
+            if (uploadOffset >= uploadLength)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+
+        var finalOffset = await GetUploadOffsetAsync(httpClient, partialUploadUri, cancellationToken);
+        throw new InvalidOperationException(
+            $"Partial upload is incomplete ({finalOffset} / {uploadLength} bytes).");
+    }
+
+    private static async Task EnsureFinalUploadCompleteAsync(
+        HttpClient httpClient,
+        Uri finalUploadUri,
+        long totalUploadLength,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.Add(UploadVerificationTimeout);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, finalUploadUri, cancellationToken);
+            await EnsureSuccessAsync(response, "TUS final HEAD", requestUri: finalUploadUri);
+
+            if (!response.Headers.TryGetValues("Upload-Length", out var lengthValues)
+                || !long.TryParse(lengthValues.FirstOrDefault(), out var uploadLength))
+            {
+                throw new InvalidOperationException("Final upload HEAD did not return Upload-Length.");
+            }
+
+            var uploadOffset = ParseUploadOffset(response.Headers);
+            if (uploadOffset >= totalUploadLength && uploadLength == totalUploadLength)
+            {
+                Console.WriteLine(
+                    $"TUS final upload verified. Upload-Offset={uploadOffset:N0} Upload-Length={uploadLength:N0}");
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            $"Final TUS upload did not reach expected length ({totalUploadLength:N0} bytes) within {UploadVerificationTimeout.TotalMinutes:N0} minutes.");
+    }
+
+    private static async Task<long?> GetPartialUploadLengthAsync(
+        HttpClient httpClient,
+        Uri partialUploadUri,
+        CancellationToken cancellationToken)
+    {
         using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, partialUploadUri, cancellationToken);
         await EnsureSuccessAsync(response, "TUS partial HEAD", requestUri: partialUploadUri);
 
-        if (!response.Headers.TryGetValues("Upload-Length", out var lengthValues)
-            || !long.TryParse(lengthValues.FirstOrDefault(), out var uploadLength))
+        return response.Headers.TryGetValues("Upload-Length", out var lengthValues)
+            && long.TryParse(lengthValues.FirstOrDefault(), out var uploadLength)
+            ? uploadLength
+            : null;
+    }
+
+    private static async Task<HttpResponseMessage> SendTusPostWithRetryAsync(
+        HttpClient httpClient,
+        HttpRequestMessage request,
+        string operation,
+        HttpStatusCode expectedStatusCode,
+        Uri requestUri,
+        CancellationToken cancellationToken)
+    {
+        HttpStatusCode? lastStatusCode = null;
+        string? lastResponseBody = null;
+
+        for (var attempt = 1; attempt <= MaxPostAttempts; attempt++)
         {
-            throw new InvalidOperationException("Partial upload HEAD did not return Upload-Length.");
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var attemptRequest = await CloneHttpRequestMessageAsync(request);
+            try
+            {
+                var response = await httpClient.SendAsync(attemptRequest, cancellationToken);
+                lastStatusCode = response.StatusCode;
+                if (response.StatusCode == expectedStatusCode)
+                {
+                    return response;
+                }
+
+                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (attempt == MaxPostAttempts || !IsTransientStatusCode(response.StatusCode))
+                {
+                    await EnsureSuccessAsync(response, operation, expectedStatusCode, requestUri);
+                }
+
+                response.Dispose();
+            }
+            catch (Exception ex) when (IsTransientRequestException(ex) && attempt < MaxPostAttempts)
+            {
+                lastResponseBody = ex.Message;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
         }
 
-        var uploadOffset = ParseUploadOffset(response.Headers);
-        if (uploadOffset != uploadLength)
+        var statusSuffix = lastStatusCode is null
+            ? string.Empty
+            : $" Last status: {(int)lastStatusCode.Value} {lastStatusCode.Value}.";
+        var bodySuffix = string.IsNullOrWhiteSpace(lastResponseBody)
+            ? string.Empty
+            : $" Response: {lastResponseBody}";
+        throw new InvalidOperationException(
+            $"{operation} failed after {MaxPostAttempts} attempts.{statusSuffix}{bodySuffix}");
+    }
+
+    private static async Task<HttpRequestMessage> CloneHttpRequestMessageAsync(HttpRequestMessage request)
+    {
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri);
+        foreach (var header in request.Headers)
         {
-            throw new InvalidOperationException(
-                $"Partial upload is incomplete ({uploadOffset} / {uploadLength} bytes).");
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
+
+        if (request.Content is not null)
+        {
+            var contentBytes = await request.Content.ReadAsByteArrayAsync();
+            clone.Content = new ByteArrayContent(contentBytes);
+            foreach (var header in request.Content.Headers)
+            {
+                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        return clone;
     }
 
     private static string ToTusConcatReference(Uri partialUploadUri)
@@ -262,7 +408,7 @@ public static class TusUploader
             }
 
             var chunkStartOffset = offset;
-            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, cancellationToken);
+            offset = await PatchChunkAsync(httpClient, partialUploadUri, offset, buffer, bytesRead, partLength, cancellationToken);
             onBytesUploaded(Math.Max(offset - chunkStartOffset, 0));
         }
     }
@@ -316,10 +462,19 @@ public static class TusUploader
         long offset,
         byte[] buffer,
         int bytesRead,
+        long uploadLength,
         CancellationToken cancellationToken)
     {
+        HttpStatusCode? lastStatusCode = null;
+        string? lastResponseBody = null;
+
         for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
         {
+            if (offset >= uploadLength)
+            {
+                return offset;
+            }
+
             try
             {
                 using var chunkContent = new ByteArrayContent(buffer, 0, bytesRead);
@@ -331,20 +486,36 @@ public static class TusUploader
                 request.Content = chunkContent;
 
                 using var response = await httpClient.SendAsync(request, cancellationToken);
+                lastStatusCode = response.StatusCode;
                 if (response.StatusCode == HttpStatusCode.NoContent)
                 {
                     return ParseUploadOffset(response.Headers);
                 }
 
-                if (response.StatusCode == HttpStatusCode.Conflict)
+                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.Conflict
+                    || IsUploadAlreadyCompleteResponse(response.StatusCode, lastResponseBody))
                 {
                     var serverOffset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                    if (serverOffset >= uploadLength)
+                    {
+                        return serverOffset;
+                    }
+
                     if (serverOffset > offset)
                     {
                         return serverOffset;
                     }
 
-                    offset = serverOffset;
+                    if (serverOffset < offset)
+                    {
+                        // Server has not caught up with the previous chunk yet (common with multi-replica).
+                        await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                        continue;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                     continue;
                 }
 
@@ -355,15 +526,31 @@ public static class TusUploader
 
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (offset >= uploadLength)
+                {
+                    return offset;
+                }
             }
             catch (Exception ex) when (IsTransientRequestException(ex) && attempt < MaxPatchAttempts)
             {
+                lastResponseBody = ex.Message;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 offset = await GetUploadOffsetAsync(httpClient, uploadUri, cancellationToken);
+                if (offset >= uploadLength)
+                {
+                    return offset;
+                }
             }
         }
 
-        throw new InvalidOperationException($"TUS PATCH at offset {offset} failed after {MaxPatchAttempts} attempts.");
+        var statusSuffix = lastStatusCode is null
+            ? string.Empty
+            : $" Last status: {(int)lastStatusCode.Value} {lastStatusCode.Value}.";
+        var bodySuffix = string.IsNullOrWhiteSpace(lastResponseBody)
+            ? string.Empty
+            : $" Response: {lastResponseBody}";
+        throw new InvalidOperationException(
+            $"TUS PATCH at offset {offset} failed after {MaxPatchAttempts} attempts.{statusSuffix}{bodySuffix}");
     }
 
     private static async Task<long> GetUploadOffsetAsync(
@@ -371,9 +558,23 @@ public static class TusUploader
         Uri uploadUri,
         CancellationToken cancellationToken)
     {
-        using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, uploadUri, cancellationToken);
-        await EnsureSuccessAsync(response, "TUS HEAD", requestUri: uploadUri);
-        return ParseUploadOffset(response.Headers);
+        for (var attempt = 1; attempt <= MaxPatchAttempts; attempt++)
+        {
+            using var response = await SendTusRequestAsync(httpClient, HttpMethod.Head, uploadUri, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return ParseUploadOffset(response.Headers);
+            }
+
+            if (attempt == MaxPatchAttempts || !IsTransientStatusCode(response.StatusCode))
+            {
+                await EnsureSuccessAsync(response, "TUS HEAD", requestUri: uploadUri);
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+        }
+
+        throw new InvalidOperationException($"TUS HEAD failed for {uploadUri} after {MaxPatchAttempts} attempts.");
     }
 
     private static Task<HttpResponseMessage> SendTusRequestAsync(
@@ -503,11 +704,18 @@ public static class TusUploader
             $"{uploadSize / (1024.0 * 1024 * 1024):N2} GiB in {totalSeconds:N1}s (avg: {averageSpeedMbps:N2} MB/s)");
     }
 
+    private static bool IsUploadAlreadyCompleteResponse(HttpStatusCode statusCode, string? responseBody)
+        => statusCode == HttpStatusCode.BadRequest
+            && !string.IsNullOrWhiteSpace(responseBody)
+            && responseBody.Contains("already complete", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsTransientRequestException(Exception exception)
         => exception is HttpRequestException or IOException or TaskCanceledException;
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
-        => statusCode is HttpStatusCode.RequestTimeout
+        => statusCode is HttpStatusCode.Unauthorized
+            or HttpStatusCode.NotFound
+            or HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
             or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway

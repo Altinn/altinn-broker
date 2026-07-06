@@ -2,6 +2,8 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Tus;
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -65,6 +67,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ((IList<AuthenticationSchemeBuilder>)o.Schemes).Clear();
             });
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
+                    AuthorizationConstants.TusUploadSession,
+                    _ => { })
                 .AddJwtBearer(options =>
                 {
                     options.RequireHttpsMetadata = false;
@@ -101,6 +106,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     };
                 });
             services.AddHangfire(c => c.UseMemoryStorage());
+            services.RemoveAll<ITusFinalizeUploadEnqueuer>();
+            services.AddSingleton<ITusFinalizeUploadEnqueuer, InlineTusFinalizeUploadEnqueuer>();
 
             var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
             altinnResourceRepository.Setup(x => x.GetResource(It.Is(TestConstants.RESOURCE_FOR_TEST, StringComparer.Ordinal), It.IsAny<CancellationToken>()))

@@ -12,18 +12,31 @@ on:
           - use-case-test
           - use-case-staging
           - use-case-production
+      force_opsgenie_alert:
+        description: 'Send Opsgenie alert even if tests pass (for testing the integration)'
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       environment:
         description: 'Environment to run against'
         required: true
         type: string
+      force_opsgenie_alert:
+        description: 'Send Opsgenie alert even if tests pass (for testing the integration)'
+        required: false
+        default: false
+        type: boolean
+
 run-name: Test use cases for environment ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
 
 jobs:
   usecase-test:
     environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
     runs-on: ubuntu-latest
+    env:
+      OPSGENIE_API_KEY: ${{ secrets.OPSGENIE_API_KEY }}
     outputs:
       tests-enabled: ${{ steps.check-enable.outputs.enabled }}
     steps:
@@ -39,10 +52,12 @@ jobs:
         fi
     
     - name: Checkout
+      if: steps.check-enable.outputs.enabled == 'true'
       uses: actions/checkout@v4
 
     - name: Run use case tests
       id: usecase-test
+      if: steps.check-enable.outputs.enabled == 'true'
       uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
       env:
         base_url: ${{ secrets.BROKER_BASE_URL }}
@@ -55,7 +70,7 @@ jobs:
         filename: tests/Altinn.Broker.UseCaseTests/case_initialize.js
 
     - name: Build failure report
-      if: failure() && steps.usecase-test.outcome == 'failure'
+      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure'
       run: |
           report=":warning: Broker use case test failure :warning: \n"
           report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
@@ -74,61 +89,36 @@ jobs:
             "text": "${{ env.stepreport }}"
           }
 
+    - name: Checkout for Opsgenie reporting
+      if: always() && env.OPSGENIE_API_KEY != '' && ((steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome != 'skipped' && steps.usecase-test.outcome == 'failure') || inputs.force_opsgenie_alert == true || github.event.inputs.force_opsgenie_alert == 'true')
+      uses: actions/checkout@v4
+
     - name: Report failure to Opsgenie
-      if: failure() && steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome == 'failure' && env.OPSGENIE_API_KEY != ''
+      if: always() && env.OPSGENIE_API_KEY != '' && ((steps.check-enable.outputs.enabled == 'true' && steps.usecase-test.outcome != 'skipped' && steps.usecase-test.outcome == 'failure') || inputs.force_opsgenie_alert == true || github.event.inputs.force_opsgenie_alert == 'true')
       env:
         OPSGENIE_API_URL: https://api.eu.opsgenie.com
+        USE_CASE_ENV: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
+        GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_WORKFLOW: ${{ github.workflow }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+        FORCE_ALERT: ${{ inputs.force_opsgenie_alert == true || github.event.inputs.force_opsgenie_alert == 'true' }}
       run: |
-        ENV="${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
-        NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%6N)Z"
-        ALERT_ID="$(cat /proc/sys/kernel/random/uuid)"
+        set -euo pipefail
 
-        payload=$(cat <<EOF
-        {
-          "schemaId": "azureMonitorCommonAlertSchema",
-          "data": {
-            "essentials": {
-              "alertId": "${ALERT_ID}",
-              "alertRule": "Broker Use Case Test",
-              "severity": "Sev1",
-              "signalType": "Metric",
-              "monitorCondition": "Fired",
-              "monitoringService": "Platform",
-              "alertTargetIDs": ["/broker/${ENV}"],
-              "firedDateTime": "${NOW}",
-              "description": "Broker use case test failed (${ENV}) - ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "essentialsVersion": "1.0",
-              "alertContextVersion": "1.0"
-            },
-            "alertContext": {
-              "properties": {
-                "repository": "${{ github.repository }}",
-                "workflow": "${{ github.workflow }}",
-                "run_id": "${{ github.run_id }}",
-                "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                "environment": "${ENV}"
-              },
-              "conditionType": "SingleResourceMultipleMetricCriteria",
-              "condition": {
-                "windowSize": "PT5M",
-                "allOf": [
-                  {
-                    "metricName": "UseCaseTestFailure",
-                    "operator": "GreaterThan",
-                    "threshold": "0",
-                    "timeAggregation": "Count",
-                    "metricValue": 1
-                  }
-                ]
-              }
-            }
-          }
-        }
-        EOF
-        )
+        node .github/scripts/build-opsgenie-use-case-alert.js > payload.json
+        echo "Opsgenie payload size: $(wc -c < payload.json) bytes"
+
+        API_KEY="$(printf '%s' "${OPSGENIE_API_KEY}" | tr -d '[:space:]')"
+        if [ -z "${API_KEY}" ]; then
+          echo "OPSGENIE_API_KEY is empty after trimming whitespace"
+          exit 1
+        fi
+
+        REQUEST_URL="${OPSGENIE_API_URL}/v1/json/azure?apiKey=${API_KEY}"
 
         curl --fail-with-body -v --show-error --silent \
           --request POST \
-          --url "${OPSGENIE_API_URL}/v1/json/azure?apiKey=${OPSGENIE_API_KEY}" \
+          --url "${REQUEST_URL}" \
           --header "Content-Type: application/json" \
-          --data "${payload}"
+          --data-binary @payload.json
