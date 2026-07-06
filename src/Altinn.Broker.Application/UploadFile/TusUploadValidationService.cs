@@ -110,13 +110,16 @@ public class TusUploadValidationService(
             return Errors.FileTransferNotFound;
         }
 
-        if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
+        if (!IsTusUploadSessionStatus(fileTransfer.FileTransferStatusEntity.Status))
         {
             return Errors.FileTransferAlreadyUploaded;
         }
 
         return null;
     }
+
+    private static bool IsTusUploadSessionStatus(FileTransferStatus status)
+        => status is FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing;
 
     /// <summary>
     /// Lightweight sender check for in-progress uploads. Used when the upload session is already
