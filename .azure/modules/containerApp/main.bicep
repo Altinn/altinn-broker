@@ -71,7 +71,7 @@ var containerAppEnvVars = concat([
   { name: 'MaskinportenSettings__ClientId', secretRef: 'maskinporten-client-id' }
   {
     name: 'MaskinportenSettings__Scope'
-    value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:authorization/authorize.admin'
+    value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:serviceowner altinn:authorization/authorize.admin altinn:resourceregistry/resource.admin'
   }
   { 
     name: 'MaskinportenSettings__ExhangeToAltinnToken'
