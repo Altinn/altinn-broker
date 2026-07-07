@@ -323,10 +323,13 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_WithoutRange_ReturnsFullFileWithAcceptRanges()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
+        // Act
         var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
 
+        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
         Assert.Equal(fileBytes.Length, response.Content.Headers.ContentLength);
@@ -336,10 +339,13 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_WithRange_ReturnsPartialContent()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
+        // Act
         var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 9));
 
+        // Assert
         Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
         Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
         var contentRange = response.Content.Headers.ContentRange;
@@ -355,9 +361,10 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_WithOpenEndedAndSuffixRanges_ReturnsPartialContent()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
-        // Open-ended range from byte 10 to end of file
+        // Act & Assert - open-ended range from byte 10 to end of file
         var openEndedResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, null));
         Assert.Equal(HttpStatusCode.PartialContent, openEndedResponse.StatusCode);
         var contentRange = openEndedResponse.Content.Headers.ContentRange;
@@ -367,7 +374,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(fileBytes.Length, contentRange.Length);
         Assert.Equal(fileBytes[10..], await openEndedResponse.Content.ReadAsByteArrayAsync());
 
-        // Suffix range of the last 10 bytes
+        // Act & Assert - suffix range of the last 10 bytes
         var suffixResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(null, 10));
         Assert.Equal(HttpStatusCode.PartialContent, suffixResponse.StatusCode);
         contentRange = suffixResponse.Content.Headers.ContentRange;
@@ -380,13 +387,16 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_ChunkedRangeDownloads_ReassembleToFullFile()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
+        // Act
         var firstChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 19));
         var secondChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(20, null));
+
+        // Assert
         Assert.Equal(HttpStatusCode.PartialContent, firstChunk.StatusCode);
         Assert.Equal(HttpStatusCode.PartialContent, secondChunk.StatusCode);
-
         var reassembled = (await firstChunk.Content.ReadAsByteArrayAsync())
             .Concat(await secondChunk.Content.ReadAsByteArrayAsync())
             .ToArray();
@@ -400,12 +410,78 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task DownloadFile_ParallelRangeDownloads_ReassembleToFullFile()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+        const int chunkSize = 10;
+        var ranges = new List<(long From, long To)>();
+        for (long start = 0; start < fileBytes.Length; start += chunkSize)
+        {
+            ranges.Add((start, Math.Min(start + chunkSize - 1, fileBytes.Length - 1)));
+        }
+
+        // Act
+        var downloadTasks = ranges.Select(range => DownloadWithRange(fileTransferId, new RangeHeaderValue(range.From, range.To))).ToList();
+        var responses = await Task.WhenAll(downloadTasks);
+
+        // Assert
+        var reassembled = new List<byte>();
+        for (var i = 0; i < responses.Length; i++)
+        {
+            Assert.Equal(HttpStatusCode.PartialContent, responses[i].StatusCode);
+            var contentRange = responses[i].Content.Headers.ContentRange;
+            Assert.NotNull(contentRange);
+            Assert.Equal(ranges[i].From, contentRange.From);
+            Assert.Equal(ranges[i].To, contentRange.To);
+            Assert.Equal(fileBytes.Length, contentRange.Length);
+            reassembled.AddRange(await responses[i].Content.ReadAsByteArrayAsync());
+        }
+        Assert.Equal(fileBytes, reassembled.ToArray());
+
+        // Concurrent chunk requests on the same instance should be debounced to a single DownloadStarted status
+        var details = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(details);
+        var downloadStartedEvents = details.RecipientFileTransferStatusHistory.Where(recipientFileStatus => recipientFileStatus.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadStarted);
+        Assert.Single(downloadStartedEvents);
+    }
+
+    [Fact]
+    public async Task DownloadFile_InterruptedDownloadResumedWithRange_ReassemblesCompleteFile()
+    {
+        // Arrange - start a full download but abandon it after the first 20 bytes, like a dropped connection
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+        var interruptedBytes = new byte[20];
+        using (var interruptedResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download", HttpCompletionOption.ResponseHeadersRead))
+        {
+            Assert.Equal(HttpStatusCode.OK, interruptedResponse.StatusCode);
+            await using var downloadStream = await interruptedResponse.Content.ReadAsStreamAsync();
+            await downloadStream.ReadExactlyAsync(interruptedBytes);
+        }
+
+        // Act - resume from the size of the partial download, as a resuming client derives the offset from its local file
+        var resumeResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(interruptedBytes.Length, null));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.PartialContent, resumeResponse.StatusCode);
+        var contentRange = resumeResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(interruptedBytes.Length, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        var reassembled = interruptedBytes.Concat(await resumeResponse.Content.ReadAsByteArrayAsync()).ToArray();
+        Assert.Equal(fileBytes, reassembled);
+    }
+
+    [Fact]
     public async Task DownloadFile_RangeStartBeyondFileEnd_ReturnsRangeNotSatisfiable()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
+        // Act
         var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(fileBytes.Length, null));
 
+        // Assert
         Assert.Equal(HttpStatusCode.RequestedRangeNotSatisfiable, response.StatusCode);
         var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
@@ -415,10 +491,13 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_RangeEndBeyondFileEnd_IsClampedToFileEnd()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
 
+        // Act
         var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, 99999));
 
+        // Assert
         Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
         var contentRange = response.Content.Headers.ContentRange;
         Assert.NotNull(contentRange);
@@ -430,13 +509,16 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task DownloadFile_WithMultiRange_ReturnsFullFile()
     {
+        // Arrange
         var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
-
         var rangeHeader = new RangeHeaderValue();
         rangeHeader.Ranges.Add(new RangeItemHeaderValue(0, 1));
         rangeHeader.Ranges.Add(new RangeItemHeaderValue(5, 10));
+
+        // Act
         var response = await DownloadWithRange(fileTransferId, rangeHeader);
 
+        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(fileBytes, await response.Content.ReadAsByteArrayAsync());
     }
