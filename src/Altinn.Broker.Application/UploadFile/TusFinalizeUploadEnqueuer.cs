@@ -4,14 +4,14 @@ namespace Altinn.Broker.Application.UploadFile;
 
 public sealed class TusFinalizeUploadEnqueuer(
     IBackgroundJobClient backgroundJobClient,
-    ITusUploadFinalizationService tusUploadFinalizationService) : ITusFinalizeUploadEnqueuer
+    ITusUploadKindResolver tusUploadKindResolver) : ITusFinalizeUploadEnqueuer
 {
     public async Task EnqueueAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
         var concatJobId = backgroundJobClient.Enqueue<TusConcatenateUploadHandler>(handler =>
             handler.Process(fileTransferId, tusFileId, CancellationToken.None));
 
-        if (await tusUploadFinalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
+        if (await tusUploadKindResolver.IsPartialUploadAsync(tusFileId, cancellationToken))
         {
             return;
         }

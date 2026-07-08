@@ -14,11 +14,11 @@ internal sealed class InlineTusFinalizeUploadEnqueuer(IServiceScopeFactory servi
         using var scope = serviceScopeFactory.CreateScope();
         var concatenateHandler = scope.ServiceProvider.GetRequiredService<TusConcatenateUploadHandler>();
         var publishHandler = scope.ServiceProvider.GetRequiredService<TusPublishUploadHandler>();
-        var finalizationService = scope.ServiceProvider.GetRequiredService<ITusUploadFinalizationService>();
+        var uploadKindResolver = scope.ServiceProvider.GetRequiredService<ITusUploadKindResolver>();
 
         await concatenateHandler.Process(fileTransferId, tusFileId, cancellationToken);
 
-        if (!await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
+        if (!await uploadKindResolver.IsPartialUploadAsync(tusFileId, cancellationToken))
         {
             await publishHandler.Process(fileTransferId, tusFileId, cancellationToken);
         }
