@@ -1,3 +1,4 @@
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -14,6 +15,7 @@ namespace Altinn.Broker.Application;
 public class StuckFileTransferHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
     IFileTransferRepository fileTransferRepository,
+    ITusUploadFinalizationProgressService tusUploadFinalizationProgressService,
     IBackgroundJobClient backgroundJobClient,
     SlackStuckFileTransferNotifier slackNotifier,
     ILogger<StuckFileTransferHandler> logger)
@@ -53,6 +55,16 @@ public class StuckFileTransferHandler(
             cancellationToken);
         foreach (FileTransferStatusEntity status in stuckInUploadProcessing)
         {
+            if (await tusUploadFinalizationProgressService.IsTusFinalizationInProgressAsync(
+                    status.FileTransferId,
+                    cancellationToken))
+            {
+                logger.LogInformation(
+                    "File transfer {fileTransferId} is in UploadProcessing but TUS finalization is still in progress. Skipping stuck notification.",
+                    status.FileTransferId);
+                continue;
+            }
+
             logger.LogWarning("File transfer {fileTransferId} has been stuck in UploadProcessing for more than {thresholdMinutes} minutes", status.FileTransferId, _stuckInUploadProcessingThresholdMinutes);
             var succesfullNotification = await slackNotifier.NotifyFileStuckWithStatus(status);
             if (!succesfullNotification)

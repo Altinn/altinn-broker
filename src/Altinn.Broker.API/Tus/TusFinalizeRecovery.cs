@@ -74,6 +74,6 @@ internal static class TusFinalizeRecovery
             isPartial);
 
         var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
-        enqueuer.Enqueue(fileTransferId, tusFileId);
+        await enqueuer.EnqueueAsync(fileTransferId, tusFileId, cancellationToken);
     }
 }

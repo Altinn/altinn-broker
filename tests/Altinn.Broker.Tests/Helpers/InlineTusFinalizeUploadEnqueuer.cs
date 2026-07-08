@@ -9,10 +9,18 @@ namespace Altinn.Broker.Tests.Helpers;
 /// </summary>
 internal sealed class InlineTusFinalizeUploadEnqueuer(IServiceScopeFactory serviceScopeFactory) : ITusFinalizeUploadEnqueuer
 {
-    public void Enqueue(Guid fileTransferId, string tusFileId)
+    public async Task EnqueueAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
         using var scope = serviceScopeFactory.CreateScope();
-        var handler = scope.ServiceProvider.GetRequiredService<TusFinalizeUploadHandler>();
-        handler.Process(fileTransferId, tusFileId, CancellationToken.None).GetAwaiter().GetResult();
+        var concatenateHandler = scope.ServiceProvider.GetRequiredService<TusConcatenateUploadHandler>();
+        var publishHandler = scope.ServiceProvider.GetRequiredService<TusPublishUploadHandler>();
+        var finalizationService = scope.ServiceProvider.GetRequiredService<ITusUploadFinalizationService>();
+
+        await concatenateHandler.Process(fileTransferId, tusFileId, cancellationToken);
+
+        if (!await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
+        {
+            await publishHandler.Process(fileTransferId, tusFileId, cancellationToken);
+        }
     }
 }

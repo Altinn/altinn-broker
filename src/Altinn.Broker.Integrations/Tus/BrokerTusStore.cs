@@ -148,7 +148,7 @@ public class BrokerTusStore(
                     logger.LogInformation(
                         "TUS partial final chunk accepted for file id {FileId}. Enqueueing staging finalize job.",
                         fileId);
-                    tusFinalizeUploadEnqueuer.Enqueue(mappedFileTransferId, fileId);
+                    await tusFinalizeUploadEnqueuer.EnqueueAsync(mappedFileTransferId, fileId, cancellationToken);
                 }
             }
 

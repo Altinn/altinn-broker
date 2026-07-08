@@ -1,6 +1,8 @@
 ﻿using Hangfire;
 using Hangfire.PostgreSql;
 
+using Hangfire.PostgreSql;
+
 using Microsoft.ApplicationInsights;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,8 +19,12 @@ public static class DependencyInjection
         services.AddHangfire((provider, config) =>
         {
             config.UsePostgreSqlStorage(
-                c => c.UseConnectionFactory(provider.GetRequiredService<IConnectionFactory>())
-            );
+                c => c.UseConnectionFactory(provider.GetRequiredService<IConnectionFactory>()),
+                new PostgreSqlStorageOptions
+                {
+                    UseSlidingInvisibilityTimeout = true,
+                    InvisibilityTimeout = TimeSpan.FromMinutes(5),
+                });
             config.UseLogProvider(new AspNetCoreLogProvider(provider.GetRequiredService<ILoggerFactory>()));
             config.UseFilter(new HangfireAppRequestFilter());
             config.UseSerializerSettings(new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore });

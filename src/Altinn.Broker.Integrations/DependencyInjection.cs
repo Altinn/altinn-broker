@@ -124,5 +124,6 @@ public static class DependencyInjection
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
+        services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
     }
 }
