@@ -29,4 +29,14 @@ public class IdempotencyEventRepository(NpgsqlDataSource dataSource, ExecuteDBCo
         var affected = await commandExecutor.ExecuteWithRetry(async (ct) => await command.ExecuteNonQueryAsync(ct), cancellationToken);
         return affected > 0;
     }
+
+    public async Task<bool> ExistsAsync(string idempotencyEventId, CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = dataSource.CreateCommand(
+            "SELECT 1 FROM broker.idempotency_event WHERE idempotency_event_id_pk = @idempotency_event_id_pk");
+        command.Parameters.AddWithValue("@idempotency_event_id_pk", idempotencyEventId);
+
+        var result = await commandExecutor.ExecuteWithRetry(async (ct) => await command.ExecuteScalarAsync(ct), cancellationToken);
+        return result is not null;
+    }
 }

@@ -1,0 +1,31 @@
+meta {
+  name: TUS
+  seq: 5
+}
+
+docs {
+  TUS resumable upload smoke tests for **small files only**.
+
+  ## Prerequisites
+  1. Authenticate (sender token)
+  2. Run **FileTransfer/Initialize** to set `fileTransferId`
+
+  ## Smoke test workflow
+  Run these requests in order (or run the whole TUS folder):
+  1. **OPTIONS** — discover server capabilities
+  2. **Create upload** — POST with `Upload-Length` (sets `tus_upload_url`)
+  3. **Head upload** — verify offset is 0
+  4. **Upload chunk** — single PATCH with the test file
+  5. **Overview** — poll `{fileTransferId}/Overview` until status is `Published`
+
+  Default test file: `tus-smoke-test.txt` in the collection root (override with `tus_test_file`).
+  **Developer Mode** must be enabled — Create upload and Upload chunk read the file via `fs`.
+  Upload chunk sends bytes with `req.setBody(..., { raw: true })`; plain Buffer objects are JSON-serialized by Bruno.
+
+  ## Large files
+  Bruno is not a TUS client. For large or resumable uploads use:
+  - `tests/tus/Altinn.Broker.Tests.LargeFile` (C#)
+  - `tests/tus/Altinn.Broker.Tests.TusPythonClient` (Python)
+
+  See `TUS-RESUMABLE-UPLOADS.md` in the repository root.
+}

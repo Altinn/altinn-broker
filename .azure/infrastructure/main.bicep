@@ -158,6 +158,15 @@ module backupStorageAccount '../modules/dbBackupStorage/create.bicep' = {
   }
 }
 
+module appIdentity '../modules/identity/create.bicep' = {
+  scope: resourceGroup
+  name: 'appIdentity'
+  params: {
+    namePrefix: namePrefix
+    location: location
+  }
+}
+
 module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
   scope: resourceGroup
   name: 'container-app-environment'
@@ -167,6 +176,22 @@ module containerAppEnv '../modules/containerAppEnvironment/main.bicep' = {
     location: location
     namePrefix: namePrefix
     migrationsStorageAccountName: migrationsStorageAccountName
+  }
+}
+
+module redis '../modules/redis/create.bicep' = {
+  scope: resourceGroup
+  name: 'redis'
+  dependsOn: [
+    environmentKeyVault
+    appIdentity
+  ]
+  params: {
+    location: location
+    namePrefix: namePrefix
+    keyVaultName: sourceKeyVaultName
+    environment: environment
+    appIdentityPrincipalId: appIdentity.outputs.principalId
   }
 }
 

@@ -4,4 +4,5 @@ public interface IIdempotencyEventRepository
 {
     Task AddIdempotencyEventAsync(string id, CancellationToken cancellationToken);
     Task<bool> TryAddIdempotencyEventAsync(string id, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(string id, CancellationToken cancellationToken);
 }

@@ -5,10 +5,12 @@ using Altinn.ApiClients.Maskinporten.Config;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
+using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
+using Altinn.Broker.Integrations.Tus;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Persistence;
@@ -17,11 +19,16 @@ using Altinn.Common.PEP.Authorization;
 using Altinn.Broker.API.Swagger;
 using Hangfire;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
+
+using StackExchange.Redis;
 
 BuildAndRun(args);
 
@@ -43,14 +50,17 @@ static void BuildAndRun(string[] args)
 
     builder.Configuration
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
-        .AddJsonFile("appsettings.local.json", true, true);
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+        .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables();
+
     ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
     var generalSettings = builder.Configuration.GetSection(nameof(GeneralSettings)).Get<GeneralSettings>();
     bootstrapLogger.LogInformation($"Running in environment {builder.Environment.EnvironmentName}");
     builder.Services.ConfigureOpenTelemetry(generalSettings?.ApplicationInsightsConnectionString ?? string.Empty);
 
     var app = builder.Build();
+    app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
     app.UseExceptionHandler();
@@ -60,9 +70,14 @@ static void BuildAndRun(string[] args)
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+
+    app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
+    app.UseMiddleware<TusIdempotentCompletePatchMiddleware>();
 
     app.MapControllers();
+    app.MapBrokerTusUploads();
 
     app.UseHangfireDashboard();
 
@@ -86,6 +101,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         options.IncludeXmlComments(xmlPath);
         options.OperationFilter<BinaryRequestBodyOperationFilter>();
+        options.DocumentFilter<TusUploadDocumentFilter>();
     });
 
     services.Configure<DatabaseOptions>(config.GetSection(key: nameof(DatabaseOptions)));
@@ -97,6 +113,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
+    services.Configure<DistributedCacheOptions>(config.GetSection(DistributedCacheOptions.SectionName));
+    services.Configure<TusOptions>(config.GetSection(TusOptions.SectionName));
 
     services.AddApplicationHandlers();
     services.AddIntegrations(config, hostEnvironment.IsDevelopment());
@@ -105,17 +123,30 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddHttpClient();
     services.AddProblemDetails();
 
-    // Add distributed cache for rate limiting (use memory cache for development, Redis for production)
-    if (hostEnvironment.IsDevelopment())
+    // Add distributed cache for rate limiting and TUS upload expiration tracking.
+    var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
+    if (!string.IsNullOrWhiteSpace(distributedCacheOptions?.RedisConnectionString))
     {
-        services.AddDistributedMemoryCache();
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = distributedCacheOptions.RedisConnectionString;
+        });
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString));
     }
     else
     {
-        // In production, use Redis if available
-        // For now, fall back to memory cache
         services.AddDistributedMemoryCache();
     }
+
+    services.AddHybridCache(options =>
+    {
+        options.DefaultEntryOptions = new HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromHours(24),
+            LocalCacheExpiration = TimeSpan.FromMinutes(5)
+        };
+    });
 
     // Register filters
     services.AddScoped<StatisticsApiKeyFilter>();
@@ -123,6 +154,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.ConfigureHangfire();
 
     services.AddAuthentication()
+        .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
+            AuthorizationConstants.TusUploadSession,
+            _ => { })
         .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             var altinnOptions = new AltinnOptions();
@@ -164,12 +198,19 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateLifetime = !hostEnvironment.IsDevelopment(),
                 ClockSkew = TimeSpan.Zero
             };
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = AltinnTokenEventsHelper.OnAuthenticationFailed,
+                OnChallenge = AltinnTokenEventsHelper.OnChallenge
+            };
         });
+
+    services.AddScoped<TusUploadSessionAuthenticationHelper>();
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(AuthorizationConstants.TusUploadSession, JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.Legacy, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.LegacyScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));

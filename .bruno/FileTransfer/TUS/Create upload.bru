@@ -1,0 +1,55 @@
+meta {
+  name: Create upload
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{broker_base_url}}/broker/api/v1/filetransfer/upload/tus/{{fileTransferId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Tus-Resumable: 1.0.0
+  Upload-Length: {{upload_length}}
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+script:pre-request {
+  const testFile = bru.getVar("tus_test_file") || "tus-smoke-test.txt";
+  
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const filePath = path.join(bru.cwd(), testFile);
+    const stats = fs.statSync(filePath);
+    bru.setVar("upload_length", stats.size.toString());
+    console.log(`Upload-Length set to ${stats.size} bytes (${testFile})`);
+  } catch (e) {
+    const length = bru.getVar("upload_length");
+    if (!length) {
+      throw new Error(
+        "Set upload_length (bytes) in your environment, or enable Developer Mode to auto-detect the test file size."
+      );
+    }
+  }
+}
+
+script:post-response {
+  let location = res.getHeader("location");
+  const baseUrl = bru.getEnvVar("broker_base_url").replace(/\/$/, "");
+  
+  if (!location) {
+    location = `${baseUrl}/broker/api/v1/filetransfer/upload/tus/${bru.getVar("fileTransferId")}`;
+  } else if (!location.startsWith("http")) {
+    location = location.startsWith("/") ? baseUrl + location : `${baseUrl}/${location}`;
+  }
+  
+  bru.setVar("tus_upload_url", location);
+  bru.setVar("upload_offset", "0");
+  console.log("TUS upload URL:", location);
+}

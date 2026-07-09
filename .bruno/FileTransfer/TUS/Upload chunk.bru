@@ -1,0 +1,48 @@
+meta {
+  name: Upload chunk
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{tus_upload_url}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{sender_token}}
+}
+
+script:pre-request {
+  const testFile = bru.getVar("tus_test_file") || "tus-smoke-test.txt";
+  const fs = require("fs");
+  const path = require("path");
+  const filePath = path.join(bru.cwd(), testFile);
+  const fileBuffer = fs.readFileSync(filePath);
+  const uploadLength = parseInt(bru.getVar("upload_length") || "0", 10);
+  const offset = bru.getVar("upload_offset") || "0";
+
+  if (uploadLength > 0 && fileBuffer.length !== uploadLength) {
+    throw new Error(
+      `File size (${fileBuffer.length}) does not match Upload-Length (${uploadLength}). Re-run Create upload, or set tus_test_file / upload_length to match.`
+    );
+  }
+
+  // Bruno JSON-serializes Node Buffers; latin1 + raw sends the actual bytes.
+  const rawBody = Buffer.from(fileBuffer).toString("latin1");
+  req.setBody(rawBody, { raw: true });
+  req.setHeader("Content-Type", "application/offset+octet-stream");
+  req.setHeader("Content-Length", String(fileBuffer.length));
+  req.setHeader("Upload-Offset", offset);
+  req.setHeader("Tus-Resumable", "1.0.0");
+  console.log(`PATCH ${fileBuffer.length} bytes at offset ${offset} from ${testFile}`);
+}
+
+script:post-response {
+  const offset = res.getHeader("upload-offset");
+  if (offset !== undefined && offset !== null) {
+    bru.setVar("upload_offset", offset);
+    console.log("Upload complete through offset:", offset);
+  }
+}
