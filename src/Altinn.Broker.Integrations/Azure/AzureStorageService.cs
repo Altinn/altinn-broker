@@ -65,7 +65,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
-    public async Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+    public async Task<(string? Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
                                       Stream stream, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");

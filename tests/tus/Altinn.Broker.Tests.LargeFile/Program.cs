@@ -28,9 +28,9 @@ public class Program
         var authOptions = AltinnAuthClient.ReadOptionsFromEnvironment();
         var baseUrl = authOptions.BaseUrl;
         var resourceId = RequireEnv("RESOURCE_ID");
-        var chunkSizeMb = int.Parse(ReadEnv("CHUNK_SIZE_MB", DefaultChunkSizeMb.ToString()));
+        var chunkSizeMb = int.Parse(ReadEnv("CHUNK_SIZE_MB", DefaultChunkSizeMb.ToString())!);
         var parallelPartialUploads = int.Parse(
-            ReadEnv("TUS_PARALLEL_PARTIAL_UPLOADS", DefaultParallelPartialUploads.ToString()));
+            ReadEnv("TUS_PARALLEL_PARTIAL_UPLOADS", DefaultParallelPartialUploads.ToString())!);
         var uploadFilePath = ReadEnv("UPLOAD_FILE_PATH", null);
         var chunkSize = chunkSizeMb * 1024 * 1024;
 

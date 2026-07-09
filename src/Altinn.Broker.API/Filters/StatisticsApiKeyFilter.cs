@@ -148,17 +148,17 @@ public class StatisticsApiKeyFilter : IAsyncAuthorizationFilter
         return result == 0;
     }
 
-    /// <summary>
-    /// Checks if the client has exceeded the rate limit
-    /// </summary>
-    /// <param name="clientIdentifier">Unique identifier for the client (IP address)</param>
-    /// <returns>Rate limit check result</returns>
     private static readonly HybridCacheEntryOptions RateLimitCacheOptions = new()
     {
         Expiration = TimeSpan.FromMinutes(RateLimitWindowMinutes + 1),
         Flags = HybridCacheEntryFlags.DisableLocalCache
     };
 
+    /// <summary>
+    /// Checks if the client has exceeded the rate limit
+    /// </summary>
+    /// <param name="clientIdentifier">Unique identifier for the client (IP address)</param>
+    /// <returns>Rate limit check result</returns>
     private async Task<RateLimitResult> CheckRateLimitAsync(string clientIdentifier)
     {
         
