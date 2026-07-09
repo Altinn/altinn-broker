@@ -44,3 +44,11 @@ public static class StatisticsErrors
     public static Error InvalidMonthRange = new Error(6004, "The requested report month is invalid.", HttpStatusCode.BadRequest);
     public static Error EndUserAndVendorBothExcluded = new Error(6005, "At least one of includeEndUser or includeVendor must be true.", HttpStatusCode.BadRequest);
 }
+
+public static class ServiceOwnerErrors
+{
+    public static Error CallerOrganizationIdNotFound = new Error(7001, "Caller organization id could not be determined", HttpStatusCode.BadRequest);
+    public static Error ServiceOwnerAlreadyExists = new Error(7002, "Service owner already exists", HttpStatusCode.Conflict);
+    public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
+    public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
+}
