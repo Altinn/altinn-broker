@@ -26,11 +26,13 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// <response code="200">Service owner initialized successfully</response>
     /// <response code="400">Caller organization id could not be determined</response>
     /// <response code="409">Service owner already exists</response>
+    /// <response code="500">Service owner could not be initialized</response>
     [HttpPost]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
         var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
@@ -63,10 +65,12 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// - altinn:serviceowner <br/>
     /// </remarks>
     /// <response code="200">Service owner retrieved successfully</response>
+    /// <response code="400">Caller organization id could not be determined</response>
     /// <response code="404">Service owner not found</response>
     [HttpGet]
     [Produces("application/json")]
     [ProducesResponseType(typeof(ServiceOwnerOverviewExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {

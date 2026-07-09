@@ -37,8 +37,15 @@ public static class ClaimsPrincipalExtensions
         var consumerClaim = user.Claims.FirstOrDefault(c => c.Type == "consumer");
         if (consumerClaim is not null)
         {
-            var consumerObject = JsonSerializer.Deserialize<TokenConsumer>(consumerClaim.Value);
-            return consumerObject?.ID?.WithoutPrefix();
+            try
+            {
+                var consumerObject = JsonSerializer.Deserialize<TokenConsumer>(consumerClaim.Value);
+                return consumerObject?.ID?.WithoutPrefix();
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
         }
         
         return null;
