@@ -76,6 +76,9 @@ public class ManifestDownloadStreamTests
         await stream.AddManifestFile(file, resource);
         var newBrokerManifest = stream.GetBrokerManifest();
         Assert.NotEqual(stream.Length, originalFileLength);
+        Assert.NotNull(newBrokerManifest);
+        Assert.NotNull(originalBrokerManifest);
+        Assert.NotEqual(originalBrokerManifest, newBrokerManifest);
         Assert.NotEqual(originalBrokerManifest.Reportee, newBrokerManifest.Reportee);
         Assert.NotEqual(originalBrokerManifest.SendersReference, newBrokerManifest.SendersReference);
         Assert.NotEqual(originalBrokerManifest.SentDate, newBrokerManifest.SentDate);        
@@ -104,7 +107,7 @@ public class ManifestDownloadStreamTests
     {
         var fileStream = File.OpenRead(path);
         var fileBuffer = new byte[fileStream.Length];
-        fileStream.Read(fileBuffer, 0, fileBuffer.Length);
+        fileStream.ReadExactly(fileBuffer, 0, fileBuffer.Length);
         return new ManifestDownloadStream(fileBuffer);
     }
 }

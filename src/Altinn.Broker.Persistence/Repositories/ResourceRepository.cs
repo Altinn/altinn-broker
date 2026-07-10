@@ -5,7 +5,7 @@ using Altinn.Broker.Persistence.Helpers;
 using Npgsql;
 
 namespace Altinn.Broker.Persistence.Repositories;
-public class ResourceRepository(NpgsqlDataSource dataSource, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, ExecuteDBCommandWithRetries commandExecutor) : IResourceRepository
+public class ResourceRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IResourceRepository
 {
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {

@@ -75,6 +75,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
+
     // Content-Range is only present on ranged responses and has the format "bytes {start}-{end}/{total}"
     private static long? ParseTotalLengthFromContentRange(string? contentRange)
     {
@@ -90,7 +91,8 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         return null;
     }
 
-    public async Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+    public async Task<(string? Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
+
                                       Stream stream, CancellationToken cancellationToken)
     {
         logger.LogInformation($"Starting upload of {fileTransferEntity.FileTransferId} for {serviceOwnerEntity.Name}");
@@ -422,6 +424,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         if (string.IsNullOrEmpty(fileTransferEntity.Checksum))
         {
             logger.LogError("Did not set checksum content hash because checksum was not found on file transfer");
+            return;
         }
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());

@@ -77,6 +77,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -117,6 +118,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
 
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);        
         Assert.NotNull(initializedFile);
@@ -153,6 +155,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -189,6 +192,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -223,6 +227,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -264,6 +269,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);
@@ -432,6 +438,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         
 
@@ -490,6 +497,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
@@ -534,6 +542,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
@@ -567,6 +576,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadedFileLength = await UploadEmptyZipFile(fileTransferId);
 
@@ -600,6 +610,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         await UploadFile(fileTransferId);
 
@@ -618,6 +629,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
@@ -648,6 +660,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
@@ -678,6 +691,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadedFileLength = await UploadZipFile(fileTransferId);
 
@@ -700,6 +714,7 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
         var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", FileTransferInitializeExtTestFactory.BasicFileTransfer());
         Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var initializedFile = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
         Assert.NotNull(initializedFile);

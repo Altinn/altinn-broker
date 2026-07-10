@@ -11,7 +11,7 @@ public sealed class HangfireNoOpLogProvider : ILogProvider
 {
     private sealed class NoOpLogger : ILog
     {
-        public bool Log(LogLevel logLevel, Func<string> messageFunc, Exception exception = null)
+        public bool Log(LogLevel logLevel, Func<string> messageFunc, Exception? exception = null)
         {
             // Returning true indicates the message has been "logged".
             return true;
