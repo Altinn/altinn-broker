@@ -183,7 +183,8 @@ public class LegacyFileController(ILogger<LegacyFileController> logger) : Contro
     }
 
     /// <summary>
-    /// Downloads the file
+    /// Downloads the file. HTTP Range requests are intentionally not supported on the legacy endpoint
+    /// because the manifest file shim requires mutating the complete file; the full file is always returned.
     /// </summary>
     /// <returns></returns>
     [HttpGet]

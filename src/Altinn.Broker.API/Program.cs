@@ -138,6 +138,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     {
         services.AddDistributedMemoryCache();
     }
+    services.AddHybridCache();
 
     services.AddHybridCache(options =>
     {
