@@ -456,6 +456,33 @@ public class LegacyFileControllerTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task Download_WithRangeHeader_RangeIsIgnoredAndFullFileIsReturned()
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer();
+        var initializeFileResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+        Assert.True(initializeFileResponse.IsSuccessStatusCode, await initializeFileResponse.Content.ReadAsStringAsync());
+        var fileTransferResponse = await initializeFileResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        var fileTransferId = fileTransferResponse!.FileTransferId.ToString();
+        var uploadedFileBytes = Encoding.UTF8.GetBytes("This is the contents of the uploaded file");
+        using (var content = new ByteArrayContent(uploadedFileBytes))
+        {
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            var uploadResponse = await _senderClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/upload", content);
+            Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        }
+
+        // Act
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"broker/api/v1/legacy/file/{fileTransferId}/download?onBehalfOfConsumer={file.Recipients[0]}");
+        request.Headers.Range = new RangeHeaderValue(0, 9);
+        var downloadedFile = await _legacyClient.SendAsync(request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, downloadedFile.StatusCode);
+        Assert.Equal(uploadedFileBytes, await downloadedFile.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
     public async Task Download_ConfirmDownloaded_Success()
     {
         // Arrange

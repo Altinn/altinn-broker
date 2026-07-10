@@ -311,6 +311,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// <remarks>
     /// One of the scopes: <br />
     /// - altinn:broker.read <br/>
+    /// Supports HTTP Range requests with a single bytes range for resumable and partial downloads.
     /// </remarks>
     /// <response code="200">Returns the file</response>
     /// <response code="400"><ul>
@@ -337,12 +338,29 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
          CancellationToken cancellationToken)
     {
         logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
+        var byteRange = ByteRangeParser.ParseRangeHeader(Request.Headers.Range);
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
-            FileTransferId = fileTransferId
+            FileTransferId = fileTransferId,
+            Range = byteRange
         }, HttpContext.User, cancellationToken);
-        return queryResult.Match<ActionResult>(
-            result => File(result.DownloadStream, "application/octet-stream", result.FileName),
+        return queryResult.Match(
+            result =>
+            {
+                Response.Headers.AcceptRanges = "bytes";
+                if (result.ResolvedRange is not null)
+                {
+                    var range = result.ResolvedRange.Value;
+                    Response.StatusCode = StatusCodes.Status206PartialContent;
+                    Response.Headers.ContentRange = $"bytes {range.Start}-{range.End}/{result.TotalSize}";
+                    Response.ContentLength = range.Length;
+                }
+                else
+                {
+                    Response.ContentLength = result.TotalSize;
+                }
+                return File(result.DownloadStream, "application/octet-stream", result.FileName);
+            },
             Problem
         );
     }

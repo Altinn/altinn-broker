@@ -49,20 +49,45 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         return $"https://{storageProviderEntity.ResourceName}.blob.core.windows.net";
     }
 
-    public async Task<Stream> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, CancellationToken cancellationToken)
+    public async Task<BrokerFileDownload> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, ByteRange? range, CancellationToken cancellationToken)
     {
         var blobContainerClient = await GetBlobContainerClient(fileTransfer, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
         try
         {
-            var content = await blobClient.DownloadStreamingAsync(new BlobDownloadOptions(), cancellationToken);
-            return content.Value.Content;
+            var options = new BlobDownloadOptions();
+            if (range is not null)
+            {
+                options.Range = new HttpRange(range.Value.Offset, range.Value.Length);
+            }
+            var content = await blobClient.DownloadStreamingAsync(options, cancellationToken);
+            var details = content.Value.Details;
+            return new BrokerFileDownload(
+                Content: content.Value.Content,
+                TotalLength: ParseTotalLengthFromContentRange(details.ContentRange) ?? (range is null ? details.ContentLength : fileTransfer.FileTransferSize),
+                SegmentLength: details.ContentLength,
+                ETag: details.ETag.ToString());
         }
         catch (RequestFailedException requestFailedException)
         {
             logger.LogError("Error occurred while downloading file: {errorCode}: {errorMessage} ", requestFailedException.ErrorCode, requestFailedException.Message);
             throw;
         }
+    }
+
+    // Content-Range is only present on ranged responses and has the format "bytes {start}-{end}/{total}"
+    private static long? ParseTotalLengthFromContentRange(string? contentRange)
+    {
+        if (string.IsNullOrEmpty(contentRange))
+        {
+            return null;
+        }
+        var separatorIndex = contentRange.LastIndexOf('/');
+        if (separatorIndex >= 0 && long.TryParse(contentRange.AsSpan(separatorIndex + 1), out var totalLength))
+        {
+            return totalLength;
+        }
+        return null;
     }
 
     public async Task<(string Checksum, long Length)?> UploadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity,
