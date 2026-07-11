@@ -17,7 +17,6 @@ namespace Altinn.Broker.Application.GenerateReport;
 public class GenerateDailySummaryReportHandler(
     IFileTransferRepository fileTransferRepository,
     IServiceOwnerRepository serviceOwnerRepository,
-    IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IOptions<ReportFilterOptions> reportFilterOptions,
     IBrokerStorageService brokerStorageService,

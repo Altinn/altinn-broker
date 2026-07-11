@@ -5,7 +5,7 @@ namespace Altinn.Broker.Helpers
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public class ValidateUseManifestFileShim : ValidationAttribute
     {
-        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             var useManifestFileShimProperty = validationContext.ObjectType.GetProperty("UseManifestFileShim");
             var externalServiceCodeLegacyProperty = validationContext.ObjectType.GetProperty("ExternalServiceCodeLegacy");

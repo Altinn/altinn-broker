@@ -193,6 +193,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId;
 
         var fileTransferAfterInitialize = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>($"broker/api/v1/filetransfer/{fileTransferId}", _responseSerializerOptions);
@@ -256,7 +257,9 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList can contain at most 10 properties", parsedError.Extensions.First().Value.ToString());
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
+        Assert.NotNull(parsedErrorValue);
+        Assert.Contains("PropertyList can contain at most 10 properties", parsedErrorValue);
     }
 
     [Fact]
@@ -271,7 +274,9 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList Key can not be longer than 50", parsedError.Extensions.First().Value.ToString());
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
+        Assert.NotNull(parsedErrorValue);
+        Assert.Contains("PropertyList Key can not be longer than 50", parsedErrorValue);
     }
 
     [Fact]
@@ -287,7 +292,9 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.False(initializeFileTransferResponse.IsSuccessStatusCode);
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
-        Assert.Contains("PropertyList Value can not be longer than 3000", parsedError.Extensions.First().Value.ToString());
+        var parsedErrorValue = parsedError.Extensions["errors"]?.ToString();
+        Assert.NotNull(parsedErrorValue);
+        Assert.Contains("PropertyList Value can not be longer than 3000", parsedErrorValue);
     }
 
     [Fact]
@@ -318,6 +325,209 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(2, downloadStartedEvents.Count());
         var lastEvent = downloadStartedEvents.OrderBy(recipientFileTransferStatus => recipientFileTransferStatus.RecipientFileTransferStatusChanged).Last();
         Assert.Equal(lastEvent.RecipientFileTransferStatusChanged, downloadedFileTransferDetails.Recipients.FirstOrDefault(recipient => recipient.Recipient == lastEvent.Recipient)?.CurrentRecipientFileTransferStatusChanged);
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithoutRange_ReturnsFullFileWithAcceptRanges()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act
+        var response = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
+        Assert.Equal(fileBytes.Length, response.Content.Headers.ContentLength);
+        Assert.Equal(fileBytes, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithRange_ReturnsPartialContent()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 9));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+        Assert.Equal("bytes", Assert.Single(response.Headers.AcceptRanges));
+        var contentRange = response.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal("bytes", contentRange.Unit);
+        Assert.Equal(0, contentRange.From);
+        Assert.Equal(9, contentRange.To);
+        Assert.Equal(fileBytes.Length, contentRange.Length);
+        Assert.Equal(10, response.Content.Headers.ContentLength);
+        Assert.Equal(fileBytes[0..10], await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithOpenEndedAndSuffixRanges_ReturnsPartialContent()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act & Assert - open-ended range from byte 10 to end of file
+        var openEndedResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, null));
+        Assert.Equal(HttpStatusCode.PartialContent, openEndedResponse.StatusCode);
+        var contentRange = openEndedResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes.Length, contentRange.Length);
+        Assert.Equal(fileBytes[10..], await openEndedResponse.Content.ReadAsByteArrayAsync());
+
+        // Act & Assert - suffix range of the last 10 bytes
+        var suffixResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(null, 10));
+        Assert.Equal(HttpStatusCode.PartialContent, suffixResponse.StatusCode);
+        contentRange = suffixResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(fileBytes.Length - 10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes[^10..], await suffixResponse.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_ChunkedRangeDownloads_ReassembleToFullFile()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act
+        var firstChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(0, 19));
+        var secondChunk = await DownloadWithRange(fileTransferId, new RangeHeaderValue(20, null));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.PartialContent, firstChunk.StatusCode);
+        Assert.Equal(HttpStatusCode.PartialContent, secondChunk.StatusCode);
+        var reassembled = (await firstChunk.Content.ReadAsByteArrayAsync())
+            .Concat(await secondChunk.Content.ReadAsByteArrayAsync())
+            .ToArray();
+        Assert.Equal(fileBytes, reassembled);
+
+        // The chunked requests make up one logical download and should be debounced to a single DownloadStarted status
+        var details = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(details);
+        var downloadStartedEvents = details.RecipientFileTransferStatusHistory.Where(recipientFileStatus => recipientFileStatus.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadStarted);
+        Assert.Single(downloadStartedEvents);
+    }
+
+    [Fact]
+    public async Task DownloadFile_ParallelRangeDownloads_ReassembleToFullFile()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+        const int chunkSize = 10;
+        var ranges = new List<(long From, long To)>();
+        for (long start = 0; start < fileBytes.Length; start += chunkSize)
+        {
+            ranges.Add((start, Math.Min(start + chunkSize - 1, fileBytes.Length - 1)));
+        }
+
+        // Act
+        var downloadTasks = ranges.Select(range => DownloadWithRange(fileTransferId, new RangeHeaderValue(range.From, range.To))).ToList();
+        var responses = await Task.WhenAll(downloadTasks);
+
+        // Assert
+        var reassembled = new List<byte>();
+        for (var i = 0; i < responses.Length; i++)
+        {
+            Assert.Equal(HttpStatusCode.PartialContent, responses[i].StatusCode);
+            var contentRange = responses[i].Content.Headers.ContentRange;
+            Assert.NotNull(contentRange);
+            Assert.Equal(ranges[i].From, contentRange.From);
+            Assert.Equal(ranges[i].To, contentRange.To);
+            Assert.Equal(fileBytes.Length, contentRange.Length);
+            reassembled.AddRange(await responses[i].Content.ReadAsByteArrayAsync());
+        }
+        Assert.Equal(fileBytes, reassembled.ToArray());
+
+        // Concurrent chunk requests on the same instance should be debounced to a single DownloadStarted status
+        var details = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
+        Assert.NotNull(details);
+        var downloadStartedEvents = details.RecipientFileTransferStatusHistory.Where(recipientFileStatus => recipientFileStatus.RecipientFileTransferStatusCode == RecipientFileTransferStatusExt.DownloadStarted);
+        Assert.Single(downloadStartedEvents);
+    }
+
+    [Fact]
+    public async Task DownloadFile_InterruptedDownloadResumedWithRange_ReassemblesCompleteFile()
+    {
+        // Arrange - start a full download but abandon it after the first 20 bytes, like a dropped connection
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+        var interruptedBytes = new byte[20];
+        using (var interruptedResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download", HttpCompletionOption.ResponseHeadersRead))
+        {
+            Assert.Equal(HttpStatusCode.OK, interruptedResponse.StatusCode);
+            await using var downloadStream = await interruptedResponse.Content.ReadAsStreamAsync();
+            await downloadStream.ReadExactlyAsync(interruptedBytes);
+        }
+
+        // Act - resume from the size of the partial download, as a resuming client derives the offset from its local file
+        var resumeResponse = await DownloadWithRange(fileTransferId, new RangeHeaderValue(interruptedBytes.Length, null));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.PartialContent, resumeResponse.StatusCode);
+        var contentRange = resumeResponse.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(interruptedBytes.Length, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        var reassembled = interruptedBytes.Concat(await resumeResponse.Content.ReadAsByteArrayAsync()).ToArray();
+        Assert.Equal(fileBytes, reassembled);
+    }
+
+    [Fact]
+    public async Task DownloadFile_RangeStartBeyondFileEnd_ReturnsRangeNotSatisfiable()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(fileBytes.Length, null));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.RequestedRangeNotSatisfiable, response.StatusCode);
+        var parsedError = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.InvalidByteRange.Message, parsedError.Detail);
+    }
+
+    [Fact]
+    public async Task DownloadFile_RangeEndBeyondFileEnd_IsClampedToFileEnd()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+
+        // Act
+        var response = await DownloadWithRange(fileTransferId, new RangeHeaderValue(10, 99999));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+        var contentRange = response.Content.Headers.ContentRange;
+        Assert.NotNull(contentRange);
+        Assert.Equal(10, contentRange.From);
+        Assert.Equal(fileBytes.Length - 1, contentRange.To);
+        Assert.Equal(fileBytes[10..], await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WithMultiRange_ReturnsFullFile()
+    {
+        // Arrange
+        var (fileTransferId, fileBytes) = await InitializeAndUploadDummyFile();
+        var rangeHeader = new RangeHeaderValue();
+        rangeHeader.Ranges.Add(new RangeItemHeaderValue(0, 1));
+        rangeHeader.Ranges.Add(new RangeItemHeaderValue(5, 10));
+
+        // Act
+        var response = await DownloadWithRange(fileTransferId, rangeHeader);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fileBytes, await response.Content.ReadAsByteArrayAsync());
     }
 
     [Fact]
@@ -533,6 +743,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         // Act
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", fileTransfer);
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, fileTransferId);
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
@@ -603,6 +814,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
         var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
 
@@ -731,7 +943,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var jobStorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
         var gracePeriod = XmlConvert.ToTimeSpan("PT24H");
 
-        Assert.NotNull(jobStorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+
+        Assert.NotNull(jobStorage?.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
             IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.AllConfirmedDownloaded) &&
             j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) &&
             j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);
@@ -821,6 +1034,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId1 = fileTransferResponse.FileTransferId.ToString();
 
 
@@ -829,6 +1043,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse2 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody2);
         Assert.True(initializeFileTransferResponse2.IsSuccessStatusCode, await initializeFileTransferResponse2.Content.ReadAsStringAsync());
         var fileTransferResponse2 = await initializeFileTransferResponse2.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse2);
         var fileTransferId2 = fileTransferResponse2.FileTransferId.ToString();
 
         var initializeRequestBody3 = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -836,11 +1051,11 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse3 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody3);
         Assert.True(initializeFileTransferResponse3.IsSuccessStatusCode, await initializeFileTransferResponse3.Content.ReadAsStringAsync());
         var fileTransferResponse3 = await initializeFileTransferResponse3.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse3);
         var fileTransferId3 = fileTransferResponse3.FileTransferId.ToString();
 
         // Act
         var resourceId = TestConstants.RESOURCE_FOR_TEST;
-        var recipientStatus = TestConstants.RECIPIENTSTATUS_INITIALIZED;
         var response1 = await _recipientClient.GetAsync($"broker/api/v1/filetransfer?resourceId={resourceId}&orderAscending=true");
         Assert.True(response1.IsSuccessStatusCode, await response1.Content.ReadAsStringAsync());
         string contentstring = await response1.Content.ReadAsStringAsync();
@@ -850,10 +1065,11 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         Assert.True(response2.IsSuccessStatusCode, await response2.Content.ReadAsStringAsync());
         string contentstring2 = await response2.Content.ReadAsStringAsync();
         var fileTransferIds2 = JsonSerializer.Deserialize<List<string>>(contentstring2);
-        var index2InClient2 = fileTransferIds2.FindIndex(ft => ft == fileTransferId2);
         Assert.NotNull(fileTransferIds2);
+        var index2InClient2 = fileTransferIds2.FindIndex(ft => ft == fileTransferId2);
         Assert.True(index2InClient2 >= 0, "FileTransfer2 should be visible to recipientClient2");
         // Assert
+        Assert.NotNull(fileTransferIds);
         var index1 = fileTransferIds.FindIndex(ft => ft == fileTransferId1);
         Assert.DoesNotContain(fileTransferId2, fileTransferIds);
         var index3 = fileTransferIds.FindIndex(ft => ft == fileTransferId3);
@@ -870,6 +1086,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId1 = fileTransferResponse.FileTransferId.ToString();
 
 
@@ -878,6 +1095,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse2 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody2);
         Assert.True(initializeFileTransferResponse2.IsSuccessStatusCode, await initializeFileTransferResponse2.Content.ReadAsStringAsync());
         var fileTransferResponse2 = await initializeFileTransferResponse2.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse2);
         var fileTransferId2 = fileTransferResponse2.FileTransferId.ToString();
 
         var initializeRequestBody3 = FileTransferInitializeExtTestFactory.BasicFileTransfer();
@@ -885,6 +1103,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse3 = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequestBody3);
         Assert.True(initializeFileTransferResponse3.IsSuccessStatusCode, await initializeFileTransferResponse3.Content.ReadAsStringAsync());
         var fileTransferResponse3 = await initializeFileTransferResponse3.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse3);
         var fileTransferId3 = fileTransferResponse3.FileTransferId.ToString();
 
         // Act
@@ -974,6 +1193,22 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         return fileTransferResponse?.FileTransferId.ToString() ?? string.Empty;
     }
 
+    private async Task<(string FileTransferId, byte[] FileBytes)> InitializeAndUploadDummyFile()
+    {
+        var fileTransferId = await InitializeAndAssertBasicFileTransfer();
+        var fileContent = "This is the contents of the uploaded file";
+        var uploadResponse = await UploadTextFileTransfer(fileTransferId, fileContent);
+        Assert.True(uploadResponse.IsSuccessStatusCode, await uploadResponse.Content.ReadAsStringAsync());
+        return (fileTransferId, Encoding.UTF8.GetBytes(fileContent));
+    }
+
+    private async Task<HttpResponseMessage> DownloadWithRange(string fileTransferId, RangeHeaderValue range)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"broker/api/v1/filetransfer/{fileTransferId}/download");
+        request.Headers.Range = range;
+        return await _recipientClient.SendAsync(request);
+    }
+
     private string CalculateChecksum(byte[] data)
     {
         using (var md5 = System.Security.Cryptography.MD5.Create())
@@ -997,6 +1232,7 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
         Assert.True(initializeFileTransferResponse.IsSuccessStatusCode, await initializeFileTransferResponse.Content.ReadAsStringAsync());
         var fileTransferResponse = await initializeFileTransferResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>();
+        Assert.NotNull(fileTransferResponse);
         var fileTransferId = fileTransferResponse.FileTransferId.ToString();
 
         var jobstorage = _factory.Services.GetService(typeof(JobStorage)) as JobStorage;
@@ -1007,7 +1243,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var downloadResponse = await _recipientClient.GetAsync($"broker/api/v1/filetransfer/{fileTransferId}/download");
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
 
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+
+        Assert.NotNull(jobstorage?.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
             IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.FileTransferExpiry)).Value);
         var confirmResponse = await _recipientClient.PostAsync($"broker/api/v1/filetransfer/{fileTransferId}/confirmdownload", null);
         var confirmedFileTransferDetails = await _senderClient.GetFromJsonAsync<FileTransferStatusDetailsExt>($"broker/api/v1/filetransfer/{fileTransferId}/details", _responseSerializerOptions);
@@ -1016,7 +1253,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
         Assert.NotNull(confirmedFileTransferDetails);
         Assert.True(confirmedFileTransferDetails.FileTransferStatus == FileTransferStatusExt.AllConfirmedDownloaded);
-        Assert.NotNull(jobstorage.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
+
+        Assert.NotNull(jobstorage?.GetMonitoringApi().ScheduledJobs(0, 100).SingleOrDefault(j =>
             IsScheduledPurgeJob(j, fileTransferId, PurgeTrigger.AllConfirmedDownloaded) &&
             j.Value.EnqueueAt > DateTime.UtcNow.Add(gracePeriod).AddMinutes(-1) &&
             j.Value.EnqueueAt < DateTime.UtcNow.Add(gracePeriod).AddMinutes(1)).Value);

@@ -9,7 +9,6 @@ using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
-using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Maskinporten;
 using Altinn.Broker.Persistence.Repositories;

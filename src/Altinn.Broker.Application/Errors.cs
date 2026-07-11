@@ -34,6 +34,7 @@ public static class Errors
     public static Error RequiredPartyNotSpecified = new Error(26, "The resource requires the service owner party to be present as part of the transaction.", HttpStatusCode.BadRequest);
     public static Error RequiredPartyInvalidRecipientConfiguration = new Error(27, "When required party is specified and the required party is not the sender, the number of recipients can only be one.", HttpStatusCode.BadRequest);
     public static Error RecipientNotInAccessList = new Error(28, "All recipients need to be in the access list of the resource.", HttpStatusCode.BadRequest);
+    public static Error InvalidByteRange = new Error(29, "The requested byte range is not satisfiable.", HttpStatusCode.RequestedRangeNotSatisfiable);
 }
 
 public static class StatisticsErrors
@@ -43,4 +44,12 @@ public static class StatisticsErrors
     public static Error InvalidMonthFormat = new Error(6003, "Invalid year or month. Provide a valid year and a month between 1 and 12.", HttpStatusCode.BadRequest);
     public static Error InvalidMonthRange = new Error(6004, "The requested report month is invalid.", HttpStatusCode.BadRequest);
     public static Error EndUserAndVendorBothExcluded = new Error(6005, "At least one of includeEndUser or includeVendor must be true.", HttpStatusCode.BadRequest);
+}
+
+public static class ServiceOwnerErrors
+{
+    public static Error CallerOrganizationIdNotFound = new Error(7001, "Caller organization id could not be determined", HttpStatusCode.BadRequest);
+    public static Error ServiceOwnerAlreadyExists = new Error(7002, "Service owner already exists", HttpStatusCode.Conflict);
+    public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
+    public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
 }

@@ -148,6 +148,7 @@ public class MaskinportenTokenTests
             var initializeRequest = FileTransferInitializeExtTestFactory.BasicFileTransfer();
             var initResponse = await writeClient.PostAsJsonAsync("broker/api/v1/filetransfer", initializeRequest);
             var initResult = await initResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
+            Assert.NotNull(initResult);
 
             // Act - Now try to read details with a valid read scope Maskinporten token
             var readToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.read");

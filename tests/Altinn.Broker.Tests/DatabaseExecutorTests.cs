@@ -88,7 +88,7 @@ public class DatabaseExecutorTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Database command attempt 1 failed")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Database command attempt 1 failed")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -123,7 +123,7 @@ public class DatabaseExecutorTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Database command attempt 1 failed")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Database command attempt 1 failed")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -132,7 +132,7 @@ public class DatabaseExecutorTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Database command attempt 2 failed")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Database command attempt 2 failed")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -163,7 +163,7 @@ public class DatabaseExecutorTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Database command attempt") && v.ToString().Contains("failed")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Database command attempt") && v.ToString()!.Contains("failed")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Exactly(3));
@@ -173,7 +173,7 @@ public class DatabaseExecutorTests
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Exception during database command retries")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Exception during database command retries")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);

@@ -1,6 +1,6 @@
-﻿using System.Net;
-
-using Altinn.Broker.API.Configuration;
+﻿using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Helpers;
+using Altinn.Broker.Application;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -24,21 +24,35 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// - altinn:serviceowner <br/>
     /// </remarks>
     /// <response code="200">Service owner initialized successfully</response>
+    /// <response code="400">Caller organization id could not be determined</response>
     /// <response code="409">Service owner already exists</response>
+    /// <response code="500">Service owner could not be initialized</response>
     [HttpPost]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
-        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
+        if (callerOrganizationId is null)
+        {
+            return Problem(ServiceOwnerErrors.CallerOrganizationIdNotFound);
+        }
+        var callerOrganizationIdWithPrefix = callerOrganizationId.WithPrefix();
+        var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (existingServiceOwner is not null)
         {
-            return Problem(detail: "Service owner already exists", statusCode: (int)HttpStatusCode.Conflict);
+            return Problem(ServiceOwnerErrors.ServiceOwnerAlreadyExists);
         }
 
-        await serviceOwnerRepository.InitializeServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix(), serviceOwnerInitializeExt.Name);
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        await serviceOwnerRepository.InitializeServiceOwner(callerOrganizationIdWithPrefix, serviceOwnerInitializeExt.Name);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
+        if (serviceOwner is null)
+        {
+            return Problem(ServiceOwnerErrors.ServiceOwnerInitializationFailed);
+        }
         resourceManager.CreateStorageProviders(serviceOwner, cancellationToken);
         return Ok();
     }
@@ -51,17 +65,25 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     /// - altinn:serviceowner <br/>
     /// </remarks>
     /// <response code="200">Service owner retrieved successfully</response>
+    /// <response code="400">Caller organization id could not be determined</response>
     /// <response code="404">Service owner not found</response>
     [HttpGet]
     [Produces("application/json")]
     [ProducesResponseType(typeof(ServiceOwnerOverviewExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOwnerOverviewExt>> GetServiceOwner(CancellationToken cancellationToken)
     {
-        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(HttpContext.User.GetCallerOrganizationId().WithPrefix());
+        var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
+        if (callerOrganizationId is null)
+        {
+            return Problem(ServiceOwnerErrors.CallerOrganizationIdNotFound);
+        }
+        var callerOrganizationIdWithPrefix = callerOrganizationId.WithPrefix();
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (serviceOwner is null)
         {
-            return NotFound();
+            return Problem(ServiceOwnerErrors.ServiceOwnerNotFound);
         }
 
         var deploymentStatuses = new Dictionary<StorageProviderEntity, DeploymentStatus>();
@@ -83,5 +105,6 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
         };
     }
 
+    private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }
 

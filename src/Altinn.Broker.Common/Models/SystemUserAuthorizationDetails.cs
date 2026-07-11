@@ -19,7 +19,7 @@ public class SystemUserAuthorizationDetails
 public class SystemUserAuthorization
 {
     [JsonPropertyName("authorization_details")]
-    public List<SystemUserAuthorizationDetails> AuthorizationDetails { get; set; }
+    public required List<SystemUserAuthorizationDetails> AuthorizationDetails { get; set; }
 }
 
 public class SystemUserOrg
