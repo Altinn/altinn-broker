@@ -53,6 +53,11 @@ internal static class TusFinalizeRecovery
             {
                 return;
             }
+
+            if (!await finalizationService.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken))
+            {
+                return;
+            }
         }
         else
         {
