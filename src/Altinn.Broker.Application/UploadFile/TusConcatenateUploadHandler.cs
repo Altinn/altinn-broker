@@ -28,7 +28,7 @@ public class TusConcatenateUploadHandler(
             else if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
             {
                 logger.LogWarning(
-                    "TUS concatenate job skipped for file transfer {FileTransferId}: concat is marked complete but staging blob is not committed.",
+                    "TUS concatenate job skipped for file transfer {FileTransferId}: concat is marked complete but destination blob is not committed.",
                     fileTransferId);
             }
             else
@@ -51,10 +51,9 @@ public class TusConcatenateUploadHandler(
 
             if (await tusUploadFinalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
             {
-                logger.LogInformation(
-                    "TUS concatenate job committing staging for partial tus file {TusFileId}",
+                logger.LogWarning(
+                    "TUS concatenate job received partial tus file {TusFileId}; partial finalize jobs are no longer used in Phase B.",
                     tusFileId);
-                await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
                 return;
             }
 
@@ -72,7 +71,7 @@ public class TusConcatenateUploadHandler(
             if (!await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
             {
                 logger.LogWarning(
-                    "TUS concatenate job finished for file transfer {FileTransferId}, but staging blob is not committed. Not enqueueing publish.",
+                    "TUS concatenate job finished for file transfer {FileTransferId}, but destination blob is not committed. Not enqueueing publish.",
                     fileTransferId);
                 return;
             }

@@ -70,4 +70,25 @@ public class TusPartialUploadRegistryTests
 
         Assert.True(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task RegisterPartialAsync_AllocatesIncreasingPartialIndex()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.Parse(FileTransferId);
+        const string firstPartialId = "partial-a";
+        const string secondPartialId = "partial-b";
+
+        await registry.RegisterPartialAsync(firstPartialId, fileTransferId, uploadLength: 1024, CancellationToken.None);
+        await registry.RegisterPartialAsync(secondPartialId, fileTransferId, uploadLength: 2048, CancellationToken.None);
+
+        var firstPartial = await registry.TryGetPartialInfoAsync(firstPartialId, CancellationToken.None);
+        var secondPartial = await registry.TryGetPartialInfoAsync(secondPartialId, CancellationToken.None);
+
+        Assert.NotNull(firstPartial);
+        Assert.NotNull(secondPartial);
+        Assert.Equal(0, firstPartial.Value.PartialIndex);
+        Assert.Equal(1, secondPartial.Value.PartialIndex);
+    }
 }

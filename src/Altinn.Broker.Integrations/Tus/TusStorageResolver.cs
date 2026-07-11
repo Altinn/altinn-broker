@@ -26,7 +26,12 @@ public sealed record TusStagedBlocksSnapshot(
 public interface ITusStorageResolver
 {
     Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
+    Task<long> StageTusBlockOnDestinationAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
     Task CommitTusBlocksAsync(
+        string fileId,
+        IReadOnlyList<string> blockIds,
+        CancellationToken cancellationToken);
+    Task CommitBlocksToDestinationAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
         CancellationToken cancellationToken);
@@ -37,9 +42,12 @@ public interface ITusStorageResolver
     Task<long> GetCommittedStagingLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetStagedBlocksLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<TusStagedBlocksSnapshot?> TryGetStagedBlocksSnapshotAsync(string fileId, CancellationToken cancellationToken);
+    Task<TusStagedBlocksSnapshot?> TryGetDestinationStagedBlocksSnapshotAsync(string fileId, CancellationToken cancellationToken);
+    Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken);
     Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
     Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
+    Task SetDestinationUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
     Task<long> ConcatenatePartialStagingBlobsAsync(
         string finalFileId,
         IReadOnlyList<string> partialFileIds,
@@ -94,6 +102,63 @@ public class TusStorageResolver(
             cancellationToken: cancellationToken);
         timing.Step("azure.stageBlock", blockBytes);
         return blockBytes;
+    }
+
+    public async Task<long> StageTusBlockOnDestinationAsync(
+        string fileId,
+        string blockId,
+        Stream blockData,
+        CancellationToken cancellationToken)
+    {
+        if (!blockData.CanSeek)
+        {
+            throw new ArgumentException("Block data stream must be seekable.", nameof(blockData));
+        }
+
+        var blockBytes = blockData.Length - blockData.Position;
+        int? expectedBytes = blockBytes is >= 0 and <= int.MaxValue ? (int)blockBytes : null;
+        using var timing = TusUploadDebugTiming.Start(logger, "StageTusBlockDestination", fileId, expectedBytes);
+
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken, timing);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        timing.Step("getDestinationBlockBlobClient");
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId));
+        await blockBlobClient.StageBlockAsync(
+            blockId,
+            blockData,
+            cancellationToken: cancellationToken);
+        timing.Step("azure.stageBlock.destination", blockBytes);
+        return blockBytes;
+    }
+
+    public async Task CommitBlocksToDestinationAsync(
+        string fileId,
+        IReadOnlyList<string> blockIds,
+        CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            throw new InvalidOperationException($"Missing storage context for file id {fileId}");
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId));
+        await blockBlobClient.CommitBlockListAsync(
+            blockIds,
+            new CommitBlockListOptions
+            {
+                HttpHeaders = new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream"
+                }
+            },
+            cancellationToken: cancellationToken);
     }
 
     public async Task CommitTusBlocksAsync(
@@ -232,7 +297,7 @@ public class TusStorageResolver(
         }
 
         var orderedBlocks = uncommittedBlocks
-            .Select(block => new { Block = block, Index = TryParseBlockIndex(block.Name) })
+            .Select(block => new { Block = block, Index = TusBlockIds.TryParseSortableIndex(block.Name) })
             .Where(entry => entry.Index.HasValue)
             .OrderBy(entry => entry.Index!.Value)
             .ToList();
@@ -245,6 +310,51 @@ public class TusStorageResolver(
         var totalLength = orderedBlocks.Sum(entry => entry.Block.SizeLong);
         var nextBlockIndex = orderedBlocks[^1].Index!.Value + 1;
         return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
+    }
+
+    public async Task<TusStagedBlocksSnapshot?> TryGetDestinationStagedBlocksSnapshotAsync(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
+        {
+            return null;
+        }
+
+        return await TusConcatDestinationStorage.TryGetStagedBlocksSnapshotAsync(blockBlobClient, cancellationToken);
+    }
+
+    public async Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
+        {
+            return 0;
+        }
+
+        var uncommittedBlocks = await TusConcatDestinationStorage.TryGetUncommittedBlocksAsync(blockBlobClient, cancellationToken);
+        return uncommittedBlocks?.Sum(static block => block.SizeLong) ?? 0;
+    }
+
+    private async Task<BlockBlobClient?> GetDestinationBlockBlobClientAsync(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(fileId, out _))
+        {
+            return null;
+        }
+
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return null;
+        }
+
+        return TusConcatDestinationStorage.GetDestinationBlockBlobClient(
+            GetBlobContainerClient(storageContext),
+            Guid.Parse(fileId));
     }
 
     private async Task<BlockBlobClient?> GetBlockStagingBlobClientAsync(
@@ -281,29 +391,17 @@ public class TusStorageResolver(
         }
     }
 
-    private static long? TryParseBlockIndex(string blockId)
+    private static long? TryParseBlockIndex(string blockId) => TusBlockIds.TryParseSortableIndex(blockId);
+
+    public async Task SetDestinationUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
     {
-        try
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        if (blockBlobClient is null)
         {
-            var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(blockId));
-            if (long.TryParse(decoded, out var index))
-            {
-                return index;
-            }
-
-            if (decoded.Length == 12
-                && int.TryParse(decoded[..6], out var partialIndex)
-                && int.TryParse(decoded[6..], out var chunkIndex))
-            {
-                return (partialIndex * 1_000_000L) + chunkIndex;
-            }
-        }
-        catch (FormatException)
-        {
-            return null;
+            return;
         }
 
-        return null;
+        await TusConcatDestinationStorage.SetUploadLengthMetadataAsync(blockBlobClient, uploadLength, cancellationToken);
     }
 
     public async Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken)

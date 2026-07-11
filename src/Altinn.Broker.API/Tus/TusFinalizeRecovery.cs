@@ -40,22 +40,6 @@ internal static class TusFinalizeRecovery
 
         if (isPartial)
         {
-            if (currentStatus > FileTransferStatus.UploadStarted)
-            {
-                return;
-            }
-
-            if (!await finalizationService.IsReadyForStagingFinalizeAsync(tusFileId, cancellationToken))
-            {
-                return;
-            }
-
-            logger.LogInformation(
-                "Enqueueing TUS partial finalize job for file transfer {FileTransferId}. TusFileId={TusFileId}",
-                fileTransferId,
-                tusFileId);
-
-            await enqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
             return;
         }
 
@@ -86,7 +70,7 @@ internal static class TusFinalizeRecovery
             if (!await finalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
             {
                 logger.LogWarning(
-                    "TUS concat is complete but staging blob is not committed for file transfer {FileTransferId}. Not enqueueing publish.",
+                    "TUS concat is complete but destination blob is not committed for file transfer {FileTransferId}. Not enqueueing publish.",
                     fileTransferId);
                 return;
             }

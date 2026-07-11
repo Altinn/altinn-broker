@@ -6,7 +6,7 @@ using StackExchange.Redis;
 
 namespace Altinn.Broker.Integrations.Tus;
 
-public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength);
+public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength, int PartialIndex);
 
 public enum TusConcatStatus
 {
@@ -92,6 +92,8 @@ public sealed class TusPartialUploadRegistry(
 
     private static string PublishEnqueueKey(string fileId) => $"tus-publish-enqueued:{NormalizeId(fileId)}";
 
+    private static string PartialIndexCounterKey(Guid fileTransferId) => $"tus-partial-index:{fileTransferId:N}";
+
     private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
     public async Task RegisterPartialAsync(
@@ -100,9 +102,11 @@ public sealed class TusPartialUploadRegistry(
         long uploadLength,
         CancellationToken cancellationToken)
     {
+        var existing = await TryGetPartialInfoAsync(partialFileId, cancellationToken);
+        var partialIndex = existing?.PartialIndex ?? await AllocatePartialIndexAsync(fileTransferId, cancellationToken);
         await SetCachedValueAsync(
             PartialInfoKey(partialFileId),
-            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength), JsonOptions),
+            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex), JsonOptions),
             cancellationToken);
         await RegisterUploadAsync(partialFileId, uploadLength, cancellationToken);
     }
@@ -119,7 +123,7 @@ public sealed class TusPartialUploadRegistry(
         }
 
         var dto = JsonSerializer.Deserialize<PartialUploadInfoDto>(json, JsonOptions);
-        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength);
+        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength, dto.PartialIndex);
     }
 
     public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
@@ -315,5 +319,19 @@ public sealed class TusPartialUploadRegistry(
         return true;
     }
 
-    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength);
+    private async Task<int> AllocatePartialIndexAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var key = PartialIndexCounterKey(fileTransferId);
+        if (_database is not null)
+        {
+            return (int)await _database.StringIncrementAsync(key) - 1;
+        }
+
+        var current = await distributedCache.GetStringAsync(key, cancellationToken);
+        var next = current is null ? 0 : int.Parse(current) + 1;
+        await SetCachedValueAsync(key, next.ToString(), cancellationToken);
+        return next;
+    }
+
+    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength, int PartialIndex = 0);
 }
