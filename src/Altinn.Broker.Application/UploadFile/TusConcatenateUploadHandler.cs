@@ -11,7 +11,7 @@ public class TusConcatenateUploadHandler(
     ILogger<TusConcatenateUploadHandler> logger)
 {
     [AutomaticRetry(Attempts = 3)]
-    [DisableConcurrentExecution(timeoutInSeconds: 28800)]
+    [DisableConcurrentExecution("tus-concat:{1}", 28800)]
     public async Task Process(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
         if (!await concatJobCoordinator.TryBeginJobAsync(tusFileId, cancellationToken))
