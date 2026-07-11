@@ -278,7 +278,20 @@ public static class TusUploader
                 throw new InvalidOperationException("Final upload HEAD did not return Upload-Length.");
             }
 
-            var uploadOffset = ParseUploadOffset(response.Headers);
+            var uploadOffset = TryParseUploadOffset(response.Headers);
+            if (uploadOffset is null)
+            {
+                // TUS concat: final HEAD may omit Upload-Offset until background concatenation finishes.
+                if (uploadLength == totalUploadLength)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    continue;
+                }
+
+                throw new InvalidOperationException(
+                    "Final upload HEAD returned Upload-Length but not Upload-Offset while concatenation is incomplete.");
+            }
+
             if (uploadOffset >= totalUploadLength && uploadLength == totalUploadLength)
             {
                 Console.WriteLine(
@@ -589,6 +602,10 @@ public static class TusUploader
     }
 
     private static long ParseUploadOffset(HttpResponseHeaders headers)
+        => TryParseUploadOffset(headers)
+            ?? throw new InvalidOperationException("TUS response did not include Upload-Offset.");
+
+    private static long? TryParseUploadOffset(HttpResponseHeaders headers)
     {
         if (headers.TryGetValues("Upload-Offset", out var values)
             && long.TryParse(values.FirstOrDefault(), out var parsedOffset))
@@ -596,7 +613,7 @@ public static class TusUploader
             return parsedOffset;
         }
 
-        throw new InvalidOperationException("TUS response did not include Upload-Offset.");
+        return null;
     }
 
     private static Uri? ResolveUploadUri(Uri tusEndpoint, Uri? location)

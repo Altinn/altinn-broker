@@ -36,6 +36,8 @@ public interface ITusPartialUploadRegistry
 
     Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken);
 
+    Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken);
+
     Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken);
 
     Task RemoveUploadAsync(string fileId, CancellationToken cancellationToken);
@@ -136,6 +138,9 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
 
     public Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken)
         => SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Complete.ToString(), cancellationToken);
+
+    public Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken)
+        => distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken);
 
     public Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken)
         => Task.WhenAll(

@@ -394,6 +394,19 @@ public class BrokerTusStore(
             return destinationLength;
         }
 
+        var uploadLength = await GetUploadLengthAsync(fileId, cancellationToken);
+        if (uploadLength is > 0
+            && await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
+        {
+            var concatCommittedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            if (concatCommittedLength >= uploadLength.Value)
+            {
+                timing.Step("concatCompleteCommittedLength", concatCommittedLength);
+                await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
+                return uploadLength.Value;
+            }
+        }
+
         timing.Step("zero");
         await RenewExpirationIfTrackedAsync(fileId, cancellationToken);
         return 0;
@@ -1128,6 +1141,7 @@ public class BrokerTusStore(
         }
 
         await partialUploadRegistry.MarkConcatCompleteAsync(fileId, cancellationToken);
+        await partialUploadRegistry.ClearFinalConcatPartialReferencesAsync(fileId, cancellationToken);
 
         logger.LogInformation(
             "TUS concatenation completed in background for file id {FileId}. TotalLength={TotalLength} PartialCount={PartialCount}",
@@ -1238,6 +1252,8 @@ public class BrokerTusStore(
 
         await uploadProgressCache.RemoveAsync(fileId, cancellationToken);
         _uploadLengths.TryRemove(fileId, out _);
+        await partialUploadRegistry.RemoveFinalConcatAsync(fileId, cancellationToken);
+        await partialUploadRegistry.RemoveUploadAsync(fileId, cancellationToken);
     }
 
     private async Task<bool> HasDurableUploadStateAsync(string fileId, CancellationToken cancellationToken)
