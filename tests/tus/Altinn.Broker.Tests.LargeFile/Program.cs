@@ -16,6 +16,8 @@ public class Program
     private const int DefaultParallelPartialUploads = 4;
     private const int DefaultUploadMiB = 64;
 
+    private const int DefaultPublishVerificationTimeoutMinutes = 240;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -92,7 +94,7 @@ public class Program
                 parallelPartialUploads);
         }
 
-        await VerifyPublishedAsync(httpClient, baseUrl, fileTransferId);
+        await VerifyPublishedAsync(authHttpClient, authOptions, baseUrl, fileTransferId);
     }
 
     private static void LogUploadSize(long uploadSize)
@@ -209,33 +211,92 @@ public class Program
     }
 
     private static async Task VerifyPublishedAsync(
-        HttpClient httpClient,
+        HttpClient authHttpClient,
+        AltinnAuthOptions authOptions,
         string baseUrl,
         string fileTransferId,
         CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"{baseUrl.TrimEnd('/')}/broker/api/v1/filetransfer/{fileTransferId}");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        var tokenHolder = new AltinnTokenHolder(authHttpClient, authOptions);
+        var timeoutMinutes = int.Parse(
+            ReadEnv("PUBLISH_VERIFICATION_TIMEOUT_MINUTES", DefaultPublishVerificationTimeoutMinutes.ToString())!);
+        var deadline = DateTime.UtcNow.AddMinutes(timeoutMinutes);
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        while (DateTime.UtcNow < deadline)
         {
-            throw new InvalidOperationException(
-                $"Overview request failed with {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var overview = await GetFileTransferOverviewAsync(
+                authHttpClient,
+                tokenHolder,
+                baseUrl,
+                fileTransferId,
+                cancellationToken);
+
+            if (overview.FileTransferStatus == FileTransferStatusExt.Published)
+            {
+                Console.WriteLine($"Verified file transfer {fileTransferId} is Published.");
+                return;
+            }
+
+            if (overview.FileTransferStatus == FileTransferStatusExt.Failed)
+            {
+                throw new InvalidOperationException(
+                    $"File transfer {fileTransferId} failed before reaching Published status.");
+            }
+
+            Console.WriteLine(
+                $"Waiting for Published status (current: {overview.FileTransferStatus}). Retrying...");
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
         }
 
-        var overview = JsonSerializer.Deserialize<FileTransferOverviewExt>(responseBody, JsonOptions)
-            ?? throw new InvalidOperationException("Overview response was empty.");
-        if (overview.FileTransferStatus != FileTransferStatusExt.Published)
+        var finalOverview = await GetFileTransferOverviewAsync(
+            authHttpClient,
+            tokenHolder,
+            baseUrl,
+            fileTransferId,
+            cancellationToken);
+        throw new InvalidOperationException(
+            $"File transfer {fileTransferId} did not reach Published within {timeoutMinutes} minutes. Last status: {finalOverview.FileTransferStatus}");
+    }
+
+    private static async Task<FileTransferOverviewExt> GetFileTransferOverviewAsync(
+        HttpClient authHttpClient,
+        AltinnTokenHolder tokenHolder,
+        string baseUrl,
+        string fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            throw new InvalidOperationException(
-                $"Expected Published status, got {overview.FileTransferStatus}");
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{baseUrl.TrimEnd('/')}/broker/api/v1/filetransfer/{fileTransferId}");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            var token = await tokenHolder.GetValidTokenAsync(cancellationToken);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await authHttpClient.SendAsync(request, cancellationToken);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
+            {
+                await tokenHolder.RefreshTokenAsync(cancellationToken);
+                continue;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    $"Overview request failed with {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
+            }
+
+            return JsonSerializer.Deserialize<FileTransferOverviewExt>(responseBody, JsonOptions)
+                ?? throw new InvalidOperationException("Overview response was empty.");
         }
 
-        Console.WriteLine($"Verified file transfer {fileTransferId} is Published.");
+        throw new InvalidOperationException("Overview request failed after token refresh.");
     }
 
     private static FileTransferInitalizeExt BasicFileTransfer(string orgNumber, string resourceId) => new()
