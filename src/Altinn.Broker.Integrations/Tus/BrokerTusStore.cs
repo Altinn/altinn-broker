@@ -148,7 +148,7 @@ public class BrokerTusStore(
                     logger.LogInformation(
                         "TUS partial final chunk accepted for file id {FileId}. Enqueueing staging finalize job.",
                         fileId);
-                    await tusFinalizeUploadEnqueuer.EnqueueAsync(mappedFileTransferId, fileId, cancellationToken);
+                    await tusFinalizeUploadEnqueuer.EnqueueConcatenateAsync(mappedFileTransferId, fileId, cancellationToken);
                 }
             }
 
@@ -1101,6 +1101,19 @@ public class BrokerTusStore(
         var partialFileIds = await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(fileId, cancellationToken);
         if (partialFileIds is null or { Length: 0 })
         {
+            if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
+            {
+                var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+                var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+                if (committedLength >= uploadLength)
+                {
+                    return;
+                }
+
+                throw new TusStoreException(
+                    $"TUS concatenation is marked complete for file id {fileId}, but staging blob is missing or incomplete.");
+            }
+
             return;
         }
 

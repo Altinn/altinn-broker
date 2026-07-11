@@ -2,5 +2,7 @@ namespace Altinn.Broker.Application.UploadFile;
 
 public interface ITusFinalizeUploadEnqueuer
 {
-    Task EnqueueAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken);
+    Task EnqueueConcatenateAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken);
+
+    void EnqueuePublish(Guid fileTransferId, string tusFileId);
 }

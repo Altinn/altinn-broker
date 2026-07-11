@@ -6,6 +6,7 @@ namespace Altinn.Broker.Application.UploadFile;
 
 public class TusConcatenateUploadHandler(
     ITusUploadFinalizationService tusUploadFinalizationService,
+    ITusFinalizeUploadEnqueuer tusFinalizeUploadEnqueuer,
     ILogger<TusConcatenateUploadHandler> logger)
 {
     [AutomaticRetry(Attempts = 3)]
@@ -28,7 +29,9 @@ public class TusConcatenateUploadHandler(
         await tusUploadFinalizationService.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
 
         logger.LogInformation(
-            "TUS concatenate job completed for file transfer {FileTransferId}",
+            "TUS concatenate job completed for file transfer {FileTransferId}. Enqueueing publish job.",
             fileTransferId);
+
+        tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
     }
 }

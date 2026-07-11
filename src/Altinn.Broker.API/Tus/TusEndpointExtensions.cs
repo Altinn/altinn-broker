@@ -323,7 +323,7 @@ public static class TusEndpointExtensions
         }
 
         var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
-        await enqueuer.EnqueueAsync(fileTransferId, context.FileId, context.CancellationToken);
+        await enqueuer.EnqueueConcatenateAsync(fileTransferId, context.FileId, context.CancellationToken);
     }
 
     private static async Task MarkUploadProcessingIfNeededAsync(
