@@ -32,6 +32,7 @@ internal static class TusFinalizeRecovery
 
         var finalizationService = httpContext.RequestServices.GetRequiredService<ITusUploadFinalizationService>();
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var concatJobCoordinator = httpContext.RequestServices.GetRequiredService<ITusConcatJobCoordinator>();
         var storageResolver = httpContext.RequestServices.GetRequiredService<ITusStorageResolver>();
         var isPartial = await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken);
         var currentStatus = fileTransfer.FileTransferStatusEntity.Status;
@@ -81,8 +82,14 @@ internal static class TusFinalizeRecovery
         }
 
         if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(tusFileId, cancellationToken) is not null
-            || concatStatus == TusConcatStatus.Pending)
+            || concatStatus is TusConcatStatus.Pending or TusConcatStatus.InProgress)
         {
+            if (concatStatus == TusConcatStatus.InProgress
+                && await concatJobCoordinator.IsConcatRunningAsync(tusFileId, cancellationToken))
+            {
+                return;
+            }
+
             logger.LogInformation(
                 "Enqueueing TUS concatenate job for file transfer {FileTransferId}. TusFileId={TusFileId}",
                 fileTransferId,

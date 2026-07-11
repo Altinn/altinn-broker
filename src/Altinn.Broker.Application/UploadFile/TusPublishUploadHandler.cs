@@ -10,6 +10,7 @@ public class TusPublishUploadHandler(
     ILogger<TusPublishUploadHandler> logger)
 {
     [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 7200)]
     public async Task Process(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
         logger.LogInformation(

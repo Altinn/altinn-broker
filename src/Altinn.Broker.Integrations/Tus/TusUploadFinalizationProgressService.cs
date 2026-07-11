@@ -10,7 +10,8 @@ public sealed class TusUploadFinalizationProgressService(
     {
         var tusFileId = fileTransferId.ToString();
 
-        if (await partialUploadRegistry.TryGetConcatStatusAsync(tusFileId, cancellationToken) == TusConcatStatus.Pending)
+        if (await partialUploadRegistry.TryGetConcatStatusAsync(tusFileId, cancellationToken)
+            is TusConcatStatus.Pending or TusConcatStatus.InProgress)
         {
             return true;
         }

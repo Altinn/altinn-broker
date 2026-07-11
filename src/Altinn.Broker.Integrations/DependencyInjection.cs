@@ -15,6 +15,7 @@ using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -112,7 +113,11 @@ public static class DependencyInjection
                 ? new RedisTusExpirationDetailsStore(multiplexer)
                 : new NullExpirationDetailsStore();
         });
-        services.AddSingleton<ITusPartialUploadRegistry, TusPartialUploadRegistry>();
+        services.AddSingleton<ITusPartialUploadRegistry>(serviceProvider =>
+            new TusPartialUploadRegistry(
+                serviceProvider.GetRequiredService<IDistributedCache>(),
+                serviceProvider.GetService<IConnectionMultiplexer>()));
+        services.AddSingleton<ITusConcatJobCoordinator, TusConcatJobCoordinator>();
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache>(serviceProvider =>
             new TusUploadProgressCache(

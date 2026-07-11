@@ -1077,12 +1077,13 @@ public class BrokerTusStore(
         var partialIds = await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(fileId, cancellationToken);
         if (partialIds is { Length: > 0 })
         {
-            var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
-            if (concatStatus != TusConcatStatus.Complete)
-            {
-                var committedStagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-                return committedStagingLength >= uploadLength.Value;
-            }
+            return false;
+        }
+
+        var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
+        if (concatStatus is TusConcatStatus.Pending or TusConcatStatus.InProgress)
+        {
+            return false;
         }
 
         var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);

@@ -7,31 +7,58 @@ namespace Altinn.Broker.Application.UploadFile;
 public class TusConcatenateUploadHandler(
     ITusUploadFinalizationService tusUploadFinalizationService,
     ITusFinalizeUploadEnqueuer tusFinalizeUploadEnqueuer,
+    ITusConcatJobCoordinator concatJobCoordinator,
     ILogger<TusConcatenateUploadHandler> logger)
 {
     [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 28800)]
     public async Task Process(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
-            "TUS concatenate job starting for file transfer {FileTransferId}. TusFileId={TusFileId}",
-            fileTransferId,
-            tusFileId);
-
-        if (await tusUploadFinalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
+        if (!await concatJobCoordinator.TryBeginJobAsync(tusFileId, cancellationToken))
         {
             logger.LogInformation(
-                "TUS concatenate job committing staging for partial tus file {TusFileId}",
+                "TUS concatenate job skipped for file transfer {FileTransferId}. Another worker is already processing TusFileId={TusFileId}.",
+                fileTransferId,
                 tusFileId);
-            await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
             return;
         }
 
-        await tusUploadFinalizationService.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
+        try
+        {
+            logger.LogInformation(
+                "TUS concatenate job starting for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                fileTransferId,
+                tusFileId);
 
-        logger.LogInformation(
-            "TUS concatenate job completed for file transfer {FileTransferId}. Enqueueing publish job.",
-            fileTransferId);
+            if (await tusUploadFinalizationService.IsPartialUploadAsync(tusFileId, cancellationToken))
+            {
+                logger.LogInformation(
+                    "TUS concatenate job committing staging for partial tus file {TusFileId}",
+                    tusFileId);
+                await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
+                return;
+            }
 
-        tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+            await tusUploadFinalizationService.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
+
+            if (!await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
+            {
+                logger.LogWarning(
+                    "TUS concatenate job finished without completing concat for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                    fileTransferId,
+                    tusFileId);
+                return;
+            }
+
+            logger.LogInformation(
+                "TUS concatenate job completed for file transfer {FileTransferId}. Enqueueing publish job.",
+                fileTransferId);
+
+            tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+        }
+        finally
+        {
+            await concatJobCoordinator.ReleaseRunningLockAsync(tusFileId, cancellationToken);
+        }
     }
 }
