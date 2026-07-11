@@ -23,5 +23,7 @@ public interface ITusConcatJobCoordinator
 
     Task<bool> IsConcatRunningAsync(string tusFileId, CancellationToken cancellationToken);
 
+    Task ClearConcatEnqueueSlotAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task ClearPublishEnqueueSlotAsync(string tusFileId, CancellationToken cancellationToken);
 }

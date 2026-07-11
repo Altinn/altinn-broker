@@ -145,6 +145,9 @@ public sealed class TusPartialUploadRegistry(
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken)
     {
+        await ClearConcatEnqueueSlotAsync(fileId, cancellationToken);
+        await ReleaseConcatRunningLockAsync(fileId, cancellationToken);
+        await ClearPublishEnqueueSlotAsync(fileId, cancellationToken);
         await SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
         await SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Pending.ToString(), cancellationToken);
     }
@@ -183,7 +186,7 @@ public sealed class TusPartialUploadRegistry(
             return false;
         }
 
-        if (status == TusConcatStatus.InProgress)
+        if (status == TusConcatStatus.InProgress && await IsConcatRunningAsync(fileId, cancellationToken))
         {
             return false;
         }

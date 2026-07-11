@@ -1,3 +1,5 @@
+using Altinn.Broker.Integrations.Tus;
+
 using Xunit;
 
 namespace Altinn.Broker.Tests.Tus;
@@ -32,5 +34,40 @@ public class TusPartialUploadRegistryTests
         var fileTransferId = await registry.TryGetFileTransferIdAsync(PartialUploadId, CancellationToken.None);
 
         Assert.Equal(Guid.Parse(FileTransferId), fileTransferId);
+    }
+
+    [Fact]
+    public async Task TryBeginConcatJobAsync_SecondCallerFailsWhileFirstHoldsClaim()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "final-concat-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+
+        var firstClaim = await registry.TryBeginConcatJobAsync(finalFileId, CancellationToken.None);
+        var secondClaim = await registry.TryBeginConcatJobAsync(finalFileId, CancellationToken.None);
+
+        Assert.True(firstClaim);
+        Assert.False(secondClaim);
+        Assert.Equal(TusConcatStatus.InProgress, await registry.TryGetConcatStatusAsync(finalFileId, CancellationToken.None));
+
+        await registry.ReleaseConcatRunningLockAsync(finalFileId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RegisterFinalConcatAsync_ClearsStaleEnqueueMarker()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "stale-enqueue-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a"], CancellationToken.None);
+        Assert.True(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
+        Assert.False(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a"], CancellationToken.None);
+
+        Assert.True(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
     }
 }
