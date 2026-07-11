@@ -83,6 +83,14 @@ internal static class TusFinalizeRecovery
         var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(tusFileId, cancellationToken);
         if (concatStatus == TusConcatStatus.Complete)
         {
+            if (!await finalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
+            {
+                logger.LogWarning(
+                    "TUS concat is complete but staging blob is not committed for file transfer {FileTransferId}. Not enqueueing publish.",
+                    fileTransferId);
+                return;
+            }
+
             logger.LogInformation(
                 "Enqueueing TUS publish job for file transfer {FileTransferId}. Concat already complete.",
                 fileTransferId);

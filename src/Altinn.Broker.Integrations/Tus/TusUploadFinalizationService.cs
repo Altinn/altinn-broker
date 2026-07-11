@@ -24,6 +24,13 @@ public sealed class TusUploadFinalizationService(
     public Task<bool> TryPromoteConcatCompleteFromStagingAsync(string tusFileId, CancellationToken cancellationToken)
         => store.TryPromoteConcatCompleteFromStagingAsync(tusFileId, cancellationToken);
 
+    public async Task<bool> IsConcatMarkedCompleteAsync(string tusFileId, CancellationToken cancellationToken)
+        => await partialUploadRegistry.TryGetConcatStatusAsync(TusRouteHelper.NormalizePartialFileId(tusFileId), cancellationToken)
+            == TusConcatStatus.Complete;
+
+    public Task<bool> IsStagingBlobCommittedAsync(string tusFileId, CancellationToken cancellationToken)
+        => store.IsStagingBlobCommittedAsync(tusFileId, cancellationToken);
+
     public Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken)
         => store.CleanupCompletedUploadAsync(tusFileId, cancellationToken);
 }

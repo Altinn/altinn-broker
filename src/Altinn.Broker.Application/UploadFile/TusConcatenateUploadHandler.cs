@@ -16,13 +16,20 @@ public class TusConcatenateUploadHandler(
     {
         if (!await concatJobCoordinator.TryBeginJobAsync(tusFileId, cancellationToken))
         {
-            if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
+            if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken)
+                && await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
             {
                 logger.LogInformation(
                     "TUS concatenate job skipped because concat is already complete for file transfer {FileTransferId}. Enqueueing publish.",
                     fileTransferId);
                 await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
                 tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+            }
+            else if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
+            {
+                logger.LogWarning(
+                    "TUS concatenate job skipped for file transfer {FileTransferId}: concat is marked complete but staging blob is not committed.",
+                    fileTransferId);
             }
             else
             {
@@ -59,6 +66,14 @@ public class TusConcatenateUploadHandler(
                     "TUS concatenate job finished without completing concat for file transfer {FileTransferId}. TusFileId={TusFileId}",
                     fileTransferId,
                     tusFileId);
+                return;
+            }
+
+            if (!await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
+            {
+                logger.LogWarning(
+                    "TUS concatenate job finished for file transfer {FileTransferId}, but staging blob is not committed. Not enqueueing publish.",
+                    fileTransferId);
                 return;
             }
 

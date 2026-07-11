@@ -1211,6 +1211,19 @@ public class BrokerTusStore(
         return true;
     }
 
+    public async Task<bool> IsStagingBlobCommittedAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
+        var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+        if (uploadLength <= 0)
+        {
+            return false;
+        }
+
+        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        return committedLength >= uploadLength;
+    }
+
     private async Task EnsurePartialReadyForConcatenationAsync(
         string partialFileId,
         long partialLength,
@@ -1250,6 +1263,25 @@ public class BrokerTusStore(
     {
         fileId = ResolveStoreFileId(fileId);
         var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+
+        if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
+        {
+            var concatCommittedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            if (concatCommittedLength >= uploadLength)
+            {
+                logger.LogInformation(
+                    "TUS staging already committed for concat-complete file id {FileId}. CommittedLength={CommittedLength} UploadLength={UploadLength}",
+                    fileId,
+                    concatCommittedLength,
+                    uploadLength);
+                await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
+                return;
+            }
+
+            throw new TusStoreException(
+                $"TUS concat is marked complete for file id {fileId}, but staging blob is missing or incomplete ({concatCommittedLength}/{uploadLength}).");
+        }
+
         await WaitForDurableCommittedOffsetAsync(fileId, uploadLength, cancellationToken);
 
         var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);

@@ -14,5 +14,9 @@ public interface ITusUploadFinalizationService
 
     Task<bool> TryPromoteConcatCompleteFromStagingAsync(string tusFileId, CancellationToken cancellationToken);
 
+    Task<bool> IsConcatMarkedCompleteAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<bool> IsStagingBlobCommittedAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken);
 }

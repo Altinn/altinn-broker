@@ -21,7 +21,22 @@ public class TusPublishUploadHandler(
                 fileTransferId,
                 tusFileId);
 
-            await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
+            if (await tusUploadFinalizationService.IsConcatMarkedCompleteAsync(tusFileId, cancellationToken))
+            {
+                if (!await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"TUS publish aborted for file transfer {fileTransferId}: concat is complete but staging blob is missing or incomplete.");
+                }
+
+                logger.LogInformation(
+                    "TUS publish skipping staging finalize for file transfer {FileTransferId}; concat already committed staging.",
+                    fileTransferId);
+            }
+            else
+            {
+                await tusUploadFinalizationService.FinalizeStagingAsync(tusFileId, cancellationToken);
+            }
 
             var result = await tusUploadCompleteHandler.Process(fileTransferId, user: null, cancellationToken);
             if (result.IsT1)
