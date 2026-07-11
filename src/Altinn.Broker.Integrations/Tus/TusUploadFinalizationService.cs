@@ -21,6 +21,9 @@ public sealed class TusUploadFinalizationService(
     public async Task<bool> IsPartialUploadAsync(string tusFileId, CancellationToken cancellationToken)
         => await partialUploadRegistry.IsPartialAsync(TusRouteHelper.NormalizePartialFileId(tusFileId), cancellationToken);
 
+    public Task<bool> TryPromoteConcatCompleteFromStagingAsync(string tusFileId, CancellationToken cancellationToken)
+        => store.TryPromoteConcatCompleteFromStagingAsync(tusFileId, cancellationToken);
+
     public Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken)
         => store.CleanupCompletedUploadAsync(tusFileId, cancellationToken);
 }

@@ -53,6 +53,8 @@ public interface ITusPartialUploadRegistry
 
     Task ClearConcatEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
 
+    Task ClearPublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
+
     Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken);
 
     Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken);
@@ -165,7 +167,9 @@ public sealed class TusPartialUploadRegistry(
     }
 
     public Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken)
-        => SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Complete.ToString(), cancellationToken);
+        => Task.WhenAll(
+            SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Complete.ToString(), cancellationToken),
+            ClearConcatEnqueueSlotAsync(fileId, cancellationToken));
 
     public Task MarkConcatInProgressAsync(string fileId, CancellationToken cancellationToken)
         => SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.InProgress.ToString(), cancellationToken);
@@ -181,12 +185,7 @@ public sealed class TusPartialUploadRegistry(
 
         if (status == TusConcatStatus.InProgress)
         {
-            if (await IsConcatRunningAsync(fileId, cancellationToken))
-            {
-                return false;
-            }
-
-            await ClearConcatEnqueueSlotAsync(fileId, cancellationToken);
+            return false;
         }
 
         return await TrySetOnceAsync(ConcatEnqueueKey(fileId), "1", cancellationToken);
@@ -249,6 +248,17 @@ public sealed class TusPartialUploadRegistry(
         }
 
         return distributedCache.RemoveAsync(ConcatEnqueueKey(fileId), cancellationToken);
+    }
+
+    public Task ClearPublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        if (_database is not null)
+        {
+            return _database.KeyDeleteAsync(PublishEnqueueKey(fileId));
+        }
+
+        return distributedCache.RemoveAsync(PublishEnqueueKey(fileId), cancellationToken);
     }
 
     public Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken)

@@ -34,6 +34,7 @@ internal static class TusFinalizeRecovery
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
         var concatJobCoordinator = httpContext.RequestServices.GetRequiredService<ITusConcatJobCoordinator>();
         var storageResolver = httpContext.RequestServices.GetRequiredService<ITusStorageResolver>();
+        var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
         var isPartial = await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken);
         var currentStatus = fileTransfer.FileTransferStatusEntity.Status;
 
@@ -54,7 +55,6 @@ internal static class TusFinalizeRecovery
                 fileTransferId,
                 tusFileId);
 
-            var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
             await enqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
             return;
         }
@@ -64,38 +64,56 @@ internal static class TusFinalizeRecovery
             return;
         }
 
+        if (await storageResolver.DestinationBlobExistsAsync(tusFileId, cancellationToken))
+        {
+            return;
+        }
+
+        if (await finalizationService.TryPromoteConcatCompleteFromStagingAsync(tusFileId, cancellationToken))
+        {
+            logger.LogInformation(
+                "Promoted TUS concat to complete from staging for file transfer {FileTransferId}. Enqueueing publish.",
+                fileTransferId);
+
+            await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+            enqueuer.EnqueuePublish(fileTransferId, tusFileId);
+            return;
+        }
+
         var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(tusFileId, cancellationToken);
         if (concatStatus == TusConcatStatus.Complete)
         {
-            if (await storageResolver.DestinationBlobExistsAsync(tusFileId, cancellationToken))
-            {
-                return;
-            }
-
             logger.LogInformation(
                 "Enqueueing TUS publish job for file transfer {FileTransferId}. Concat already complete.",
                 fileTransferId);
 
-            httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>()
-                .EnqueuePublish(fileTransferId, tusFileId);
+            await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+            enqueuer.EnqueuePublish(fileTransferId, tusFileId);
             return;
         }
 
-        if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(tusFileId, cancellationToken) is not null
-            || concatStatus is TusConcatStatus.Pending or TusConcatStatus.InProgress)
+        if (concatStatus == TusConcatStatus.InProgress)
         {
-            if (concatStatus == TusConcatStatus.InProgress
-                && await concatJobCoordinator.IsConcatRunningAsync(tusFileId, cancellationToken))
+            if (await concatJobCoordinator.IsConcatRunningAsync(tusFileId, cancellationToken))
             {
                 return;
             }
 
+            logger.LogWarning(
+                "TUS concat is InProgress without an active worker for file transfer {FileTransferId}. TusFileId={TusFileId}. Staging is incomplete; not re-enqueueing concat.",
+                fileTransferId,
+                tusFileId);
+            return;
+        }
+
+        if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(tusFileId, cancellationToken) is not null
+            || concatStatus == TusConcatStatus.Pending)
+        {
             logger.LogInformation(
                 "Enqueueing TUS concatenate job for file transfer {FileTransferId}. TusFileId={TusFileId}",
                 fileTransferId,
                 tusFileId);
 
-            var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
             await enqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
             return;
         }
@@ -110,7 +128,6 @@ internal static class TusFinalizeRecovery
             fileTransferId,
             tusFileId);
 
-        var finalizeEnqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
-        await finalizeEnqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
+        await enqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
     }
 }

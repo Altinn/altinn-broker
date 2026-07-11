@@ -12,5 +12,7 @@ public interface ITusUploadFinalizationService
 
     Task<bool> IsPartialUploadAsync(string tusFileId, CancellationToken cancellationToken);
 
+    Task<bool> TryPromoteConcatCompleteFromStagingAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken);
 }

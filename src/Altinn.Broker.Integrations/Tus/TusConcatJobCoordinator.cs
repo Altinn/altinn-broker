@@ -33,4 +33,7 @@ public sealed class TusConcatJobCoordinator(ITusPartialUploadRegistry partialUpl
 
     public Task<bool> IsConcatRunningAsync(string tusFileId, CancellationToken cancellationToken)
         => partialUploadRegistry.IsConcatRunningAsync(tusFileId, cancellationToken);
+
+    public Task ClearPublishEnqueueSlotAsync(string tusFileId, CancellationToken cancellationToken)
+        => partialUploadRegistry.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
 }

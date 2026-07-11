@@ -16,10 +16,22 @@ public class TusConcatenateUploadHandler(
     {
         if (!await concatJobCoordinator.TryBeginJobAsync(tusFileId, cancellationToken))
         {
-            logger.LogInformation(
-                "TUS concatenate job skipped for file transfer {FileTransferId}. Another worker is already processing TusFileId={TusFileId}.",
-                fileTransferId,
-                tusFileId);
+            if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
+            {
+                logger.LogInformation(
+                    "TUS concatenate job skipped because concat is already complete for file transfer {FileTransferId}. Enqueueing publish.",
+                    fileTransferId);
+                await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+                tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "TUS concatenate job skipped for file transfer {FileTransferId}. Another worker is already processing TusFileId={TusFileId}.",
+                    fileTransferId,
+                    tusFileId);
+            }
+
             return;
         }
 

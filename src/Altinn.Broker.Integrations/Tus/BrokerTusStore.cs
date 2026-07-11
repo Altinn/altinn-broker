@@ -1102,17 +1102,18 @@ public class BrokerTusStore(
         var partialFileIds = await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(fileId, cancellationToken);
         if (partialFileIds is null or { Length: 0 })
         {
-            if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
+            if (await TryPromoteConcatCompleteFromStagingAsync(fileId, cancellationToken))
+            {
+                return;
+            }
+
+            var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
+            if (concatStatus is TusConcatStatus.Pending or TusConcatStatus.InProgress)
             {
                 var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
                 var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-                if (committedLength >= uploadLength)
-                {
-                    return;
-                }
-
                 throw new TusStoreException(
-                    $"TUS concatenation is marked complete for file id {fileId}, but staging blob is missing or incomplete.");
+                    $"TUS concatenation cannot resume for file id {fileId}: partial references are missing and staging is incomplete ({committedLength}/{uploadLength}).");
             }
 
             return;
@@ -1170,6 +1171,44 @@ public class BrokerTusStore(
             uploadStateRegistry.Remove(partialFileId);
             _uploadLengths.TryRemove(partialFileId, out _);
         }
+    }
+
+    public async Task<bool> TryPromoteConcatCompleteFromStagingAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
+        if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
+        {
+            var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            if (committedLength >= uploadLength)
+            {
+                return true;
+            }
+
+            throw new TusStoreException(
+                $"TUS concatenation is marked complete for file id {fileId}, but staging blob is missing or incomplete.");
+        }
+
+        var expectedLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
+        if (expectedLength <= 0)
+        {
+            return false;
+        }
+
+        var stagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+        if (stagingLength < expectedLength)
+        {
+            return false;
+        }
+
+        await partialUploadRegistry.MarkConcatCompleteAsync(fileId, cancellationToken);
+        await partialUploadRegistry.ClearFinalConcatPartialReferencesAsync(fileId, cancellationToken);
+
+        logger.LogInformation(
+            "TUS concatenation promoted to complete from existing staging for file id {FileId}. StagingLength={StagingLength}",
+            fileId,
+            stagingLength);
+        return true;
     }
 
     private async Task EnsurePartialReadyForConcatenationAsync(
