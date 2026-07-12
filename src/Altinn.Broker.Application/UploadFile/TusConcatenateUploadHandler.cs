@@ -37,9 +37,7 @@ public class TusConcatenateUploadHandler(
                 logger.LogInformation(
                     "TUS concat chain skipped because concat is already complete for file transfer {FileTransferId}. Enqueueing publish.",
                     fileTransferId);
-                await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
-                await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
-                tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+                await TryEnqueuePublishWhenChainCompleteAsync(fileTransferId, tusFileId, cancellationToken);
             }
             else if (await concatJobCoordinator.IsConcatCompleteAsync(tusFileId, cancellationToken))
             {
@@ -81,9 +79,7 @@ public class TusConcatenateUploadHandler(
                     "TUS concat chain completed for file transfer {FileTransferId}. Enqueueing publish job.",
                     fileTransferId);
 
-                await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
-                await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
-                tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId);
+                await TryEnqueuePublishWhenChainCompleteAsync(fileTransferId, tusFileId, cancellationToken);
                 return;
             }
 
@@ -125,5 +121,31 @@ public class TusConcatenateUploadHandler(
         {
             await concatJobCoordinator.ReleaseRunningLockAsync(tusFileId, cancellationToken);
         }
+    }
+
+    private async Task TryEnqueuePublishWhenChainCompleteAsync(
+        Guid fileTransferId,
+        string tusFileId,
+        CancellationToken cancellationToken)
+    {
+        await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
+        await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+
+        if (tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId))
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "TUS publish was not enqueued for chain-complete file transfer {FileTransferId}. TusFileId={TusFileId}. Scheduling concat chain retry in {RetryDelaySeconds}s.",
+            fileTransferId,
+            tusFileId,
+            PartialWaitRetryDelay.TotalSeconds);
+
+        await tusFinalizeUploadEnqueuer.ScheduleConcatChainStepAsync(
+            fileTransferId,
+            tusFileId,
+            PartialWaitRetryDelay,
+            cancellationToken);
     }
 }
