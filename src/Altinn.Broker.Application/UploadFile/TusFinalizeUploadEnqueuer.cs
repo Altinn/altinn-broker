@@ -75,7 +75,7 @@ public sealed class TusFinalizeUploadEnqueuer(
         }
 
         backgroundJobClient.Enqueue<TusPublishUploadHandler>(handler =>
-            handler.Process(fileTransferId, tusFileId, CancellationToken.None));
+            handler.Process(fileTransferId, tusFileId, CancellationToken.None, null));
 
         logger.LogInformation(
             "Enqueued TUS publish job for file transfer {FileTransferId}. TusFileId={TusFileId}",

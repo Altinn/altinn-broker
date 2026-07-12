@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Server;
 
 using Microsoft.Extensions.Logging;
 
@@ -10,9 +11,15 @@ public class TusPublishUploadHandler(
     ITusConcatJobCoordinator concatJobCoordinator,
     ILogger<TusPublishUploadHandler> logger)
 {
-    [AutomaticRetry(Attempts = 3)]
+    private const int RetryAttempts = 3;
+
+    [AutomaticRetry(Attempts = RetryAttempts)]
     [DisableConcurrentExecution("tus-publish:{1}", 7200)]
-    public async Task Process(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
+    public async Task Process(
+        Guid fileTransferId,
+        string tusFileId,
+        CancellationToken cancellationToken,
+        PerformContext? performContext)
     {
         try
         {
@@ -50,10 +57,19 @@ public class TusPublishUploadHandler(
             logger.LogInformation(
                 "TUS publish job completed for file transfer {FileTransferId}",
                 fileTransferId);
+
+            await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, CancellationToken.None);
         }
-        finally
+        catch (Exception) when (ShouldReleasePublishSlotAfterFailure(performContext))
         {
-            await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+            await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, CancellationToken.None);
+            throw;
         }
+    }
+
+    private static bool ShouldReleasePublishSlotAfterFailure(PerformContext? performContext)
+    {
+        var retryCount = performContext?.GetJobParameter<int>("RetryCount") ?? 0;
+        return retryCount >= RetryAttempts;
     }
 }

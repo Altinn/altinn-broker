@@ -327,7 +327,9 @@ public sealed class TusPartialUploadRegistry(
         var key = PartialIndexCounterKey(fileTransferId);
         if (_database is not null)
         {
-            return (int)await _database.StringIncrementAsync(key) - 1;
+            var value = await _database.StringIncrementAsync(key);
+            await _database.KeyExpireAsync(key, CacheExpiration);
+            return (int)value - 1;
         }
 
         var current = await distributedCache.GetStringAsync(key, cancellationToken);

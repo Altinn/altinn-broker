@@ -32,7 +32,7 @@ internal sealed class InlineTusFinalizeUploadEnqueuer(IServiceScopeFactory servi
     {
         using var scope = serviceScopeFactory.CreateScope();
         var publishHandler = scope.ServiceProvider.GetRequiredService<TusPublishUploadHandler>();
-        publishHandler.Process(fileTransferId, tusFileId, CancellationToken.None).GetAwaiter().GetResult();
+        publishHandler.Process(fileTransferId, tusFileId, CancellationToken.None, performContext: null).GetAwaiter().GetResult();
         return true;
     }
 

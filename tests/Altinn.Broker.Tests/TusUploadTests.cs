@@ -74,6 +74,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         var patchResponse = await _senderClient.SendAsync(patchRequest);
         Assert.Equal(HttpStatusCode.NoContent, patchResponse.StatusCode);
 
+        await Task.Delay(5000);
         var overview = await _senderClient.GetFromJsonAsync<FileTransferOverviewExt>(
             $"broker/api/v1/filetransfer/{fileTransferId}",
             _responseSerializerOptions);

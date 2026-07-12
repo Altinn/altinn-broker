@@ -104,6 +104,11 @@ internal static class TusFinalizeRecovery
         if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(tusFileId, cancellationToken) is not null
             || concatStatus == TusConcatStatus.Pending)
         {
+            if (await concatJobCoordinator.IsConcatRunningAsync(tusFileId, cancellationToken))
+            {
+                return;
+            }
+
             logger.LogInformation(
                 "Enqueueing TUS concatenate job for file transfer {FileTransferId}. TusFileId={TusFileId}",
                 fileTransferId,
