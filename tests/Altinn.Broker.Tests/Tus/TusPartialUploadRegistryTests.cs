@@ -1,3 +1,5 @@
+using Altinn.Broker.Integrations.Tus;
+
 using Xunit;
 
 namespace Altinn.Broker.Tests.Tus;
@@ -32,5 +34,76 @@ public class TusPartialUploadRegistryTests
         var fileTransferId = await registry.TryGetFileTransferIdAsync(PartialUploadId, CancellationToken.None);
 
         Assert.Equal(Guid.Parse(FileTransferId), fileTransferId);
+    }
+
+    [Fact]
+    public async Task TryBeginConcatJobAsync_SecondCallerFailsWhileFirstHoldsClaim()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "final-concat-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+
+        var firstClaim = await registry.TryBeginConcatJobAsync(finalFileId, CancellationToken.None);
+        var secondClaim = await registry.TryBeginConcatJobAsync(finalFileId, CancellationToken.None);
+
+        Assert.True(firstClaim);
+        Assert.False(secondClaim);
+        Assert.Equal(TusConcatStatus.InProgress, await registry.TryGetConcatStatusAsync(finalFileId, CancellationToken.None));
+
+        await registry.ReleaseConcatRunningLockAsync(finalFileId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RegisterFinalConcatAsync_ClearsStaleEnqueueMarker()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "stale-enqueue-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a"], CancellationToken.None);
+        Assert.True(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
+        Assert.False(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a"], CancellationToken.None);
+
+        Assert.True(await registry.TryAcquireConcatEnqueueSlotAsync(finalFileId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RegisterFinalConcatAsync_PreservesExistingConcatStatusOnReplay()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "replay-final-concat-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+        await registry.MarkConcatCompleteAsync(finalFileId, CancellationToken.None);
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+
+        Assert.Equal(TusConcatStatus.Complete, await registry.TryGetConcatStatusAsync(finalFileId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RegisterPartialAsync_AllocatesIncreasingPartialIndex()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.Parse(FileTransferId);
+        const string firstPartialId = "partial-a";
+        const string secondPartialId = "partial-b";
+
+        await registry.RegisterPartialAsync(firstPartialId, fileTransferId, uploadLength: 1024, CancellationToken.None);
+        await registry.RegisterPartialAsync(secondPartialId, fileTransferId, uploadLength: 2048, CancellationToken.None);
+
+        var firstPartial = await registry.TryGetPartialInfoAsync(firstPartialId, CancellationToken.None);
+        var secondPartial = await registry.TryGetPartialInfoAsync(secondPartialId, CancellationToken.None);
+
+        Assert.NotNull(firstPartial);
+        Assert.NotNull(secondPartial);
+        Assert.Equal(0, firstPartial.Value.PartialIndex);
+        Assert.Equal(1, secondPartial.Value.PartialIndex);
     }
 }

@@ -55,7 +55,8 @@ public class TusUploadCompleteHandler(
             return Errors.ServiceOwnerNotConfigured;
         }
 
-        if (fileTransfer.FileTransferStatusEntity.Status > FileTransferStatus.UploadStarted)
+        if (fileTransfer.FileTransferStatusEntity.Status is not (
+            FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing))
         {
             logger.LogInformation(
                 "TUS completion skipped for file transfer {FileTransferId}: status already {CurrentStatus}",

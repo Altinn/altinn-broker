@@ -18,16 +18,21 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using Moq;
 
 using Polly;
+
+using StackExchange.Redis;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -38,13 +43,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
+        builder.UseSetting("DistributedCacheOptions:RedisConnectionString", string.Empty);
 
         // Configure malware scan simulation based on EnableMalwareScanSimulation property
         builder.ConfigureAppConfiguration((context, configBuilder) =>
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                { "GeneralSettings:SimulateMalwareScan", EnableMalwareScanSimulation.ToString().ToLower() }
+                { "GeneralSettings:SimulateMalwareScan", EnableMalwareScanSimulation.ToString().ToLower() },
+                { "DistributedCacheOptions:RedisConnectionString", string.Empty },
             });
         });
 
@@ -60,6 +67,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Overwrite registrations from Program.cs
         builder.ConfigureTestServices((services) =>
         {
+            services.RemoveAll<IConnectionMultiplexer>();
+            services.RemoveAll<IConfigureOptions<RedisCacheOptions>>();
+            services.RemoveAll<IDistributedCache>();
+            services.AddDistributedMemoryCache();
+
             var authenticationBuilder = services.AddAuthentication();
             authenticationBuilder.Services.Configure<AuthenticationOptions>(o =>
             {

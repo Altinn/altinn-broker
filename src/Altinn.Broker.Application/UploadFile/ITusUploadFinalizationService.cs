@@ -2,6 +2,10 @@ namespace Altinn.Broker.Application.UploadFile;
 
 public interface ITusUploadFinalizationService
 {
+    Task EnsureFinalConcatenatedAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<TusConcatChainStepResult> ProcessConcatChainStepAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task FinalizeStagingAsync(string tusFileId, CancellationToken cancellationToken);
 
     Task<bool> IsReadyForTransferCompletionAsync(string tusFileId, CancellationToken cancellationToken);
@@ -9,6 +13,12 @@ public interface ITusUploadFinalizationService
     Task<bool> IsReadyForStagingFinalizeAsync(string tusFileId, CancellationToken cancellationToken);
 
     Task<bool> IsPartialUploadAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<bool> TryPromoteConcatCompleteFromStagingAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<bool> IsConcatMarkedCompleteAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<bool> IsStagingBlobCommittedAsync(string tusFileId, CancellationToken cancellationToken);
 
     Task CleanupCompletedUploadAsync(string tusFileId, CancellationToken cancellationToken);
 }

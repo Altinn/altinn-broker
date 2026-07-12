@@ -2,9 +2,18 @@ using System.Text.Json;
 
 using Microsoft.Extensions.Caching.Distributed;
 
+using StackExchange.Redis;
+
 namespace Altinn.Broker.Integrations.Tus;
 
-public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength);
+public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength, int PartialIndex);
+
+public enum TusConcatStatus
+{
+    Pending,
+    InProgress,
+    Complete
+}
 
 public interface ITusPartialUploadRegistry
 {
@@ -26,6 +35,28 @@ public interface ITusPartialUploadRegistry
 
     Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken);
 
+    Task<TusConcatStatus?> TryGetConcatStatusAsync(string fileId, CancellationToken cancellationToken);
+
+    Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken);
+
+    Task MarkConcatInProgressAsync(string fileId, CancellationToken cancellationToken);
+
+    Task<bool> TryAcquireConcatEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
+
+    Task<bool> TryBeginConcatJobAsync(string fileId, CancellationToken cancellationToken);
+
+    Task ReleaseConcatRunningLockAsync(string fileId, CancellationToken cancellationToken);
+
+    Task<bool> TryAcquirePublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
+
+    Task<bool> IsConcatRunningAsync(string fileId, CancellationToken cancellationToken);
+
+    Task ClearConcatEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
+
+    Task ClearPublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken);
+
+    Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken);
+
     Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken);
 
     Task RemoveUploadAsync(string fileId, CancellationToken cancellationToken);
@@ -33,20 +64,35 @@ public interface ITusPartialUploadRegistry
     Task RemoveFinalConcatAsync(string fileId, CancellationToken cancellationToken);
 }
 
-public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache) : ITusPartialUploadRegistry
+public sealed class TusPartialUploadRegistry(
+    IDistributedCache distributedCache,
+    IConnectionMultiplexer? redis = null) : ITusPartialUploadRegistry
 {
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
+    private static readonly TimeSpan RunningLockExpiration = TimeSpan.FromHours(8);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly DistributedCacheEntryOptions CacheOptions = new()
     {
         AbsoluteExpirationRelativeToNow = CacheExpiration
     };
 
+    private readonly IDatabase? _database = redis?.GetDatabase();
+
     private static string PartialInfoKey(string partialFileId) => $"tus-partial-info:{NormalizeId(partialFileId)}";
 
     private static string UploadLengthKey(string fileId) => $"tus-upload-length:{NormalizeId(fileId)}";
 
     private static string FinalConcatKey(string fileId) => $"tus-final-concat:{NormalizeId(fileId)}";
+
+    private static string ConcatStatusKey(string fileId) => $"tus-concat-status:{NormalizeId(fileId)}";
+
+    private static string ConcatEnqueueKey(string fileId) => $"tus-concat-enqueued:{NormalizeId(fileId)}";
+
+    private static string ConcatRunningKey(string fileId) => $"tus-concat-running:{NormalizeId(fileId)}";
+
+    private static string PublishEnqueueKey(string fileId) => $"tus-publish-enqueued:{NormalizeId(fileId)}";
+
+    private static string PartialIndexCounterKey(Guid fileTransferId) => $"tus-partial-index:{fileTransferId:N}";
 
     private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
@@ -56,9 +102,11 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         long uploadLength,
         CancellationToken cancellationToken)
     {
+        var existing = await TryGetPartialInfoAsync(partialFileId, cancellationToken);
+        var partialIndex = existing?.PartialIndex ?? await AllocatePartialIndexAsync(fileTransferId, cancellationToken);
         await SetCachedValueAsync(
             PartialInfoKey(partialFileId),
-            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength), JsonOptions),
+            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex), JsonOptions),
             cancellationToken);
         await RegisterUploadAsync(partialFileId, uploadLength, cancellationToken);
     }
@@ -75,7 +123,7 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         }
 
         var dto = JsonSerializer.Deserialize<PartialUploadInfoDto>(json, JsonOptions);
-        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength);
+        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength, dto.PartialIndex);
     }
 
     public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
@@ -96,11 +144,20 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         return partialInfo?.FileTransferId;
     }
 
-    public Task RegisterFinalConcatAsync(
+    public async Task RegisterFinalConcatAsync(
         string fileId,
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken)
-        => SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
+    {
+        await ClearConcatEnqueueSlotAsync(fileId, cancellationToken);
+        await ReleaseConcatRunningLockAsync(fileId, cancellationToken);
+        await ClearPublishEnqueueSlotAsync(fileId, cancellationToken);
+        await SetCachedValueAsync(FinalConcatKey(fileId), JsonSerializer.Serialize(partialFileIds, JsonOptions), cancellationToken);
+        if (await TryGetConcatStatusAsync(fileId, cancellationToken) is null)
+        {
+            await SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Pending.ToString(), cancellationToken);
+        }
+    }
 
     public async Task<string[]?> TryGetFinalConcatPartialIdsAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -113,6 +170,110 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         return JsonSerializer.Deserialize<string[]>(json, JsonOptions);
     }
 
+    public async Task<TusConcatStatus?> TryGetConcatStatusAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var value = await distributedCache.GetStringAsync(ConcatStatusKey(fileId), cancellationToken);
+        return Enum.TryParse<TusConcatStatus>(value, ignoreCase: true, out var status) ? status : null;
+    }
+
+    public Task MarkConcatCompleteAsync(string fileId, CancellationToken cancellationToken)
+        => Task.WhenAll(
+            SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.Complete.ToString(), cancellationToken),
+            ClearConcatEnqueueSlotAsync(fileId, cancellationToken));
+
+    public Task MarkConcatInProgressAsync(string fileId, CancellationToken cancellationToken)
+        => SetCachedValueAsync(ConcatStatusKey(fileId), TusConcatStatus.InProgress.ToString(), cancellationToken);
+
+    public async Task<bool> TryAcquireConcatEnqueueSlotAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        var status = await TryGetConcatStatusAsync(fileId, cancellationToken);
+        if (status == TusConcatStatus.Complete)
+        {
+            return false;
+        }
+
+        if (status == TusConcatStatus.InProgress && await IsConcatRunningAsync(fileId, cancellationToken))
+        {
+            return false;
+        }
+
+        return await TrySetOnceAsync(ConcatEnqueueKey(fileId), "1", cancellationToken);
+    }
+
+    public async Task<bool> TryBeginConcatJobAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        var status = await TryGetConcatStatusAsync(fileId, cancellationToken);
+        if (status == TusConcatStatus.Complete)
+        {
+            return false;
+        }
+
+        if (!await TrySetOnceAsync(ConcatRunningKey(fileId), "1", cancellationToken, RunningLockExpiration))
+        {
+            return false;
+        }
+
+        if (status == TusConcatStatus.Pending)
+        {
+            await MarkConcatInProgressAsync(fileId, cancellationToken);
+        }
+
+        return true;
+    }
+
+    public Task ReleaseConcatRunningLockAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        if (_database is not null)
+        {
+            return _database.KeyDeleteAsync(ConcatRunningKey(fileId));
+        }
+
+        return distributedCache.RemoveAsync(ConcatRunningKey(fileId), cancellationToken);
+    }
+
+    public Task<bool> TryAcquirePublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken)
+        => TrySetOnceAsync(PublishEnqueueKey(NormalizeId(fileId)), "1", cancellationToken);
+
+    public async Task<bool> IsConcatRunningAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        if (_database is not null)
+        {
+            return await _database.KeyExistsAsync(ConcatRunningKey(fileId));
+        }
+
+        return !string.IsNullOrWhiteSpace(
+            await distributedCache.GetStringAsync(ConcatRunningKey(fileId), cancellationToken));
+    }
+
+    public Task ClearConcatEnqueueSlotAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        if (_database is not null)
+        {
+            return _database.KeyDeleteAsync(ConcatEnqueueKey(fileId));
+        }
+
+        return distributedCache.RemoveAsync(ConcatEnqueueKey(fileId), cancellationToken);
+    }
+
+    public Task ClearPublishEnqueueSlotAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = NormalizeId(fileId);
+        if (_database is not null)
+        {
+            return _database.KeyDeleteAsync(PublishEnqueueKey(fileId));
+        }
+
+        return distributedCache.RemoveAsync(PublishEnqueueKey(fileId), cancellationToken);
+    }
+
+    public Task ClearFinalConcatPartialReferencesAsync(string fileId, CancellationToken cancellationToken)
+        => distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken);
+
     public Task RemovePartialAsync(string partialFileId, CancellationToken cancellationToken)
         => Task.WhenAll(
             distributedCache.RemoveAsync(PartialInfoKey(partialFileId), cancellationToken),
@@ -122,10 +283,60 @@ public sealed class TusPartialUploadRegistry(IDistributedCache distributedCache)
         => distributedCache.RemoveAsync(UploadLengthKey(fileId), cancellationToken);
 
     public Task RemoveFinalConcatAsync(string fileId, CancellationToken cancellationToken)
-        => distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken);
+        => Task.WhenAll(
+            distributedCache.RemoveAsync(FinalConcatKey(fileId), cancellationToken),
+            distributedCache.RemoveAsync(ConcatStatusKey(fileId), cancellationToken));
 
     private Task SetCachedValueAsync(string key, string value, CancellationToken cancellationToken)
         => distributedCache.SetStringAsync(key, value, CacheOptions, cancellationToken);
 
-    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength);
+    private async Task<bool> TrySetOnceAsync(
+        string key,
+        string value,
+        CancellationToken cancellationToken,
+        TimeSpan? expiration = null)
+    {
+        if (_database is not null)
+        {
+            return await _database.StringSetAsync(
+                key,
+                value,
+                expiration ?? CacheExpiration,
+                When.NotExists);
+        }
+
+        var existing = await distributedCache.GetStringAsync(key, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            return false;
+        }
+
+        await distributedCache.SetStringAsync(
+            key,
+            value,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = expiration ?? CacheExpiration
+            },
+            cancellationToken);
+        return true;
+    }
+
+    private async Task<int> AllocatePartialIndexAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var key = PartialIndexCounterKey(fileTransferId);
+        if (_database is not null)
+        {
+            var value = await _database.StringIncrementAsync(key);
+            await _database.KeyExpireAsync(key, CacheExpiration);
+            return (int)value - 1;
+        }
+
+        var current = await distributedCache.GetStringAsync(key, cancellationToken);
+        var next = current is null ? 0 : int.Parse(current) + 1;
+        await SetCachedValueAsync(key, next.ToString(), cancellationToken);
+        return next;
+    }
+
+    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength, int PartialIndex = 0);
 }

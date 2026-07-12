@@ -272,6 +272,26 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
 
         try
         {
+            if (await destinationBlobClient.ExistsAsync(cancellationToken))
+            {
+                var destinationProperties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                var destinationLength = destinationProperties.Value.ContentLength;
+                string? destinationChecksum = null;
+                if (destinationProperties.Value.ContentHash is { Length: > 0 } contentHash)
+                {
+                    destinationChecksum = BitConverter.ToString(contentHash).Replace("-", "").ToLowerInvariant();
+                }
+
+                logger.LogInformation(
+                    "TUS destination blob already committed for {FileTransferId}. Skipping staging copy. Size={ContentLength}",
+                    fileTransferEntity.FileTransferId,
+                    destinationLength);
+
+                await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                return (destinationChecksum, destinationLength);
+            }
+
             var stagingBlobClient = await ResolveTusStagingBlobClientAsync(
                 blockStagingBlobClient,
                 appendStagingBlobClient,
