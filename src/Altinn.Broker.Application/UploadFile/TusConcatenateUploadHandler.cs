@@ -69,9 +69,16 @@ public class TusConcatenateUploadHandler(
             {
                 if (!await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
                 {
-                    logger.LogWarning(
-                        "TUS concat chain completed for file transfer {FileTransferId}, but destination blob is not committed. Not enqueueing publish.",
-                        fileTransferId);
+                    logger.LogInformation(
+                        "TUS concat chain completed for file transfer {FileTransferId}, but staging is not yet committed. Retrying in {RetryDelaySeconds}s.",
+                        fileTransferId,
+                        PartialWaitRetryDelay.TotalSeconds);
+
+                    await tusFinalizeUploadEnqueuer.ScheduleConcatChainStepAsync(
+                        fileTransferId,
+                        tusFileId,
+                        PartialWaitRetryDelay,
+                        cancellationToken);
                     return;
                 }
 

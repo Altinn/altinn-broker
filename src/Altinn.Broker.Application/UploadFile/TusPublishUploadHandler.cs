@@ -69,7 +69,12 @@ public class TusPublishUploadHandler(
 
     private static bool ShouldReleasePublishSlotAfterFailure(PerformContext? performContext)
     {
-        var retryCount = performContext?.GetJobParameter<int>("RetryCount") ?? 0;
+        if (performContext is null)
+        {
+            return true;
+        }
+
+        var retryCount = performContext.GetJobParameter<int>("RetryCount");
         return retryCount >= RetryAttempts;
     }
 }
