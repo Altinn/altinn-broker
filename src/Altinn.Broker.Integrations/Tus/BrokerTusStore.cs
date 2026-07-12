@@ -9,6 +9,7 @@ using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 
@@ -23,6 +24,7 @@ public class BrokerTusStore(
     ITusUploadStateRegistry uploadStateRegistry,
     ITusUploadProgressCache uploadProgressCache,
     ITusUploadActivityCache uploadActivityCache,
+    ITusConcatCheckpointStore concatCheckpointStore,
     IHttpContextAccessor httpContextAccessor,
     ILogger<BrokerTusStore> logger,
     IOptions<AzureStorageOptions> azureStorageOptions,
@@ -475,6 +477,7 @@ public class BrokerTusStore(
         _uploadMetadata[finalFileId] = metadata;
         await partialUploadRegistry.RegisterUploadAsync(finalFileId, totalLength, cancellationToken);
         await partialUploadRegistry.RegisterFinalConcatAsync(finalFileId, normalizedPartialFileIds, cancellationToken);
+        await concatCheckpointStore.ClearCheckpointAsync(finalFileId, cancellationToken);
         await storageResolver.SetDestinationUploadLengthAsync(finalFileId, totalLength, cancellationToken);
         var state = RegisterUploadState(finalFileId, totalLength, initialOffset: totalLength);
         state.AcceptedOffset = totalLength;
@@ -1084,12 +1087,30 @@ public class BrokerTusStore(
     public async Task EnsureFinalConcatenatedAsync(string fileId, CancellationToken cancellationToken)
     {
         fileId = ResolveStoreFileId(fileId);
+        while (true)
+        {
+            var result = await ProcessConcatChainStepAsync(fileId, cancellationToken);
+            if (result.ChainComplete)
+            {
+                return;
+            }
+
+            if (!result.StepCompleted)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            }
+        }
+    }
+
+    public async Task<TusConcatChainStepResult> ProcessConcatChainStepAsync(string fileId, CancellationToken cancellationToken)
+    {
+        fileId = ResolveStoreFileId(fileId);
         var partialFileIds = await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(fileId, cancellationToken);
         if (partialFileIds is null or { Length: 0 })
         {
             if (await TryPromoteConcatCompleteFromStagingAsync(fileId, cancellationToken))
             {
-                return;
+                return new TusConcatChainStepResult(StepCompleted: true, ChainComplete: true, ShouldRetryStep: false);
             }
 
             var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
@@ -1101,7 +1122,7 @@ public class BrokerTusStore(
                     $"TUS concatenation cannot resume for file id {fileId}: partial references are missing and destination is incomplete ({committedLength}/{expectedUploadLength}).");
             }
 
-            return;
+            return new TusConcatChainStepResult(StepCompleted: true, ChainComplete: true, ShouldRetryStep: false);
         }
 
         var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
@@ -1109,103 +1130,238 @@ public class BrokerTusStore(
         if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete
             && destinationCommittedLength >= uploadLength)
         {
-            return;
+            await concatCheckpointStore.ClearCheckpointAsync(fileId, cancellationToken);
+            return new TusConcatChainStepResult(StepCompleted: true, ChainComplete: true, ShouldRetryStep: false);
         }
 
-        var currentConcatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
-        var concatAlreadyInProgress = currentConcatStatus == TusConcatStatus.InProgress
-            && await partialUploadRegistry.IsConcatRunningAsync(fileId, cancellationToken);
-        var acquiredConcatLock = false;
-        if (!concatAlreadyInProgress)
+        var checkpoint = await concatCheckpointStore.TryGetCheckpointAsync(fileId, cancellationToken)
+            ?? new TusConcatCheckpoint();
+
+        switch (checkpoint.NextStep)
         {
-            acquiredConcatLock = await partialUploadRegistry.TryBeginConcatJobAsync(fileId, cancellationToken);
-            if (!acquiredConcatLock)
-            {
-                destinationCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
-                if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete
-                    && destinationCommittedLength >= uploadLength)
-                {
-                    return;
-                }
-
-                return;
-            }
-        }
-
-        try
-        {
-            long totalLength = 0;
-            foreach (var partialFileId in partialFileIds)
-            {
-                var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
-                if (partialInfo is null)
-                {
-                    throw new TusStoreException($"Unknown partial upload id {partialFileId}.");
-                }
-
-                await WaitForPartialDurableCommittedAsync(
-                    partialFileId,
-                    partialInfo.Value.UploadLength,
+            case TusConcatChainStep.ValidatePartials:
+                return await ProcessValidatePartialsStepAsync(
+                    fileId,
+                    partialFileIds,
+                    uploadLength,
+                    checkpoint,
                     cancellationToken);
-                totalLength += partialInfo.Value.UploadLength;
-            }
 
-            if (totalLength != uploadLength)
-            {
-                throw new TusStoreException(
-                    $"Concatenated upload length mismatch for file id {fileId}. Expected {uploadLength}, partial sum {totalLength}.");
-            }
+            case TusConcatChainStep.PrepareCommit:
+                return await ProcessPrepareCommitStepAsync(
+                    fileId,
+                    partialFileIds,
+                    uploadLength,
+                    checkpoint,
+                    cancellationToken);
 
-            var stagedSnapshot = await storageResolver.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken);
-            if (stagedSnapshot is not { BlockIds.Count: > 0 })
-            {
-                throw new TusStoreException($"Cannot commit TUS concatenation for file id {fileId} because no destination blocks were staged.");
-            }
+            case TusConcatChainStep.CommitDestination:
+                return await ProcessCommitDestinationStepAsync(
+                    fileId,
+                    uploadLength,
+                    checkpoint,
+                    cancellationToken);
 
-            if (stagedSnapshot.TotalLength != totalLength)
-            {
-                throw new TusStoreException(
-                    $"Cannot commit TUS concatenation for file id {fileId}. Staged {stagedSnapshot.TotalLength} bytes, expected {totalLength}.");
-            }
+            case TusConcatChainStep.Cleanup:
+                return await ProcessCleanupStepAsync(fileId, partialFileIds, checkpoint, cancellationToken);
 
-            if (stagedSnapshot.BlockIds.Count > TusBlockIds.MaxBlocksPerBlob)
-            {
-                throw new TusStoreException(
-                    $"Cannot commit TUS concatenation for file id {fileId}. Block count {stagedSnapshot.BlockIds.Count} exceeds Azure limit of {TusBlockIds.MaxBlocksPerBlob}.");
-            }
-
-            logger.LogInformation(
-                "TUS committing destination blocks for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
-                fileId,
-                stagedSnapshot.BlockIds.Count,
-                stagedSnapshot.TotalLength,
-                uploadLength);
-
-            await storageResolver.CommitBlocksToDestinationAsync(fileId, stagedSnapshot.BlockIds, cancellationToken);
-            await partialUploadRegistry.MarkConcatCompleteAsync(fileId, cancellationToken);
-            await partialUploadRegistry.ClearFinalConcatPartialReferencesAsync(fileId, cancellationToken);
-
-            logger.LogInformation(
-                "TUS concatenation completed in background for file id {FileId}. TotalLength={TotalLength} PartialCount={PartialCount}",
-                fileId,
-                totalLength,
-                partialFileIds.Length);
-
-            foreach (var partialFileId in partialFileIds)
-            {
-                await partialUploadRegistry.RemovePartialAsync(partialFileId, cancellationToken);
-                await uploadProgressCache.RemoveAsync(partialFileId, cancellationToken);
-                uploadStateRegistry.Remove(partialFileId);
-                _uploadLengths.TryRemove(partialFileId, out _);
-            }
+            default:
+                throw new TusStoreException($"Unknown TUS concat chain step {checkpoint.NextStep} for file id {fileId}.");
         }
-        finally
+    }
+
+    private async Task<TusConcatChainStepResult> ProcessValidatePartialsStepAsync(
+        string fileId,
+        string[] partialFileIds,
+        long uploadLength,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        if (checkpoint.ValidatedPartialCount >= partialFileIds.Length)
         {
-            if (acquiredConcatLock)
-            {
-                await partialUploadRegistry.ReleaseConcatRunningLockAsync(fileId, cancellationToken);
-            }
+            var advanced = checkpoint with { NextStep = TusConcatChainStep.PrepareCommit };
+            await concatCheckpointStore.SaveCheckpointAsync(fileId, advanced, cancellationToken);
+            return new TusConcatChainStepResult(
+                StepCompleted: true,
+                ChainComplete: false,
+                ShouldRetryStep: false,
+                NextStep: TusConcatChainStep.PrepareCommit);
         }
+
+        var partialFileId = partialFileIds[checkpoint.ValidatedPartialCount];
+        var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
+        if (partialInfo is null)
+        {
+            throw new TusStoreException($"Unknown partial upload id {partialFileId}.");
+        }
+
+        var progress = await uploadProgressCache.GetAsync(partialFileId, cancellationToken);
+        if (progress is null || progress.CommittedOffset < partialInfo.Value.UploadLength)
+        {
+            logger.LogInformation(
+                "TUS concat chain waiting for partial {PartialFileId} ({CommittedOffset}/{UploadLength}) on file id {FileId}.",
+                partialFileId,
+                progress?.CommittedOffset ?? 0,
+                partialInfo.Value.UploadLength,
+                fileId);
+            return new TusConcatChainStepResult(
+                StepCompleted: false,
+                ChainComplete: false,
+                ShouldRetryStep: true,
+                NextStep: TusConcatChainStep.ValidatePartials);
+        }
+
+        var nextCheckpoint = checkpoint with
+        {
+            ValidatedPartialCount = checkpoint.ValidatedPartialCount + 1,
+            TotalValidatedLength = checkpoint.TotalValidatedLength + partialInfo.Value.UploadLength,
+            NextStep = checkpoint.ValidatedPartialCount + 1 >= partialFileIds.Length
+                ? TusConcatChainStep.PrepareCommit
+                : TusConcatChainStep.ValidatePartials
+        };
+        await concatCheckpointStore.SaveCheckpointAsync(fileId, nextCheckpoint, cancellationToken);
+
+        logger.LogInformation(
+            "TUS concat chain validated partial {PartialIndex}/{PartialCount} for file id {FileId}.",
+            nextCheckpoint.ValidatedPartialCount,
+            partialFileIds.Length,
+            fileId);
+
+        if (nextCheckpoint.NextStep == TusConcatChainStep.PrepareCommit
+            && nextCheckpoint.TotalValidatedLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Concatenated upload length mismatch for file id {fileId}. Expected {uploadLength}, partial sum {nextCheckpoint.TotalValidatedLength}.");
+        }
+
+        return new TusConcatChainStepResult(
+            StepCompleted: true,
+            ChainComplete: false,
+            ShouldRetryStep: false,
+            NextStep: nextCheckpoint.NextStep);
+    }
+
+    private async Task<TusConcatChainStepResult> ProcessPrepareCommitStepAsync(
+        string fileId,
+        string[] partialFileIds,
+        long uploadLength,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        if (checkpoint.TotalValidatedLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Concatenated upload length mismatch for file id {fileId}. Expected {uploadLength}, partial sum {checkpoint.TotalValidatedLength}.");
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken);
+        if (stagedSnapshot is not { BlockIds.Count: > 0 })
+        {
+            throw new TusStoreException($"Cannot commit TUS concatenation for file id {fileId} because no destination blocks were staged.");
+        }
+
+        if (stagedSnapshot.TotalLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Cannot commit TUS concatenation for file id {fileId}. Staged {stagedSnapshot.TotalLength} bytes, expected {uploadLength}.");
+        }
+
+        if (stagedSnapshot.BlockIds.Count > TusBlockIds.MaxBlocksPerBlob)
+        {
+            throw new TusStoreException(
+                $"Cannot commit TUS concatenation for file id {fileId}. Block count {stagedSnapshot.BlockIds.Count} exceeds Azure limit of {TusBlockIds.MaxBlocksPerBlob}.");
+        }
+
+        var nextCheckpoint = checkpoint with
+        {
+            BlockCount = stagedSnapshot.BlockIds.Count,
+            StagedLength = stagedSnapshot.TotalLength,
+            NextStep = TusConcatChainStep.CommitDestination
+        };
+        await concatCheckpointStore.SaveCheckpointAsync(fileId, nextCheckpoint, cancellationToken);
+
+        logger.LogInformation(
+            "TUS concat chain prepared commit for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} PartialCount={PartialCount}",
+            fileId,
+            stagedSnapshot.BlockIds.Count,
+            stagedSnapshot.TotalLength,
+            partialFileIds.Length);
+
+        return new TusConcatChainStepResult(
+            StepCompleted: true,
+            ChainComplete: false,
+            ShouldRetryStep: false,
+            NextStep: TusConcatChainStep.CommitDestination);
+    }
+
+    private async Task<TusConcatChainStepResult> ProcessCommitDestinationStepAsync(
+        string fileId,
+        long uploadLength,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        var destinationCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        if (destinationCommittedLength >= uploadLength)
+        {
+            var advanced = checkpoint with { NextStep = TusConcatChainStep.Cleanup };
+            await concatCheckpointStore.SaveCheckpointAsync(fileId, advanced, cancellationToken);
+            return new TusConcatChainStepResult(
+                StepCompleted: true,
+                ChainComplete: false,
+                ShouldRetryStep: false,
+                NextStep: TusConcatChainStep.Cleanup);
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken);
+        if (stagedSnapshot is not { BlockIds.Count: > 0 })
+        {
+            throw new TusStoreException($"Cannot commit TUS concatenation for file id {fileId} because no destination blocks were staged.");
+        }
+
+        logger.LogInformation(
+            "TUS concat chain committing destination blocks for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
+            fileId,
+            stagedSnapshot.BlockIds.Count,
+            stagedSnapshot.TotalLength,
+            uploadLength);
+
+        await storageResolver.CommitBlocksToDestinationAsync(fileId, stagedSnapshot.BlockIds, cancellationToken);
+
+        var nextCheckpoint = checkpoint with { NextStep = TusConcatChainStep.Cleanup };
+        await concatCheckpointStore.SaveCheckpointAsync(fileId, nextCheckpoint, cancellationToken);
+
+        return new TusConcatChainStepResult(
+            StepCompleted: true,
+            ChainComplete: false,
+            ShouldRetryStep: false,
+            NextStep: TusConcatChainStep.Cleanup);
+    }
+
+    private async Task<TusConcatChainStepResult> ProcessCleanupStepAsync(
+        string fileId,
+        string[] partialFileIds,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        await partialUploadRegistry.MarkConcatCompleteAsync(fileId, cancellationToken);
+        await partialUploadRegistry.ClearFinalConcatPartialReferencesAsync(fileId, cancellationToken);
+        await concatCheckpointStore.ClearCheckpointAsync(fileId, cancellationToken);
+
+        logger.LogInformation(
+            "TUS concat chain completed cleanup for file id {FileId}. TotalLength={TotalLength} PartialCount={PartialCount}",
+            fileId,
+            checkpoint.StagedLength,
+            partialFileIds.Length);
+
+        foreach (var partialFileId in partialFileIds)
+        {
+            await partialUploadRegistry.RemovePartialAsync(partialFileId, cancellationToken);
+            await uploadProgressCache.RemoveAsync(partialFileId, cancellationToken);
+            uploadStateRegistry.Remove(partialFileId);
+            _uploadLengths.TryRemove(partialFileId, out _);
+        }
+
+        return new TusConcatChainStepResult(StepCompleted: true, ChainComplete: true, ShouldRetryStep: false);
     }
 
     public async Task<bool> TryPromoteConcatCompleteFromStagingAsync(string fileId, CancellationToken cancellationToken)
@@ -1280,29 +1436,6 @@ public class BrokerTusStore(
 
         throw new TusStoreException(
             $"Partial upload {partialFileId} is not ready for concatenation. Expected {partialLength} bytes, committed {progress?.CommittedOffset ?? 0}.");
-    }
-
-    private async Task WaitForPartialDurableCommittedAsync(
-        string partialFileId,
-        long partialLength,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTime.UtcNow.AddHours(2);
-        while (DateTime.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var progress = await uploadProgressCache.GetAsync(partialFileId, cancellationToken);
-            if (progress is not null && progress.CommittedOffset >= partialLength)
-            {
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-        }
-
-        throw new TusStoreException(
-            $"Partial upload {partialFileId} did not stage within the allowed time. Expected {partialLength} bytes.");
     }
 
     public async Task FinalizeStagingFromDurableStateAsync(string fileId, CancellationToken cancellationToken)

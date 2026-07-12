@@ -92,9 +92,12 @@ internal static class TusFinalizeRecovery
             }
 
             logger.LogWarning(
-                "TUS concat is InProgress without an active worker for file transfer {FileTransferId}. TusFileId={TusFileId}. Staging is incomplete; not re-enqueueing concat.",
+                "TUS concat is InProgress without an active worker for file transfer {FileTransferId}. TusFileId={TusFileId}. Resuming concat chain from checkpoint.",
                 fileTransferId,
                 tusFileId);
+
+            await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
+            await enqueuer.EnqueueConcatenateAsync(fileTransferId, tusFileId, cancellationToken);
             return;
         }
 

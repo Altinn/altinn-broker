@@ -9,6 +9,9 @@ public sealed class TusUploadFinalizationService(
     public Task EnsureFinalConcatenatedAsync(string tusFileId, CancellationToken cancellationToken)
         => store.EnsureFinalConcatenatedAsync(tusFileId, cancellationToken);
 
+    public Task<TusConcatChainStepResult> ProcessConcatChainStepAsync(string tusFileId, CancellationToken cancellationToken)
+        => store.ProcessConcatChainStepAsync(tusFileId, cancellationToken);
+
     public Task FinalizeStagingAsync(string tusFileId, CancellationToken cancellationToken)
         => store.FinalizeStagingFromDurableStateAsync(tusFileId, cancellationToken);
 

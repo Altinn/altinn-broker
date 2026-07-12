@@ -118,6 +118,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<IDistributedCache>(),
                 serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusConcatJobCoordinator, TusConcatJobCoordinator>();
+        services.AddSingleton<ITusConcatCheckpointStore, TusConcatCheckpointStore>();
         services.AddSingleton<ITusUploadStateRegistry, TusUploadStateRegistry>();
         services.AddSingleton<ITusUploadProgressCache>(serviceProvider =>
             new TusUploadProgressCache(

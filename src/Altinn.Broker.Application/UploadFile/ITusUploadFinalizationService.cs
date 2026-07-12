@@ -4,6 +4,8 @@ public interface ITusUploadFinalizationService
 {
     Task EnsureFinalConcatenatedAsync(string tusFileId, CancellationToken cancellationToken);
 
+    Task<TusConcatChainStepResult> ProcessConcatChainStepAsync(string tusFileId, CancellationToken cancellationToken);
+
     Task FinalizeStagingAsync(string tusFileId, CancellationToken cancellationToken);
 
     Task<bool> IsReadyForTransferCompletionAsync(string tusFileId, CancellationToken cancellationToken);

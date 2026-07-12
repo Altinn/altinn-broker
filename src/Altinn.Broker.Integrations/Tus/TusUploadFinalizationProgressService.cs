@@ -4,11 +4,17 @@ namespace Altinn.Broker.Integrations.Tus;
 
 public sealed class TusUploadFinalizationProgressService(
     ITusPartialUploadRegistry partialUploadRegistry,
+    ITusConcatCheckpointStore concatCheckpointStore,
     ITusStorageResolver storageResolver) : ITusUploadFinalizationProgressService
 {
     public async Task<bool> IsTusFinalizationInProgressAsync(Guid fileTransferId, CancellationToken cancellationToken)
     {
         var tusFileId = fileTransferId.ToString();
+
+        if (await concatCheckpointStore.TryGetCheckpointAsync(tusFileId, cancellationToken) is not null)
+        {
+            return true;
+        }
 
         if (await partialUploadRegistry.TryGetConcatStatusAsync(tusFileId, cancellationToken)
             is TusConcatStatus.Pending or TusConcatStatus.InProgress)

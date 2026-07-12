@@ -13,6 +13,9 @@ internal sealed class HybridCacheTestScope : IAsyncDisposable
 
     public HybridCache Cache { get; }
 
+    public Microsoft.Extensions.Caching.Distributed.IDistributedCache DistributedCache
+        => _provider.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
+
     private HybridCacheTestScope(ServiceProvider provider, HybridCache cache)
     {
         _provider = provider;

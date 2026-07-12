@@ -11,10 +11,21 @@ internal sealed class InlineTusFinalizeUploadEnqueuer(IServiceScopeFactory servi
 {
     public async Task<bool> EnqueueConcatenateAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
     {
-        using var scope = serviceScopeFactory.CreateScope();
-        var concatenateHandler = scope.ServiceProvider.GetRequiredService<TusConcatenateUploadHandler>();
-        await concatenateHandler.Process(fileTransferId, tusFileId, cancellationToken);
+        await RunChainStepAsync(fileTransferId, tusFileId, cancellationToken);
         return true;
+    }
+
+    public Task EnqueueConcatChainStepAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
+        => RunChainStepAsync(fileTransferId, tusFileId, cancellationToken);
+
+    public async Task ScheduleConcatChainStepAsync(
+        Guid fileTransferId,
+        string tusFileId,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(delay, cancellationToken);
+        await RunChainStepAsync(fileTransferId, tusFileId, cancellationToken);
     }
 
     public bool EnqueuePublish(Guid fileTransferId, string tusFileId)
@@ -23,5 +34,12 @@ internal sealed class InlineTusFinalizeUploadEnqueuer(IServiceScopeFactory servi
         var publishHandler = scope.ServiceProvider.GetRequiredService<TusPublishUploadHandler>();
         publishHandler.Process(fileTransferId, tusFileId, CancellationToken.None).GetAwaiter().GetResult();
         return true;
+    }
+
+    private async Task RunChainStepAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
+    {
+        using var scope = serviceScopeFactory.CreateScope();
+        var concatenateHandler = scope.ServiceProvider.GetRequiredService<TusConcatenateUploadHandler>();
+        await concatenateHandler.ProcessChainStep(fileTransferId, tusFileId, cancellationToken);
     }
 }

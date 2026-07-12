@@ -22,11 +22,10 @@ public sealed class TusFinalizeUploadEnqueuer(
 
         try
         {
-            backgroundJobClient.Enqueue<TusConcatenateUploadHandler>(handler =>
-                handler.Process(fileTransferId, tusFileId, CancellationToken.None));
+            await EnqueueConcatChainStepAsync(fileTransferId, tusFileId, cancellationToken);
 
             logger.LogInformation(
-                "Enqueued TUS concatenate job for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                "Enqueued TUS concat chain for file transfer {FileTransferId}. TusFileId={TusFileId}",
                 fileTransferId,
                 tusFileId);
             return true;
@@ -36,11 +35,30 @@ public sealed class TusFinalizeUploadEnqueuer(
             await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
             logger.LogError(
                 ex,
-                "Failed to enqueue TUS concatenate job for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                "Failed to enqueue TUS concat chain for file transfer {FileTransferId}. TusFileId={TusFileId}",
                 fileTransferId,
                 tusFileId);
             throw;
         }
+    }
+
+    public Task EnqueueConcatChainStepAsync(Guid fileTransferId, string tusFileId, CancellationToken cancellationToken)
+    {
+        backgroundJobClient.Enqueue<TusConcatenateUploadHandler>(handler =>
+            handler.ProcessChainStep(fileTransferId, tusFileId, CancellationToken.None));
+        return Task.CompletedTask;
+    }
+
+    public Task ScheduleConcatChainStepAsync(
+        Guid fileTransferId,
+        string tusFileId,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        backgroundJobClient.Schedule<TusConcatenateUploadHandler>(
+            handler => handler.ProcessChainStep(fileTransferId, tusFileId, CancellationToken.None),
+            delay);
+        return Task.CompletedTask;
     }
 
     public bool EnqueuePublish(Guid fileTransferId, string tusFileId)
