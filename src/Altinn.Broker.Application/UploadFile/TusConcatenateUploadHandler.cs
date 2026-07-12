@@ -56,6 +56,8 @@ public class TusConcatenateUploadHandler(
             return;
         }
 
+        ChainFollowUp followUp = ChainFollowUp.None;
+
         try
         {
             logger.LogInformation(
@@ -67,67 +69,95 @@ public class TusConcatenateUploadHandler(
 
             if (result.ChainComplete)
             {
-                if (!await tusUploadFinalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
+                if (!await tusUploadFinalizationService.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken))
                 {
                     logger.LogInformation(
-                        "TUS concat chain completed for file transfer {FileTransferId}, but staging is not yet committed. Retrying in {RetryDelaySeconds}s.",
+                        "TUS concat chain completed for file transfer {FileTransferId}, but upload is not yet ready for completion. Retrying in {RetryDelaySeconds}s.",
                         fileTransferId,
                         PartialWaitRetryDelay.TotalSeconds);
-
-                    await tusFinalizeUploadEnqueuer.ScheduleConcatChainStepAsync(
-                        fileTransferId,
-                        tusFileId,
-                        PartialWaitRetryDelay,
-                        cancellationToken);
-                    return;
+                    followUp = ChainFollowUp.ScheduleRetry;
                 }
-
-                logger.LogInformation(
-                    "TUS concat chain completed for file transfer {FileTransferId}. Enqueueing publish job.",
-                    fileTransferId);
-
-                await TryEnqueuePublishWhenChainCompleteAsync(fileTransferId, tusFileId, cancellationToken);
-                return;
+                else
+                {
+                    logger.LogInformation(
+                        "TUS concat chain completed for file transfer {FileTransferId}. Enqueueing publish job.",
+                        fileTransferId);
+                    followUp = ChainFollowUp.Publish;
+                }
             }
-
-            if (!result.StepCompleted && result.ShouldRetryStep)
+            else if (!result.StepCompleted && result.ShouldRetryStep)
             {
                 logger.LogInformation(
                     "TUS concat chain step deferred for file transfer {FileTransferId}. Retrying in {RetryDelaySeconds}s.",
                     fileTransferId,
                     PartialWaitRetryDelay.TotalSeconds);
+                followUp = ChainFollowUp.ScheduleRetry;
+            }
+            else if (result.StepCompleted)
+            {
+                logger.LogInformation(
+                    "TUS concat chain advanced for file transfer {FileTransferId}. NextStep={NextStep}",
+                    fileTransferId,
+                    result.NextStep);
+                followUp = ChainFollowUp.EnqueueNextStep;
+            }
+            else
+            {
+                logger.LogWarning(
+                    "TUS concat chain step finished without advancing for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                    fileTransferId,
+                    tusFileId);
+            }
+        }
+        finally
+        {
+            await concatJobCoordinator.ReleaseRunningLockAsync(tusFileId, CancellationToken.None);
+        }
+
+        await RunDeferredChainFollowUpAsync(fileTransferId, tusFileId, followUp, cancellationToken);
+    }
+
+    private async Task RunDeferredChainFollowUpAsync(
+        Guid fileTransferId,
+        string tusFileId,
+        ChainFollowUp followUp,
+        CancellationToken cancellationToken)
+    {
+        switch (followUp)
+        {
+            case ChainFollowUp.ScheduleRetry:
+                if (await tusUploadFinalizationService.IsReadyForTransferCompletionAsync(tusFileId, cancellationToken))
+                {
+                    await TryEnqueuePublishWhenChainCompleteAsync(fileTransferId, tusFileId, cancellationToken);
+                    return;
+                }
 
                 await tusFinalizeUploadEnqueuer.ScheduleConcatChainStepAsync(
                     fileTransferId,
                     tusFileId,
                     PartialWaitRetryDelay,
                     cancellationToken);
-                return;
-            }
+                break;
 
-            if (result.StepCompleted)
-            {
-                logger.LogInformation(
-                    "TUS concat chain advanced for file transfer {FileTransferId}. NextStep={NextStep}",
-                    fileTransferId,
-                    result.NextStep);
-
+            case ChainFollowUp.EnqueueNextStep:
                 await tusFinalizeUploadEnqueuer.EnqueueConcatChainStepAsync(
                     fileTransferId,
                     tusFileId,
                     cancellationToken);
-                return;
-            }
+                break;
 
-            logger.LogWarning(
-                "TUS concat chain step finished without advancing for file transfer {FileTransferId}. TusFileId={TusFileId}",
-                fileTransferId,
-                tusFileId);
+            case ChainFollowUp.Publish:
+                await TryEnqueuePublishWhenChainCompleteAsync(fileTransferId, tusFileId, cancellationToken);
+                break;
         }
-        finally
-        {
-            await concatJobCoordinator.ReleaseRunningLockAsync(tusFileId, cancellationToken);
-        }
+    }
+
+    private enum ChainFollowUp
+    {
+        None,
+        ScheduleRetry,
+        EnqueueNextStep,
+        Publish
     }
 
     private async Task TryEnqueuePublishWhenChainCompleteAsync(
@@ -135,8 +165,8 @@ public class TusConcatenateUploadHandler(
         string tusFileId,
         CancellationToken cancellationToken)
     {
-        await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, cancellationToken);
-        await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, cancellationToken);
+        await concatJobCoordinator.ClearConcatEnqueueSlotAsync(tusFileId, CancellationToken.None);
+        await concatJobCoordinator.ClearPublishEnqueueSlotAsync(tusFileId, CancellationToken.None);
 
         if (tusFinalizeUploadEnqueuer.EnqueuePublish(fileTransferId, tusFileId))
         {
