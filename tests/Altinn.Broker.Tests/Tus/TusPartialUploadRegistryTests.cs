@@ -72,6 +72,21 @@ public class TusPartialUploadRegistryTests
     }
 
     [Fact]
+    public async Task RegisterFinalConcatAsync_PreservesExistingConcatStatusOnReplay()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        const string finalFileId = "replay-final-concat-file-id";
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+        await registry.MarkConcatCompleteAsync(finalFileId, CancellationToken.None);
+
+        await registry.RegisterFinalConcatAsync(finalFileId, ["partial-a", "partial-b"], CancellationToken.None);
+
+        Assert.Equal(TusConcatStatus.Complete, await registry.TryGetConcatStatusAsync(finalFileId, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task RegisterPartialAsync_AllocatesIncreasingPartialIndex()
     {
         await using var scope = TestHybridCacheFactory.CreateScope();
