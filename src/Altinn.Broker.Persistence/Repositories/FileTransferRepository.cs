@@ -146,12 +146,12 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     {
                         FileTransferId = fileTransferId,
                         Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                        Date = ReadUtcDateTimeOffset(reader, "file_transfer_status_date"),
+                        Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
                         DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
                     },
-                    FileTransferStatusChanged = ReadUtcDateTimeOffset(reader, "file_transfer_status_date"),
-                    Created = ReadUtcDateTimeOffset(reader, "created"),
-                    ExpirationTime = ReadUtcDateTimeOffset(reader, "expiration_time"),
+                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
                     Sender = new ActorEntity()
@@ -198,12 +198,12 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     {
                         FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
                         Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                        Date = ReadUtcDateTimeOffset(reader, "file_transfer_status_date"),
+                        Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
                         DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
                     },
-                    FileTransferStatusChanged = ReadUtcDateTimeOffset(reader, "file_transfer_status_date"),
-                    Created = ReadUtcDateTimeOffset(reader, "created"),
-                    ExpirationTime = ReadUtcDateTimeOffset(reader, "expiration_time"),
+                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
                     Sender = new ActorEntity()
@@ -231,13 +231,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         LogContext.PushProperty("recipients", string.Join(',', fileTransferEntity.RecipientCurrentStatuses.Select(status => status.Actor.ActorExternalId)));
         LogContext.PushProperty("fileName", fileTransferEntity.FileName);
         LogContext.PushProperty("status", fileTransferEntity.FileTransferStatusEntity.Status.ToString());
-    }
-
-    private static DateTimeOffset ReadUtcDateTimeOffset(NpgsqlDataReader reader, string columnName)
-    {
-        // Timestamps are stored without timezone, but the service writes them as UTC.
-        var dateTime = reader.GetDateTime(reader.GetOrdinal(columnName));
-        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
     }
 
     /*
@@ -268,7 +261,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 {
                     FileTransferId = fileTransferId,
                     Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
-                    Date = ReadUtcDateTimeOffset(reader, "actor_file_transfer_status_date"),
+                    Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
                     Actor = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
@@ -786,8 +779,8 @@ LEFT JOIN LATERAL (
                             ActorExternalId = senderActorExternalId
                         },
                         SendersFileTransferReference = reader.IsDBNull(reader.GetOrdinal("external_file_transfer_reference")) ? null : reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                        Created = ReadUtcDateTimeOffset(reader, "created"),
-                        ExpirationTime = ReadUtcDateTimeOffset(reader, "expiration_time"),
+                        Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                        ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                         FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                         HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
                         FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
@@ -797,9 +790,9 @@ LEFT JOIN LATERAL (
                         {
                             FileTransferId = fileTransferId,
                             Status = FileTransferStatus.UploadStarted, // Default, actual status not needed for report
-                            Date = ReadUtcDateTimeOffset(reader, "created")
+                            Date = reader.GetDateTime(reader.GetOrdinal("created"))
                         },
-                        FileTransferStatusChanged = ReadUtcDateTimeOffset(reader, "created"),
+                        FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("created")),
                         PropertyList = new Dictionary<string, string>()
                     };
                     
@@ -812,7 +805,7 @@ LEFT JOIN LATERAL (
                     var recipientActorId = reader.GetInt64(reader.GetOrdinal("recipient_actor_id_pk"));
                     var recipientActorExternalId = reader.GetString(reader.GetOrdinal("recipient_actor_external_id"));
                     var recipientStatus = reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk"));
-                    var recipientDate = ReadUtcDateTimeOffset(reader, "actor_file_transfer_status_date");
+                    var recipientDate = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date"));
                     
                     // Check if this recipient already exists (avoid duplicates)
                     if (!fileTransfer.RecipientCurrentStatuses.Any(r => r.Actor.ActorId == recipientActorId))
@@ -1045,3 +1038,4 @@ LEFT JOIN LATERAL (
     }
 
 }
+

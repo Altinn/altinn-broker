@@ -121,11 +121,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                         }
                     };
                 });
-            services.AddHangfire(config =>
-            {
-                config.UseMemoryStorage();
-                config.UseLogProvider(new HangfireNoOpLogProvider());
-            });
+            services.AddHangfire(c => c.UseMemoryStorage());
             services.RemoveAll<ITusFinalizeUploadEnqueuer>();
             services.AddSingleton<ITusFinalizeUploadEnqueuer, InlineTusFinalizeUploadEnqueuer>();
 
@@ -226,18 +222,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             // Ensure Hangfire for tests uses in-memory storage and a test-safe log provider,
             // overriding any AspNetCoreLogProvider that depends on a scoped LoggerFactory.
-            services.AddHangfire(config =>
-            {
-                config.UseMemoryStorage();
-                config.UseLogProvider(new HangfireNoOpLogProvider());
-            });
+            services.AddHangfire(config => config.UseMemoryStorage());
 
             var sp = services.BuildServiceProvider();
             var backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
             var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
             var result = policy.ExecuteAndCapture(() => backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
-
-            LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
 
             services.RemoveAll<IRecurringJobManager>();
             services.AddSingleton(new Mock<IRecurringJobManager>().Object);

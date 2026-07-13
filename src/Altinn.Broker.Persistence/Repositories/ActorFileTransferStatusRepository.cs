@@ -27,7 +27,7 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
                     Status = (Core.Domain.Enums.ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
-                    Date = ReadUtcDateTimeOffset(reader, "actor_file_transfer_status_date"),
+                    Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
                     Actor = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
@@ -37,13 +37,6 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
             }
             return fileTransferStatuses;
         }, cancellationToken);
-    }
-
-    private static DateTimeOffset ReadUtcDateTimeOffset(NpgsqlDataReader reader, string columnName)
-    {
-        // Timestamps are stored without timezone, but the service writes them as UTC.
-        var dateTime = reader.GetDateTime(reader.GetOrdinal(columnName));
-        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
     }
 
     public async Task InsertActorFileTransferStatus(Guid fileTransferId, ActorFileTransferStatus status, string actorExternalReference, string? vendor, CancellationToken cancellationToken)

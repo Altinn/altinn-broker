@@ -1195,7 +1195,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
 
     private static string ToQueryDate(DateTimeOffset dateTime)
     {
-        return Uri.EscapeDataString(dateTime.ToString("O", CultureInfo.InvariantCulture));
+        var utcDateTime = DateTime.SpecifyKind(dateTime.DateTime, DateTimeKind.Utc);
+        return Uri.EscapeDataString(utcDateTime.ToString("O", CultureInfo.InvariantCulture));
     }
 
     private async Task<(string FileTransferId, byte[] FileBytes)> InitializeAndUploadDummyFile()

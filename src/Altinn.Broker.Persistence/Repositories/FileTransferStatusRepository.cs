@@ -85,7 +85,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
                     Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                    Date = ReadUtcDateTimeOffset(reader, "file_transfer_status_date"),
+                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
                     DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
                 });
             }
@@ -117,18 +117,11 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
                     Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("latest_file_status_id")),
-                    Date = ReadUtcDateTimeOffset(reader, "latest_file_status_date"),
+                    Date = reader.GetDateTime(reader.GetOrdinal("latest_file_status_date")),
                     DetailedStatus = reader.GetString(reader.GetOrdinal("file_transfer_status_description"))
                 });
             }
             return fileTransferStatuses;
         }, cancellationToken);
-    }
-
-    private static DateTimeOffset ReadUtcDateTimeOffset(NpgsqlDataReader reader, string columnName)
-    {
-        // Timestamps are stored without timezone, but the service writes them as UTC.
-        var dateTime = reader.GetDateTime(reader.GetOrdinal(columnName));
-        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
     }
 }
