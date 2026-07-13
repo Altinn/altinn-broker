@@ -67,6 +67,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Overwrite registrations from Program.cs
         builder.ConfigureTestServices((services) =>
         {
+            // Hangfire keeps the log provider globally. Set the test-safe provider before
+            // any test service provider resolves Hangfire services.
+            LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
+
             services.RemoveAll<IConnectionMultiplexer>();
             services.RemoveAll<IConfigureOptions<RedisCacheOptions>>();
             services.RemoveAll<IDistributedCache>();
@@ -224,8 +228,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
             var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
             var result = policy.ExecuteAndCapture(() => backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
-
-            LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
 
             services.RemoveAll<IRecurringJobManager>();
             services.AddSingleton(new Mock<IRecurringJobManager>().Object);
