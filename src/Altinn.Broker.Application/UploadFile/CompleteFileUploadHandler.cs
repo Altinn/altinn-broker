@@ -100,6 +100,7 @@ public class CompleteFileUploadHandler(
 
         try
         {
+            var enqueueChecksumProcessing = false;
             await TransactionWithRetriesPolicy.Execute<Task>(async ct =>
             {
                 if (request.DeferChecksumValidation)
@@ -161,8 +162,7 @@ public class CompleteFileUploadHandler(
                         request.UploadLength,
                         ct);
 
-                    backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
-                        handler.Process(request.FileTransferId, CancellationToken.None));
+                    enqueueChecksumProcessing = true;
                 }
                 else
                 {
@@ -217,6 +217,12 @@ public class CompleteFileUploadHandler(
 
                 return Task.CompletedTask;
             }, logger, cancellationToken);
+
+            if (enqueueChecksumProcessing)
+            {
+                backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
+                    handler.Process(request.FileTransferId, CancellationToken.None));
+            }
         }
         catch (Exception e)
         {
