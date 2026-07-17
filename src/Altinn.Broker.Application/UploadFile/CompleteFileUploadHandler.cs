@@ -155,11 +155,11 @@ public class CompleteFileUploadHandler(
                     }
 
                     await fileTransferRepository.SetStorageDetails(
-                    request.FileTransferId,
-                    storageProvider.Id,
-                    request.FileTransferId.ToString(),
-                    request.UploadLength,
-                    ct);
+                        request.FileTransferId,
+                        storageProvider.Id,
+                        request.FileTransferId.ToString(),
+                        request.UploadLength,
+                        ct);
 
                     backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
                         handler.Process(request.FileTransferId, CancellationToken.None));
