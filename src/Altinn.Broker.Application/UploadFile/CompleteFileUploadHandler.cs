@@ -155,11 +155,11 @@ public class CompleteFileUploadHandler(
                     }
 
                     await fileTransferRepository.SetStorageDetails(
-                        request.FileTransferId,
-                        storageProvider.Id,
-                        request.FileTransferId.ToString(),
-                        request.UploadLength,
-                        ct);
+                    request.FileTransferId,
+                    storageProvider.Id,
+                    request.FileTransferId.ToString(),
+                    request.UploadLength,
+                    ct);
 
                     backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
                         handler.Process(request.FileTransferId, CancellationToken.None));
@@ -218,15 +218,13 @@ public class CompleteFileUploadHandler(
                                 AltinnEventSubjectRole.Recipient));
                         }
                     }
-                    if (fileTransfer.FileTransferSize == 0) 
-                    { 
-                        await fileTransferRepository.SetStorageDetails(
-                            request.FileTransferId,
-                            storageProvider.Id,
-                            request.FileTransferId.ToString(),
-                            request.UploadLength,
-                            ct);
-                    }
+
+                    await fileTransferRepository.SetStorageDetails(
+                        request.FileTransferId,
+                        storageProvider.Id,
+                        request.FileTransferId.ToString(),
+                        request.UploadLength,
+                        ct);
                 }
 
                 return Task.CompletedTask;
