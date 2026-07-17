@@ -206,13 +206,15 @@ public class CompleteFileUploadHandler(
                                 AltinnEventSubjectRole.Recipient));
                         }
                     }
-
-                    await fileTransferRepository.SetStorageDetails(
-                        request.FileTransferId,
-                        storageProvider.Id,
-                        request.FileTransferId.ToString(),
-                        request.UploadLength,
-                        ct);
+                    if (fileTransfer.FileTransferSize == 0) 
+                    { 
+                        await fileTransferRepository.SetStorageDetails(
+                            request.FileTransferId,
+                            storageProvider.Id,
+                            request.FileTransferId.ToString(),
+                            request.UploadLength,
+                            ct);
+                    }
                 }
 
                 return Task.CompletedTask;
