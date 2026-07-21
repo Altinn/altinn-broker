@@ -52,8 +52,6 @@ public class CompleteFileUploadHandler(
             return request.FileTransferId;
         }
 
-        var alreadyUploadProcessing = fileTransfer.FileTransferStatusEntity.Status == FileTransferStatus.UploadProcessing;
-
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {
@@ -106,7 +104,13 @@ public class CompleteFileUploadHandler(
                 {
                     if (userProvidedChecksum || requiresVirusScan)
                     {
-                        if (!alreadyUploadProcessing)
+                        var currentFileTransfer = await fileTransferRepository.GetFileTransfer(request.FileTransferId, ct);
+                        if (currentFileTransfer is null)
+                        {
+                            throw new InvalidOperationException(
+                                $"File transfer {request.FileTransferId} not found when trying to set status to UploadProcessing");
+                        }
+                        if (currentFileTransfer.FileTransferStatusEntity.Status == FileTransferStatus.UploadStarted)
                         {
                             logger.LogInformation(
                                 "CompleteFileUpload setting status UploadProcessing for file transfer {FileTransferId} (defer checksum, virus scan or user checksum)",
