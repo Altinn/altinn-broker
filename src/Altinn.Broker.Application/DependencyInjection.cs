@@ -37,7 +37,6 @@ public static class DependencyInjection
         services.AddScoped<ConfirmDownloadHandler>();
         services.AddScoped<GetFileTransfersHandler>();
         services.AddScoped<PurgeFileTransferHandler>();
-        services.AddScoped<LegacyGetFilesHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
         services.AddScoped<ConfigureResourceHandler>();
         services.AddScoped<EventBusMiddleware>();

@@ -39,15 +39,11 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         };
-        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsRecipient(request.OnBehalfOfConsumer))
-        {
-            return Errors.NoAccessToResource;
-        }
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
             return Errors.NoFileUploaded;
@@ -56,7 +52,7 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        var caller = (request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId())?.WithPrefix();
+        var caller = user?.GetCallerOrganizationId()?.WithPrefix();
         if (string.IsNullOrWhiteSpace(caller))
         {
             logger.LogError("Caller is not set");
@@ -66,8 +62,7 @@ public class ConfirmDownloadHandler(
         {
             return Task.CompletedTask;
         }
-        if (request.IsLegacy == false 
-            && !fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == caller && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted))
+        if (!fileTransfer.RecipientCurrentStatuses.Any(recipientStatus => recipientStatus.Actor.ActorExternalId == caller && recipientStatus.Status == ActorFileTransferStatus.DownloadStarted))
         {
             return Errors.ConfirmDownloadBeforeDownloadStarted;
         }

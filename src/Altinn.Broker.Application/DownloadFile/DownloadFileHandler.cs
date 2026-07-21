@@ -1,11 +1,9 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Common;
-using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Caching.Hybrid;
@@ -26,12 +24,8 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
         if (!hasAccess)
-        {
-            return Errors.NoAccessToResource;
-        }
-        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsRecipient(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
         }
@@ -64,14 +58,7 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         }
         var download = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, resolvedRange, cancellationToken);
         var downloadStream = download.Content;
-        if (resource.UseManifestFileShim == true && request.IsLegacy)
-        {
-            var fileBuffer = new byte[fileTransfer.FileTransferSize];
-            downloadStream.ReadExactly(fileBuffer, 0, fileBuffer.Length);
-            downloadStream = new ManifestDownloadStream(fileBuffer);
-            await ((ManifestDownloadStream)downloadStream).AddManifestFile(fileTransfer, resource);
-        }
-        var caller = request.OnBehalfOfConsumer ?? user?.GetCallerOrganizationId();
+        var caller = user?.GetCallerOrganizationId();
         if (caller is null)
         {
             return Errors.NoAccessToResource;
