@@ -106,6 +106,13 @@ public class UploadFileHandler(
                 request.FileTransferId.ToString(),
                 uploadLength,
                 CancellationToken.None);
+            if (fileTransfer.Checksum is null && !string.IsNullOrWhiteSpace(checksum))
+            {
+                await fileTransferRepository.SetChecksum(
+                    request.FileTransferId,
+                    checksum,
+                    CancellationToken.None);
+            }
             return await completeFileUploadHandler.Process(
                 new CompleteFileUploadRequest
                 {
