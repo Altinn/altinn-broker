@@ -1,14 +1,12 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Application.Middlewares;
-using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
-using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
 
 using Hangfire;
@@ -22,6 +20,7 @@ namespace Altinn.Broker.Application.UploadFile;
 public class UploadFileHandler(
     TusUploadValidationService tusUploadValidationService,
     IFileTransferStatusRepository fileTransferStatusRepository,
+    IFileTransferRepository fileTransferRepository,
     IBrokerStorageService brokerStorageService,
     CompleteFileUploadHandler completeFileUploadHandler,
     IResourceRepository resourceRepository,
@@ -96,6 +95,17 @@ public class UploadFileHandler(
             }
 
             var (checksum, uploadLength) = result.Value;
+            var storageProvider = serviceOwner.GetStorageProvider(fileTransfer.UseVirusScan);
+            if (storageProvider is null)
+            {
+                throw new InvalidOperationException(Errors.StorageProviderNotReady.Message);
+            }
+            await fileTransferRepository.SetStorageDetails(
+                request.FileTransferId,
+                storageProvider.Id,
+                request.FileTransferId.ToString(),
+                uploadLength,
+                CancellationToken.None);
             return await completeFileUploadHandler.Process(
                 new CompleteFileUploadRequest
                 {
