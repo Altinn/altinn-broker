@@ -23,7 +23,7 @@ public class GetFileTransfersHandler(IAuthorizationService authorizationService,
             logger.LogError("Caller not found");
             return Errors.NoAccessToResource;
         }
-        var hasAccess = await authorizationService.CheckAccessForSearch(user, request.ResourceId, caller, false, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessForSearch(user, request.ResourceId, caller, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

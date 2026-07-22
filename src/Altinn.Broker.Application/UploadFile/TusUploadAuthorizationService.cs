@@ -70,7 +70,6 @@ public class TusUploadAuthorizationService(
             user,
             fileTransferId,
             uploadLength,
-            isLegacyUser: false,
             cancellationToken);
         timing?.Step("validateForUpload", uploadError is null ? "ok" : "error");
 

@@ -23,7 +23,7 @@ public class GetFileTransferDetailsHandler(IFileTransferRepository fileTransferR
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, false, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

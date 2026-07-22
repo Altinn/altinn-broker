@@ -33,15 +33,15 @@ public class AltinnAuthorizationService : IAuthorizationService
         _logger = logger;
     }
 
-    public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, bool isLegacyUser, CancellationToken cancellationToken = default)
-        => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, isLegacyUser, cancellationToken);
+    public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
+        => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, cancellationToken);
 
-    public async Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, bool isLegacyUser, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default)
     {
         var recipients = fileTransfer.RecipientCurrentStatuses.DistinctBy(recipient => recipient.Actor.ActorExternalId);
         foreach (var recipient in recipients)
         {
-            if (await CheckUserAccess(user, fileTransfer.ResourceId, recipient.Actor.ActorExternalId.WithoutPrefix(), fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, isLegacyUser, cancellationToken))
+            if (await CheckUserAccess(user, fileTransfer.ResourceId, recipient.Actor.ActorExternalId.WithoutPrefix(), fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, cancellationToken))
             {
                 return true;
             }
@@ -49,25 +49,21 @@ public class AltinnAuthorizationService : IAuthorizationService
         return false;
     }
 
-    public async Task<bool> CheckAccessForSearch(ClaimsPrincipal? user, string resourceId, string party, bool isLegacyUser, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckAccessForSearch(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
     {
-        return await CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, isLegacyUser, cancellationToken);
+        return await CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write, ResourceAccessLevel.Read }, cancellationToken);
     }
 
-    public async Task<bool> CheckAccessAsSenderOrRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, bool isLegacyUser, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckAccessAsSenderOrRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default)
     {
-        return await CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId.WithoutPrefix(), isLegacyUser, cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, isLegacyUser, cancellationToken);
+        return await CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId.WithoutPrefix(), cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
     }
 
-    private async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, string party, string? fileTransferId, List<ResourceAccessLevel> rights, bool isLegacyUser, CancellationToken cancellationToken = default)
+    private async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, string party, string? fileTransferId, List<ResourceAccessLevel> rights, CancellationToken cancellationToken = default)
     {
         if (user is null)
         {
             throw new InvalidOperationException("This operation cannot be called outside an authenticated HttpContext");
-        }
-        if (isLegacyUser)
-        {
-            return true;
         }
         var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
@@ -75,7 +71,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             _logger.LogWarning("Resource not found");
             return false;
         }
-        var bypass = await EvaluateBypassConditions(isLegacyUser, resource, cancellationToken);
+        var bypass = await EvaluateBypassConditions(resource, cancellationToken);
         if (bypass.HasValue)
         {
             return bypass.Value;
@@ -96,12 +92,8 @@ public class AltinnAuthorizationService : IAuthorizationService
         var validationResult = ValidateResult(responseContent, user, isMaskinportenToken);
         return validationResult;
     }
-    private async Task<bool?> EvaluateBypassConditions(bool isLegacyUser, ResourceEntity resource, CancellationToken cancellationToken)
+    private async Task<bool?> EvaluateBypassConditions(ResourceEntity resource, CancellationToken cancellationToken)
     {
-        if (isLegacyUser)
-        {
-            return true;
-        }
         if (string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
         {
             _logger.LogWarning("Service owner not found for resource");
