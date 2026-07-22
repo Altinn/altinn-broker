@@ -39,11 +39,15 @@ public static class TransactionWithRetriesPolicy
         .Or<BackgroundJobClientException>()
         .Or<PostgreSqlDistributedLockException>()
         .WaitAndRetryAsync(
-            8,
-            retryAttempt => TimeSpan.FromMilliseconds(Math.Min(5 * Math.Pow(2, retryAttempt), 640)),
-            (exception, timeSpan, retryCount, context) => 
+            6,
+            retryAttempt => TimeSpan.FromMilliseconds(Math.Min(100 * Math.Pow(2, retryAttempt), 5000)),
+            (exception, timeSpan, retryCount, context) =>
             {
-                logger.LogWarning($"Attempt {retryCount} failed with exception {exception.Message}. Retrying in {timeSpan.Milliseconds} seconds.");
+                logger.LogWarning(
+                    "Attempt {RetryCount} failed with exception {ExceptionMessage}. Retrying in {DelayMs} ms.",
+                    retryCount,
+                    exception.Message,
+                    (int)timeSpan.TotalMilliseconds);
             }
         );
 }
