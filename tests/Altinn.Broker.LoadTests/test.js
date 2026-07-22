@@ -1,20 +1,19 @@
 import http from 'k6/http';
 import { sleep, check, fail } from 'k6';
+import { getSenderAltinnToken } from './helpers/altinnTokenService.js';
 
 export const options = {
   vus: 20,
-  duration: '10m',
-  iterations: 20 // can be set to 0 or removed to run indefinitely
+  duration: '10m'
   //httpDebug: 'full', // information about the request and response
 };
 
-var TOKENS = {
-  DUMMY_SENDER_TOKEN: "",
-  DUMMY_SERVICE_OWNER_TOKEN: ""
-}
-const BASE_URL = "http://localhost:5096"
+const baseUrl = __ENV.base_url || 'https://platform.tt02.altinn.no';
+const sender = __ENV.sender;
+const recipient = __ENV.recipient;
 
-const file = open("./data/testfile.txt", "b");
+const file = open('./data/testfile.txt', 'b');
+
 function checkResult(res, status) {
   if (!status) {
     console.error(status)
@@ -22,53 +21,86 @@ function checkResult(res, status) {
   }
 }
 
-export function setup() {
-  let headers = generateHeaders(TOKENS.DUMMY_SERVICE_OWNER_TOKEN, 'application/json')
-
-  //set fileTransfer TTL to 15 minutes. Should be longer than the test time
-  var fileRes = http.put(`${BASE_URL}/broker/api/v1/resource/altinn-broker-test-resource-1`, JSON.stringify({
-    fileTransferTimeToLive: "PT15M"
-  }), { headers: headers });
-
-  if (
-    !check(fileRes, {
-      'status code MUST be 200,204 or 409': (fileRes) => fileRes.status === 200 || fileRes.status === 409 || fileRes.status === 204
-    })
-  ) {
-    checkResult(fileRes, false)
-    fail('Could not update file transfer TTL. Exiting');
+export async function setup() {
+  const senderToken = await getSenderAltinnToken();
+  if (!check(senderToken, { 'Sender Altinn token obtained': (t) => typeof t === 'string' && t.length > 0 })) {
+    fail('Could not obtain sender Altinn token');
   }
+  return { senderToken };
 }
 
-export default async function () {
+export default async function (data) {
   var baseFile = {
-    resourceId: 'altinn-broker-test-resource-1',
+    resourceId: 'bruno-broker',
     checksum: null,
     fileName: 'testfile.txt',
-    recipients: ['0192:986252932'],
-    sender: '0192:991825827',
+    recipients: [`urn:altinn:organization:identifier-no:${recipient}`],
+    sender: `urn:altinn:organization:identifier-no:${sender}`,
     sendersFileTransferReference: 'test-data'
   }
 
-  let headers = generateHeaders(TOKENS.DUMMY_SENDER_TOKEN, 'application/json')
+  let headers = generateHeaders(data.senderToken, 'application/json')
   var res = await http.asyncRequest('POST',
-    `${BASE_URL}/broker/api/v1/filetransfer`,
+    `${baseUrl}/broker/api/v1/filetransfer`,
     JSON.stringify(baseFile), { headers: headers });
   var status = check(res, { 'Initialize: status was 200': (r) => r.status == 200 });
   sleep(1);
   checkResult(res, status)
 
   if (status) {
-    headers = generateHeaders(TOKENS.DUMMY_SENDER_TOKEN, 'application/octet-stream')
-    const data = {
+    headers = generateHeaders(data.senderToken, 'application/octet-stream')
+    const body = res.json();
+    const uploadData = {
       field: 'this is a standard form field',
       file: http.file(file, 'testfile.txt')
     }
     var res2 = await http.asyncRequest('POST',
-      `${BASE_URL}/broker/api/v1/filetransfer/${res.body}/upload`, data, { timeout: "600s", headers: headers });
+      `${baseUrl}/broker/api/v1/filetransfer/${body.fileTransferId}/upload`, uploadData, { timeout: "600s", headers: headers });
     sleep(1);
     status = check(res2, { 'Upload: status was 200': (r) => r.status == 200 });
-    checkResult(res, status)
+    checkResult(res2, status)
+
+    if (status) {
+      await pollUntilPublished(body.fileTransferId, data.senderToken);
+    }
+  }
+}
+
+function isPublishedStatus(val) {
+  if (typeof val === 'number') return val === 3;
+  if (typeof val === 'string') return val.toLowerCase() === 'published';
+  return false;
+}
+
+async function pollUntilPublished(fileTransferId, token) {
+  const headers = generateHeaders(token, 'application/json');
+  const maxAttempts = Number(__ENV.poll_max_seconds) || 30;
+  let published = false;
+  let lastResponse = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    lastResponse = http.get(
+      `${baseUrl}/broker/api/v1/filetransfer/${fileTransferId}`, { headers });
+    if (lastResponse.status === 200) {
+      const overview = lastResponse.json();
+      if (isPublishedStatus(overview.fileTransferStatus)) {
+        published = true;
+        check(overview, {
+          'Published: fileTransferStatus is Published': (o) => isPublishedStatus(o.fileTransferStatus),
+          'Published: published field is set': (o) => o.published != null && o.published !== '',
+          'Published: fileTransferSize > 0': (o) => o.fileTransferSize > 0,
+          'Published: checksum is set': (o) => o.checksum != null && o.checksum !== '',
+        });
+        break;
+      }
+    }
+
+    sleep(1);
+  }
+
+  check(published, { 'Published: reached within poll timeout': (p) => p === true });
+  if (!published) {
+    checkResult(lastResponse, false);
   }
 }
 
