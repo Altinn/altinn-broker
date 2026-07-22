@@ -7,11 +7,13 @@ using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Hangfire.Logging;
+using Hangfire.PostgreSql;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -23,14 +25,13 @@ using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 using Moq;
-
-using Polly;
 
 using StackExchange.Redis;
 
@@ -67,10 +68,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Overwrite registrations from Program.cs
         builder.ConfigureTestServices((services) =>
         {
-            // Hangfire keeps the log provider globally. Set the test-safe provider before
-            // any test service provider resolves Hangfire services.
-            LogProvider.SetCurrentLogProvider(new HangfireNoOpLogProvider());
-
             services.RemoveAll<IConnectionMultiplexer>();
             services.RemoveAll<IConfigureOptions<RedisCacheOptions>>();
             services.RemoveAll<IDistributedCache>();
@@ -121,7 +118,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                         }
                     };
                 });
-            services.AddHangfire(c => c.UseMemoryStorage());
+            ReplaceHangfireForTests(services);
             services.RemoveAll<ITusFinalizeUploadEnqueuer>();
             services.AddSingleton<ITusFinalizeUploadEnqueuer, InlineTusFinalizeUploadEnqueuer>();
 
@@ -220,21 +217,40 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
 
-            // Ensure Hangfire for tests uses in-memory storage and a test-safe log provider,
-            // overriding any AspNetCoreLogProvider that depends on a scoped LoggerFactory.
-            services.AddHangfire(config => config.UseMemoryStorage());
-
-            var sp = services.BuildServiceProvider();
-            var backgroundJobClient = sp.GetRequiredService<IBackgroundJobClient>();
-            var policy = Policy.Handle<Exception>().WaitAndRetry(10, _ => TimeSpan.FromSeconds(1));
-            var result = policy.ExecuteAndCapture(() => backgroundJobClient.Enqueue(() => Console.WriteLine("Hello World!")));
-
             services.RemoveAll<IRecurringJobManager>();
             services.AddSingleton(new Mock<IRecurringJobManager>().Object);
-            if (result.Outcome == OutcomeType.Failure)
-            {
-                throw new InvalidOperationException("Hangfire could not be installed");
-            }
+        });
+    }
+
+    private static void ReplaceHangfireForTests(IServiceCollection services)
+    {
+        // Production ConfigureHangfire() registers first and wires AspNetCoreLogProvider to
+        // ILoggerFactory. Hangfire uses TryAddSingleton, so a later AddHangfire() does not
+        // replace those registrations. AspNetCoreLogProvider is also process-global static
+        // state, so a disposed test host can cause intermittent ObjectDisposedException.
+        var descriptorsToRemove = services
+            .Where(d =>
+                (d.ServiceType.FullName?.StartsWith("Hangfire.", StringComparison.Ordinal) ?? false) ||
+                (d.ImplementationType?.FullName?.StartsWith("Hangfire.", StringComparison.Ordinal) ?? false) ||
+                d.ImplementationType == typeof(HangfireQueueMetricsService) ||
+                (d.ServiceType == typeof(IHostedService) &&
+                 (d.ImplementationType?.FullName?.Contains("Hangfire", StringComparison.Ordinal) ?? false)))
+            .ToList();
+
+        foreach (var descriptor in descriptorsToRemove)
+        {
+            services.Remove(descriptor);
+        }
+
+        services.RemoveAll<IConnectionFactory>();
+
+        var noOpLogProvider = new HangfireNoOpLogProvider();
+        LogProvider.SetCurrentLogProvider(noOpLogProvider);
+
+        services.AddHangfire(config =>
+        {
+            config.UseMemoryStorage();
+            config.UseLogProvider(noOpLogProvider);
         });
     }
 
