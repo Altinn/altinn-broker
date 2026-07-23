@@ -37,16 +37,10 @@ public class UploadFileHandler(
             user,
             request.FileTransferId,
             request.ContentLength,
-            request.IsLegacy,
             cancellationToken);
         if (validationError is not null)
         {
             return validationError;
-        }
-
-        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSender(request.OnBehalfOfConsumer))
-        {
-            return Errors.NoAccessToResource;
         }
 
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);

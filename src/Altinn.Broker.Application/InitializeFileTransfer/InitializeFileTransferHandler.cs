@@ -59,7 +59,7 @@ public class InitializeFileTransferHandler(
             }
         }
 
-        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, cancellationToken);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;

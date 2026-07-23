@@ -16,7 +16,7 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
 {
     public async Task<OneOf<GetFileTransferOverviewResponse, Error>> Process(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Retrieving file overview for file transfer {fileTransferId}. Legacy: {legacy}", request.FileTransferId, request.IsLegacy);
+        logger.LogInformation("Retrieving file overview for file transfer {fileTransferId}", request.FileTransferId);
 
         var fileTransfer = await TransactionWithRetriesPolicy.Execute(
             async (cancellationToken) => await fileTransferRepository.GetFileTransfer(request.FileTransferId, cancellationToken),
@@ -26,12 +26,8 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, request.IsLegacy, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSenderOrRecipient(user, fileTransfer, cancellationToken);
         if (!hasAccess)
-        {
-            return Errors.NoAccessToResource;
-        }
-        if (request.IsLegacy && request.OnBehalfOfConsumer is not null && !fileTransfer.IsSenderOrRecipient(request.OnBehalfOfConsumer))
         {
             return Errors.NoAccessToResource;
         }
@@ -40,32 +36,6 @@ public class GetFileTransferOverviewHandler(IAuthorizationService authorizationS
         {
             FileTransfer = fileTransfer,
             FileTransferEvents = fileTransferEvents
-        };
-    }
-
-    public async Task<OneOf<GetFileTransferOverviewsResponse, Error>> ProcessMultiple(GetFileTransferOverviewRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
-    {
-        var ids = request.FileTransferIds ?? [];
-        logger.LogInformation("Retrieving file overview for {Transfers} file transfers. Legacy: {Legacy}", ids.Count, request.IsLegacy);
-        var fileTransfers = await fileTransferRepository.GetFileTransfers(ids, cancellationToken);
-        if (fileTransfers is null)
-        {
-            return Errors.FileTransferNotFound;
-        }
-        var accessChecks = await Task.WhenAll(
-        fileTransfers.Select(ft => authorizationService.CheckAccessAsSenderOrRecipient(user, ft, request.IsLegacy, cancellationToken)));
-        if (accessChecks.Any(allowed => !allowed))
-        {
-            return Errors.NoAccessToResource;
-        }
-        if (request.IsLegacy && !string.IsNullOrWhiteSpace(request.OnBehalfOfConsumer)
-            && fileTransfers.Any(ft => !ft.IsSenderOrRecipient(request.OnBehalfOfConsumer!)))
-        {
-            return Errors.NoAccessToResource;
-        }
-        return new GetFileTransferOverviewsResponse()
-        {
-            FileTransfers = fileTransfers
         };
     }
 }

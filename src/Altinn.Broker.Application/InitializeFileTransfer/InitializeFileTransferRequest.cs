@@ -11,6 +11,5 @@ public class InitializeFileTransferRequest
     public required List<string> RecipientExternalIds { get; set; }
     public required Dictionary<string, string> PropertyList { get; set; }
     public string? Checksum { get; set; }
-    public bool IsLegacy { get; set; }
     public bool DisableVirusScan { get; set; }
 }

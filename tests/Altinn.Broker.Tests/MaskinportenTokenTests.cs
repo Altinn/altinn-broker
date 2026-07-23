@@ -159,24 +159,5 @@ public class MaskinportenTokenTests
             // Assert - Should be able to read details with read scope
             Assert.True(detailsResponse.IsSuccessStatusCode, $"Expected success but got {detailsResponse.StatusCode}: {await detailsResponse.Content.ReadAsStringAsync()}");
         }
-
-
-        [Fact]
-        public async Task LegacyApi_WithValidMaskinportenToken_SuccessfullyInitializes()
-        {
-            // Arrange - Test that valid Maskinporten tokens work with legacy API endpoints too
-            var maskinportenToken = TestTokenHelper.CreateMaskinportenToken("991825827", "altinn:broker.legacy");
-            var client = _factory.CreateClientWithAuthorization(maskinportenToken);
-
-            // Act - Try to initialize using legacy API with valid Maskinporten token
-            var initializeRequest = FileTransferInitializeExtTestFactory.BasicFileTransfer();
-            var response = await client.PostAsJsonAsync("broker/api/v1/legacy/file", initializeRequest);
-
-            // Assert - Should work with legacy API too
-            Assert.True(response.IsSuccessStatusCode, $"Expected success but got {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-
-            var fileId = await response.Content.ReadAsStringAsync();
-            Assert.False(string.IsNullOrEmpty(fileId));
-        }
     }
 }

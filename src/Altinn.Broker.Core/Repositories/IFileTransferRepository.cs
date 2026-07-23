@@ -16,11 +16,9 @@ public interface IFileTransferRepository
         string? checksum,
         bool useVirusScan,
         CancellationToken cancellationToken);
-    Task<Domain.FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<FileTransferEntity>> GetFileTransfers(IReadOnlyCollection<Guid> fileTransferIds, CancellationToken cancellationToken);
+    Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
-    Task<List<Guid>> LegacyGetFilesForRecipientsWithRecipientStatus(LegacyFileSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken);
     Task SetStorageDetails(
         Guid fileTransferId,
