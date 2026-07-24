@@ -50,13 +50,12 @@ export default async function (data) {
   if (status) {
     headers = generateHeaders(data.senderToken, 'application/octet-stream')
     const body = res.json();
-    const uploadData = {
-      field: 'this is a standard form field',
-      file: http.file(file, 'testfile.txt')
-    }
-    var res2 = await http.asyncRequest('POST',
-      `${baseUrl}/broker/api/v1/filetransfer/${body.fileTransferId}/upload`, uploadData, { timeout: "600s", headers: headers });
-    sleep(1);
+    var res2 = await http.asyncRequest(
+      'POST',
+      `${baseUrl}/broker/api/v1/filetransfer/${body.fileTransferId}/upload`,
+      file,
+      { timeout: '600s', headers: headers }
+    );
     status = check(res2, { 'Upload: status was 200': (r) => r.status == 200 });
     checkResult(res2, status)
 
@@ -94,7 +93,9 @@ async function pollUntilPublished(fileTransferId, token) {
         break;
       }
     }
-
+    if (attempt == maxAttempts - 1) {
+      console.log(`Polling attempt ${attempt} of ${maxAttempts} for file transfer ${fileTransferId}`);
+    }
     sleep(1);
   }
 
