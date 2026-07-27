@@ -11,6 +11,7 @@ on:
         type: choice
         options:
           - test
+          - performance
           - staging
           - production
 
