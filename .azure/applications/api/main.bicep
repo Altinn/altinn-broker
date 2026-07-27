@@ -96,10 +96,15 @@ resource keyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bicep' = {
   name: 'fetchAzureEventGridIpsScript'
   scope: resourceGroup
-  dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
+  dependsOn: [
+    appDeployToAzureAccess
+    keyvaultAddReaderRolesAppIdentity
+    databaseAccess
+  ]
   params: {
     location: location
     principal_id: appIdentityId
+    subscription_id: subscription().subscriptionId
   }
 }
 
