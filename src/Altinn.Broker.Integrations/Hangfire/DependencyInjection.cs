@@ -24,6 +24,8 @@ public static class DependencyInjection
                 {
                     UseSlidingInvisibilityTimeout = true,
                     InvisibilityTimeout = TimeSpan.FromMinutes(5),
+                    EnableTransactionScopeEnlistment = true,
+                    DistributedLockTimeout = TimeSpan.FromSeconds(30),
                 });
             config.UseLogProvider(new AspNetCoreLogProvider(provider.GetRequiredService<ILoggerFactory>()));
             config.UseFilter(new HangfireAppRequestFilter());

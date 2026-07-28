@@ -1,7 +1,14 @@
 services:
   k6-test:
     image: grafana/k6:latest
-    command: run /test.js
+    working_dir: /tests/Altinn.Broker.LoadTests
+    command: run test.js
+    environment:
+      base_url: ${base_url:-https://platform.tt02.altinn.no}
+      mp_client_id: ${mp_client_id}
+      mp_kid: ${mp_kid}
+      mp_client_pem: ${mp_client_pem}
+      sender: ${sender}
+      recipient: ${recipient}
     volumes:
-      - ./test.js:/test.js
-      - ./data:/data
+      - ./:/tests/Altinn.Broker.LoadTests
