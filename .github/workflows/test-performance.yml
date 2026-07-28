@@ -6,9 +6,10 @@ on:
       environment:
         description: 'Environment to run against'
         required: true
-        default: 'use-case-test'
+        default: 'performance'
         type: choice
         options:
+          - performance
           - use-case-test
           - use-case-staging
           - use-case-production
