@@ -1,0 +1,87 @@
+name: Test Performance On Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: true
+        default: 'use-case-test'
+        type: choice
+        options:
+          - use-case-test
+          - use-case-staging
+          - use-case-production
+      vus:
+        description: 'Number of virtual users'
+        required: false
+        default: '20'
+        type: string
+      duration:
+        description: 'Test duration (e.g. 10m, 2m)'
+        required: false
+        default: '10m'
+        type: string
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: true
+        type: string
+      vus:
+        description: 'Number of virtual users'
+        required: false
+        default: '20'
+        type: string
+      duration:
+        description: 'Test duration (e.g. 10m, 2m)'
+        required: false
+        default: '10m'
+        type: string
+
+run-name: Test performance for environment ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
+
+jobs:
+  performance-test:
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Run performance tests
+      id: performance-test
+      uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
+      env:
+        base_url: ${{ secrets.BROKER_BASE_URL }}
+        mp_client_id: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_CLIENT_ID }}
+        mp_kid: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_KID }}
+        mp_client_pem: ${{ secrets.BRUKSMONSTER_MASKINPORTEN_PEM }}
+        recipient: ${{ secrets.BRUKSMONSTER_RECIPIENT }}
+        sender: ${{ secrets.BRUKSMONSTER_SENDER }}
+      with:
+        filename: tests/Altinn.Broker.LoadTests/test.js
+        flags: >-
+          --vus ${{ inputs.vus || github.event.inputs.vus || '20' }}
+          --duration ${{ inputs.duration || github.event.inputs.duration || '10m' }}
+
+    - name: Build failure report
+      if: failure() && steps.performance-test.outcome == 'failure'
+      run: |
+          report=":warning: Broker performance test failure :warning: \n"
+          report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+          report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "stepreport=$report" >> $GITHUB_ENV
+
+    - name: Report failure to Slack
+      if: failure() && steps.performance-test.outcome == 'failure'
+      id: slack
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+      with:
+        webhook-type: incoming-webhook
+        webhook: ${{ secrets.BRUKSMONSTER_SLACK_URL || secrets.SLACK_URL }}
+        payload: |
+          {
+            "text": "${{ env.stepreport }}"
+          }
