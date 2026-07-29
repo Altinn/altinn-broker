@@ -93,8 +93,7 @@ var containerAppEnvVars = concat([
 ],
 empty(maskinportenTokenExchangeEnvironment) ? [] : [
   { name: 'MaskinportenSettings__TokenExchangeEnvironment', value: maskinportenTokenExchangeEnvironment }
-],
-, rotationContainerAppEnvVars)
+], rotationContainerAppEnvVars)
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
