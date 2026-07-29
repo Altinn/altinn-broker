@@ -131,6 +131,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     maskinporten_environment: maskinporten_environment
     userIdentityClientId: appIdentityClientId
     containerAppEnvId: keyvault.getSecret('container-app-env-id')
+    maskinportenTokenExchangeEnvironment: maskinportenTokenExchangeEnvironment
   }
 }
 
