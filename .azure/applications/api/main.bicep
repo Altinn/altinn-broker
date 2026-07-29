@@ -20,6 +20,7 @@ param namePrefix string
 @secure()
 @minLength(3)
 param apimIp string
+param maskinportenTokenExchangeEnvironment string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
