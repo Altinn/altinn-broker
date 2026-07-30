@@ -91,7 +91,7 @@ var containerAppEnvVars = concat([
   { name: 'ReportResourceIdFilter', secretRef: 'report-resource-id-filter' }
   { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
 ],
-empty(maskinportenTokenExchangeEnvironment) ? [] : [
+empty(trim(maskinportenTokenExchangeEnvironment)) ? [] : [
   { name: 'MaskinportenSettings__TokenExchangeEnvironment', value: maskinportenTokenExchangeEnvironment }
 ], rotationContainerAppEnvVars)
 
