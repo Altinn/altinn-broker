@@ -20,7 +20,10 @@ public static class TransactionWithRetriesPolicy
     {
         var result = await RetryPolicy(logger).ExecuteAndCaptureAsync<T>(async (cancellationToken) =>
         {
-            using var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+            using var transaction = new TransactionScope(
+                TransactionScopeOption.Required,
+                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+                TransactionScopeAsyncFlowOption.Enabled);
             var result = await operation(cancellationToken);
             transaction.Complete();
             return result;
@@ -35,12 +38,18 @@ public static class TransactionWithRetriesPolicy
 
     public static AsyncRetryPolicy RetryPolicy(ILogger logger) => Policy
         .Handle<TransactionAbortedException>()
-        .Or<PostgresException>()
+        .Or<PostgresException>(IsTransientPostgresException)
+        .OrInner<PostgresException>(IsTransientPostgresException)
         .Or<BackgroundJobClientException>()
         .Or<PostgreSqlDistributedLockException>()
         .WaitAndRetryAsync(
             6,
-            retryAttempt => TimeSpan.FromMilliseconds(Math.Min(100 * Math.Pow(2, retryAttempt), 5000)),
+            retryAttempt =>
+            {
+                var baseDelayMs = Math.Min(100 * Math.Pow(2, retryAttempt), 5000);
+                var jitterMs = Random.Shared.Next(0, 100);
+                return TimeSpan.FromMilliseconds(baseDelayMs + jitterMs);
+            },
             (exception, timeSpan, retryCount, context) =>
             {
                 logger.LogWarning(
@@ -50,4 +59,8 @@ public static class TransactionWithRetriesPolicy
                     (int)timeSpan.TotalMilliseconds);
             }
         );
+
+    private static bool IsTransientPostgresException(PostgresException exception) =>
+        exception.IsTransient
+        || exception.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected;
 }
