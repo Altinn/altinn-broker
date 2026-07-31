@@ -93,11 +93,6 @@ async function pollUntilPublished(fileTransferId, token) {
         break;
       }
     }
-    if (attempt == maxAttempts - 1) {
-      const overview = lastResponse.json();
-      console.log(`Polling attempt ${attempt} of ${maxAttempts} for file transfer ${fileTransferId}`);
-      console.log(`Checksum: ${JSON.stringify(overview.checksum)}`)
-    }
     sleep(1);
   }
 
