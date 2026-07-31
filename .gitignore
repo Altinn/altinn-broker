@@ -353,3 +353,4 @@ MigrationBackup/
 
 # Bruno environment variables
 .bruno/environments/
+tests/Altinn.Broker.LoadTests/set-loadtest-env.ps1
