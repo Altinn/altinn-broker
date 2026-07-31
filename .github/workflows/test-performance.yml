@@ -107,10 +107,13 @@ jobs:
 
     - name: Build failure report
       if: failure() && steps.performance-test.outcome == 'failure'
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        TEST: ${{ inputs.test }}
       run: |
           report=":warning: Broker performance test failure :warning: \n"
-          report+="\n Environment: ${{ inputs.environment }}"
-          report+="\n Test: ${{ inputs.test || 'load' }}"
+          report+="\n Environment: ${ENVIRONMENT}"
+          report+="\n Test: ${TEST}"
           report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "stepreport=$report" >> $GITHUB_ENV
 
