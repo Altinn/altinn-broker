@@ -54,11 +54,11 @@ on:
         default: '10m'
         type: string
 
-run-name: Test ${{ inputs.test || 'load' }} performance for environment ${{ inputs.environment || 'use-case-test' }}
+run-name: Test ${{ inputs.test || 'load' }} performance for environment ${{ inputs.environment }}
 
 jobs:
   performance-test:
-    environment: ${{ inputs.environment || 'use-case-test' }}
+    environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.test == 'range-download' && 180 || 60 }}
     steps:
@@ -109,7 +109,7 @@ jobs:
       if: failure() && steps.performance-test.outcome == 'failure'
       run: |
           report=":warning: Broker performance test failure :warning: \n"
-          report+="\n Environment: ${{ inputs.environment || 'use-case-test' }}"
+          report+="\n Environment: ${{ inputs.environment }}"
           report+="\n Test: ${{ inputs.test || 'load' }}"
           report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "stepreport=$report" >> $GITHUB_ENV
