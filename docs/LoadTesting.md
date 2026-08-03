@@ -36,3 +36,16 @@ k6 run -e base_url=https://platform.tt02.altinn.no \
   -e sender=... -e recipient=... \
   test.js
 ```
+
+### Parallel Range download timing (`test-range-download.js`)
+
+Uploads a large file via TUS, then downloads it in waves of parallel HTTP Range requests (default: 1 GiB upload, 3 × 50 MiB ranges per wave). Compares first-wave chunk timings vs later waves to check for a cold-start / first-wave penalty.
+
+```bash
+k6 run -e base_url=https://platform.tt02.altinn.no \
+  -e mp_client_id=... -e mp_kid=... -e mp_client_pem=... \
+  -e sender=... -e recipient=... \
+  test-range-download.js
+```
+
+Optional: `-e file_size_mb=1024 -e download_chunk_mb=50 -e parallel=3`, or `-e file_transfer_id=<id>` to skip upload and reuse a published transfer.

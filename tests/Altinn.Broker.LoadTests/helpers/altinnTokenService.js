@@ -1,9 +1,7 @@
 import http from 'k6/http';
 import { retrieveMaskinportenToken } from './maskinportenTokenService.js';
 
-const authorizationBaseUrl = (__ENV.base_url.toLowerCase().includes('platform.altinn.no'))
-    ? 'https://platform.altinn.no'
-    : 'https://platform.tt02.altinn.no';
+const authorizationBaseUrl = __ENV.base_url || 'https://platform.yt01.altinn.cloud';
 
 async function retrieveAltinnToken({ baseUrl, clientId, kid, pem, scope, isSender }) {
     const mpToken = await retrieveMaskinportenToken({ clientId, kid, pem, scope, isSender });

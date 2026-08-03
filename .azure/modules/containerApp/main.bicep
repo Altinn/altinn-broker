@@ -6,6 +6,7 @@ param environment string
 param platform_base_url string
 param maskinporten_environment string
 param eventGridIps array
+param maskinportenTokenExchangeEnvironment string
 
 @secure()
 param subscription_id string
@@ -67,7 +68,7 @@ var containerAppEnvVars = concat([
   }
   { name: 'AltinnOptions__PlatformGatewayUrl', value: platform_base_url }
   { name: 'AltinnOptions__PlatformSubscriptionKey', secretRef: 'platform-subscription-key' }
-  { name: 'MaskinportenSettings__Environment', value: maskinporten_environment }
+  { name: 'MaskinportenSettings__Environment', value: maskinporten_environment } 
   { name: 'MaskinportenSettings__ClientId', secretRef: 'maskinporten-client-id' }
   {
     name: 'MaskinportenSettings__Scope'
@@ -89,6 +90,9 @@ var containerAppEnvVars = concat([
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
   { name: 'ReportResourceIdFilter', secretRef: 'report-resource-id-filter' }
   { name: 'OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION', value: 'true' }
+],
+empty(trim(maskinportenTokenExchangeEnvironment)) ? [] : [
+  { name: 'MaskinportenSettings__TokenExchangeEnvironment', value: maskinportenTokenExchangeEnvironment }
 ], rotationContainerAppEnvVars)
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {

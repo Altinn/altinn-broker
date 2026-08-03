@@ -8,7 +8,7 @@ export const options = {
   //httpDebug: 'full', // information about the request and response
 };
 
-const baseUrl = __ENV.base_url || 'https://platform.tt02.altinn.no';
+const baseUrl = __ENV.base_url || 'https://platform.yt01.altinn.cloud';
 const sender = __ENV.sender;
 const recipient = __ENV.recipient;
 
@@ -31,7 +31,7 @@ export async function setup() {
 
 export default async function (data) {
   var baseFile = {
-    resourceId: 'bruno-broker',
+    resourceId: 'ttd-broker-performance-test',
     checksum: null,
     fileName: 'testfile.txt',
     recipients: [`urn:altinn:organization:identifier-no:${recipient}`],
@@ -92,9 +92,6 @@ async function pollUntilPublished(fileTransferId, token) {
         });
         break;
       }
-    }
-    if (attempt == maxAttempts - 1) {
-      console.log(`Polling attempt ${attempt} of ${maxAttempts} for file transfer ${fileTransferId}`);
     }
     sleep(1);
   }

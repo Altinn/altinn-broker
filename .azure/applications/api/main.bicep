@@ -20,6 +20,7 @@ param namePrefix string
 @secure()
 @minLength(3)
 param apimIp string
+param maskinportenTokenExchangeEnvironment string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
@@ -96,10 +97,15 @@ resource keyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 module fetchEventGridIpsScript '../../modules/containerApp/fetchEventGridIps.bicep' = {
   name: 'fetchAzureEventGridIpsScript'
   scope: resourceGroup
-  dependsOn: [keyvaultAddReaderRolesAppIdentity, databaseAccess]
+  dependsOn: [
+    appDeployToAzureAccess
+    keyvaultAddReaderRolesAppIdentity
+    databaseAccess
+  ]
   params: {
     location: location
     principal_id: appIdentityId
+    subscription_id: subscription().subscriptionId
   }
 }
 
@@ -125,6 +131,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     maskinporten_environment: maskinporten_environment
     userIdentityClientId: appIdentityClientId
     containerAppEnvId: keyvault.getSecret('container-app-env-id')
+    maskinportenTokenExchangeEnvironment: maskinportenTokenExchangeEnvironment
   }
 }
 

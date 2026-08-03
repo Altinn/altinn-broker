@@ -6,19 +6,29 @@ on:
       environment:
         description: 'Environment to run against'
         required: true
-        default: 'use-case-test'
+        default: 'performance'
         type: choice
         options:
+          - performance
           - use-case-test
           - use-case-staging
           - use-case-production
+      test:
+        description: 'Load test to run'
+        required: true
+        default: 'load'
+        type: choice
+        options:
+          - load
+          - rate-limit
+          - range-download
       vus:
-        description: 'Number of virtual users'
+        description: 'Number of virtual users (load test only)'
         required: false
         default: '20'
         type: string
       duration:
-        description: 'Test duration (e.g. 10m, 2m)'
+        description: 'Test duration, e.g. 10m, 2m (load test only)'
         required: false
         default: '10m'
         type: string
@@ -28,27 +38,58 @@ on:
         description: 'Environment to run against'
         required: true
         type: string
+      test:
+        description: 'Load test to run (load | rate-limit | range-download)'
+        required: false
+        default: 'load'
+        type: string
       vus:
-        description: 'Number of virtual users'
+        description: 'Number of virtual users (load test only)'
         required: false
         default: '20'
         type: string
       duration:
-        description: 'Test duration (e.g. 10m, 2m)'
+        description: 'Test duration, e.g. 10m, 2m (load test only)'
         required: false
         default: '10m'
         type: string
 
-run-name: Test performance for environment ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
+run-name: Test ${{ inputs.test || 'load' }} performance for environment ${{ inputs.environment }}
 
 jobs:
   performance-test:
-    environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}
+    environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: ${{ inputs.test == 'range-download' && 180 || 60 }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Resolve load test script
+      id: resolve
+      run: |
+        case "${TEST}" in
+          load)
+            echo "filename=tests/Altinn.Broker.LoadTests/test.js" >> "$GITHUB_OUTPUT"
+            echo "flags=--vus ${VUS} --duration ${DURATION}" >> "$GITHUB_OUTPUT"
+            ;;
+          rate-limit)
+            echo "filename=tests/Altinn.Broker.LoadTests/test-rate-limit.js" >> "$GITHUB_OUTPUT"
+            echo "flags=" >> "$GITHUB_OUTPUT"
+            ;;
+          range-download)
+            echo "filename=tests/Altinn.Broker.LoadTests/test-range-download.js" >> "$GITHUB_OUTPUT"
+            echo "flags=" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "Unknown test '${TEST}'. Expected load, rate-limit, or range-download." >&2
+            exit 1
+            ;;
+        esac
+      env:
+        TEST: ${{ inputs.test || 'load' }}
+        VUS: ${{ inputs.vus || '20' }}
+        DURATION: ${{ inputs.duration || '10m' }}
 
     - name: Run performance tests
       id: performance-test
@@ -61,16 +102,18 @@ jobs:
         recipient: ${{ secrets.BRUKSMONSTER_RECIPIENT }}
         sender: ${{ secrets.BRUKSMONSTER_SENDER }}
       with:
-        filename: tests/Altinn.Broker.LoadTests/test.js
-        flags: >-
-          --vus ${{ inputs.vus || github.event.inputs.vus || '20' }}
-          --duration ${{ inputs.duration || github.event.inputs.duration || '10m' }}
+        filename: ${{ steps.resolve.outputs.filename }}
+        flags: ${{ steps.resolve.outputs.flags }}
 
     - name: Build failure report
       if: failure() && steps.performance-test.outcome == 'failure'
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        TEST: ${{ inputs.test }}
       run: |
           report=":warning: Broker performance test failure :warning: \n"
-          report+="\n Environment: ${{ inputs.environment || github.event.inputs.environment || 'use-case-test' }}"
+          report+="\n Environment: ${ENVIRONMENT}"
+          report+="\n Test: ${TEST}"
           report+="\n Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "stepreport=$report" >> $GITHUB_ENV
 
