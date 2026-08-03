@@ -16,12 +16,14 @@ public class StuckFileTransferHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
     IFileTransferRepository fileTransferRepository,
     ITusUploadFinalizationProgressService tusUploadFinalizationProgressService,
+    ITusUploadActivityCache tusUploadActivityCache,
     IBackgroundJobClient backgroundJobClient,
     SlackStuckFileTransferNotifier slackNotifier,
     ILogger<StuckFileTransferHandler> logger)
 {
     private readonly int _stuckInUploadProcessingThresholdMinutes = 15;
     private readonly int _stuckInUploadStartingThresholdMinutes = 60 * 24;
+    private readonly TimeSpan _recentTusActivityWindow = TimeSpan.FromHours(1);
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
     {
@@ -34,6 +36,12 @@ public class StuckFileTransferHandler(
 
         foreach (FileTransferStatusEntity fileTransferStatus in stuckInUploadStarted)
         {
+            if (await tusUploadActivityCache.HasRecentActivityAsync(fileTransferStatus.FileTransferId, _recentTusActivityWindow, cancellationToken))
+            {
+                logger.LogInformation("File transfer {fileTransferId} has been in UploadStarted for more than {thresholdMinutes} minutes but had TUS activity within the last {activityWindowMinutes} minutes. Letting the upload continue.", fileTransferStatus.FileTransferId, _stuckInUploadStartingThresholdMinutes, _recentTusActivityWindow.TotalMinutes);
+                continue;
+            }
+
             var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferStatus.FileTransferId, cancellationToken);
             if (fileTransfer is null)
             {
