@@ -29,6 +29,7 @@ public class CompleteFileUploadHandler(
     IResourceRepository resourceRepository,
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
+    FileTransferPublishService fileTransferPublishService,
     IHostEnvironment hostEnvironment,
     IOptions<GeneralSettings> generalSettings,
     MalwareScanningResultHandler malwareScanResultHandler,
@@ -134,28 +135,10 @@ public class CompleteFileUploadHandler(
                         logger.LogInformation(
                             "CompleteFileUpload setting status Published for file transfer {FileTransferId} (defer checksum, no virus scan)",
                             request.FileTransferId);
-                        await fileTransferStatusRepository.InsertFileTransferStatus(
-                            request.FileTransferId,
-                            FileTransferStatus.Published,
-                            timestamp: finishedUploadTimestamp,
-                            cancellationToken: ct);
-                        backgroundJobClient.Enqueue(() => eventBus.Publish(
-                            AltinnEventType.Published,
-                            fileTransfer.ResourceId,
-                            request.FileTransferId.ToString(),
-                            fileTransfer.Sender.ActorExternalId,
-                            Guid.NewGuid(),
-                            AltinnEventSubjectRole.Sender));
-                        foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-                        {
-                            backgroundJobClient.Enqueue(() => eventBus.Publish(
-                                AltinnEventType.Published,
-                                fileTransfer.ResourceId,
-                                request.FileTransferId.ToString(),
-                                recipient.Actor.ActorExternalId,
-                                Guid.NewGuid(),
-                                AltinnEventSubjectRole.Recipient));
-                        }
+                        await fileTransferPublishService.TryPublishAsync(
+                            fileTransfer,
+                            finishedUploadTimestamp,
+                            ct);
                     }
 
                     await fileTransferRepository.SetStorageDetails(
@@ -199,28 +182,10 @@ public class CompleteFileUploadHandler(
                     }
                     else if (!generalSettings.Value.SimulateMalwareScan)
                     {
-                        await fileTransferStatusRepository.InsertFileTransferStatus(
-                            request.FileTransferId,
-                            FileTransferStatus.Published,
-                            timestamp: finishedUploadTimestamp,
-                            cancellationToken: ct);
-                        backgroundJobClient.Enqueue(() => eventBus.Publish(
-                            AltinnEventType.Published,
-                            fileTransfer.ResourceId,
-                            request.FileTransferId.ToString(),
-                            fileTransfer.Sender.ActorExternalId,
-                            Guid.NewGuid(),
-                            AltinnEventSubjectRole.Sender));
-                        foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-                        {
-                            backgroundJobClient.Enqueue(() => eventBus.Publish(
-                                AltinnEventType.Published,
-                                fileTransfer.ResourceId,
-                                request.FileTransferId.ToString(),
-                                recipient.Actor.ActorExternalId,
-                                Guid.NewGuid(),
-                                AltinnEventSubjectRole.Recipient));
-                        }
+                        await fileTransferPublishService.TryPublishAsync(
+                            fileTransfer,
+                            finishedUploadTimestamp,
+                            ct);
                     }
 
                     await fileTransferRepository.SetStorageDetails(
@@ -266,23 +231,6 @@ public class CompleteFileUploadHandler(
         if (simulateMalwareScanNow)
         {
             await SimulateMalwareScanResult(request.FileTransferId);
-            backgroundJobClient.Enqueue(() => eventBus.Publish(
-                AltinnEventType.Published,
-                fileTransfer.ResourceId,
-                request.FileTransferId.ToString(),
-                fileTransfer.Sender.ActorExternalId,
-                Guid.NewGuid(),
-                AltinnEventSubjectRole.Sender));
-            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-            {
-                backgroundJobClient.Enqueue(() => eventBus.Publish(
-                    AltinnEventType.Published,
-                    fileTransfer.ResourceId,
-                    request.FileTransferId.ToString(),
-                    recipient.Actor.ActorExternalId,
-                    Guid.NewGuid(),
-                    AltinnEventSubjectRole.Recipient));
-            }
         }
 
         if (!request.DeferChecksumValidation

@@ -22,6 +22,7 @@ public class TusChecksumProcessingHandler(
     IServiceOwnerRepository serviceOwnerRepository,
     IBrokerStorageService brokerStorageService,
     IIdempotencyEventRepository idempotencyEventRepository,
+    FileTransferPublishService fileTransferPublishService,
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
@@ -160,36 +161,9 @@ public class TusChecksumProcessingHandler(
 
     private async Task PublishFileTransferAsync(FileTransferEntity fileTransfer, CancellationToken cancellationToken)
     {
-        if (fileTransfer.FileTransferStatusEntity.Status == FileTransferStatus.Published)
-        {
-            return;
-        }
-
         await TransactionWithRetriesPolicy.Execute(async ct =>
         {
-            await fileTransferStatusRepository.InsertFileTransferStatus(
-                fileTransfer.FileTransferId,
-                FileTransferStatus.Published,
-                timestamp: DateTime.UtcNow,
-                cancellationToken: ct);
-            backgroundJobClient.Enqueue(() => eventBus.Publish(
-                AltinnEventType.Published,
-                fileTransfer.ResourceId,
-                fileTransfer.FileTransferId.ToString(),
-                fileTransfer.Sender.ActorExternalId,
-                Guid.NewGuid(),
-                AltinnEventSubjectRole.Sender));
-            foreach (var recipient in fileTransfer.RecipientCurrentStatuses)
-            {
-                backgroundJobClient.Enqueue(() => eventBus.Publish(
-                    AltinnEventType.Published,
-                    fileTransfer.ResourceId,
-                    fileTransfer.FileTransferId.ToString(),
-                    recipient.Actor.ActorExternalId,
-                    Guid.NewGuid(),
-                    AltinnEventSubjectRole.Recipient));
-            }
-
+            await fileTransferPublishService.TryPublishAsync(fileTransfer, DateTime.UtcNow, ct);
             return Task.CompletedTask;
         }, logger, cancellationToken);
     }
