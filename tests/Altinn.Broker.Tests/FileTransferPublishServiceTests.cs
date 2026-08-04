@@ -202,6 +202,225 @@ public class FileTransferPublishServiceTests
     }
 
     [Fact]
+    public async Task TryPublishAsync_WhenStatusInsertFails_DoesNotEnqueueAndPropagates()
+    {
+        // Arrange
+        var fileTransfer = CreateFileTransfer(recipientCount: 1);
+        var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
+        var claimTaken = false;
+
+        var statusRepository = new Mock<IFileTransferStatusRepository>();
+        var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+
+        idempotencyRepository
+            .Setup(r => r.TryAddIdempotencyEventAsync(claimKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                // Simulates transactional rollback of the claim after a failed attempt:
+                // the next call can claim again and recover.
+                if (claimTaken)
+                {
+                    return false;
+                }
+
+                claimTaken = true;
+                return true;
+            });
+        statusRepository
+            .Setup(r => r.InsertFileTransferStatus(
+                It.IsAny<Guid>(),
+                It.IsAny<FileTransferStatus>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("status persistence failed"));
+
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        var firstAttempt = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+
+        // Recover: claim is available again (transaction rolled back), status succeeds.
+        claimTaken = false;
+        statusRepository
+            .Setup(r => r.InsertFileTransferStatus(
+                It.IsAny<Guid>(),
+                It.IsAny<FileTransferStatus>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        backgroundJobClient
+            .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Returns("job-id");
+
+        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+
+        // Assert
+        Assert.Equal("status persistence failed", firstAttempt.Message);
+        backgroundJobClient.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Exactly(2));
+        Assert.True(recovered);
+        statusRepository.Verify(
+            r => r.InsertFileTransferStatus(
+                fileTransfer.FileTransferId,
+                FileTransferStatus.Published,
+                timestamp,
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task TryPublishAsync_WhenSenderEnqueueFails_PropagatesAndAllowsRetry()
+    {
+        // Arrange
+        var fileTransfer = CreateFileTransfer(recipientCount: 1);
+        var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
+        var claimTaken = false;
+        var enqueueAttempts = 0;
+
+        var statusRepository = new Mock<IFileTransferStatusRepository>();
+        var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+
+        idempotencyRepository
+            .Setup(r => r.TryAddIdempotencyEventAsync(claimKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                if (claimTaken)
+                {
+                    return false;
+                }
+
+                claimTaken = true;
+                return true;
+            });
+        statusRepository
+            .Setup(r => r.InsertFileTransferStatus(
+                It.IsAny<Guid>(),
+                It.IsAny<FileTransferStatus>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        backgroundJobClient
+            .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Returns(() =>
+            {
+                enqueueAttempts++;
+                if (enqueueAttempts == 1)
+                {
+                    throw new BackgroundJobClientException("sender enqueue failed", new Exception("inner"));
+                }
+
+                return $"job-{enqueueAttempts}";
+            });
+
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
+            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+
+        claimTaken = false;
+        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+
+        // Assert
+        Assert.True(recovered);
+        // Failed sender enqueue + successful sender + recipient
+        Assert.Equal(3, enqueueAttempts);
+        statusRepository.Verify(
+            r => r.InsertFileTransferStatus(
+                fileTransfer.FileTransferId,
+                FileTransferStatus.Published,
+                timestamp,
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task TryPublishAsync_WhenRecipientEnqueueFails_PropagatesAndAllowsRetry()
+    {
+        // Arrange
+        var fileTransfer = CreateFileTransfer(recipientCount: 1);
+        var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
+        var claimTaken = false;
+        var enqueueAttempts = 0;
+
+        var statusRepository = new Mock<IFileTransferStatusRepository>();
+        var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+
+        idempotencyRepository
+            .Setup(r => r.TryAddIdempotencyEventAsync(claimKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                if (claimTaken)
+                {
+                    return false;
+                }
+
+                claimTaken = true;
+                return true;
+            });
+        statusRepository
+            .Setup(r => r.InsertFileTransferStatus(
+                It.IsAny<Guid>(),
+                It.IsAny<FileTransferStatus>(),
+                It.IsAny<DateTimeOffset>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        backgroundJobClient
+            .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Returns(() =>
+            {
+                enqueueAttempts++;
+                if (enqueueAttempts == 2)
+                {
+                    throw new BackgroundJobClientException("recipient enqueue failed", new Exception("inner"));
+                }
+
+                return $"job-{enqueueAttempts}";
+            });
+
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
+            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+
+        claimTaken = false;
+        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+
+        // Assert
+        Assert.True(recovered);
+        // Failed attempt: sender ok + recipient fail; retry: sender + recipient
+        Assert.Equal(4, enqueueAttempts);
+        statusRepository.Verify(
+            r => r.InsertFileTransferStatus(
+                fileTransfer.FileTransferId,
+                FileTransferStatus.Published,
+                timestamp,
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
     public void GetPublishedClaimKey_UsesFileTransferIdAndSuffix()
     {
         var fileTransferId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");

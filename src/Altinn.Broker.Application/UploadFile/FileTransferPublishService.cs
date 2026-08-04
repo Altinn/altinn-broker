@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Transactions;
 
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Domain;
@@ -26,7 +27,9 @@ public class FileTransferPublishService(
         $"{fileTransferId}{PublishedIdempotencySuffix}";
 
     /// <summary>
-    /// Atomically claims publish for a file transfer, inserts Published status, and enqueues Published events.
+    /// Atomically claims publish for a file transfer, inserts Published status, and enqueues Published events
+    /// in one ambient transaction. Hangfire jobs are only durable after the transaction commits, so a failed
+    /// status insert or enqueue rolls back the claim and allows a safe retry.
     /// Returns false if another caller already claimed publish.
     /// </summary>
     public async Task<bool> TryPublishAsync(
@@ -34,6 +37,11 @@ public class FileTransferPublishService(
         DateTimeOffset timestamp,
         CancellationToken cancellationToken)
     {
+        using var transaction = new TransactionScope(
+            TransactionScopeOption.Required,
+            new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+            TransactionScopeAsyncFlowOption.Enabled);
+
         var claimed = await idempotencyEventRepository.TryAddIdempotencyEventAsync(
             GetPublishedClaimKey(fileTransfer.FileTransferId),
             cancellationToken);
@@ -42,6 +50,8 @@ public class FileTransferPublishService(
             logger.LogInformation(
                 "Skipping publish for {fileTransferId}; publish already claimed",
                 fileTransfer.FileTransferId);
+            // Complete so we join (and do not abort) any ambient caller transaction.
+            transaction.Complete();
             return false;
         }
 
@@ -52,6 +62,8 @@ public class FileTransferPublishService(
             cancellationToken: cancellationToken);
 
         EnqueuePublishedEvents(fileTransfer);
+
+        transaction.Complete();
         return true;
     }
 
