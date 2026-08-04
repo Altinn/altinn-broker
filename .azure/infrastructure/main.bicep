@@ -133,7 +133,7 @@ module postgresBackupVault '../modules/postgreSql/backupVault.bicep' = {
     namePrefix: namePrefix
     environment: environment
     location: location
-    pgDatabaseResourceId: postgresql.outputs.postgresDatabaseId
+    pgServerResourceId: postgresql.outputs.postgresServerId
     existingBackupPolicyName: existingBackupPolicyName
   }
 }

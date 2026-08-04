@@ -7,9 +7,9 @@ param environment string
 @description('Location for Backup vault og tilhørende ressurser.')
 param location string
 
-@description('Resource ID til PostgreSQL Flexible Server som skal ha backup).')
+@description('Resource ID til PostgreSQL Flexible Server som skal ha backup.')
 @minLength(1)
-param pgDatabaseResourceId string
+param pgServerResourceId string
 
 @description('Antall dager backup skal beholdes. Standard er 365 dager (1 år) for prod/production-lignende miljøer, 90 dager for test.')
 param retentionDays int = (environment == 'production' || environment == 'prod') ? 365 : environment == 'test' ? 90 : 180
@@ -39,7 +39,7 @@ var backupPolicyName = existingBackupPolicyName != '' ? existingBackupPolicyName
 var useExistingPolicy = existingBackupPolicyName != ''
 // Backup instance navn settes til server-navnet
 // Vi henter server-navnet fra resource ID (siste del)
-var resourceIdParts = split(pgDatabaseResourceId, '/')
+var resourceIdParts = split(pgServerResourceId, '/')
 var serverName = resourceIdParts[length(resourceIdParts) - 1]
 var backupInstanceName = serverName
 
@@ -147,7 +147,7 @@ resource pgBackupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@20
   }
 }
 
-// Backup instance som knytter databasen til vault + policy
+// Backup instance som knytter PostgreSQL-serveren til vault + policy
 resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances@2024-03-01' = {
   parent: backupVault
   name: backupInstanceName
@@ -158,7 +158,7 @@ resource pgBackupInstance 'Microsoft.DataProtection/backupVaults/backupInstances
     }
     dataSourceInfo: {
       objectType: 'Datasource'
-      resourceID: pgDatabaseResourceId
+      resourceID: pgServerResourceId
       resourceLocation: location
       resourceName: serverName
       datasourceType: pgDatasourceType
@@ -194,4 +194,3 @@ resource pgLtrBackupRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 output backupVaultNameOut string = backupVault.name
 output backupPolicyNameOut string = useExistingPolicy ? pgBackupPolicyExisting.name : pgBackupPolicy.name
 output backupInstanceNameOut string = pgBackupInstance.name
-

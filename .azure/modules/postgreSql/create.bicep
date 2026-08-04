@@ -231,4 +231,5 @@ resource postgreSqlAuditDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-
   }
 }
 
+output postgresServerId string = postgres.id
 output postgresDatabaseId string = database.id
