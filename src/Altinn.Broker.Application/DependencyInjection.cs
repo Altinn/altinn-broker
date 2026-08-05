@@ -12,6 +12,7 @@ using Altinn.Broker.Application.MonthlyStatistics;
 using Altinn.Broker.Application.MaskinportenJwkRotation;
 using Altinn.Broker.Application.SendSlackNotification;
 using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 
 using Microsoft.Extensions.DependencyInjection;

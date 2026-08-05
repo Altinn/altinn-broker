@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.Settings;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;

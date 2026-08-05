@@ -3,7 +3,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Tus;
-using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;

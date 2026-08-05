@@ -1,4 +1,5 @@
 using Altinn.Broker.Application.Middlewares;
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Altinn.Broker.Application.UploadFile;
+namespace Altinn.Broker.Application.UploadFile.Tus;
 
 public class TusChecksumProcessingHandler(
     IFileTransferRepository fileTransferRepository,

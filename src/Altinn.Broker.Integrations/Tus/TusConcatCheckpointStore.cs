@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 
 using Microsoft.Extensions.Caching.Distributed;
 

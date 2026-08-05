@@ -6,7 +6,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 
-namespace Altinn.Broker.Application.UploadFile;
+namespace Altinn.Broker.Application.UploadFile.Tus;
 
 public class TusUploadValidationService(
     IAuthorizationService authorizationService,
