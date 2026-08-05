@@ -1,6 +1,8 @@
+using System.Text.Json.Nodes;
+
 using Altinn.Broker.API.Tus;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -25,32 +27,54 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
-        swaggerDoc.Paths[TusPath] = new OpenApiPathItem
+        swaggerDoc.Tags ??= new HashSet<OpenApiTag>();
+        if (!swaggerDoc.Tags.Any(tag => tag.Name == Tag))
         {
-            Operations = new Dictionary<OperationType, OpenApiOperation>
-            {
-                [OperationType.Options] = CreateOptionsOperation(),
-                [OperationType.Post] = CreatePostOperation(),
-                [OperationType.Head] = CreateHeadOperation(),
-                [OperationType.Patch] = CreatePatchOperation(),
-                [OperationType.Delete] = CreateDeleteOperation()
-            }
-        };
+            swaggerDoc.Tags.Add(new OpenApiTag { Name = Tag });
+        }
 
-        swaggerDoc.Paths[TusPartialPath] = new OpenApiPathItem
+        var tusPathItem = new OpenApiPathItem
         {
-            Operations = new Dictionary<OperationType, OpenApiOperation>
+            Operations = new Dictionary<HttpMethod, OpenApiOperation>
             {
-                [OperationType.Head] = CreatePartialHeadOperation(),
-                [OperationType.Patch] = CreatePartialPatchOperation(),
-                [OperationType.Delete] = CreatePartialDeleteOperation()
+                [HttpMethod.Options] = CreateOptionsOperation(),
+                [HttpMethod.Post] = CreatePostOperation(),
+                [HttpMethod.Head] = CreateHeadOperation(),
+                [HttpMethod.Patch] = CreatePatchOperation(),
+                [HttpMethod.Delete] = CreateDeleteOperation()
             }
         };
+        SetOperationTags(swaggerDoc, tusPathItem);
+        swaggerDoc.Paths[TusPath] = tusPathItem;
+
+        var tusPartialPathItem = new OpenApiPathItem
+        {
+            Operations = new Dictionary<HttpMethod, OpenApiOperation>
+            {
+                [HttpMethod.Head] = CreatePartialHeadOperation(),
+                [HttpMethod.Patch] = CreatePartialPatchOperation(),
+                [HttpMethod.Delete] = CreatePartialDeleteOperation()
+            }
+        };
+        SetOperationTags(swaggerDoc, tusPartialPathItem);
+        swaggerDoc.Paths[TusPartialPath] = tusPartialPathItem;
+    }
+
+    private static void SetOperationTags(OpenApiDocument swaggerDoc, OpenApiPathItem pathItem)
+    {
+        if (pathItem.Operations is null) return;
+
+        foreach (var operation in pathItem.Operations.Values)
+        {
+            operation.Tags = new HashSet<OpenApiTagReference>
+            {
+                new(Tag, swaggerDoc, null)
+            };
+        }
     }
 
     private static OpenApiOperation CreateOptionsOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Discover TUS server capabilities",
         Description = BuildDescription(
             "Returns supported TUS protocol version and extensions. " +
@@ -68,7 +92,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreatePostOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Create a resumable upload",
         Description = BuildDescription(
             "Creates a TUS upload resource for an initialized file transfer. " +
@@ -102,7 +125,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreateHeadOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Get current upload offset",
         Description = BuildDescription(
             "Returns how many bytes have been uploaded so far via the <c>Upload-Offset</c> response header. " +
@@ -123,7 +145,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreatePatchOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Upload the next chunk",
         Description = BuildDescription(
             "Appends a chunk of file data at the offset given in the <c>Upload-Offset</c> request header. " +
@@ -150,7 +171,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreateDeleteOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Terminate an incomplete upload",
         Description = BuildDescription(
             "Deletes an in-progress TUS upload. Supported when the termination extension is enabled."),
@@ -169,7 +189,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreatePartialHeadOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Get current partial upload offset",
         Description = BuildDescription(
             "Returns the current byte offset for a concatenation partial upload via the <c>Upload-Offset</c> response header. " +
@@ -190,7 +209,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreatePartialPatchOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Upload the next chunk to a partial upload",
         Description = BuildDescription(
             "Appends a chunk to a concatenation partial upload at the offset given in the <c>Upload-Offset</c> request header. " +
@@ -216,7 +234,6 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
 
     private static OpenApiOperation CreatePartialDeleteOperation() => new()
     {
-        Tags = [new OpenApiTag { Name = Tag }],
         Summary = "Terminate an incomplete partial upload",
         Description = BuildDescription(
             "Deletes an in-progress concatenation partial upload."),
@@ -243,7 +260,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
             {
                 Schema = new OpenApiSchema
                 {
-                    Type = "string",
+                    Type = JsonSchemaType.String,
                     Format = "binary"
                 }
             }
@@ -259,7 +276,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = "fileTransferId",
         In = ParameterLocation.Path,
         Required = true,
-        Schema = new OpenApiSchema { Type = "string", Format = "uuid" },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
         Description = "The file transfer id returned from initialize."
     };
 
@@ -268,7 +285,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = "partialUploadId",
         In = ParameterLocation.Path,
         Required = true,
-        Schema = new OpenApiSchema { Type = "string" },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.String },
         Description = "The partial upload id returned in the Location header when creating a partial upload."
     };
 
@@ -277,7 +294,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = TusResumableHeader,
         In = ParameterLocation.Header,
         Required = required,
-        Schema = new OpenApiSchema { Type = "string", Default = new Microsoft.OpenApi.Any.OpenApiString(TusVersion) },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.String, Default = JsonValue.Create(TusVersion) },
         Description = "TUS protocol version. Must be 1.0.0."
     };
 
@@ -286,7 +303,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = UploadLengthHeader,
         In = ParameterLocation.Header,
         Required = required,
-        Schema = new OpenApiSchema { Type = "integer", Format = "int64" },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.Integer, Format = "int64" },
         Description = "Total upload size in bytes. Required for single-file and partial uploads. Omit on final concatenation requests."
     };
 
@@ -295,7 +312,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = UploadConcatHeader,
         In = ParameterLocation.Header,
         Required = required,
-        Schema = new OpenApiSchema { Type = "string" },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.String },
         Description =
             "Concatenation mode. Use <c>partial</c> when creating a segment upload, or " +
             "<c>final;&lt;partial-location-1&gt; &lt;partial-location-2&gt; ...</c> to finalize."
@@ -306,7 +323,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Name = UploadOffsetHeader,
         In = ParameterLocation.Header,
         Required = required,
-        Schema = new OpenApiSchema { Type = "integer", Format = "int64" },
+        Schema = new OpenApiSchema { Type = JsonSchemaType.Integer, Format = "int64" },
         Description = "Byte offset at which this chunk should be appended."
     };
 
