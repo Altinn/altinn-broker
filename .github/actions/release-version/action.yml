@@ -84,8 +84,8 @@ runs:
     - name: Verify deployment
       uses: azure/CLI@v3
       id: verify-deployment
+      timeout-minutes: 3
       with:
-        timeout-minutes: 3
         azcliversion: 2.72.0
         inlineScript: |
           chmod +x ./.github/tools/revisionVerifier.sh
