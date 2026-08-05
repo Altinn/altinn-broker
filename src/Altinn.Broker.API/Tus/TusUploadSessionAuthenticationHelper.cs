@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
-using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;

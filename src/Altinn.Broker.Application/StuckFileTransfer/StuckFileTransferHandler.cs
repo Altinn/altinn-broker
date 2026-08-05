@@ -1,4 +1,4 @@
-using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;

@@ -4,6 +4,7 @@ using System.Net;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
