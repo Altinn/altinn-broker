@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Altinn.Broker.API.Swagger;
@@ -29,20 +30,19 @@ public sealed class BinaryRequestBodyOperationFilter : IOperationFilter
 
         if (!hasOctetStreamViaApiDescription && !hasOctetStreamViaConsumesAttribute) return;
 
-        operation.RequestBody ??= new OpenApiRequestBody
-        {
-            Required = true
-        };
+        var requestBody = operation.RequestBody as OpenApiRequestBody ?? new OpenApiRequestBody();
+        requestBody.Required = true;
+        requestBody.Content ??= new Dictionary<string, OpenApiMediaType>();
+        operation.RequestBody = requestBody;
 
-        operation.RequestBody.Content[OctetStream] = new OpenApiMediaType
+        requestBody.Content[OctetStream] = new OpenApiMediaType
         {
             Schema = new OpenApiSchema
             {
-                Type = "string",
+                Type = JsonSchemaType.String,
                 Format = "binary"
             }
         };
     }
 }
-
 
