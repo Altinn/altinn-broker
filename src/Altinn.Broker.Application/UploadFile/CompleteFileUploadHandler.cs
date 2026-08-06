@@ -72,7 +72,6 @@ public class CompleteFileUploadHandler(
             return Errors.StorageProviderNotReady;
         }
 
-        var finishedUploadTimestamp = DateTime.UtcNow;
         var userProvidedChecksum = !string.IsNullOrWhiteSpace(fileTransfer.Checksum);
         var requiresVirusScan = storageProvider.Type == StorageProviderType.Altinn3Azure;
 
@@ -90,7 +89,7 @@ public class CompleteFileUploadHandler(
             await fileTransferStatusRepository.InsertFileTransferStatus(
                 request.FileTransferId,
                 FileTransferStatus.Failed,
-                timestamp: finishedUploadTimestamp,
+                timestamp: request.UploadFinishedTimestamp,
                 detailedFileTransferStatus: "Checksum mismatch",
                 cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue<IBrokerStorageService>(service =>
@@ -120,7 +119,7 @@ public class CompleteFileUploadHandler(
                             await fileTransferStatusRepository.InsertFileTransferStatus(
                                 request.FileTransferId,
                                 FileTransferStatus.UploadProcessing,
-                                timestamp: finishedUploadTimestamp,
+                                timestamp: request.UploadFinishedTimestamp,
                                 cancellationToken: ct);
                             backgroundJobClient.Enqueue(() => eventBus.Publish(
                                 AltinnEventType.UploadProcessing,
@@ -138,7 +137,7 @@ public class CompleteFileUploadHandler(
                             request.FileTransferId);
                         await fileTransferPublishService.TryPublishAsync(
                             fileTransfer,
-                            finishedUploadTimestamp,
+                            DateTimeOffset.UtcNow,
                             ct);
                     }
 
@@ -170,7 +169,7 @@ public class CompleteFileUploadHandler(
                             await fileTransferStatusRepository.InsertFileTransferStatus(
                                 request.FileTransferId,
                                 FileTransferStatus.UploadProcessing,
-                                timestamp: finishedUploadTimestamp,
+                                timestamp: request.UploadFinishedTimestamp,
                                 cancellationToken: ct);
                             backgroundJobClient.Enqueue(() => eventBus.Publish(
                                 AltinnEventType.UploadProcessing,
@@ -185,7 +184,7 @@ public class CompleteFileUploadHandler(
                     {
                         await fileTransferPublishService.TryPublishAsync(
                             fileTransfer,
-                            finishedUploadTimestamp,
+                            DateTimeOffset.UtcNow,
                             ct);
                     }
 

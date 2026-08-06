@@ -76,6 +76,7 @@ public class TusUploadCompleteHandler(
         }
 
         var (checksum, uploadLength) = finalizeResult.Value;
+        var uploadFinishedTimeStamp = DateTime.UtcNow;
         logger.LogInformation(
             "TUS storage finalized for file transfer {FileTransferId}. UploadLength={UploadLength} ChecksumPresent={ChecksumPresent}",
             fileTransferId,
@@ -88,7 +89,8 @@ public class TusUploadCompleteHandler(
                 FileTransferId = fileTransferId,
                 Checksum = checksum,
                 UploadLength = uploadLength,
-                DeferChecksumValidation = true
+                DeferChecksumValidation = true,
+                UploadFinishedTimestamp = uploadFinishedTimeStamp
             },
             user,
             cancellationToken);
