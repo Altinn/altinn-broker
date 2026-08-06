@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
-namespace Altinn.Broker.Application.UploadFile;
+namespace Altinn.Broker.Application.UploadFile.Tus;
 
 public class TusUploadCompleteHandler(
     IFileTransferRepository fileTransferRepository,

@@ -1,4 +1,4 @@
-namespace Altinn.Broker.Application.UploadFile;
+namespace Altinn.Broker.Application.UploadFile.Tus;
 
 public interface ITusUploadFinalizationProgressService
 {

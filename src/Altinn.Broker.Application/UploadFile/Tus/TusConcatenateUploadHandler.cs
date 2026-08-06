@@ -2,7 +2,7 @@ using Hangfire;
 
 using Microsoft.Extensions.Logging;
 
-namespace Altinn.Broker.Application.UploadFile;
+namespace Altinn.Broker.Application.UploadFile.Tus;
 
 public class TusConcatenateUploadHandler(
     ITusUploadFinalizationService tusUploadFinalizationService,

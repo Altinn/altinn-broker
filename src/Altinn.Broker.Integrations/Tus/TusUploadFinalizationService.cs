@@ -1,4 +1,4 @@
-using Altinn.Broker.Application.UploadFile;
+using Altinn.Broker.Application.UploadFile.Tus;
 
 namespace Altinn.Broker.Integrations.Tus;
 
