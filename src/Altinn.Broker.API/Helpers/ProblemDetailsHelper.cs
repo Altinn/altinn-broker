@@ -27,6 +27,7 @@ public static class ProblemDetailsHelper
     {
         var descriptor = _factory.Create((uint)error.ErrorCode, error.StatusCode, error.Message);
         var problemDetails = descriptor.ToProblemDetails();
+        problemDetails.Detail = error.Message;
 
         if (StatusCodeMappings.TryGetValue(error.StatusCode, out var mapping))
         {
