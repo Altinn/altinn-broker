@@ -68,6 +68,7 @@ public class UploadFileHandler(
         try
         {
             var result = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
+            var finishedUploadTimestamp = DateTime.UtcNow;
             if (result is null)
             {
                 return await TransactionWithRetriesPolicy.Execute(async ct =>
@@ -106,7 +107,8 @@ public class UploadFileHandler(
                 {
                     FileTransferId = request.FileTransferId,
                     Checksum = checksum,
-                    UploadLength = uploadLength
+                    UploadLength = uploadLength,
+                    UploadFinishedTimestamp = finishedUploadTimestamp,
                 },
                 user,
                 cancellationToken);
