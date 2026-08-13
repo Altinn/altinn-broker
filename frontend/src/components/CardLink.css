@@ -1,0 +1,50 @@
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #d2d5d8;
+  border-radius: 0.25rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-link:hover {
+  border-color: #1eadf7;
+  text-decoration: none;
+}
+
+.card-link__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.25rem;
+  background: #6e1955;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.card-link__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+
+.card-link__title {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.card-link__description {
+  font-size: 0.875rem;
+  color: #545c7a;
+}
+
+.card-link__chevron {
+  font-size: 1.5rem;
+  color: #545c7a;
+}

@@ -1,0 +1,98 @@
+.app-header {
+  background: #fff;
+  border-bottom: 1px solid #d2d5d8;
+}
+
+.app-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #00315d;
+}
+
+.app-header__logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #1eadf7;
+}
+
+.app-header__profile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-header__org {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-header__org-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  background: #6e1955;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+}
+
+.app-header__org-name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.app-header__org-number {
+  font-size: 0.8125rem;
+  color: #545c7a;
+}
+
+.app-header__menu-button {
+  background: #00315d;
+  color: #fff;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.breadcrumbs {
+  padding: 0 1.5rem 0.75rem;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  color: #545c7a;
+}
+
+.breadcrumbs li:not(:last-child)::after {
+  content: '›';
+  margin-left: 0.35rem;
+  color: #8b93a7;
+}
+
+.breadcrumbs a {
+  color: #00315d;
+}
+
+.breadcrumbs span {
+  color: #1e2b3c;
+}
