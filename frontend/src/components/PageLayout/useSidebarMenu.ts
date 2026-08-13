@@ -1,9 +1,9 @@
 import type { MenuItemProps, MenuProps } from '@altinn/altinn-components'
 import {
   ArchiveIcon,
+  ArrowRightLeftIcon,
   ExternalLinkIcon,
   FileCheckmarkIcon,
-  FileIcon,
   PersonCircleIcon,
 } from '@navikt/aksel-icons'
 import { useLocation } from 'react-router-dom'
@@ -42,7 +42,7 @@ export function useSidebarMenu(): MenuProps {
       id: 'file-transfers',
       groupId: 'global',
       size: 'lg',
-      icon: FileIcon,
+      icon: ArrowRightLeftIcon,
       title: 'Formidlinger',
       selected: isRouteSelected(pathname, PageRoutes.fileTransfers),
       expanded: true,
