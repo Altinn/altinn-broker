@@ -85,6 +85,10 @@ var containerAppEnvVars = concat([
   { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
+  { name: 'AzureStorageOptions__MaxStripes', value: '16' }
+  { name: 'AzureStorageOptions__MinStripeBytes', value: '274877906944' }
+  { name: 'AzureStorageOptions__MaxStripeBytes', value: '5000000000000' }
+  { name: 'AzureStorageOptions__MaxBlocksPerStripe', value: '50000' }
   { name: 'TusOptions__UploadExpiration', value: '24:00:00' }
   { name: 'DistributedCacheOptions__RedisConnectionString', secretRef: 'redis-connection-string' }
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }
