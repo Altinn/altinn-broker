@@ -7,6 +7,12 @@ This subfolder contains the code for the Broker frontend application that is int
 
 It is a React app that directly connects to the Broker API from the browser, and uses ID-Porten for login.
 
+## To start
+
+1. cd frontend
+2. npm install
+3. npm run dev
+
 ## Goals
 
 - [ ] The user should be able to login with ID-Porten
