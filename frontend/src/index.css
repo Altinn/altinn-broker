@@ -1,11 +1,9 @@
 @import url('https://altinncdn.no/fonts/inter/v4.1/inter.css');
+@import '@altinn/altinn-components/dist/global.css';
 
 :root {
   font-family: Inter, system-ui, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1e2b3c;
-  background-color: #eef8fd;
+  font-feature-settings: 'cv05' 1;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,18 +16,11 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  min-width: 320px;
-}
-
-a {
-  color: #00315d;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
+  min-height: 100vh;
+  width: 100%;
 }
 
 button,
