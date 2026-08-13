@@ -25,6 +25,7 @@ function App() {
         <Route path={PageRoutes.historical} element={<HistoricalFileTransfersPage />} />
         <Route path={PageRoutes.historicalDetail} element={<HistoricalFileTransferDetailPage />} />
       </Route>
+      <Route path="*" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
     </Routes>
   )
 }
