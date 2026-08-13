@@ -16,7 +16,18 @@ public sealed class TusUploadState : IDisposable
 
     public object SyncRoot { get; } = new();
 
-    public List<string> BlockIds { get; } = new();
+    public Dictionary<int, List<string>> BlockIdsByStripe { get; } = new();
+
+    public void AddBlockId(int stripeIndex, string blockId)
+    {
+        if (!BlockIdsByStripe.TryGetValue(stripeIndex, out var blockIds))
+        {
+            blockIds = [];
+            BlockIdsByStripe[stripeIndex] = blockIds;
+        }
+
+        blockIds.Add(blockId);
+    }
 
     public long UploadLength { get; }
 

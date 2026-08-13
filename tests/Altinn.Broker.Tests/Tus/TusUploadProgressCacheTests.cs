@@ -15,12 +15,13 @@ public class TusUploadProgressCacheTests
         const string fileId = "partial-1";
         await cache.InitializeAsync(fileId, uploadLength: 128 * 1024 * 1024, CancellationToken.None);
 
-        var first = await cache.TryAcceptChunkAsync(fileId, expectedOffset: 0, chunkLength: 32 * 1024 * 1024, CancellationToken.None);
-        var conflict = await cache.TryAcceptChunkAsync(fileId, expectedOffset: 0, chunkLength: 32 * 1024 * 1024, CancellationToken.None);
+        var first = await cache.TryAcceptChunkAsync(fileId, expectedOffset: 0, chunkLength: 32 * 1024 * 1024, blockCount: 1, CancellationToken.None);
+        var conflict = await cache.TryAcceptChunkAsync(fileId, expectedOffset: 0, chunkLength: 32 * 1024 * 1024, blockCount: 1, CancellationToken.None);
         var second = await cache.TryAcceptChunkAsync(
             fileId,
             expectedOffset: first.NewAcceptedOffset,
             chunkLength: 32 * 1024 * 1024,
+            blockCount: 1,
             CancellationToken.None);
 
         Assert.Equal(TusAcceptChunkStatus.Accepted, first.Status);
@@ -44,7 +45,7 @@ public class TusUploadProgressCacheTests
 
         const string fileId = "partial-2";
         await cache.InitializeAsync(fileId, uploadLength: 64 * 1024 * 1024, CancellationToken.None);
-        var accepted = await cache.TryAcceptChunkAsync(fileId, 0, 16 * 1024 * 1024, CancellationToken.None);
+        var accepted = await cache.TryAcceptChunkAsync(fileId, 0, 16 * 1024 * 1024, blockCount: 1, CancellationToken.None);
         Assert.Equal(TusAcceptChunkStatus.Accepted, accepted.Status);
 
         await cache.IncrementCommittedOffsetAsync(fileId, 16 * 1024 * 1024, CancellationToken.None);

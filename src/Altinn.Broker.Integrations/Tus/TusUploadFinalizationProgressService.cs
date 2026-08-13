@@ -28,7 +28,9 @@ public sealed class TusUploadFinalizationProgressService(
             return true;
         }
 
-        if (await storageResolver.DestinationBlobExistsAsync(tusFileId, cancellationToken))
+        var uploadLength = await partialUploadRegistry.TryGetUploadLengthAsync(tusFileId, cancellationToken);
+        var committedStripes = await storageResolver.GetCommittedStripesAsync(tusFileId, cancellationToken);
+        if (committedStripes.StripeCount > 0 && committedStripes.TotalLength >= (uploadLength ?? 0))
         {
             return false;
         }

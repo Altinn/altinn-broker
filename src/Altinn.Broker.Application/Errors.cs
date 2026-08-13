@@ -27,7 +27,7 @@ public static class Errors
     public static Error ConfirmDownloadBeforeDownloadStarted = new Error(19, "Cannot confirm before the files have been downloaded", HttpStatusCode.BadRequest);
     public static Error NotApprovedForDisabledVirusScan = new Error(20, "In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack.", HttpStatusCode.BadRequest);
     public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
-    public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it.", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size exceeds the largest transfer Broker can store. Contact us @ Slack if you need more.", HttpStatusCode.BadRequest);
     public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
     public static Error ServiceOwnerHasNotBeenConfigured = new Error(24, "The service owner associated with the resource has not been configured.", HttpStatusCode.BadRequest);
     public static Error ResourceHasNotBeenConfigured = new Error(25, "The resource has not been configured.", HttpStatusCode.BadRequest);

@@ -21,5 +21,9 @@ public interface IBrokerStorageService
     Task SetContentHashForExistingBlob(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task<string?> ComputeFileChecksumAsync(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
     Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken);
-    Task<(string? Checksum, long Length)?> FinalizeTusUpload(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
+    /// <summary>
+    /// Promotes a completed TUS upload to its final location. Returns null if it cannot be found, and
+    /// a null StripeSizeBytes when the content ended up in a single blob.
+    /// </summary>
+    Task<(string? Checksum, long Length, long? StripeSizeBytes)?> FinalizeTusUpload(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken);
 }

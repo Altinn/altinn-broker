@@ -23,10 +23,15 @@ public interface ITusUploadProgressCache
 
     Task InitializeAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reserves the next <paramref name="blockCount"/> block indices atomically. A chunk that straddles
+    /// a stripe boundary stages one block per stripe it touches.
+    /// </summary>
     Task<TusAcceptChunkResult> TryAcceptChunkAsync(
         string fileId,
         long expectedOffset,
         int chunkLength,
+        int blockCount,
         CancellationToken cancellationToken);
 
     Task IncrementCommittedOffsetAsync(string fileId, long chunkLength, CancellationToken cancellationToken);
@@ -63,6 +68,7 @@ public sealed class TusUploadProgressCache(
         local expected = tonumber(ARGV[1])
         local chunkLen = tonumber(ARGV[2])
         local ttl = tonumber(ARGV[3])
+        local blockCount = tonumber(ARGV[4])
 
         local accepted = redis.call('HGET', KEYS[1], 'acceptedOffset')
         if not accepted then
@@ -82,7 +88,7 @@ public sealed class TusUploadProgressCache(
         end
 
         local blockIndex = tonumber(redis.call('HGET', KEYS[1], 'nextBlockIndex') or '0')
-        redis.call('HSET', KEYS[1], 'acceptedOffset', newAccepted, 'nextBlockIndex', blockIndex + 1)
+        redis.call('HSET', KEYS[1], 'acceptedOffset', newAccepted, 'nextBlockIndex', blockIndex + blockCount)
         redis.call('EXPIRE', KEYS[1], ttl)
         return {1, accepted, newAccepted, blockIndex}
         """;
@@ -157,16 +163,19 @@ public sealed class TusUploadProgressCache(
         string fileId,
         long expectedOffset,
         int chunkLength,
+        int blockCount,
         CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockCount);
+
         TusAcceptChunkResult result;
         if (_database is not null)
         {
-            result = await TryAcceptChunkRedisAsync(fileId, expectedOffset, chunkLength, cancellationToken);
+            result = await TryAcceptChunkRedisAsync(fileId, expectedOffset, chunkLength, blockCount, cancellationToken);
         }
         else
         {
-            result = TryAcceptChunkInMemory(fileId, expectedOffset, chunkLength);
+            result = TryAcceptChunkInMemory(fileId, expectedOffset, chunkLength, blockCount);
         }
 
         if (result.Status == TusAcceptChunkStatus.Accepted && _database is null)
@@ -308,13 +317,14 @@ public sealed class TusUploadProgressCache(
         string fileId,
         long expectedOffset,
         int chunkLength,
+        int blockCount,
         CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
         var result = (RedisResult[]?)await _database!.ScriptEvaluateAsync(
             TryAcceptChunkScript,
             [BuildHashKey(fileId)],
-            [(RedisValue)expectedOffset, chunkLength, (int)CacheExpiration.TotalSeconds]);
+            [(RedisValue)expectedOffset, chunkLength, (int)CacheExpiration.TotalSeconds, blockCount]);
 
         var parsed = ParseAcceptChunkResult(result);
         logger.LogDebug(
@@ -420,7 +430,8 @@ public sealed class TusUploadProgressCache(
     private static TusAcceptChunkResult TryAcceptChunkInMemory(
         string fileId,
         long expectedOffset,
-        int chunkLength)
+        int chunkLength,
+        int blockCount)
     {
         var entry = InMemoryProgress.GetOrAdd(fileId, _ => new InMemoryProgressEntry(uploadLength: 0));
         lock (entry.SyncRoot)
@@ -451,7 +462,7 @@ public sealed class TusUploadProgressCache(
 
             var blockIndex = entry.NextBlockIndex;
             entry.AcceptedOffset = newAccepted;
-            entry.NextBlockIndex++;
+            entry.NextBlockIndex += blockCount;
             return new TusAcceptChunkResult(
                 TusAcceptChunkStatus.Accepted,
                 expectedOffset,

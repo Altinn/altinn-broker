@@ -101,6 +101,7 @@ public class UploadFileHandler(
                 storageProvider.Id,
                 request.FileTransferId.ToString(),
                 uploadLength,
+                stripeSizeBytes: null,
                 CancellationToken.None);
             return await completeFileUploadHandler.Process(
                 new CompleteFileUploadRequest
