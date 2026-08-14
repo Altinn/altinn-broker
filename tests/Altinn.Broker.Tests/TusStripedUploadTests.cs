@@ -38,10 +38,8 @@ public class StripedStorageWebApplicationFactory : CustomWebApplicationFactory
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                { "AzureStorageOptions:MinStripeBytes", StripeSize.ToString() },
-                { "AzureStorageOptions:MaxStripeBytes", StripeSize.ToString() },
-                { "AzureStorageOptions:MaxBlocksPerStripe", MaxBlocksPerStripe.ToString() },
-                { "AzureStorageOptions:MaxStripes", "16" }
+                { "AzureStorageOptions:StripeSizeBytes", StripeSize.ToString() },
+                { "AzureStorageOptions:MaxBlocksPerStripe", MaxBlocksPerStripe.ToString() }
             });
         });
     }

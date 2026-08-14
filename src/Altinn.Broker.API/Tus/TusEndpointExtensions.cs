@@ -208,7 +208,7 @@ public static class TusEndpointExtensions
                 concatenatedLength += await partialUploadRegistry.TryGetUploadLengthAsync(partialId, context.CancellationToken) ?? 0;
             }
 
-            await ValidateTotalUploadSizeAsync(context, finalFileTransferId, concatenatedLength);
+            await ValidateTotalUploadSizeAsync(context, finalFileTransferId, concatenatedLength, singleUploadLength: null);
             return;
         }
 
@@ -233,18 +233,24 @@ public static class TusEndpointExtensions
             ? await partialUploadRegistry.PeekNextBaseOffsetAsync(fileTransferId, context.CancellationToken)
             : 0L;
 
-        await ValidateTotalUploadSizeAsync(context, fileTransferId, precedingBytes + context.UploadLength);
+        await ValidateTotalUploadSizeAsync(
+            context,
+            fileTransferId,
+            precedingBytes + context.UploadLength,
+            singleUploadLength: context.UploadLength);
     }
 
     private static async Task ValidateTotalUploadSizeAsync(
         BeforeCreateContext context,
         Guid fileTransferId,
-        long totalUploadLength)
+        long totalUploadLength,
+        long? singleUploadLength)
     {
         var validationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadValidationService>();
         var (maxUploadSize, error) = await validationService.ValidateUploadSizeAsync(
             fileTransferId,
             totalUploadLength,
+            singleUploadLength,
             context.CancellationToken);
 
         if (error is not null)

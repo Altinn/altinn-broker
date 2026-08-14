@@ -1,4 +1,6 @@
-﻿namespace Altinn.Broker.Core.Options;
+﻿using Altinn.Broker.Core.Domain;
+
+namespace Altinn.Broker.Core.Options;
 
 /// <summary>
 /// Configuration options for Azure Storage block blob operations.
@@ -22,22 +24,12 @@ public class AzureStorageOptions
     public int BlocksBeforeCommit { get; set; }
 
     /// <summary>
-    /// Maximum number of blobs a single file transfer's content may be spread over.
-    /// Together with <see cref="MaxStripeBytes"/> this sets the largest transfer Broker can store.
+    /// Bytes per stripe blob, and therefore the size above which a transfer spans several blobs.
+    /// Frozen onto each transfer at initialize, so raising or lowering it never relayouts content that
+    /// is already stored. It also fixes the minimum chunk size clients must send
+    /// (<see cref="StripeSizeBytes"/> / <see cref="MaxBlocksPerStripe"/>).
     /// </summary>
-    public int MaxStripes { get; set; } = 16;
-
-    /// <summary>
-    /// Smallest stripe size, so a resource with a modest size limit is never striped at all.
-    /// A transfer only spans several blobs once it grows past this.
-    /// </summary>
-    public long MinStripeBytes { get; set; } = 274_877_906_944; // 256 GiB
-
-    /// <summary>
-    /// Largest stripe size. Set so that a full stripe never requires a block larger than the 100 MB
-    /// Azure accepts (<see cref="MaxBlocksPerStripe"/> x 100 MB).
-    /// </summary>
-    public long MaxStripeBytes { get; set; } = 5_000_000_000_000;
+    public long StripeSizeBytes { get; set; } = 274_877_906_944; // 256 GiB
 
     /// <summary>
     /// Blocks a single stripe blob may hold. Azure's hard limit is 50 000; it is configurable only so
@@ -47,7 +39,8 @@ public class AzureStorageOptions
 
     /// <summary>
     /// The largest file transfer that can be stored, and therefore the ceiling for a resource's
-    /// configured maximum transfer size.
+    /// configured maximum transfer size. Bounded by the stripe index width in the blob name, not by
+    /// any configured stripe count.
     /// </summary>
-    public long MaxTotalTransferBytes => MaxStripeBytes * MaxStripes;
+    public long MaxTotalTransferBytes => StripeSizeBytes * (StripeLayout.MaxStripeIndex + 1L);
 }

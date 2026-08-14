@@ -36,6 +36,7 @@ public static class Errors
     public static Error RecipientNotInAccessList = new Error(28, "All recipients need to be in the access list of the resource.", HttpStatusCode.BadRequest);
     public static Error InvalidByteRange = new Error(29, "The requested byte range is not satisfiable.", HttpStatusCode.RequestedRangeNotSatisfiable);
     public static Error MalwareScanResultNotReady = new Error(30, "File transfer is not yet in UploadProcessing. Retry when upload completion has been recorded.", HttpStatusCode.ServiceUnavailable);
+    public static Error PartialUploadTooLong = new Error(31, "A single upload is too long to be addressed. Split the file transfer into more concatenation partials.", HttpStatusCode.BadRequest);
 }
 
 public static class StatisticsErrors

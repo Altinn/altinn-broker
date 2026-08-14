@@ -17,6 +17,12 @@ public readonly record struct StripeLayout(long TotalLength, long StripeSize)
     public const int MaxStripeIndex = 9999;
 
     /// <summary>
+    /// Largest value a TUS block id's D6 index fields can hold, bounding how far a single upload can
+    /// reach.
+    /// </summary>
+    public const int MaxNamespacedBlockIndex = 999_999;
+
+    /// <summary>
     /// Picks the single-blob fast path on reads. Writes key off <see cref="StripeSize"/> alone, since a
     /// concatenated upload's total length is unknown until the final POST.
     /// </summary>
@@ -133,20 +139,21 @@ public readonly record struct StripeLayout(long TotalLength, long StripeSize)
     }
 
     /// <summary>
-    /// Derives a transfer's stripe size from its resource's maximum. Call once, at initialize: changing
-    /// it later would change how already-written content is read.
+    /// Stripes a single partial upload may span. A TUS block id encodes the partial index and the block
+    /// index as D6 each, and the block index runs across every stripe the partial touches rather than
+    /// restarting per stripe. Since each chunk is at least <see cref="MinimumChunkSize"/>, one stripe
+    /// costs a partial at most one block per chunk plus one for the boundary it straddles.
     /// </summary>
-    public static long DeriveStripeSizeBytes(long maxTransferSize, int maxStripes, long minStripeBytes, long maxStripeBytes)
+    public static int MaxStripesPerPartial(int maxBlocksPerStripe)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxStripes);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minStripeBytes);
-        ArgumentOutOfRangeException.ThrowIfLessThan(maxStripeBytes, minStripeBytes);
-
-        if (maxTransferSize <= 0)
-        {
-            return minStripeBytes;
-        }
-
-        return Math.Clamp((maxTransferSize + maxStripes - 1) / maxStripes, minStripeBytes, maxStripeBytes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBlocksPerStripe);
+        return MaxNamespacedBlockIndex / (maxBlocksPerStripe + 1);
     }
+
+    /// <summary>
+    /// The largest length one partial may declare before it would exhaust its block id space.
+    /// Zero stripe size means a single blob, which the block budget alone already bounds.
+    /// </summary>
+    public static long MaxPartialLength(long stripeSize, int maxBlocksPerStripe) =>
+        stripeSize <= 0 ? long.MaxValue : MaxStripesPerPartial(maxBlocksPerStripe) * stripeSize;
 }

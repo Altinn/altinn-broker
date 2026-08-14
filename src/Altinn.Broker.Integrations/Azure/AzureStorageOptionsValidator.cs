@@ -16,11 +16,6 @@ public sealed class AzureStorageOptionsValidator(IHostEnvironment hostEnvironmen
     {
         var failures = new List<string>();
 
-        if (options.MaxStripes <= 0)
-        {
-            failures.Add($"{nameof(AzureStorageOptions.MaxStripes)} must be greater than 0.");
-        }
-
         if (options.MaxBlocksPerStripe <= 0)
         {
             failures.Add($"{nameof(AzureStorageOptions.MaxBlocksPerStripe)} must be greater than 0.");
@@ -33,38 +28,27 @@ public sealed class AzureStorageOptionsValidator(IHostEnvironment hostEnvironmen
                 $"{TusBlockIds.MaxBlocksPerBlob} blocks per blob.");
         }
 
-        if (options.MinStripeBytes <= 0)
+        if (options.StripeSizeBytes <= 0)
         {
-            failures.Add($"{nameof(AzureStorageOptions.MinStripeBytes)} must be greater than 0.");
+            failures.Add($"{nameof(AzureStorageOptions.StripeSizeBytes)} must be greater than 0.");
         }
 
-        if (options.MaxStripeBytes < options.MinStripeBytes)
+        if (options.MaxBlocksPerStripe > 0
+            && options.StripeSizeBytes > (long)options.MaxBlocksPerStripe * AzureStorageConstants.MaxBlockSizeBytes)
         {
             failures.Add(
-                $"{nameof(AzureStorageOptions.MaxStripeBytes)} must be greater than or equal to " +
-                $"{nameof(AzureStorageOptions.MinStripeBytes)}.");
-        }
-
-        // A partial upload's block index is namespaced as D6, and a partial can contribute at most
-        // MaxStripes x MaxBlocksPerStripe blocks. Exceeding six digits would produce block ids that
-        // Azure rejects at commit time - at the very end of a multi-hour upload.
-        if (options.MaxStripes > 0
-            && options.MaxBlocksPerStripe > 0
-            && (long)options.MaxStripes * options.MaxBlocksPerStripe > TusBlockIds.MaxNamespacedIndex)
-        {
-            failures.Add(
-                $"{nameof(AzureStorageOptions.MaxStripes)} x {nameof(AzureStorageOptions.MaxBlocksPerStripe)} " +
-                $"({(long)options.MaxStripes * options.MaxBlocksPerStripe}) must not exceed " +
-                $"{TusBlockIds.MaxNamespacedIndex}, the largest block index a namespaced TUS block id can hold.");
+                $"{nameof(AzureStorageOptions.StripeSizeBytes)} must not exceed " +
+                $"{nameof(AzureStorageOptions.MaxBlocksPerStripe)} x {AzureStorageConstants.MaxBlockSizeBytes} bytes, " +
+                $"the largest block Azure accepts.");
         }
 
         // Malware scan results are matched back to a file transfer by the blob's name, which only works
-        // for a single blob. Keeping the smallest stripe above the virus scan ceiling makes a scanned
+        // for a single blob. Keeping the stripe size above the virus scan ceiling makes a scanned
         // transfer structurally incapable of being striped.
-        if (!hostEnvironment.IsDevelopment() && options.MinStripeBytes < ApplicationConstants.MaxVirusScanUploadSize)
+        if (!hostEnvironment.IsDevelopment() && options.StripeSizeBytes < ApplicationConstants.MaxVirusScanUploadSize)
         {
             failures.Add(
-                $"{nameof(AzureStorageOptions.MinStripeBytes)} must be at least " +
+                $"{nameof(AzureStorageOptions.StripeSizeBytes)} must be at least " +
                 $"{ApplicationConstants.MaxVirusScanUploadSize} bytes so that virus scanned transfers are never striped.");
         }
 

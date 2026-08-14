@@ -1,5 +1,6 @@
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 using Altinn.Broker.Tests.Factories;
@@ -36,7 +37,8 @@ public class TusUploadAuthorizationServiceTests
             Mock.Of<IAuthorizationService>(),
             fileTransferRepository.Object,
             Mock.Of<IResourceRepository>(),
-            Mock.Of<IServiceOwnerRepository>());
+            Mock.Of<IServiceOwnerRepository>(),
+            Options.Create(new AzureStorageOptions()));
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["TusOptions:UploadExpiration"] = "24:00:00" })
@@ -79,7 +81,8 @@ public class TusUploadAuthorizationServiceTests
             Mock.Of<IAuthorizationService>(),
             fileTransferRepository.Object,
             Mock.Of<IResourceRepository>(),
-            Mock.Of<IServiceOwnerRepository>());
+            Mock.Of<IServiceOwnerRepository>(),
+            Options.Create(new AzureStorageOptions()));
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["TusOptions:UploadExpiration"] = "24:00:00" })
@@ -114,7 +117,8 @@ public class TusUploadAuthorizationServiceTests
             Mock.Of<IAuthorizationService>(),
             fileTransferRepository.Object,
             Mock.Of<IResourceRepository>(),
-            Mock.Of<IServiceOwnerRepository>());
+            Mock.Of<IServiceOwnerRepository>(),
+            Options.Create(new AzureStorageOptions()));
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["TusOptions:UploadExpiration"] = "24:00:00" })

@@ -4,7 +4,6 @@ using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
-using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
@@ -134,13 +133,8 @@ public class InitializeFileTransferHandler(
 
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var senderVendor = user?.GetCallerVendorId()?.WithPrefix();
-        // Frozen here so later changes to the resource's maximum or stripe configuration cannot relayout this transfer and break it.
-        var storageOptions = azureStorageOptions.Value;
-        var stripeSizeBytes = StripeLayout.DeriveStripeSizeBytes(
-            resource.MaxFileTransferSize ?? storageOptions.MaxTotalTransferBytes,
-            storageOptions.MaxStripes,
-            storageOptions.MinStripeBytes,
-            storageOptions.MaxStripeBytes);
+        // Frozen here so a later change to the configured stripe size cannot relayout this transfer and break it.
+        var stripeSizeBytes = azureStorageOptions.Value.StripeSizeBytes;
         var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, stripeSizeBytes, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId.WithoutPrefix().WithPrefix(), null, cancellationToken));

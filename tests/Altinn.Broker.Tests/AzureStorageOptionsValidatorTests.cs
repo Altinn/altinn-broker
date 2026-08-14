@@ -34,21 +34,6 @@ public class AzureStorageOptionsValidatorTests
     }
 
     [Fact]
-    public void Validate_TooManyStripesForTheBlockIdFormat_Fails()
-    {
-        // Arrange
-        var validator = CreateValidator();
-        var options = new AzureStorageOptions { MaxStripes = 25, MaxBlocksPerStripe = 50_000 };
-
-        // Act
-        var result = validator.Validate(null, options);
-
-        // Assert
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Failures!, failure => failure.Contains("namespaced TUS block id"));
-    }
-
-    [Fact]
     public void Validate_MoreBlocksThanAzureAllows_Fails()
     {
         // Arrange
@@ -64,18 +49,18 @@ public class AzureStorageOptionsValidatorTests
     }
 
     [Fact]
-    public void Validate_CeilingBelowFloor_Fails()
+    public void Validate_StripeTooLargeToFillWithAzureSizedBlocks_Fails()
     {
         // Arrange
         var validator = CreateValidator();
-        var options = new AzureStorageOptions { MinStripeBytes = 1024, MaxStripeBytes = 512 };
+        var options = new AzureStorageOptions { StripeSizeBytes = 6_000_000_000_000, MaxBlocksPerStripe = 50_000 };
 
         // Act
         var result = validator.Validate(null, options);
 
         // Assert
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Failures!, failure => failure.Contains(nameof(AzureStorageOptions.MaxStripeBytes)));
+        Assert.Contains(result.Failures!, failure => failure.Contains("largest block Azure accepts"));
     }
 
     [Fact]
@@ -83,7 +68,7 @@ public class AzureStorageOptionsValidatorTests
     {
         // Arrange
         var validator = CreateValidator();
-        var options = new AzureStorageOptions { MinStripeBytes = 1024, MaxStripeBytes = 5_000_000_000_000 };
+        var options = new AzureStorageOptions { StripeSizeBytes = 1024 };
 
         // Act
         var result = validator.Validate(null, options);
@@ -98,7 +83,7 @@ public class AzureStorageOptionsValidatorTests
     {
         // Arrange
         var validator = CreateValidator(Environments.Development);
-        var options = new AzureStorageOptions { MinStripeBytes = 16, MaxStripeBytes = 16, MaxBlocksPerStripe = 8 };
+        var options = new AzureStorageOptions { StripeSizeBytes = 16, MaxBlocksPerStripe = 8 };
 
         // Act
         var result = validator.Validate(null, options);

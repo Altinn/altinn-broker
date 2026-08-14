@@ -252,53 +252,59 @@ public class StripeLayoutTests
     }
 
     [Theory]
-    [InlineData(100L * 1000 * 1000 * 1000, 256)]
-    [InlineData(4L * 1024 * 1024 * 1024 * 1024, 256)]
-    [InlineData(8L * 1024 * 1024 * 1024 * 1024, 512)]
-    [InlineData(0, 256)]
-    public void DeriveStripeSizeBytes_ScalesWithTheResourceLimitAndClampsToTheFloor(long maxTransferSize, long expectedGiB)
+    [InlineData(50_000, 19)]
+    [InlineData(8, 111_111)]
+    [InlineData(1, 499_999)]
+    public void MaxStripesPerPartial_LeavesRoomForOneStraddledBlockPerStripe(int maxBlocksPerStripe, int expected)
     {
-        // Arrange
-        const int maxStripes = 16;
-
         // Act
-        var stripeSize = StripeLayout.DeriveStripeSizeBytes(
-            maxTransferSize,
-            maxStripes,
-            minStripeBytes: 256 * GiB,
-            maxStripeBytes: 5_000_000_000_000);
+        var maxStripesPerPartial = StripeLayout.MaxStripesPerPartial(maxBlocksPerStripe);
 
         // Assert
-        Assert.Equal(expectedGiB * GiB, stripeSize);
+        Assert.Equal(expected, maxStripesPerPartial);
     }
 
     [Fact]
-    public void DeriveStripeSizeBytes_ClampsToTheCeiling()
+    public void MaxStripesPerPartial_AtTheBoundStaysWithinTheBlockIdSpace()
     {
         // Arrange
-        const long maxStripeBytes = 5_000_000_000_000;
+        const int maxBlocksPerStripe = 50_000;
+        var maxStripesPerPartial = StripeLayout.MaxStripesPerPartial(maxBlocksPerStripe);
 
         // Act
-        var stripeSize = StripeLayout.DeriveStripeSizeBytes(
-            1000L * TiB,
-            maxStripes: 16,
-            minStripeBytes: 256 * GiB,
-            maxStripeBytes: maxStripeBytes);
+        var worstCaseBlockIndex = (long)maxStripesPerPartial * (maxBlocksPerStripe + 1);
+        var oneStripeFurther = (long)(maxStripesPerPartial + 1) * (maxBlocksPerStripe + 1);
 
         // Assert
-        Assert.Equal(maxStripeBytes, stripeSize);
+        Assert.True(worstCaseBlockIndex <= StripeLayout.MaxNamespacedBlockIndex);
+        Assert.True(oneStripeFurther > StripeLayout.MaxNamespacedBlockIndex);
     }
 
     [Fact]
-    public void DeriveStripeSizeBytes_TwoTebibytesOnAFourTebibyteResource_FitsTheBlockBudget()
+    public void MaxPartialLength_ScalesWithTheStripeSize()
+    {
+        // Act
+        var maxPartialLength = StripeLayout.MaxPartialLength(256 * GiB, maxBlocksPerStripe: 50_000);
+
+        // Assert
+        Assert.Equal(19 * 256 * GiB, maxPartialLength);
+    }
+
+    [Fact]
+    public void MaxPartialLength_UnstripedTransferIsUnbounded()
+    {
+        // Act
+        var maxPartialLength = StripeLayout.MaxPartialLength(stripeSize: 0, maxBlocksPerStripe: 50_000);
+
+        // Assert
+        Assert.Equal(long.MaxValue, maxPartialLength);
+    }
+
+    [Fact]
+    public void TwoTebibytesAtTheDefaultStripeSize_FitsTheBlockBudget()
     {
         // Arrange
-        var stripeSize = StripeLayout.DeriveStripeSizeBytes(
-            4 * TiB,
-            maxStripes: 16,
-            minStripeBytes: 256 * GiB,
-            maxStripeBytes: 5_000_000_000_000);
-        var layout = new StripeLayout(2 * TiB, stripeSize);
+        var layout = new StripeLayout(2 * TiB, 256 * GiB);
 
         // Act
         var blocksInFirstStripe = layout.LengthOfStripe(0) / (32 * 1024 * 1024);

@@ -1,5 +1,7 @@
 using System.Text;
 
+using Altinn.Broker.Core.Domain;
+
 namespace Altinn.Broker.Integrations.Tus;
 
 internal static class TusBlockIds
@@ -10,7 +12,7 @@ internal static class TusBlockIds
     /// Both indices are encoded as D6. Widening the format is not backwards compatible: Azure rejects
     /// a commit whose block ids decode to different lengths.
     /// </summary>
-    public const int MaxNamespacedIndex = 999_999;
+    public const int MaxNamespacedIndex = StripeLayout.MaxNamespacedBlockIndex;
 
     public static string BuildSequentialBlockId(long blockIndex)
     {

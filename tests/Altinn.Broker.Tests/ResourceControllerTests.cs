@@ -48,7 +48,7 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
         {
-            MaxFileTransferSize = 999999999999999
+            MaxFileTransferSize = long.MaxValue
         });
         Assert.True(response.StatusCode == HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
     }
