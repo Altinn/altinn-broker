@@ -20,18 +20,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
-resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
-  parent: storageAccount
-  name: 'default'
-  properties: {
-    staticWebsite: {
-      enabled: true
-      indexDocument: 'index.html'
-      errorDocument404Path: 'index.html'
-    }
-  }
-}
-
 var staticWebsiteEndpoint = storageAccount.properties.primaryEndpoints.web
 
 @description('Hostname of the static website endpoint, e.g. myaccount.z16.web.core.windows.net')

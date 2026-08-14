@@ -81,13 +81,19 @@ runs:
         failOnStdErr: false
         parameters: ./.azure/applications/frontend/params.bicepparam
 
-    - name: Upload static assets
+    - name: Enable static website and upload assets
       shell: bash
       run: |
         set -euo pipefail
         STORAGE_ACCOUNT="${{ inputs.FRONTEND_STORAGE_ACCOUNT }}"
         for attempt in {1..6}; do
-          if az storage blob upload-batch \
+          if az storage blob service-properties update \
+            --account-name "$STORAGE_ACCOUNT" \
+            --static-website \
+            --index-document index.html \
+            --404-document index.html \
+            --auth-mode login \
+          && az storage blob upload-batch \
             --account-name "$STORAGE_ACCOUNT" \
             --destination '$web' \
             --source ./frontend/dist \
@@ -96,10 +102,10 @@ runs:
             exit 0
           fi
           if [ "$attempt" -eq 6 ]; then
-            echo "Failed to upload static assets after $attempt attempts."
+            echo "Failed to enable static website and upload assets after $attempt attempts."
             exit 1
           fi
-          echo "Upload failed, waiting for RBAC propagation (attempt $attempt/6)..."
+          echo "Storage data-plane call failed, waiting for RBAC propagation (attempt $attempt/6)..."
           sleep 30
         done
 

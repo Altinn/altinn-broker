@@ -3,17 +3,18 @@ param storageAccountName string
 @description('Object ID of the principal that uploads frontend assets during deployment.')
 param principalObjectId string
 
-var storageBlobDataContributorRoleDefinitionId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+@description('Storage Blob Data Owner is required to enable static website hosting (set blob service properties) and upload assets.')
+var storageBlobDataOwnerRoleDefinitionId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
 
-resource storageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, principalObjectId, storageBlobDataContributorRoleDefinitionId)
+resource storageBlobDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, principalObjectId, storageBlobDataOwnerRoleDefinitionId)
   scope: storageAccount
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleDefinitionId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleDefinitionId)
     principalId: principalObjectId
     principalType: 'ServicePrincipal'
   }
