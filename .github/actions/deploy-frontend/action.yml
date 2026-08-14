@@ -1,0 +1,125 @@
+name: Deploy frontend
+
+description: "Build the React app and deploy static assets to Azure Storage behind Azure Front Door"
+
+inputs:
+  region:
+    description: "Azure region to deploy to"
+    required: true
+  environment:
+    description: "Github environment to deploy from"
+    required: true
+  AZURE_NAME_PREFIX:
+    description: "Prefix for all resources"
+    required: true
+  AZURE_CLIENT_ID:
+    description: "Client ID for the service principal"
+    required: true
+  AZURE_TENANT_ID:
+    description: "Tenant ID for the service principal"
+    required: true
+  AZURE_SUBSCRIPTION_ID:
+    description: "Subscription ID for the service principal"
+    required: true
+  FRONTEND_STORAGE_ACCOUNT:
+    description: "Globally unique storage account name for the frontend static website"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: "22"
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: frontend
+      run: npm ci
+
+    - name: Build frontend
+      shell: bash
+      working-directory: frontend
+      run: npm run build
+
+    - name: OIDC Login to Azure Public Cloud
+      uses: azure/login@v3
+      with:
+        client-id: ${{ inputs.AZURE_CLIENT_ID }}
+        tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+        subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Resolve deployment principal object ID
+      shell: bash
+      run: |
+        set -euo pipefail
+        OBJECT_ID="$(az ad sp show --id "${{ inputs.AZURE_CLIENT_ID }}" --query id -o tsv)"
+        echo "DEPLOYMENT_PRINCIPAL_OBJECT_ID=$OBJECT_ID" >> "$GITHUB_ENV"
+
+    - name: Deploy frontend infrastructure
+      uses: azure/arm-deploy@v2
+      id: deploy
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
+        DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ env.DEPLOYMENT_PRINCIPAL_OBJECT_ID }}
+        FRONTEND_STORAGE_ACCOUNT: ${{ inputs.FRONTEND_STORAGE_ACCOUNT }}
+      with:
+        scope: subscription
+        subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ inputs.AZURE_NAME_PREFIX }}-rg
+        template: ./.azure/applications/frontend/main.bicep
+        deploymentMode: Incremental
+        deploymentName: ${{ inputs.AZURE_NAME_PREFIX }}-frontend-${{ github.run_id }}
+        region: ${{ inputs.region }}
+        failOnStdErr: false
+        parameters: ./.azure/applications/frontend/params.bicepparam
+
+    - name: Upload static assets
+      shell: bash
+      run: |
+        set -euo pipefail
+        STORAGE_ACCOUNT="${{ inputs.FRONTEND_STORAGE_ACCOUNT }}"
+        for attempt in {1..6}; do
+          if az storage blob upload-batch \
+            --account-name "$STORAGE_ACCOUNT" \
+            --destination '$web' \
+            --source ./frontend/dist \
+            --overwrite \
+            --auth-mode login; then
+            exit 0
+          fi
+          if [ "$attempt" -eq 6 ]; then
+            echo "Failed to upload static assets after $attempt attempts."
+            exit 1
+          fi
+          echo "Upload failed, waiting for RBAC propagation (attempt $attempt/6)..."
+          sleep 30
+        done
+
+    - name: Purge Front Door cache
+      shell: bash
+      run: |
+        set -euo pipefail
+        az afd endpoint purge \
+          --resource-group "${{ steps.deploy.outputs.resourceGroupName }}" \
+          --profile-name "${{ steps.deploy.outputs.frontDoorProfileName }}" \
+          --endpoint-name "${{ steps.deploy.outputs.frontDoorEndpointName }}" \
+          --content-paths '/*'
+
+    - name: Log deployment URL
+      shell: bash
+      run: |
+        echo "Frontend deployed to https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}"
+
+    - name: Logout from azure
+      shell: bash
+      if: ${{ failure() || success() }}
+      continue-on-error: true
+      run: az logout

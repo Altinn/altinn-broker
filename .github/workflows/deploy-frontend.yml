@@ -1,0 +1,46 @@
+name: Deploy frontend
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options:
+          - test
+          - performance
+          - staging
+          - production
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.azure/applications/frontend/**'
+      - '.azure/modules/staticWebsite/**'
+      - '.azure/modules/frontDoor/**'
+      - '.github/actions/deploy-frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  deploy-frontend:
+    name: Deploy frontend (${{ inputs.environment || github.event.inputs.environment || 'test' }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Deploy frontend
+        uses: ./.github/actions/deploy-frontend
+        with:
+          region: norwayeast
+          environment: ${{ inputs.environment || github.event.inputs.environment || 'test' }}
+          AZURE_NAME_PREFIX: ${{ secrets.AZURE_NAME_PREFIX }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          FRONTEND_STORAGE_ACCOUNT: ${{ secrets.FRONTEND_STORAGE_ACCOUNT }}
