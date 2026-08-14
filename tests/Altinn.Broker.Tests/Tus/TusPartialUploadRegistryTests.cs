@@ -21,6 +21,54 @@ public class TusPartialUploadRegistryTests
     }
 
     [Fact]
+    public async Task RegisterPartialAsync_ConcurrentCreates_KeepIndexAndBaseOffsetInStep()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.NewGuid();
+        var partialIds = Enumerable.Range(0, 32).Select(_ => Guid.NewGuid().ToString("N")).ToList();
+
+        // PartialIndex and BaseOffset come from two counters. Bumping them in separate round trips lets an
+        // interleaved create pair a lower PartialIndex with a higher BaseOffset, misordering assembly.
+        await Task.WhenAll(partialIds.Select((partialId, i) =>
+            registry.RegisterPartialAsync(partialId, fileTransferId, uploadLength: 100 + i, CancellationToken.None)));
+
+        var partials = new List<PartialUploadInfo>();
+        foreach (var partialId in partialIds)
+        {
+            var info = await registry.TryGetPartialInfoAsync(partialId, CancellationToken.None);
+            Assert.NotNull(info);
+            partials.Add(info!.Value);
+        }
+
+        Assert.Equal(partialIds.Count, partials.Select(partial => partial.PartialIndex).Distinct().Count());
+
+        var expectedOffset = 0L;
+        foreach (var partial in partials.OrderBy(partial => partial.PartialIndex))
+        {
+            Assert.Equal(expectedOffset, partial.BaseOffset);
+            expectedOffset += partial.UploadLength;
+        }
+
+        Assert.Equal(expectedOffset, await registry.PeekNextBaseOffsetAsync(fileTransferId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IncrementStripeBlockCountAsync_CountsPerStripeAndClears()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.NewGuid();
+
+        Assert.Equal(1, await registry.IncrementStripeBlockCountAsync(fileTransferId, 0, 1, CancellationToken.None));
+        Assert.Equal(2, await registry.IncrementStripeBlockCountAsync(fileTransferId, 0, 1, CancellationToken.None));
+        // A different stripe of the same transfer has its own budget.
+        Assert.Equal(1, await registry.IncrementStripeBlockCountAsync(fileTransferId, 1, 1, CancellationToken.None));
+
+        await registry.ClearStripeBlockCountsAsync(fileTransferId, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task TryGetFileTransferIdAsync_RegisteredPartial_ReturnsParentFileTransferId()
     {
         await using var scope = TestHybridCacheFactory.CreateScope();

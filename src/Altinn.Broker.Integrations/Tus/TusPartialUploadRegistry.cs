@@ -6,7 +6,10 @@ using StackExchange.Redis;
 
 namespace Altinn.Broker.Integrations.Tus;
 
-public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength, int PartialIndex);
+/// <summary>
+/// <paramref name="BaseOffset"/> is where this partial's first byte sits in the assembled file.
+/// </summary>
+public readonly record struct PartialUploadInfo(Guid FileTransferId, long UploadLength, int PartialIndex, long BaseOffset);
 
 public enum TusConcatStatus
 {
@@ -18,6 +21,18 @@ public enum TusConcatStatus
 public interface ITusPartialUploadRegistry
 {
     Task RegisterPartialAsync(string partialFileId, Guid fileTransferId, long uploadLength, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Where the next partial would start, i.e. the total length of everything created so far.
+    /// </summary>
+    Task<long> PeekNextBaseOffsetAsync(Guid fileTransferId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Blocks staged on one stripe, shared by every partial writing into it.
+    /// </summary>
+    Task<long> IncrementStripeBlockCountAsync(Guid fileTransferId, int stripeIndex, int delta, CancellationToken cancellationToken);
+
+    Task ClearStripeBlockCountsAsync(Guid fileTransferId, CancellationToken cancellationToken);
 
     Task RegisterUploadAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
 
@@ -92,7 +107,24 @@ public sealed class TusPartialUploadRegistry(
 
     private static string PublishEnqueueKey(string fileId) => $"tus-publish-enqueued:{NormalizeId(fileId)}";
 
-    private static string PartialIndexCounterKey(Guid fileTransferId) => $"tus-partial-index:{fileTransferId:N}";
+    private static string PartialSlotKey(Guid fileTransferId) => $"tus-partial-slots:{fileTransferId:N}";
+
+    private static string StripeBlockCountKey(Guid fileTransferId) => $"tus-stripe-blocks:{fileTransferId:N}";
+
+    private const string NextIndexField = "nextIndex";
+    private const string NextOffsetField = "nextOffset";
+
+    // Index and offset must be handed out together: two separate increments can interleave and leave a
+    // partial with the lower index sitting at the higher offset.
+    private const string AllocatePartialSlotScript = """
+        local uploadLength = tonumber(ARGV[1])
+        local ttl = tonumber(ARGV[2])
+
+        local index = redis.call('HINCRBY', KEYS[1], 'nextIndex', 1) - 1
+        local nextOffset = redis.call('HINCRBY', KEYS[1], 'nextOffset', uploadLength)
+        redis.call('EXPIRE', KEYS[1], ttl)
+        return {index, nextOffset - uploadLength}
+        """;
 
     private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
@@ -103,12 +135,58 @@ public sealed class TusPartialUploadRegistry(
         CancellationToken cancellationToken)
     {
         var existing = await TryGetPartialInfoAsync(partialFileId, cancellationToken);
-        var partialIndex = existing?.PartialIndex ?? await AllocatePartialIndexAsync(fileTransferId, cancellationToken);
+        var (partialIndex, baseOffset) = existing is { } known
+            ? (known.PartialIndex, known.BaseOffset)
+            : await AllocatePartialSlotAsync(fileTransferId, uploadLength, cancellationToken);
         await SetCachedValueAsync(
             PartialInfoKey(partialFileId),
-            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex), JsonOptions),
+            JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex, baseOffset), JsonOptions),
             cancellationToken);
         await RegisterUploadAsync(partialFileId, uploadLength, cancellationToken);
+    }
+
+    public async Task<long> PeekNextBaseOffsetAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            var value = await _database.HashGetAsync(PartialSlotKey(fileTransferId), NextOffsetField);
+            return value.HasValue ? (long)value : 0;
+        }
+
+        var cached = await distributedCache.GetStringAsync(PartialSlotKey(fileTransferId) + ":offset", cancellationToken);
+        return long.TryParse(cached, out var offset) ? offset : 0;
+    }
+
+    public async Task<long> IncrementStripeBlockCountAsync(
+        Guid fileTransferId,
+        int stripeIndex,
+        int delta,
+        CancellationToken cancellationToken)
+    {
+        var key = StripeBlockCountKey(fileTransferId);
+        if (_database is not null)
+        {
+            var count = await _database.HashIncrementAsync(key, stripeIndex, delta);
+            await _database.KeyExpireAsync(key, CacheExpiration);
+            return count;
+        }
+
+        var field = $"{key}:{stripeIndex}";
+        var current = await distributedCache.GetStringAsync(field, cancellationToken);
+        var next = (long.TryParse(current, out var parsed) ? parsed : 0) + delta;
+        await SetCachedValueAsync(field, next.ToString(), cancellationToken);
+        return next;
+    }
+
+    public Task ClearStripeBlockCountsAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        if (_database is not null)
+        {
+            return _database.KeyDeleteAsync(StripeBlockCountKey(fileTransferId));
+        }
+
+        // Without Redis the per-stripe counters are individually keyed and expire on their own.
+        return Task.CompletedTask;
     }
 
     public Task RegisterUploadAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
@@ -123,7 +201,7 @@ public sealed class TusPartialUploadRegistry(
         }
 
         var dto = JsonSerializer.Deserialize<PartialUploadInfoDto>(json, JsonOptions);
-        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength, dto.PartialIndex);
+        return dto is null ? null : new PartialUploadInfo(dto.FileTransferId, dto.UploadLength, dto.PartialIndex, dto.BaseOffset);
     }
 
     public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
@@ -322,21 +400,36 @@ public sealed class TusPartialUploadRegistry(
         return true;
     }
 
-    private async Task<int> AllocatePartialIndexAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    private async Task<(int PartialIndex, long BaseOffset)> AllocatePartialSlotAsync(
+        Guid fileTransferId,
+        long uploadLength,
+        CancellationToken cancellationToken)
     {
-        var key = PartialIndexCounterKey(fileTransferId);
+        var key = PartialSlotKey(fileTransferId);
         if (_database is not null)
         {
-            var value = await _database.StringIncrementAsync(key);
-            await _database.KeyExpireAsync(key, CacheExpiration);
-            return (int)value - 1;
+            var result = (RedisResult[]?)await _database.ScriptEvaluateAsync(
+                AllocatePartialSlotScript,
+                [key],
+                [uploadLength, (int)CacheExpiration.TotalSeconds]);
+            if (result is { Length: 2 })
+            {
+                return ((int)result[0], (long)result[1]);
+            }
         }
 
-        var current = await distributedCache.GetStringAsync(key, cancellationToken);
-        var next = current is null ? 0 : int.Parse(current) + 1;
-        await SetCachedValueAsync(key, next.ToString(), cancellationToken);
-        return next;
+        // Read-modify-write fallback for configurations without Redis, such as the test host. It carries
+        // the same race as the rest of the non-Redis paths in this class and is not used in deployment.
+        var indexKey = key + ":index";
+        var offsetKey = key + ":offset";
+        var currentIndex = await distributedCache.GetStringAsync(indexKey, cancellationToken);
+        var currentOffset = await distributedCache.GetStringAsync(offsetKey, cancellationToken);
+        var partialIndex = int.TryParse(currentIndex, out var parsedIndex) ? parsedIndex : 0;
+        var baseOffset = long.TryParse(currentOffset, out var parsedOffset) ? parsedOffset : 0;
+        await SetCachedValueAsync(indexKey, (partialIndex + 1).ToString(), cancellationToken);
+        await SetCachedValueAsync(offsetKey, (baseOffset + uploadLength).ToString(), cancellationToken);
+        return (partialIndex, baseOffset);
     }
 
-    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength, int PartialIndex = 0);
+    private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength, int PartialIndex = 0, long BaseOffset = 0);
 }

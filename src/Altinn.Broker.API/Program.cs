@@ -25,7 +25,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using StackExchange.Redis;
@@ -110,6 +110,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<MaskinportenJwkRotationSettings>(config.GetSection(key: nameof(MaskinportenJwkRotationSettings)));
     services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.AddSingleton<IValidateOptions<AzureStorageOptions>, AzureStorageOptionsValidator>();
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));

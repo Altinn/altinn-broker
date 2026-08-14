@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Azure;
 
 using Azure;
-using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -26,12 +26,19 @@ public sealed record TusStagedBlocksSnapshot(
 public interface ITusStorageResolver
 {
     Task<long> StageTusBlockAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
-    Task<long> StageTusBlockOnDestinationAsync(string fileId, string blockId, Stream blockData, CancellationToken cancellationToken);
-    Task CommitTusBlocksAsync(
+    Task<long> StageTusBlockOnDestinationAsync(string fileId, int stripeIndex, string blockId, Stream blockData, CancellationToken cancellationToken);
+    Task CommitStripeBlocksAsync(
         string fileId,
+        int stripeIndex,
         IReadOnlyList<string> blockIds,
+        IReadOnlyDictionary<string, string>? metadata,
         CancellationToken cancellationToken);
-    Task CommitBlocksToDestinationAsync(
+    Task<TusStagedBlocksSnapshot?> TryGetStripeStagedBlocksSnapshotAsync(string fileId, int stripeIndex, CancellationToken cancellationToken);
+    Task<long> GetStripeBlobLengthAsync(string fileId, int stripeIndex, CancellationToken cancellationToken);
+    Task<CommittedStripes> GetCommittedStripesAsync(string fileId, CancellationToken cancellationToken);
+    Task DeleteAllStripesAsync(string fileId, CancellationToken cancellationToken);
+    Task<long> GetStripeSizeAsync(string fileId, CancellationToken cancellationToken);
+    Task CommitTusBlocksAsync(
         string fileId,
         IReadOnlyList<string> blockIds,
         CancellationToken cancellationToken);
@@ -42,8 +49,7 @@ public interface ITusStorageResolver
     Task<long> GetCommittedStagingLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<long> GetStagedBlocksLengthAsync(string fileId, CancellationToken cancellationToken);
     Task<TusStagedBlocksSnapshot?> TryGetStagedBlocksSnapshotAsync(string fileId, CancellationToken cancellationToken);
-    Task<TusStagedBlocksSnapshot?> TryGetDestinationStagedBlocksSnapshotAsync(string fileId, CancellationToken cancellationToken);
-    Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, CancellationToken cancellationToken);
+    Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, int stripeIndex, CancellationToken cancellationToken);
     Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken);
     Task InitializePartialStagingBlobAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
     Task SetStagingUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken);
@@ -53,8 +59,6 @@ public interface ITusStorageResolver
         IReadOnlyList<string> partialFileIds,
         CancellationToken cancellationToken);
     Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken);
-    Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken);
-    Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken);
 }
 
 public class TusStorageResolver(
@@ -106,6 +110,7 @@ public class TusStorageResolver(
 
     public async Task<long> StageTusBlockOnDestinationAsync(
         string fileId,
+        int stripeIndex,
         string blockId,
         Stream blockData,
         CancellationToken cancellationToken)
@@ -127,7 +132,7 @@ public class TusStorageResolver(
 
         timing.Step("getDestinationBlockBlobClient");
         var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId));
+        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId), stripeIndex);
         await blockBlobClient.StageBlockAsync(
             blockId,
             blockData,
@@ -136,9 +141,11 @@ public class TusStorageResolver(
         return blockBytes;
     }
 
-    public async Task CommitBlocksToDestinationAsync(
+    public async Task CommitStripeBlocksAsync(
         string fileId,
+        int stripeIndex,
         IReadOnlyList<string> blockIds,
+        IReadOnlyDictionary<string, string>? metadata,
         CancellationToken cancellationToken)
     {
         var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
@@ -148,17 +155,74 @@ public class TusStorageResolver(
         }
 
         var containerClient = GetBlobContainerClient(storageContext);
-        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId));
-        await blockBlobClient.CommitBlockListAsync(
-            blockIds,
-            new CommitBlockListOptions
+        var blockBlobClient = TusConcatDestinationStorage.GetDestinationBlockBlobClient(containerClient, Guid.Parse(fileId), stripeIndex);
+        var options = new CommitBlockListOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
             {
-                HttpHeaders = new BlobHttpHeaders
-                {
-                    ContentType = "application/octet-stream"
-                }
-            },
-            cancellationToken: cancellationToken);
+                ContentType = "application/octet-stream"
+            }
+        };
+        if (metadata is not null)
+        {
+            options.Metadata = metadata.ToDictionary(entry => entry.Key, entry => entry.Value);
+        }
+
+        await blockBlobClient.CommitBlockListAsync(blockIds, options, cancellationToken: cancellationToken);
+    }
+
+    public async Task<long> GetStripeBlobLengthAsync(string fileId, int stripeIndex, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null)
+        {
+            return 0;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        var blobClient = containerClient.GetBlobClient(StripeLayout.GetStripeBlobName(Guid.Parse(fileId), stripeIndex));
+        try
+        {
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            return properties.Value.ContentLength;
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return 0;
+        }
+    }
+
+    public async Task<CommittedStripes> GetCommittedStripesAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null || !Guid.TryParse(fileId, out var fileTransferId))
+        {
+            return new CommittedStripes(0, 0, []);
+        }
+
+        return await CommittedStripes.ReadAsync(GetBlobContainerClient(storageContext), fileTransferId, cancellationToken);
+    }
+
+    public async Task<long> GetStripeSizeAsync(string fileId, CancellationToken cancellationToken)
+        => (await ResolveStorageContextAsync(fileId, cancellationToken))?.StripeSizeBytes ?? 0;
+
+    public async Task DeleteAllStripesAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
+        if (storageContext is null || !Guid.TryParse(fileId, out var fileTransferId))
+        {
+            return;
+        }
+
+        var containerClient = GetBlobContainerClient(storageContext);
+        await foreach (var blob in containerClient.GetBlobsAsync(
+            BlobTraits.None,
+            BlobStates.None,
+            prefix: StripeLayout.GetStripeBlobPrefix(fileTransferId),
+            cancellationToken))
+        {
+            await containerClient.DeleteBlobIfExistsAsync(blob.Name, cancellationToken: cancellationToken);
+        }
     }
 
     public async Task CommitTusBlocksAsync(
@@ -312,11 +376,12 @@ public class TusStorageResolver(
         return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
     }
 
-    public async Task<TusStagedBlocksSnapshot?> TryGetDestinationStagedBlocksSnapshotAsync(
+    public async Task<TusStagedBlocksSnapshot?> TryGetStripeStagedBlocksSnapshotAsync(
         string fileId,
+        int stripeIndex,
         CancellationToken cancellationToken)
     {
-        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, stripeIndex, cancellationToken);
         if (blockBlobClient is null)
         {
             return null;
@@ -325,9 +390,9 @@ public class TusStorageResolver(
         return await TusConcatDestinationStorage.TryGetStagedBlocksSnapshotAsync(blockBlobClient, cancellationToken);
     }
 
-    public async Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, CancellationToken cancellationToken)
+    public async Task<long> GetDestinationUncommittedBlocksLengthAsync(string fileId, int stripeIndex, CancellationToken cancellationToken)
     {
-        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, stripeIndex, cancellationToken);
         if (blockBlobClient is null)
         {
             return 0;
@@ -339,9 +404,10 @@ public class TusStorageResolver(
 
     private async Task<BlockBlobClient?> GetDestinationBlockBlobClientAsync(
         string fileId,
+        int stripeIndex,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(fileId, out _))
+        if (!Guid.TryParse(fileId, out var fileTransferId))
         {
             return null;
         }
@@ -354,7 +420,8 @@ public class TusStorageResolver(
 
         return TusConcatDestinationStorage.GetDestinationBlockBlobClient(
             GetBlobContainerClient(storageContext),
-            Guid.Parse(fileId));
+            fileTransferId,
+            stripeIndex);
     }
 
     private async Task<BlockBlobClient?> GetBlockStagingBlobClientAsync(
@@ -395,7 +462,7 @@ public class TusStorageResolver(
 
     public async Task SetDestinationUploadLengthAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
     {
-        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, cancellationToken);
+        var blockBlobClient = await GetDestinationBlockBlobClientAsync(fileId, stripeIndex: 0, cancellationToken);
         if (blockBlobClient is null)
         {
             return;
@@ -729,38 +796,6 @@ public class TusStorageResolver(
         await blockBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
-    public async Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return false;
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var destinationBlobClient = containerClient.GetBlobClient(fileId);
-        return await destinationBlobClient.ExistsAsync(cancellationToken);
-    }
-
-    public async Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken)
-    {
-        var storageContext = await ResolveStorageContextAsync(fileId, cancellationToken);
-        if (storageContext is null)
-        {
-            return 0;
-        }
-
-        var containerClient = GetBlobContainerClient(storageContext);
-        var destinationBlobClient = containerClient.GetBlobClient(fileId);
-        if (!await destinationBlobClient.ExistsAsync(cancellationToken))
-        {
-            return 0;
-        }
-
-        var properties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-        return properties.Value.ContentLength;
-    }
-
     private BlobContainerClient GetBlobContainerClient(TusStorageContext storageContext)
     {
         return _containerClients.GetOrAdd(storageContext.StorageAccountName, _ =>
@@ -808,20 +843,28 @@ public class TusStorageResolver(
         TusUploadDebugTiming? timing = null)
     {
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
-        var httpContext = httpContextAccessor.HttpContext;
-        var requestPath = httpContext?.Request.Path.Value;
 
-        if (httpContext is not null
-            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
+        // Blocks stage on background tasks that outlive their PATCH, and a disposed HttpContext throws.
+        // The route is only a hint: the lookups below resolve the same transfer without it.
+        try
         {
-            timing?.Step("resolve.fileTransferId.fromRoute", routeFileTransferId);
-            return routeFileTransferId;
+            var httpContext = httpContextAccessor.HttpContext;
+            if (httpContext is not null
+                && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
+            {
+                timing?.Step("resolve.fileTransferId.fromRoute", routeFileTransferId);
+                return routeFileTransferId;
+            }
+
+            if (TusRouteHelper.TryGetFileTransferIdFromPath(httpContext?.Request.Path.Value, out var pathFileTransferId))
+            {
+                timing?.Step("resolve.fileTransferId.fromPath", pathFileTransferId);
+                return pathFileTransferId;
+            }
         }
-
-        if (TusRouteHelper.TryGetFileTransferIdFromPath(requestPath, out var pathFileTransferId))
+        catch (ObjectDisposedException)
         {
-            timing?.Step("resolve.fileTransferId.fromPath", pathFileTransferId);
-            return pathFileTransferId;
+            timing?.Step("resolve.fileTransferId.requestEnded");
         }
 
         if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
@@ -884,7 +927,7 @@ public class TusStorageResolver(
             ? AzureConstants.AzuriteUrl
             : $"https://{storageProvider.ResourceName}.blob.core.windows.net";
 
-        var context = new TusStorageContext(connectionString, storageProvider.ResourceName);
+        var context = new TusStorageContext(connectionString, storageProvider.ResourceName, fileTransfer.StripeSizeBytes ?? 0);
         _storageContextsByFileTransferId.TryAdd(fileTransferId, context);
         timing?.Step("resolve.contextBuilt", storageProvider.ResourceName);
         return context;
@@ -901,5 +944,6 @@ public class TusStorageResolver(
 
     private sealed record TusStorageContext(
         string ConnectionString,
-        string StorageAccountName);
+        string StorageAccountName,
+        long StripeSizeBytes);
 }

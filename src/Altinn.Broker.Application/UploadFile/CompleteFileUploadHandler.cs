@@ -146,6 +146,7 @@ public class CompleteFileUploadHandler(
                         storageProvider.Id,
                         request.FileTransferId.ToString(),
                         request.UploadLength,
+                        request.StripeSizeBytes,
                         ct);
 
                     backgroundJobClient.Enqueue<TusChecksumProcessingHandler>(handler =>
@@ -193,6 +194,7 @@ public class CompleteFileUploadHandler(
                         storageProvider.Id,
                         request.FileTransferId.ToString(),
                         request.UploadLength,
+                        request.StripeSizeBytes,
                         ct);
                 }
 
