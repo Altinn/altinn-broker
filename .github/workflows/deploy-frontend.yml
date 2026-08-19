@@ -17,13 +17,6 @@ on:
           - production
   push:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.azure/applications/frontend/**'
-      - '.azure/modules/staticWebsite/**'
-      - '.azure/modules/frontDoor/**'
-      - '.github/actions/deploy-frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
 
 jobs:
   deploy-frontend:

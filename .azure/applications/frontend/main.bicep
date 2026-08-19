@@ -41,6 +41,7 @@ module frontDoor '../../modules/frontDoor/create.bicep' = {
   params: {
     frontDoorProfileName: frontDoorProfileName
     originHostName: staticWebsite.outputs.staticWebsiteHostName
+    endpointName: '${namePrefix}-frontend'
   }
 }
 
