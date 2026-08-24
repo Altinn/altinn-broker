@@ -50,6 +50,28 @@ public class AuthenticationController : ControllerBase
     }
 
     /// <summary>
+    /// OIDC redirect URI for the ID-Porten authorization code flow (GET, <c>response_mode=query</c>).
+    /// Handled by the OpenIdConnect middleware (<c>CallbackPath</c>) before MVC —
+    /// this action exists so the path appears in OpenAPI. Register the absolute URL
+    /// as <c>redirect_uri</c> on the ID-Porten client (e.g. Front Door + this path).
+    /// </summary>
+    [HttpPost("callback")]
+    [AllowAnonymous]
+    [Consumes("application/x-www-form-urlencoded")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult CallbackPost(
+        [FromForm] string? code = null,
+        [FromForm] string? state = null,
+        [FromForm] string? iss = null,
+        [FromForm] string? error = null,
+        [FromForm(Name = "error_description")] string? errorDescription = null)
+    {
+        _ = (code, state, iss, error, errorDescription);
+        return NotFound();
+    }
+
+    /// <summary>
     /// Logs out: clears cookie and redirects through ID-Porten endsession.
     /// </summary>
     [HttpGet("logout")]
