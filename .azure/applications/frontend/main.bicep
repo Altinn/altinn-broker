@@ -45,7 +45,9 @@ module frontDoor '../../modules/frontDoor/create.bicep' = {
     frontDoorProfileName: frontDoorProfileName
     originHostName: staticWebsite.outputs.staticWebsiteHostName
     apiOriginHostName: apiOriginHostName
-    endpointName: '${namePrefix}-frontend'
+    // Must stay 'default' — existing hostname is default-{hash}.azurefd.net.
+    // A different endpoint name creates a second unused endpoint without /broker routing.
+    endpointName: 'default'
   }
 }
 

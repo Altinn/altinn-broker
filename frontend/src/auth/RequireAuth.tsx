@@ -18,6 +18,18 @@ export function RequireAuth({ children }: RequireAuthProps) {
     }
   }, [status, login])
 
+  if (status === 'api_unreachable') {
+    return (
+      <main id="main-content" style={{ padding: '2rem' }}>
+        <p>
+          Broker API er ikke tilgjengelig på denne adressen. Front Door ruter ikke{' '}
+          <code>/broker</code> til APIM (fikk HTML i stedet for JSON fra{' '}
+          <code>/broker/api/v1/authentication/me</code>).
+        </p>
+      </main>
+    )
+  }
+
   if (status === 'loading' || status === 'unauthenticated') {
     return (
       <main id="main-content" style={{ padding: '2rem' }}>

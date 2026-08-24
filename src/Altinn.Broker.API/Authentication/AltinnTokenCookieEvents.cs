@@ -24,6 +24,22 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
         _logoutSessionStore = logoutSessionStore;
     }
 
+    /// <summary>
+    /// Cookie challenges must not 302 to a login page (that nests returnUrl forever for APIs).
+    /// The SPA initiates login via GET /broker/api/v1/authentication/login (OIDC Challenge).
+    /// </summary>
+    public override Task RedirectToLogin(RedirectContext<CookieAuthenticationOptions> context)
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    }
+
+    public override Task RedirectToAccessDenied(RedirectContext<CookieAuthenticationOptions> context)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    }
+
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
         var sid = GetItem(context.Properties, OidcSessionKeys.Sid);

@@ -134,6 +134,8 @@ runs:
       shell: bash
       run: |
         echo "Frontend deployed to https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}"
+        echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        echo "Expect Content-Type: application/json (not text/html)."
 
     - name: Logout from azure
       shell: bash

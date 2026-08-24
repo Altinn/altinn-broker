@@ -22,11 +22,15 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function fetchCurrentUser(): Promise<AuthUser | null> {
+async function fetchCurrentUser(): Promise<AuthUser | null | 'html'> {
   try {
     const me = await apiFetch<MeResponse>(`${AUTH_BASE_PATH}/me`, {
       redirectOnUnauthorized: false,
     })
+    // Front Door misroute: /broker hits static website → index.html instead of JSON.
+    if (typeof me === 'string') {
+      return 'html'
+    }
     if (!me?.authenticated) {
       return null
     }
@@ -41,6 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const user = await fetchCurrentUser()
+    if (user === 'html') {
+      setState({ status: 'api_unreachable' })
+      return
+    }
     setState(user ? { status: 'authenticated', user } : { status: 'unauthenticated' })
   }, [])
 
@@ -53,7 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: state.status,
       user: state.status === 'authenticated' ? state.user : null,
       isAuthenticated: state.status === 'authenticated',
-      login: (returnUrl) => redirectToLogin(returnUrl),
+      login: (returnUrl) => {
+        if (state.status === 'api_unreachable') {
+          return
+        }
+        redirectToLogin(returnUrl)
+      },
       logout: (returnUrl) => redirectToLogout(returnUrl),
       refresh,
     }),

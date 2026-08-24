@@ -73,8 +73,16 @@ export async function apiFetch<T = unknown>(
 }
 
 export function redirectToLogin(returnUrl: string = window.location.pathname + window.location.search) {
-  const params = new URLSearchParams({ returnUrl })
-  window.location.assign(apiUrl(`${AUTH_BASE_PATH}/login?${params}`))
+  const loginPath = `${AUTH_BASE_PATH}/login`
+  // Avoid nested returnUrl when /broker/... is wrongly served as the SPA (Front Door → storage).
+  if (window.location.pathname === loginPath) {
+    return
+  }
+
+  const safeReturnUrl =
+    !returnUrl || returnUrl.startsWith(AUTH_BASE_PATH) ? '/' : returnUrl
+  const params = new URLSearchParams({ returnUrl: safeReturnUrl })
+  window.location.assign(apiUrl(`${loginPath}?${params}`))
 }
 
 export function redirectToLogout(returnUrl: string = '/') {

@@ -7,6 +7,7 @@ param originHostName string
 @description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, /broker/* is forwarded to APIM.')
 param apiOriginHostName string = ''
 
+@description('AFD endpoint name. Hostname is {endpointName}-{hash}.azurefd.net — must match the endpoint already in use.')
 param endpointName string = 'default'
 
 var hasApiOrigin = !empty(apiOriginHostName)
@@ -92,7 +93,55 @@ resource apiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = if
   }
 }
 
-// More specific than /* so /broker/* is matched first.
+// Safety net: if /* wins over /broker/*, still force APIM for broker paths.
+resource brokerApiRuleSet 'Microsoft.Cdn/profiles/ruleSets@2023-05-01' = if (hasApiOrigin) {
+  parent: frontDoorProfile
+  name: 'brokerapi'
+}
+
+resource brokerToApimRule 'Microsoft.Cdn/profiles/ruleSets/rules@2023-05-01' = if (hasApiOrigin) {
+  parent: brokerApiRuleSet
+  name: 'ForwardBrokerToApim'
+  properties: {
+    order: 1
+    matchProcessingBehavior: 'Stop'
+    conditions: [
+      {
+        name: 'UrlPath'
+        parameters: {
+          typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
+          operator: 'BeginsWith'
+          negateCondition: false
+          // AFD UrlPath may be with or without a leading slash depending on SKU/version.
+          matchValues: [
+            'broker'
+            '/broker'
+          ]
+          transforms: [
+            'Lowercase'
+          ]
+        }
+      }
+    ]
+    actions: [
+      {
+        name: 'RouteConfigurationOverride'
+        parameters: {
+          typeName: 'DeliveryRuleRouteConfigurationOverrideActionParameters'
+          // Omit cacheConfiguration → caching disabled for overridden requests.
+          originGroupOverride: {
+            originGroup: {
+              id: apiOriginGroup!.id
+            }
+            forwardingProtocol: 'HttpsOnly'
+          }
+        }
+      }
+    ]
+  }
+}
+
+// More specific than /* so /broker/* is matched first when route selection works.
 resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (hasApiOrigin) {
   parent: afdEndpoint
   name: 'api-route'
@@ -127,6 +176,13 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
     originGroup: {
       id: frontendOriginGroup.id
     }
+    ruleSets: hasApiOrigin
+      ? [
+          {
+            id: brokerApiRuleSet!.id
+          }
+        ]
+      : []
     supportedProtocols: [
       'Http'
       'Https'
