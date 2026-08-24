@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace Altinn.Broker.API.Controllers;
 
 [ApiController]
-[Route("authentication")]
+[Route("broker/api/v1/authentication")]
 public class AuthenticationController : ControllerBase
 {
     private readonly IdPortenSettings _idPortenSettings;
