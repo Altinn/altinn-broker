@@ -13,11 +13,28 @@ namespace Altinn.Broker.API.Authentication;
 /// On each request authenticated via cookie, validates the stored Altinn token.
 /// If expired, attempts re-exchange using the stored ID-Porten access/refresh material.
 /// Sets ClaimsPrincipal from the Altinn token so downstream authorization sees urn:altinn:* claims.
+/// Rejects sessions revoked via ID-Porten back-channel logout.
 /// </summary>
 public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 {
+    private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
+
+    public AltinnTokenCookieEvents(IOidcBackChannelLogoutSessionStore logoutSessionStore)
+    {
+        _logoutSessionStore = logoutSessionStore;
+    }
+
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
+        var sid = GetItem(context.Properties, OidcSessionKeys.Sid);
+        var sub = GetItem(context.Properties, OidcSessionKeys.Sub);
+        if (await _logoutSessionStore.IsRevokedAsync(sid, sub))
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
+            return;
+        }
+
         var tokens = context.Properties.GetTokens().ToList();
         var altinnToken = tokens.FirstOrDefault(t => t.Name == "altinn_token")?.Value;
 
@@ -52,6 +69,11 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             AuthorizationConstants.EndUserCookie,
             ClaimTypes.Name,
             ClaimTypes.Role);
+        if (!string.IsNullOrEmpty(sid) && !identity.HasClaim("sid", sid))
+        {
+            identity.AddClaim(new Claim("sid", sid));
+        }
+
         context.ReplacePrincipal(new ClaimsPrincipal(identity));
         context.ShouldRenew = false;
     }
@@ -92,4 +114,7 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
         context.ShouldRenew = true;
         return true;
     }
+
+    private static string? GetItem(AuthenticationProperties properties, string key)
+        => properties.Items.TryGetValue(key, out var value) ? value : null;
 }

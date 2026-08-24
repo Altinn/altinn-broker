@@ -22,6 +22,13 @@ public class IdPortenSettings
     public string RequiredAcr { get; set; } = "idporten-loa-substantial";
     public string CookieName { get; set; } = "AltinnBrokerSession";
     public int CookieLifetimeMinutes { get; set; } = 60;
+    /// <summary>
+    /// Path registered as <c>backchannel_logout_uri</c> on the ID-Porten client.
+    /// Must be publicly reachable over HTTPS; the domain must match a redirect URI.
+    /// </summary>
+    public string BackChannelLogoutPath { get; set; } = "/authentication/backchannel-logout";
+
+    public TimeSpan SessionRevocationLifetime => TimeSpan.FromMinutes(CookieLifetimeMinutes + 10);
 
     public string BuildSpaUrl(string? path)
     {

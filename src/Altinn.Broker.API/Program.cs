@@ -32,7 +32,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
@@ -181,6 +183,17 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     var idPortenSettings = config.GetSection(nameof(IdPortenSettings)).Get<IdPortenSettings>() ?? new IdPortenSettings();
 
     services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
+    services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
+    {
+        var settings = sp.GetRequiredService<IOptions<IdPortenSettings>>().Value;
+        var metadataAddress = $"{settings.Authority.TrimEnd('/')}/.well-known/openid-configuration";
+        return new ConfigurationManager<OpenIdConnectConfiguration>(
+            metadataAddress,
+            new OpenIdConnectConfigurationRetriever(),
+            new HttpDocumentRetriever { RequireHttps = true });
+    });
+    services.AddSingleton<IOidcLogoutTokenValidator, OidcLogoutTokenValidator>();
+    services.AddSingleton<IOidcBackChannelLogoutSessionStore, OidcBackChannelLogoutSessionStore>();
     services.AddScoped<AltinnTokenCookieEvents>();
 
     services.AddAuthentication()
@@ -311,6 +324,17 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                     {
                         context.Fail("Altinn token exchange failed");
                         return;
+                    }
+
+                    var sid = context.Principal?.FindFirst("sid")?.Value;
+                    var sub = context.Principal?.FindFirst("sub")?.Value;
+                    if (!string.IsNullOrEmpty(sid))
+                    {
+                        context.Properties!.Items[OidcSessionKeys.Sid] = sid;
+                    }
+                    if (!string.IsNullOrEmpty(sub))
+                    {
+                        context.Properties!.Items[OidcSessionKeys.Sub] = sub;
                     }
 
                     // Keep cookie small: Altinn JWT + refresh only (no ID-Porten access/id tokens).

@@ -1,3 +1,4 @@
+using Altinn.Broker.API.Authentication;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Options;
 
@@ -14,10 +15,20 @@ namespace Altinn.Broker.API.Controllers;
 public class AuthenticationController : ControllerBase
 {
     private readonly IdPortenSettings _idPortenSettings;
+    private readonly IOidcLogoutTokenValidator _logoutTokenValidator;
+    private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
+    private readonly ILogger<AuthenticationController> _logger;
 
-    public AuthenticationController(IOptions<IdPortenSettings> idPortenSettings)
+    public AuthenticationController(
+        IOptions<IdPortenSettings> idPortenSettings,
+        IOidcLogoutTokenValidator logoutTokenValidator,
+        IOidcBackChannelLogoutSessionStore logoutSessionStore,
+        ILogger<AuthenticationController> logger)
     {
         _idPortenSettings = idPortenSettings.Value;
+        _logoutTokenValidator = logoutTokenValidator;
+        _logoutSessionStore = logoutSessionStore;
+        _logger = logger;
     }
 
     /// <summary>
@@ -43,8 +54,9 @@ public class AuthenticationController : ControllerBase
     /// </summary>
     [HttpGet("logout")]
     [AllowAnonymous]
-    public IActionResult Logout([FromQuery] string? returnUrl = null)
+    public async Task<IActionResult> Logout([FromQuery] string? returnUrl = null)
     {
+        await RevokeLocalOidcSessionAsync();
         var path = ToSafeAppPath(returnUrl ?? _idPortenSettings.PostLogoutRedirectUri);
         var properties = new AuthenticationProperties
         {
@@ -71,7 +83,7 @@ public class AuthenticationController : ControllerBase
         var claims = result.Principal.Claims
             .Where(c =>
                 c.Type.StartsWith("urn:altinn:")
-                || c.Type is "pid" or "name" or "acr"
+                || c.Type is "pid" or "name" or "acr" or "sid"
                 || c.Type.Contains("authnclassreference", StringComparison.OrdinalIgnoreCase))
             .Select(c => new { c.Type, c.Value });
         return Ok(new { authenticated = true, claims });
@@ -79,15 +91,80 @@ public class AuthenticationController : ControllerBase
 
     /// <summary>
     /// Front-channel logout endpoint registered with ID-Porten.
-    /// Clears the session cookie when logout is initiated from another service.
+    /// Clears the session cookie when logout is initiated from another service (browser GET).
     /// </summary>
     [HttpGet("frontchannel-logout")]
     [AllowAnonymous]
     public async Task<IActionResult> FrontChannelLogout()
     {
+        await RevokeLocalOidcSessionAsync();
         await HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
         return Ok();
     }
+
+    /// <summary>
+    /// Back-channel logout endpoint registered as <c>backchannel_logout_uri</c> on the ID-Porten client.
+    /// ID-Porten POSTs a signed <c>logout_token</c> when the user signs out of another public-sector service.
+    /// See https://docs.digdir.no/docs/idporten/oidc/oidc_func_backchannel_logout.html
+    /// </summary>
+    [HttpPost("backchannel-logout")]
+    [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [Consumes("application/x-www-form-urlencoded")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> BackChannelLogout(
+        [FromForm(Name = "logout_token")] string? logoutToken,
+        CancellationToken cancellationToken)
+    {
+        var claims = await _logoutTokenValidator.ValidateAsync(logoutToken ?? string.Empty, cancellationToken);
+        if (claims is null)
+        {
+            return BadRequest();
+        }
+
+        var jtiTtl = claims.ExpiresAt - DateTimeOffset.UtcNow;
+        if (jtiTtl < TimeSpan.FromMinutes(1))
+        {
+            jtiTtl = TimeSpan.FromMinutes(5);
+        }
+
+        if (!await _logoutSessionStore.TryConsumeJtiAsync(claims.Jti, jtiTtl, cancellationToken))
+        {
+            // Already processed — still 204 so ID-Porten treats the call as accepted (idempotent).
+            return NoContent();
+        }
+
+        await _logoutSessionStore.RevokeAsync(
+            claims.Sid,
+            claims.Sub,
+            _idPortenSettings.SessionRevocationLifetime,
+            cancellationToken);
+
+        _logger.LogInformation("Revoked end-user session from ID-Porten back-channel logout");
+        return NoContent();
+    }
+
+    private async Task RevokeLocalOidcSessionAsync()
+    {
+        var result = await HttpContext.AuthenticateAsync(AuthorizationConstants.EndUserCookie);
+        if (!result.Succeeded)
+        {
+            return;
+        }
+
+        var sid = GetItem(result.Properties, OidcSessionKeys.Sid);
+        var sub = GetItem(result.Properties, OidcSessionKeys.Sub);
+        if (string.IsNullOrEmpty(sid) && string.IsNullOrEmpty(sub))
+        {
+            return;
+        }
+
+        await _logoutSessionStore.RevokeAsync(sid, sub, _idPortenSettings.SessionRevocationLifetime);
+    }
+
+    private static string? GetItem(AuthenticationProperties? properties, string key)
+        => properties?.Items.TryGetValue(key, out var value) == true ? value : null;
 
     private string ToSafeAppPath(string? returnUrl)
     {

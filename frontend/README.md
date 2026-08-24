@@ -19,6 +19,13 @@ Vite serves the SPA over HTTPS and proxies `/authentication` and `/broker` to th
 
 Register this redirect URI on the ID-Porten client: `https://localhost:5173/authentication/callback`
 
+Also register back-channel logout (Samarbeidsportalen → client → `backchannel_logout_uri`):
+
+- Local API: `https://localhost:7241/authentication/backchannel-logout`
+- Deployed (same site as a redirect URI): `https://<broker-host>/authentication/backchannel-logout`
+
+ID-Porten POSTs a signed `logout_token` there when the user logs out of another public-sector service. The API revokes the session by `sid`; the next SPA request then sees the user as logged out.
+
 `IdPortenSettings:SpaBaseUrl` is set to `https://localhost:5173` in Development so post-login redirects return to the SPA (not `https://localhost:7241`).
 
 ### Auth
