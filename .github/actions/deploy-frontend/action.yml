@@ -24,6 +24,10 @@ inputs:
   FRONTEND_STORAGE_ACCOUNT:
     description: "Globally unique storage account name for the frontend static website"
     required: true
+  VITE_API_BASE_URL:
+    description: "Broker API origin baked into the SPA at build time (e.g. https://altinn-dev-api.azure-api.net). Leave empty if Front Door serves API and SPA on the same origin."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -46,6 +50,8 @@ runs:
     - name: Build frontend
       shell: bash
       working-directory: frontend
+      env:
+        VITE_API_BASE_URL: ${{ inputs.VITE_API_BASE_URL }}
       run: npm run build
 
     - name: OIDC Login to Azure Public Cloud
