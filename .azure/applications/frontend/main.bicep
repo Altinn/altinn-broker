@@ -19,6 +19,9 @@ param deploymentPrincipalObjectId string
 @maxLength(24)
 param storageAccountName string
 
+@description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, Front Door forwards /broker/* to APIM.')
+param apiOriginHostName string = ''
+
 var resourceGroupName = '${namePrefix}-rg'
 var frontDoorProfileName = '${namePrefix}-frontend-fd'
 
@@ -41,6 +44,7 @@ module frontDoor '../../modules/frontDoor/create.bicep' = {
   params: {
     frontDoorProfileName: frontDoorProfileName
     originHostName: staticWebsite.outputs.staticWebsiteHostName
+    apiOriginHostName: apiOriginHostName
     endpointName: '${namePrefix}-frontend'
   }
 }

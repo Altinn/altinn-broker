@@ -17,9 +17,13 @@ It is a React app that directly connects to the Broker API from the browser, and
 
 Vite serves the SPA over HTTPS and proxies `/broker` to the API so the session cookie stays first-party.
 
-In deployed environments, set GitHub secret `VITE_API_BASE_URL` to the Broker API origin (e.g. `https://altinn-dev-api.azure-api.net`) so the SPA build calls APIM. Leave it empty only when the SPA and API are same-origin (Front Door routes `/broker` to the API).
+In Azure, Front Door can do the same: set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host
+(e.g. `altinn-dev-api.azure-api.net`). Then `/broker/*` is forwarded to APIM and the SPA stays on
+`/*`. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs (cookies work).
 
-Register this redirect URI on the ID-Porten client: `https://localhost:5173/broker/api/v1/authentication/callback`
+Register this ID-Porten redirect URI (Front Door + API path):
+
+`https://<front-door-host>/broker/api/v1/authentication/callback`
 
 Also register back-channel logout (Samarbeidsportalen → client → `backchannel_logout_uri`):
 

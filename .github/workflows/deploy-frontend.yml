@@ -39,4 +39,5 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           FRONTEND_STORAGE_ACCOUNT: ${{ secrets.FRONTEND_STORAGE_ACCOUNT }}
+          API_ORIGIN_HOST_NAME: ${{ secrets.API_ORIGIN_HOST_NAME }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
