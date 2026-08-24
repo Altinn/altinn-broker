@@ -33,6 +33,9 @@ inputs:
   FRONTEND_BASE_URL:
     description: "Public base url for the Broker SPA"
     required: true
+  IDPORTEN_AUTHORITY:
+    description: "ID-Porten OIDC authority (e.g. https://test.idporten.no)"
+    required: true
   MASKINPORTEN_ENVIRONMENT:
     description: "Environment for maskinporten"
     required: true
@@ -71,6 +74,7 @@ runs:
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         PLATFORM_BASE_URL: ${{ inputs.PLATFORM_BASE_URL }}
         FRONTEND_BASE_URL: ${{ inputs.FRONTEND_BASE_URL }}
+        IDPORTEN_AUTHORITY: ${{ inputs.IDPORTEN_AUTHORITY }}
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         APIM_IP: ${{ inputs.APIM_IP }}
         MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT: ${{ inputs.MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT }}

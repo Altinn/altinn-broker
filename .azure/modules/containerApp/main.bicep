@@ -5,6 +5,7 @@ param image string
 param environment string
 param platform_base_url string
 param frontend_base_url string
+param idporten_authority string
 param maskinporten_environment string
 param eventGridIps array
 param maskinportenTokenExchangeEnvironment string
@@ -73,6 +74,7 @@ var containerAppEnvVars = concat([
   { name: 'MaskinportenSettings__ClientId', secretRef: 'maskinporten-client-id' }
   { name: 'IdPortenSettings__ClientId', secretRef: 'idporten-client-id' }
   { name: 'IdPortenSettings__ClientSecret', secretRef: 'idporten-client-secret' }
+  { name: 'IdPortenSettings__Authority', value: idporten_authority }
   { name: 'IdPortenSettings__SpaBaseUrl', value: frontend_base_url }
   {
     name: 'MaskinportenSettings__Scope'
