@@ -11,20 +11,7 @@ export default defineConfig({
     https: true,
     proxy: {
       // Same-origin proxy so the session cookie is first-party in local dev.
-      '/authentication': {
-        target: process.env.VITE_API_PROXY_TARGET ?? 'https://localhost:7241',
-        changeOrigin: true,
-        secure: false,
-        xfwd: true,
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq, req) => {
-            const host = req.headers.host
-            if (host) {
-              proxyReq.setHeader('X-Forwarded-Host', host)
-            }
-          })
-        },
-      },
+      // Covers API + auth under /broker/api/v1/...
       '/broker': {
         target: process.env.VITE_API_PROXY_TARGET ?? 'https://localhost:7241',
         changeOrigin: true,

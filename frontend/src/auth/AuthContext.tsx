@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { apiFetch, redirectToLogin, redirectToLogout } from '../api/client'
+import { AUTH_BASE_PATH } from '../api/config'
 import type { AuthState, AuthUser, MeResponse } from './types'
 
 type AuthContextValue = {
@@ -23,7 +24,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 async function fetchCurrentUser(): Promise<AuthUser | null> {
   try {
-    const me = await apiFetch<MeResponse>('/authentication/me', {
+    const me = await apiFetch<MeResponse>(`${AUTH_BASE_PATH}/me`, {
       redirectOnUnauthorized: false,
     })
     if (!me?.authenticated) {

@@ -15,14 +15,14 @@ It is a React app that directly connects to the Broker API from the browser, and
 4. npm run dev
 5. Open **https://localhost:5173** (not `http://`) and accept the Vite self-signed certificate
 
-Vite serves the SPA over HTTPS and proxies `/authentication` and `/broker` to the API so the session cookie stays first-party.
+Vite serves the SPA over HTTPS and proxies `/broker` to the API so the session cookie stays first-party.
 
-Register this redirect URI on the ID-Porten client: `https://localhost:5173/authentication/callback`
+Register this redirect URI on the ID-Porten client: `https://localhost:5173/broker/api/v1/authentication/callback`
 
 Also register back-channel logout (Samarbeidsportalen → client → `backchannel_logout_uri`):
 
-- Local API: `https://localhost:7241/authentication/backchannel-logout`
-- Deployed (same site as a redirect URI): `https://<broker-host>/authentication/backchannel-logout`
+- Local API: `https://localhost:7241/broker/api/v1/authentication/backchannel-logout`
+- Deployed (same site as a redirect URI): `https://<broker-host>/broker/api/v1/authentication/backchannel-logout`
 
 ID-Porten POSTs a signed `logout_token` there when the user logs out of another public-sector service. The API revokes the session by `sid`; the next SPA request then sees the user as logged out.
 
@@ -30,9 +30,9 @@ ID-Porten POSTs a signed `logout_token` there when the user logs out of another 
 
 ### Auth
 
-- Unauthenticated users are redirected to `GET /authentication/login`
+- Unauthenticated users are redirected to `GET /broker/api/v1/authentication/login`
 - Session is an httpOnly cookie; API calls use `credentials: "include"`
-- Logout uses the header **Logg ut** button → `GET /authentication/logout`
+- Logout uses the header **Logg ut** button → `GET /broker/api/v1/authentication/logout`
 - Mutations must send `X-Requested-With` (handled by `apiFetch`)
 
 Optional: set `VITE_API_PROXY_TARGET` if the API runs on a different host/port.

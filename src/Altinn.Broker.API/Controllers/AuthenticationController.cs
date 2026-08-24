@@ -33,7 +33,7 @@ public class AuthenticationController : ControllerBase
 
     /// <summary>
     /// Initiates ID-Porten login via OIDC authorization code flow.
-    /// The OIDC middleware handles <c>/authentication/callback</c> (CallbackPath) —
+    /// The OIDC middleware handles <c>/broker/api/v1/authentication/callback</c> (CallbackPath) —
     /// do not redirect there after login; that path must only receive ID-Porten's code+state.
     /// </summary>
     [HttpGet("login")]

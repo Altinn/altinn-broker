@@ -7,7 +7,7 @@ type RequireAuthProps = {
 
 /**
  * Ensures the user has an active Broker session cookie.
- * Unauthenticated users are sent to /authentication/login.
+ * Unauthenticated users are sent to /broker/api/v1/authentication/login.
  */
 export function RequireAuth({ children }: RequireAuthProps) {
   const { status, login } = useAuth()

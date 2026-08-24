@@ -10,7 +10,7 @@ public class IdPortenSettings
     /// rejects ID-Porten exchange when the access token has only openid/profile.
     /// </summary>
     public string[] Scopes { get; set; } = ["openid", "profile", "altinn:portal/enduser"];
-    public string CallbackPath { get; set; } = "/authentication/callback";
+    public string CallbackPath { get; set; } = "/broker/api/v1/authentication/callback";
     public string PostLogoutRedirectUri { get; set; } = "/";
     /// <summary>
     /// Public origin of the SPA (e.g. https://localhost:5173 in local Vite).
@@ -26,7 +26,7 @@ public class IdPortenSettings
     /// Path registered as <c>backchannel_logout_uri</c> on the ID-Porten client.
     /// Must be publicly reachable over HTTPS; the domain must match a redirect URI.
     /// </summary>
-    public string BackChannelLogoutPath { get; set; } = "/authentication/backchannel-logout";
+    public string BackChannelLogoutPath { get; set; } = "/broker/api/v1/authentication/backchannel-logout";
 
     public TimeSpan SessionRevocationLifetime => TimeSpan.FromMinutes(CookieLifetimeMinutes + 10);
 

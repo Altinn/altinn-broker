@@ -1,4 +1,4 @@
-import { apiUrl } from './config'
+import { AUTH_BASE_PATH, apiUrl } from './config'
 
 export class ApiError extends Error {
   public readonly status: number
@@ -74,10 +74,10 @@ export async function apiFetch<T = unknown>(
 
 export function redirectToLogin(returnUrl: string = window.location.pathname + window.location.search) {
   const params = new URLSearchParams({ returnUrl })
-  window.location.assign(apiUrl(`/authentication/login?${params}`))
+  window.location.assign(apiUrl(`${AUTH_BASE_PATH}/login?${params}`))
 }
 
 export function redirectToLogout(returnUrl: string = '/') {
   const params = new URLSearchParams({ returnUrl })
-  window.location.assign(apiUrl(`/authentication/logout?${params}`))
+  window.location.assign(apiUrl(`${AUTH_BASE_PATH}/logout?${params}`))
 }
