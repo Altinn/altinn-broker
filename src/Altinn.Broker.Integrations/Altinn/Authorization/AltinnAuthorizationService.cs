@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Integrations.Altinn.Authorization;
+
 public class AltinnAuthorizationService : IAuthorizationService
 {
     private readonly HttpClient _httpClient;
@@ -77,7 +78,21 @@ public class AltinnAuthorizationService : IAuthorizationService
             return bypass.Value;
         }
         bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
-        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(user, party.WithoutPrefix(), fileTransferId, rights, resource.Id, isMaskinportenToken);
+        bool isIdportenToken = IdportenXacmlMapper.IsIdportenToken(user);
+        XacmlJsonCategory? idportenSubjectCategory = null;
+        if (isIdportenToken && !IdportenXacmlMapper.TryCreateSubjectCategory(user, out idportenSubjectCategory))
+        {
+            _logger.LogWarning("ID-porten token does not contain the required pid claim");
+            return false;
+        }
+
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(
+            user,
+            party.WithoutPrefix(),
+            fileTransferId,
+            rights,
+            resource.Id,
+            isIdportenToken ? idportenSubjectCategory : null);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -89,7 +104,9 @@ public class AltinnAuthorizationService : IAuthorizationService
             _logger.LogError("Unexpected null or invalid json response from Authorization.");
             return false;
         }
-        var validationResult = ValidateResult(responseContent, user, isMaskinportenToken);
+        var validationResult = isIdportenToken
+            ? IdportenXacmlMapper.ValidateAuthorizationResponse(responseContent, user)
+            : ValidateResult(responseContent, user, isMaskinportenToken);
         return validationResult;
     }
     private async Task<bool?> EvaluateBypassConditions(ResourceEntity resource, CancellationToken cancellationToken)
@@ -102,7 +119,13 @@ public class AltinnAuthorizationService : IAuthorizationService
         return null;
     }
 
-    private XacmlJsonRequestRoot CreateDecisionRequest(ClaimsPrincipal user, string party, string? fileTransferId, List<ResourceAccessLevel> actionTypes, string resourceId, bool isMaskinportenToken)
+    private XacmlJsonRequestRoot CreateDecisionRequest(
+        ClaimsPrincipal user,
+        string party,
+        string? fileTransferId,
+        List<ResourceAccessLevel> actionTypes,
+        string resourceId,
+        XacmlJsonCategory? subjectCategory = null)
     {
         XacmlJsonRequest request = new()
         {
@@ -110,8 +133,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             Action = new List<XacmlJsonCategory>(),
             Resource = new List<XacmlJsonCategory>()
         };
-        var subjectCategory = CreateSubjectCategory(user);
-        request.AccessSubject.Add(subjectCategory);
+        request.AccessSubject.Add(subjectCategory ?? CreateSubjectCategory(user));
         foreach (var actionType in actionTypes)
         {
             request.Action.Add(XacmlMappers.CreateActionCategory(GetActionId(actionType)));
@@ -145,7 +167,7 @@ public class AltinnAuthorizationService : IAuthorizationService
 
             // For Altinn tokens: use full validation with obligations
             result = ValidateDecisionResult(decision, user, isMaskinportenToken);
-            
+
             if (result == false)
             {
                 return false;
