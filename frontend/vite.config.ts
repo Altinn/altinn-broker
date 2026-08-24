@@ -6,9 +6,8 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
-    // HTTPS so Secure session cookies and ID-Porten redirect URIs work locally.
-    // Open https://localhost:5173 (not http://) — accept the self-signed cert once.
-    https: true,
+    // HTTPS for local dev comes from @vitejs/plugin-basic-ssl (Vite 8 no longer
+    // accepts server.https: true). Open https://localhost:5173 — accept the cert once.
     proxy: {
       // Same-origin proxy so the session cookie is first-party in local dev.
       // Covers API + auth under /broker/api/v1/...
