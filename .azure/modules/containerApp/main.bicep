@@ -4,6 +4,7 @@ param namePrefix string
 param image string
 param environment string
 param platform_base_url string
+param frontend_base_url string
 param maskinporten_environment string
 param eventGridIps array
 param maskinportenTokenExchangeEnvironment string
@@ -70,6 +71,9 @@ var containerAppEnvVars = concat([
   { name: 'AltinnOptions__PlatformSubscriptionKey', secretRef: 'platform-subscription-key' }
   { name: 'MaskinportenSettings__Environment', value: maskinporten_environment } 
   { name: 'MaskinportenSettings__ClientId', secretRef: 'maskinporten-client-id' }
+  { name: 'IdPortenSettings__ClientId', secretRef: 'idporten-client-id' }
+  { name: 'IdPortenSettings__ClientSecret', secretRef: 'idporten-client-secret' }
+  { name: 'IdPortenSettings__SpaBaseUrl', value: frontend_base_url }
   {
     name: 'MaskinportenSettings__Scope'
     value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:serviceowner altinn:authorization/authorize.admin altinn:resourceregistry/resource.admin'
@@ -153,6 +157,16 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/maskinporten-client-id'
           name: 'maskinporten-client-id'
+        }
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/idporten-client-id'
+          name: 'idporten-client-id'
+        }
+        {
+          identity: principal_id
+          keyVaultUrl: '${keyVaultUrl}/secrets/idporten-client-secret'
+          name: 'idporten-client-secret'
         }
         {
           identity: principal_id

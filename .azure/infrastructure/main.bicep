@@ -23,6 +23,10 @@ param maskinportenJwk string
 @secure()
 param maskinportenClientId string
 @secure()
+param idportenClientId string
+@secure()
+param idportenClientSecret string
+@secure()
 param platformSubscriptionKey string
 @secure()
 param slackUrl string
@@ -64,6 +68,14 @@ var secrets = [
   {
     name: 'maskinporten-jwk'
     value: maskinportenJwk
+  }
+  {
+    name: 'idporten-client-id'
+    value: idportenClientId
+  }
+  {
+    name: 'idporten-client-secret'
+    value: idportenClientSecret
   }
   {
     name: 'platform-subscription-key'

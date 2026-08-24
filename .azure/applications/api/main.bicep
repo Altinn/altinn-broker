@@ -9,6 +9,8 @@ param location string
 @minLength(3)
 param platform_base_url string
 @minLength(3)
+param frontend_base_url string
+@minLength(3)
 param maskinporten_environment string
 @secure()
 @minLength(3)
@@ -127,6 +129,7 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     subscription_id: subscription().subscriptionId
     principal_id: appIdentityId
     platform_base_url: platform_base_url
+    frontend_base_url: frontend_base_url
     keyVaultUrl: keyVaultUrl
     maskinporten_environment: maskinporten_environment
     userIdentityClientId: appIdentityClientId
