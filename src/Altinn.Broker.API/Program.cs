@@ -2,30 +2,38 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
+using Altinn.Broker.API.Authentication;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
+using Altinn.Broker.API.Swagger;
 using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
-using Altinn.Broker.Integrations.Tus;
+using Altinn.Broker.Integrations.Altinn;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
+using Altinn.Broker.Integrations.Tus;
 using Altinn.Broker.Persistence;
 using Altinn.Broker.Persistence.Options;
 using Altinn.Common.PEP.Authorization;
-using Altinn.Broker.API.Swagger;
+
 using Hangfire;
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
 using StackExchange.Redis;
@@ -60,6 +68,10 @@ static void BuildAndRun(string[] args)
     builder.Services.ConfigureOpenTelemetry(generalSettings?.ApplicationInsightsConnectionString ?? string.Empty);
 
     var app = builder.Build();
+
+    // Vite (and other reverse proxies) set X-Forwarded-* so OIDC/cookies see the SPA host.
+    app.UseForwardedHeaders();
+
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<AcceptHeaderValidationMiddleware>();
@@ -73,6 +85,7 @@ static void BuildAndRun(string[] args)
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<CsrfProtectionMiddleware>();
     app.UseMiddleware<TusFileTransferIdRouteMiddleware>();
     app.UseMiddleware<TusIdempotentCompletePatchMiddleware>();
 
@@ -113,6 +126,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
+    services.Configure<IdPortenSettings>(config.GetSection(key: nameof(IdPortenSettings)));
     services.Configure<DistributedCacheOptions>(config.GetSection(DistributedCacheOptions.SectionName));
     services.Configure<TusOptions>(config.GetSection(TusOptions.SectionName));
 
@@ -122,6 +136,16 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
     services.AddProblemDetails();
+
+    services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+            | ForwardedHeaders.XForwardedProto
+            | ForwardedHeaders.XForwardedHost;
+        // Local Vite proxy — trust forwarded headers from loopback.
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
 
     // Add distributed cache for rate limiting and TUS upload expiration tracking.
     var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
@@ -154,6 +178,11 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
+    var idPortenSettings = config.GetSection(nameof(IdPortenSettings)).Get<IdPortenSettings>() ?? new IdPortenSettings();
+
+    services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
+    services.AddScoped<AltinnTokenCookieEvents>();
+
     services.AddAuthentication()
         .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
             AuthorizationConstants.TusUploadSession,
@@ -170,7 +199,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 ValidateIssuer = true,
                 ValidateAudience = false,
                 RequireExpirationTime = true,
-                ValidateLifetime = !hostEnvironment.IsDevelopment(), // Do not validate lifetime in tests
+                ValidateLifetime = !hostEnvironment.IsDevelopment(),
                 ClockSkew = TimeSpan.Zero
             };
             options.Events = new JwtBearerEvents()
@@ -179,7 +208,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
-        .AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options => // For both pure Maskinporten tokens and legacy
+        .AddJwtBearer(AuthorizationConstants.LegacyAndMaskinporten, options =>
         {
             options.SaveToken = true;
             if (hostEnvironment.IsProduction())
@@ -204,11 +233,110 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnAuthenticationFailed = AltinnTokenEventsHelper.OnAuthenticationFailed,
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
+        })
+        .AddCookie(AuthorizationConstants.EndUserCookie, options =>
+        {
+            options.Cookie.Name = idPortenSettings.CookieName;
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(idPortenSettings.CookieLifetimeMinutes);
+            options.SlidingExpiration = true;
+            options.EventsType = typeof(AltinnTokenCookieEvents);
+        })
+        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        {
+            options.Authority = idPortenSettings.Authority;
+            options.ClientId = idPortenSettings.ClientId;
+            options.ClientSecret = idPortenSettings.ClientSecret;
+            options.ResponseType = OpenIdConnectResponseType.Code;
+            options.CallbackPath = idPortenSettings.CallbackPath;
+            options.SignInScheme = AuthorizationConstants.EndUserCookie;
+            // Do not persist ID-Porten id/access tokens in the auth cookie — size easily exceeds
+            // browser limits and the cookie is silently dropped → endless login loop.
+            options.SaveTokens = false;
+            options.GetClaimsFromUserInfoEndpoint = false;
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters.NameClaimType = "sub";
+
+            foreach (var scope in idPortenSettings.Scopes)
+            {
+                options.Scope.Add(scope);
+            }
+
+            options.Events = new OpenIdConnectEvents
+            {
+                OnRedirectToIdentityProvider = context =>
+                {
+                    // Force callback onto the SPA origin (Vite proxy) so cookies and
+                    // post-login redirect stay on https://localhost:5173, not the API port.
+                    if (!string.IsNullOrWhiteSpace(idPortenSettings.SpaBaseUrl))
+                    {
+                        context.ProtocolMessage.RedirectUri = idPortenSettings.OidcCallbackUrl;
+                    }
+
+                    return Task.CompletedTask;
+                },
+                OnRedirectToIdentityProviderForSignOut = context =>
+                {
+                    if (!string.IsNullOrWhiteSpace(idPortenSettings.SpaBaseUrl))
+                    {
+                        context.ProtocolMessage.PostLogoutRedirectUri =
+                            idPortenSettings.BuildSpaUrl(idPortenSettings.PostLogoutRedirectUri);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = async context =>
+                {
+                    var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
+                    var accessToken = context.TokenEndpointResponse?.AccessToken;
+                    if (string.IsNullOrEmpty(accessToken))
+                    {
+                        context.Fail("No access token received from ID-Porten");
+                        return;
+                    }
+
+                    var requiredAcr = idPortenSettings.RequiredAcr;
+                    var acr = context.Principal?.FindFirst(ClaimConstants.UserFlow)?.Value
+                        ?? context.Principal?.FindFirst("acr")?.Value;
+                    if (!string.IsNullOrEmpty(requiredAcr) && acr != requiredAcr)
+                    {
+                        context.Fail($"Insufficient authentication level. Required: {requiredAcr}, got: {acr}");
+                        return;
+                    }
+
+                    var altinnToken = await tokenExchange.ExchangeIdPortenToken(accessToken);
+                    if (string.IsNullOrEmpty(altinnToken))
+                    {
+                        context.Fail("Altinn token exchange failed");
+                        return;
+                    }
+
+                    // Keep cookie small: Altinn JWT + refresh only (no ID-Porten access/id tokens).
+                    var refreshToken = context.TokenEndpointResponse?.RefreshToken ?? string.Empty;
+                    context.Properties!.StoreTokens(
+                    [
+                        new AuthenticationToken { Name = "altinn_token", Value = altinnToken },
+                        new AuthenticationToken { Name = "id_porten_refresh_token", Value = refreshToken }
+                    ]);
+
+                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                    var altinnJwt = handler.ReadJwtToken(altinnToken);
+                    var identity = new System.Security.Claims.ClaimsIdentity(
+                        altinnJwt.Claims,
+                        AuthorizationConstants.EndUserCookie,
+                        System.Security.Claims.ClaimTypes.Name,
+                        System.Security.Claims.ClaimTypes.Role);
+                    context.Principal = new System.Security.Claims.ClaimsPrincipal(identity);
+                }
+            };
         });
 
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
+    services.AddTransient<IAuthorizationHandler, EndUserAuthorizationHandler>();
     services.AddAuthorization(options =>
     {
         options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(AuthorizationConstants.TusUploadSession, JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
@@ -216,6 +344,12 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.EndUser, policy =>
+        {
+            policy.AddAuthenticationSchemes(AuthorizationConstants.EndUserCookie);
+            policy.RequireAuthenticatedUser();
+            policy.AddRequirements(new EndUserRequirement());
+        });
     });
 
     services.Configure<KestrelServerOptions>(options =>

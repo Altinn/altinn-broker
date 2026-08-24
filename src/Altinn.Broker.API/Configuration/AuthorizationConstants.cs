@@ -9,6 +9,8 @@ public static class AuthorizationConstants
     public const string Maintenance = "Maintenance";
     public const string LegacyAndMaskinporten = "LegacyAndMaskinporten";
     public const string TusUploadSession = "TusUploadSession";
+    public const string EndUserCookie = "EndUserCookie";
+    public const string EndUser = "EndUser";
 
     public const string SenderScope = "altinn:broker.write";
     public const string RecipientScope = "altinn:broker.read";

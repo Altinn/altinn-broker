@@ -1,12 +1,14 @@
 import type { GlobalHeaderProps } from '@altinn/altinn-components'
 import { useAccountSelector } from '@altinn/altinn-components'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import { PageRoutes } from '../../pages/routes'
 import { mockAuthorizedParties, mockCurrentAccountUuid } from './mockParties'
 import { useSidebarMenu } from './useSidebarMenu'
 
 export function useHeaderConfig(): GlobalHeaderProps {
   const sidebarMenu = useSidebarMenu()
+  const { logout } = useAuth()
 
   const accountSelector = useAccountSelector({
     partyListDTO: mockAuthorizedParties,
@@ -36,7 +38,7 @@ export function useHeaderConfig(): GlobalHeaderProps {
       menu: sidebarMenu,
       logoutButton: {
         label: 'Logg ut',
-        onClick: () => {},
+        onClick: () => logout('/'),
       },
     },
     desktopMenu: sidebarMenu,
