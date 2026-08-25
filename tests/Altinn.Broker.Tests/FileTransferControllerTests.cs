@@ -1423,8 +1423,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Theory]
-    [InlineData("0192:999999999")]
-    [InlineData(UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    [InlineData("0192:986252932")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":986252932")]
     public async Task InitializeFileTransfer_WithRecipientNotInAccessList_ReturnsBadRequest(string recipient)
     {
         // Arrange
@@ -1439,6 +1439,50 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
         var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(parsedError);
         Assert.Equal(Errors.RecipientNotInAccessList.Message, parsedError.Detail);
+    }
+
+    [Theory]
+    [InlineData("0192:111111111")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":111111111")]
+    public async Task InitializeFileTransfer_WithInvalidRecipient_ReturnsBadRequest(string recipient)
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add(recipient);
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, initializeFileTransferResponse.StatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal((int)HttpStatusCode.BadRequest, parsedError.Status);
+        Assert.Equal("Bad Request", parsedError.Title);
+        Assert.Equal(Errors.InvalidRecipient.Message, parsedError.Detail);
+        Assert.Equal("BRO-00031", parsedError.Extensions["code"]?.ToString());
+        Assert.False(parsedError.Extensions.ContainsKey("exceptionType"));
+        Assert.False(parsedError.Extensions.ContainsKey("stackTrace"));
+    }
+
+    [Theory]
+    [InlineData("0192:311764837", "0192:111111111")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837", UrnConstants.OrganizationNumberAttribute + ":111111111")]
+    public async Task InitializeFileTransfer_WithInvalidRecipientAmongMultipleRecipients_ReturnsBadRequest(string validRecipient, string invalidRecipient)
+    {
+        // Arrange
+        var file = FileTransferInitializeExtTestFactory.BasicFileTransfer_With_AccessList_Resource_And_No_Recipients();
+        file.Recipients.Add(validRecipient);
+        file.Recipients.Add(invalidRecipient);
+
+        // Act
+        var initializeFileTransferResponse = await _senderClient.PostAsJsonAsync("broker/api/v1/filetransfer", file);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, initializeFileTransferResponse.StatusCode);
+        var parsedError = await initializeFileTransferResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(parsedError);
+        Assert.Equal(Errors.InvalidRecipient.Message, parsedError.Detail);
     }
 
     [Theory]
@@ -1462,8 +1506,8 @@ public class FileTransferControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Theory]
-    [InlineData("0192:311764837", "0192:999999999")]
-    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837", UrnConstants.OrganizationNumberAttribute + ":999999999")]
+    [InlineData("0192:311764837", "0192:986252932")]
+    [InlineData(UrnConstants.OrganizationNumberAttribute + ":311764837", UrnConstants.OrganizationNumberAttribute + ":986252932")]
     public async Task InitializeFileTransfer_WithNotAllRecipientsInAccessList_ReturnsBadRequest(string recipientInAccessList, string recipientNotInAccessList)
     {
         // Arrange

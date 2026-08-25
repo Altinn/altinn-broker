@@ -92,7 +92,8 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         var response = await _client.GetAsync(url, cancellationToken);
         return response.StatusCode switch
         {
-            HttpStatusCode.NotFound or HttpStatusCode.NoContent => null,
+            // Resource Registry returns 400 when the party URN is invalid or cannot be resolved.
+            HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.NoContent => null,
             HttpStatusCode.OK => (await response.Content.ReadFromJsonAsync<AccessListMembershipResponse>(cancellationToken: cancellationToken))
                 ?.Data
                 ?.Select(m => m.Party?.Split(":").Last())
