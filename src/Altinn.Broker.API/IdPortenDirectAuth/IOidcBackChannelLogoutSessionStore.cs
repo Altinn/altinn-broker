@@ -1,4 +1,4 @@
-namespace Altinn.Broker.API.Authentication;
+namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 public interface IOidcBackChannelLogoutSessionStore
 {

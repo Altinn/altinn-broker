@@ -2,17 +2,18 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 
 using Altinn.ApiClients.Maskinporten.Config;
+using Altinn.Broker.API.AltinnPlatformAuth;
 using Altinn.Broker.API.Authentication;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Filters;
 using Altinn.Broker.API.Helpers;
+using Altinn.Broker.API.IdPortenDirectAuth;
 using Altinn.Broker.API.Swagger;
 using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
-using Altinn.Broker.Integrations.Altinn;
 using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Integrations.Tus;
@@ -23,9 +24,7 @@ using Altinn.Common.PEP.Authorization;
 using Hangfire;
 
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -33,9 +32,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Options;
-using Microsoft.Identity.Web;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
 using StackExchange.Redis;
@@ -128,7 +124,6 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
-    services.Configure<IdPortenSettings>(config.GetSection(key: nameof(IdPortenSettings)));
     services.Configure<DistributedCacheOptions>(config.GetSection(DistributedCacheOptions.SectionName));
     services.Configure<TusOptions>(config.GetSection(TusOptions.SectionName));
 
@@ -180,21 +175,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.ConfigureHangfire();
 
-    var idPortenSettings = config.GetSection(nameof(IdPortenSettings)).Get<IdPortenSettings>() ?? new IdPortenSettings();
-
-    services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
-    services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
-    {
-        var settings = sp.GetRequiredService<IOptions<IdPortenSettings>>().Value;
-        var metadataAddress = $"{settings.Authority.TrimEnd('/')}/.well-known/openid-configuration";
-        return new ConfigurationManager<OpenIdConnectConfiguration>(
-            metadataAddress,
-            new OpenIdConnectConfigurationRetriever(),
-            new HttpDocumentRetriever { RequireHttps = true });
-    });
-    services.AddSingleton<IOidcLogoutTokenValidator, OidcLogoutTokenValidator>();
-    services.AddSingleton<IOidcBackChannelLogoutSessionStore, OidcBackChannelLogoutSessionStore>();
-    services.AddScoped<AltinnTokenCookieEvents>();
+    services.AddAltinnPlatformAuth(config);
 
     services.AddAuthentication()
         .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
@@ -247,115 +228,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
-        .AddCookie(AuthorizationConstants.EndUserCookie, options =>
-        {
-            options.Cookie.Name = idPortenSettings.CookieName;
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            options.Cookie.SameSite = SameSiteMode.Lax;
-            options.ExpireTimeSpan = TimeSpan.FromMinutes(idPortenSettings.CookieLifetimeMinutes);
-            options.SlidingExpiration = true;
-            options.EventsType = typeof(AltinnTokenCookieEvents);
-        })
-        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
-        {
-            options.Authority = idPortenSettings.Authority;
-            options.ClientId = idPortenSettings.ClientId;
-            options.ClientSecret = idPortenSettings.ClientSecret;
-            options.ResponseType = OpenIdConnectResponseType.Code;
-            options.CallbackPath = idPortenSettings.CallbackPath;
-            options.SignInScheme = AuthorizationConstants.EndUserCookie;
-            // Do not persist ID-Porten id/access tokens in the auth cookie — size easily exceeds
-            // browser limits and the cookie is silently dropped → endless login loop.
-            options.SaveTokens = false;
-            options.GetClaimsFromUserInfoEndpoint = false;
-            options.MapInboundClaims = false;
-            options.TokenValidationParameters.NameClaimType = "sub";
-
-            foreach (var scope in idPortenSettings.Scopes)
-            {
-                options.Scope.Add(scope);
-            }
-
-            options.Events = new OpenIdConnectEvents
-            {
-                OnRedirectToIdentityProvider = context =>
-                {
-                    // Force callback onto the SPA origin (Vite proxy) so cookies and
-                    // post-login redirect stay on https://localhost:5173, not the API port.
-                    if (!string.IsNullOrWhiteSpace(idPortenSettings.SpaBaseUrl))
-                    {
-                        context.ProtocolMessage.RedirectUri = idPortenSettings.OidcCallbackUrl;
-                    }
-
-                    return Task.CompletedTask;
-                },
-                OnRedirectToIdentityProviderForSignOut = context =>
-                {
-                    if (!string.IsNullOrWhiteSpace(idPortenSettings.SpaBaseUrl))
-                    {
-                        context.ProtocolMessage.PostLogoutRedirectUri =
-                            idPortenSettings.BuildSpaUrl(idPortenSettings.PostLogoutRedirectUri);
-                    }
-
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = async context =>
-                {
-                    var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
-                    var accessToken = context.TokenEndpointResponse?.AccessToken;
-                    if (string.IsNullOrEmpty(accessToken))
-                    {
-                        context.Fail("No access token received from ID-Porten");
-                        return;
-                    }
-
-                    var requiredAcr = idPortenSettings.RequiredAcr;
-                    var acr = context.Principal?.FindFirst(ClaimConstants.UserFlow)?.Value
-                        ?? context.Principal?.FindFirst("acr")?.Value;
-                    if (!string.IsNullOrEmpty(requiredAcr) && acr != requiredAcr)
-                    {
-                        context.Fail($"Insufficient authentication level. Required: {requiredAcr}, got: {acr}");
-                        return;
-                    }
-
-                    var altinnToken = await tokenExchange.ExchangeIdPortenToken(accessToken);
-                    if (string.IsNullOrEmpty(altinnToken))
-                    {
-                        context.Fail("Altinn token exchange failed");
-                        return;
-                    }
-
-                    var sid = context.Principal?.FindFirst("sid")?.Value;
-                    var sub = context.Principal?.FindFirst("sub")?.Value;
-                    if (!string.IsNullOrEmpty(sid))
-                    {
-                        context.Properties!.Items[OidcSessionKeys.Sid] = sid;
-                    }
-                    if (!string.IsNullOrEmpty(sub))
-                    {
-                        context.Properties!.Items[OidcSessionKeys.Sub] = sub;
-                    }
-
-                    // Keep cookie small: Altinn JWT + refresh only (no ID-Porten access/id tokens).
-                    var refreshToken = context.TokenEndpointResponse?.RefreshToken ?? string.Empty;
-                    context.Properties!.StoreTokens(
-                    [
-                        new AuthenticationToken { Name = "altinn_token", Value = altinnToken },
-                        new AuthenticationToken { Name = "id_porten_refresh_token", Value = refreshToken }
-                    ]);
-
-                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-                    var altinnJwt = handler.ReadJwtToken(altinnToken);
-                    var identity = new System.Security.Claims.ClaimsIdentity(
-                        altinnJwt.Claims,
-                        AuthorizationConstants.EndUserCookie,
-                        System.Security.Claims.ClaimTypes.Name,
-                        System.Security.Claims.ClaimTypes.Role);
-                    context.Principal = new System.Security.Claims.ClaimsPrincipal(identity);
-                }
-            };
-        });
+        .AddIdPortenDirectAuth(config);
 
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
 

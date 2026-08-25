@@ -3,8 +3,8 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-using Altinn.Broker.API.Authentication;
-using Altinn.Broker.Core.Options;
+using Altinn.Broker.API.IdPortenDirectAuth;
+using Altinn.Broker.API.IdPortenDirectAuth.Options;
 
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -98,7 +98,7 @@ public class OidcBackChannelLogoutTests
         };
 
         return new OidcLogoutTokenValidator(
-            new IdPortenSettings { ClientId = ClientId, Authority = Issuer, CookieLifetimeMinutes = 60 },
+            new IdPortenDirectAuthSettings { ClientId = ClientId, Authority = Issuer, CookieLifetimeMinutes = 60 },
             parameters,
             NullLogger<OidcLogoutTokenValidator>.Instance);
     }

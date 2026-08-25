@@ -7,7 +7,7 @@ using Altinn.Broker.Integrations.Altinn;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
-namespace Altinn.Broker.API.Authentication;
+namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
 /// On each request authenticated via cookie, validates the stored Altinn token.

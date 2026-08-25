@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace Altinn.Broker.API.Authentication;
+namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 public sealed class OidcBackChannelLogoutSessionStore(IDistributedCache cache) : IOidcBackChannelLogoutSessionStore
 {

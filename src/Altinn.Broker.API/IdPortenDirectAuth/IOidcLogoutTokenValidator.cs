@@ -1,4 +1,4 @@
-namespace Altinn.Broker.API.Authentication;
+namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 public sealed record OidcLogoutTokenClaims(string? Sid, string? Sub, string Jti, DateTimeOffset ExpiresAt);
 

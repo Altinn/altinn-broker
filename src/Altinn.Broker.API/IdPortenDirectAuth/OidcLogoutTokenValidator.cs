@@ -1,14 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 
-using Altinn.Broker.Core.Options;
+using Altinn.Broker.API.IdPortenDirectAuth.Options;
 
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Altinn.Broker.API.Authentication;
+namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
 /// Validates ID-Porten back-channel logout tokens per
@@ -16,13 +16,13 @@ namespace Altinn.Broker.API.Authentication;
 /// </summary>
 public sealed class OidcLogoutTokenValidator : IOidcLogoutTokenValidator
 {
-    private readonly IdPortenSettings _settings;
+    private readonly IdPortenDirectAuthSettings _settings;
     private readonly IConfigurationManager<OpenIdConnectConfiguration>? _configurationManager;
     private readonly TokenValidationParameters? _testValidationParameters;
     private readonly ILogger<OidcLogoutTokenValidator> _logger;
 
     public OidcLogoutTokenValidator(
-        IOptions<IdPortenSettings> settings,
+        IOptions<IdPortenDirectAuthSettings> settings,
         IConfigurationManager<OpenIdConnectConfiguration> configurationManager,
         ILogger<OidcLogoutTokenValidator> logger)
     {
@@ -32,7 +32,7 @@ public sealed class OidcLogoutTokenValidator : IOidcLogoutTokenValidator
     }
 
     public OidcLogoutTokenValidator(
-        IdPortenSettings settings,
+        IdPortenDirectAuthSettings settings,
         TokenValidationParameters testValidationParameters,
         ILogger<OidcLogoutTokenValidator> logger)
     {
