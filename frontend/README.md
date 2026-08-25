@@ -97,13 +97,10 @@ Used for direct ID-Porten login. Section name is unchanged for existing deployme
 | `ClientId` | Yes | ID-Porten client id (Key Vault secret in deploy) |
 | `ClientSecret` | Yes | ID-Porten client secret (Key Vault secret in deploy) |
 | `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) |
-| `CallbackPath` | No | Default `/broker/api/v1/authentication/callback` |
 | `SpaBaseUrl` | Dev / split-origin | Public SPA origin (e.g. `https://localhost:5173`). OIDC callback and post-login redirect use this host. Leave empty when SPA and API share the same origin (Front Door + APIM). |
-| `PostLogoutRedirectUri` | No | Path after logout (default `/`) |
-| `RequiredAcr` | No | Minimum auth level (default `idporten-loa-substantial`) |
 | `CookieName` | No | Broker session cookie name (default `AltinnBrokerSession`) |
-| `CookieLifetimeMinutes` | No | Session lifetime (default `60`) |
-| `BackChannelLogoutPath` | No | Back-channel logout path (default `/broker/api/v1/authentication/backchannel-logout`) |
+
+Fixed in code (not configurable): callback `/broker/api/v1/authentication/callback`, front-channel logout `/broker/api/v1/authentication/frontchannel-logout`, back-channel logout `/broker/api/v1/authentication/backchannel-logout`, post-logout redirect `/`, required ACR `idporten-loa-substantial`, session lifetime 60 minutes.
 
 **Deploy environment variables** (Container App):
 

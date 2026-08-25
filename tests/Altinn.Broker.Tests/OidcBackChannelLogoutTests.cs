@@ -98,7 +98,7 @@ public class OidcBackChannelLogoutTests
         };
 
         return new OidcLogoutTokenValidator(
-            new IdPortenDirectAuthSettings { ClientId = ClientId, Authority = Issuer, CookieLifetimeMinutes = 60 },
+            new IdPortenDirectAuthSettings { ClientId = ClientId, Authority = Issuer },
             parameters,
             NullLogger<OidcLogoutTokenValidator>.Instance);
     }

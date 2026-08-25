@@ -79,7 +79,7 @@ public class IdPortenDirectAuthController : ControllerBase
     public async Task<IActionResult> Logout([FromQuery] string? returnUrl = null)
     {
         await RevokeLocalOidcSessionAsync();
-        var path = ToSafeAppPath(returnUrl ?? _settings.PostLogoutRedirectUri);
+        var path = ToSafeAppPath(returnUrl ?? IdPortenDirectAuthDefaults.PostLogoutRedirectUri);
         var properties = new AuthenticationProperties
         {
             RedirectUri = _settings.BuildSpaUrl(path)
@@ -137,7 +137,7 @@ public class IdPortenDirectAuthController : ControllerBase
         await _logoutSessionStore.RevokeAsync(
             claims.Sid,
             claims.Sub,
-            _settings.SessionRevocationLifetime,
+            IdPortenDirectAuthDefaults.SessionRevocationLifetime,
             cancellationToken);
 
         _logger.LogInformation("Revoked end-user session from ID-Porten back-channel logout");
@@ -159,7 +159,7 @@ public class IdPortenDirectAuthController : ControllerBase
             return;
         }
 
-        await _logoutSessionStore.RevokeAsync(sid, sub, _settings.SessionRevocationLifetime);
+        await _logoutSessionStore.RevokeAsync(sid, sub, IdPortenDirectAuthDefaults.SessionRevocationLifetime);
     }
 
     private static string? GetItem(AuthenticationProperties? properties, string key)

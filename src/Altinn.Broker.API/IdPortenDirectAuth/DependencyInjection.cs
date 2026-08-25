@@ -51,7 +51,7 @@ public static class DependencyInjection
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 options.Cookie.SameSite = SameSiteMode.Lax;
-                options.ExpireTimeSpan = TimeSpan.FromMinutes(settings.CookieLifetimeMinutes);
+                options.ExpireTimeSpan = TimeSpan.FromMinutes(IdPortenDirectAuthDefaults.CookieLifetimeMinutes);
                 options.SlidingExpiration = true;
                 options.EventsType = typeof(AltinnTokenCookieEvents);
             })
@@ -61,7 +61,7 @@ public static class DependencyInjection
                 options.ClientId = settings.ClientId;
                 options.ClientSecret = settings.ClientSecret;
                 options.ResponseType = OpenIdConnectResponseType.Code;
-                options.CallbackPath = settings.CallbackPath;
+                options.CallbackPath = IdPortenDirectAuthDefaults.CallbackPath;
                 options.SignInScheme = AuthorizationConstants.EndUserCookie;
                 options.SaveTokens = false;
                 options.GetClaimsFromUserInfoEndpoint = false;
@@ -89,7 +89,7 @@ public static class DependencyInjection
                         if (!string.IsNullOrWhiteSpace(settings.SpaBaseUrl))
                         {
                             context.ProtocolMessage.PostLogoutRedirectUri =
-                                settings.BuildSpaUrl(settings.PostLogoutRedirectUri);
+                                settings.BuildSpaUrl(IdPortenDirectAuthDefaults.PostLogoutRedirectUri);
                         }
 
                         return Task.CompletedTask;
@@ -104,7 +104,7 @@ public static class DependencyInjection
                             return;
                         }
 
-                        var requiredAcr = settings.RequiredAcr;
+                        var requiredAcr = IdPortenDirectAuthDefaults.RequiredAcr;
                         var acr = context.Principal?.FindFirst(ClaimConstants.UserFlow)?.Value
                             ?? context.Principal?.FindFirst("acr")?.Value;
                         if (!string.IsNullOrEmpty(requiredAcr) && acr != requiredAcr)

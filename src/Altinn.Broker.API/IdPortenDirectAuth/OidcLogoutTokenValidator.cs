@@ -80,7 +80,7 @@ public sealed class OidcLogoutTokenValidator : IOidcLogoutTokenValidator
             }
 
             var expiresAt = jwt.ValidTo == DateTime.MinValue
-                ? DateTimeOffset.UtcNow.AddMinutes(_settings.CookieLifetimeMinutes)
+                ? DateTimeOffset.UtcNow.AddMinutes(IdPortenDirectAuthDefaults.CookieLifetimeMinutes)
                 : new DateTimeOffset(DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc));
 
             return new OidcLogoutTokenClaims(sid, sub, jti, expiresAt);
