@@ -24,6 +24,8 @@ param apiOriginHostName string = ''
 
 var resourceGroupName = '${namePrefix}-rg'
 var frontDoorProfileName = '${namePrefix}-frontend-fd'
+// AFD endpoint names are globally unique across Azure.
+var resolvedEndpointName = take('${toLower(namePrefix)}fe', 46)
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: resourceGroupName
@@ -45,9 +47,7 @@ module frontDoor '../../modules/frontDoor/create.bicep' = {
     frontDoorProfileName: frontDoorProfileName
     originHostName: staticWebsite.outputs.staticWebsiteHostName
     apiOriginHostName: apiOriginHostName
-    // Must stay 'default' — existing hostname is default-{hash}.azurefd.net.
-    // A different endpoint name creates a second unused endpoint without /broker routing.
-    endpointName: 'default'
+    endpointName: resolvedEndpointName
   }
 }
 

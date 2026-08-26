@@ -7,7 +7,7 @@ param originHostName string
 @description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, /broker/* is forwarded to APIM.')
 param apiOriginHostName string = ''
 
-@description('AFD endpoint name. Hostname is {endpointName}-{hash}.azurefd.net — must match the endpoint already in use.')
+@description('AFD endpoint name. Must be globally unique across Azure. Hostname becomes {endpointName}-{hash}.azurefd.net.')
 param endpointName string = 'default'
 
 var hasApiOrigin = !empty(apiOriginHostName)
