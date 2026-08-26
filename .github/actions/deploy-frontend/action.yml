@@ -24,6 +24,14 @@ inputs:
   FRONTEND_STORAGE_ACCOUNT:
     description: "Globally unique storage account name for the frontend static website"
     required: true
+  API_ORIGIN_HOST_NAME:
+    description: "APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). Front Door forwards /broker/* here. Leave empty for SPA-only Front Door."
+    required: false
+    default: ""
+  VITE_API_BASE_URL:
+    description: "Broker API origin baked into the SPA at build time. Leave empty when Front Door proxies /broker/* (same-origin cookies)."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -46,6 +54,8 @@ runs:
     - name: Build frontend
       shell: bash
       working-directory: frontend
+      env:
+        VITE_API_BASE_URL: ${{ inputs.VITE_API_BASE_URL }}
       run: npm run build
 
     - name: OIDC Login to Azure Public Cloud
@@ -70,6 +80,7 @@ runs:
         NAME_PREFIX: ${{ inputs.AZURE_NAME_PREFIX }}
         DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ env.DEPLOYMENT_PRINCIPAL_OBJECT_ID }}
         FRONTEND_STORAGE_ACCOUNT: ${{ inputs.FRONTEND_STORAGE_ACCOUNT }}
+        API_ORIGIN_HOST_NAME: ${{ inputs.API_ORIGIN_HOST_NAME }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
@@ -123,6 +134,8 @@ runs:
       shell: bash
       run: |
         echo "Frontend deployed to https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}"
+        echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        echo "Expect Content-Type: application/json (not text/html)."
 
     - name: Logout from azure
       shell: bash

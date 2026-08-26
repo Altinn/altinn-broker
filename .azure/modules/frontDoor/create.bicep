@@ -4,7 +4,13 @@ param frontDoorProfileName string
 @description('Hostname of the static website origin.')
 param originHostName string
 
+@description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, /broker/* is forwarded to APIM.')
+param apiOriginHostName string = ''
+
+@description('AFD endpoint name. Must be globally unique across Azure. Hostname becomes {endpointName}-{hash}.azurefd.net.')
 param endpointName string = 'default'
+
+var hasApiOrigin = !empty(apiOriginHostName)
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2023-05-01' = {
   name: frontDoorProfileName
@@ -24,7 +30,7 @@ resource afdEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2023-05-01' = {
   }
 }
 
-resource originGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
+resource frontendOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
   parent: frontDoorProfile
   name: 'frontend-origin-group'
   properties: {
@@ -41,8 +47,8 @@ resource originGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
   }
 }
 
-resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
-  parent: originGroup
+resource frontendOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
+  parent: frontendOriginGroup
   name: 'storage-static-website'
   properties: {
     hostName: originHostName
@@ -55,16 +61,126 @@ resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
   }
 }
 
-resource route 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
+resource apiOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = if (hasApiOrigin) {
+  parent: frontDoorProfile
+  name: 'api-origin-group'
+  properties: {
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
+    }
+    healthProbeSettings: {
+      // Built-in APIM health endpoint (always available on the gateway).
+      probePath: '/status-0123456789abcdef'
+      probeRequestType: 'GET'
+      probeProtocol: 'Https'
+      probeIntervalInSeconds: 100
+    }
+  }
+}
+
+resource apiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = if (hasApiOrigin) {
+  parent: apiOriginGroup
+  name: 'apim-gateway'
+  properties: {
+    hostName: apiOriginHostName
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: apiOriginHostName
+    priority: 1
+    weight: 1000
+    enabledState: 'Enabled'
+  }
+}
+
+// Safety net: if /* wins over /broker/*, still force APIM for broker paths.
+resource brokerApiRuleSet 'Microsoft.Cdn/profiles/ruleSets@2023-05-01' = if (hasApiOrigin) {
+  parent: frontDoorProfile
+  name: 'brokerapi'
+}
+
+resource brokerToApimRule 'Microsoft.Cdn/profiles/ruleSets/rules@2023-05-01' = if (hasApiOrigin) {
+  parent: brokerApiRuleSet
+  name: 'ForwardBrokerToApim'
+  properties: {
+    order: 1
+    matchProcessingBehavior: 'Stop'
+    conditions: [
+      {
+        name: 'UrlPath'
+        parameters: {
+          typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
+          operator: 'BeginsWith'
+          negateCondition: false
+          matchValues: [
+            'broker'
+            '/broker'
+          ]
+          transforms: [
+            'Lowercase'
+          ]
+        }
+      }
+    ]
+    actions: [
+      {
+        name: 'RouteConfigurationOverride'
+        parameters: {
+          typeName: 'DeliveryRuleRouteConfigurationOverrideActionParameters'
+          originGroupOverride: {
+            originGroup: {
+              id: apiOriginGroup!.id
+            }
+            forwardingProtocol: 'HttpsOnly'
+          }
+        }
+      }
+    ]
+  }
+}
+
+// More specific than /* so /broker/* is matched first when route selection works.
+resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (hasApiOrigin) {
   parent: afdEndpoint
-  name: 'frontend-route'
+  name: 'api-route'
   dependsOn: [
-    origin
+    apiOrigin
   ]
   properties: {
     originGroup: {
-      id: originGroup.id
+      id: apiOriginGroup!.id
     }
+    supportedProtocols: [
+      'Http'
+      'Https'
+    ]
+    patternsToMatch: [
+      '/broker/*'
+    ]
+    forwardingProtocol: 'HttpsOnly'
+    linkToDefaultDomain: 'Enabled'
+    httpsRedirect: 'Enabled'
+    enabledState: 'Enabled'
+  }
+}
+
+resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
+  parent: afdEndpoint
+  name: 'frontend-route'
+  dependsOn: [
+    frontendOrigin
+  ]
+  properties: {
+    originGroup: {
+      id: frontendOriginGroup.id
+    }
+    ruleSets: hasApiOrigin
+      ? [
+          {
+            id: brokerApiRuleSet!.id
+          }
+        ]
+      : []
     supportedProtocols: [
       'Http'
       'Https'
