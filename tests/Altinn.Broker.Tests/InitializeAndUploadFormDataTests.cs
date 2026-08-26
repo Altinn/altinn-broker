@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 
 using Altinn.Broker.API.Models;
+using Altinn.Broker.Application;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
@@ -96,6 +97,29 @@ public class InitializeAndUploadFormDataTests : IClassFixture<CustomWebApplicati
     }
 
     [Fact]
+    public async Task InitializeAndUpload_InvalidRecipient_Returns400()
+    {
+        var metadata = new FileTransferInitalizeExt
+        {
+            FileName = "test.txt",
+            ResourceId = TestConstants.RESOURCE_WITH_ACCESS_LIST,
+            Sender = "0192:991825827",
+            Recipients = new List<string> { "0192:111111111" },
+            SendersFileTransferReference = "123",
+            PropertyList = new Dictionary<string, string>()
+        };
+
+        var multipart = CreateMultipartFormData(metadata, "hello world");
+
+        var response = await _senderClient.PostAsync("broker/api/v1/filetransfer/upload", multipart);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(_jsonOptions);
+        Assert.NotNull(problem);
+        Assert.Equal(Errors.InvalidRecipient.Message, problem.Detail);
+    }
+
+    [Fact]
     public async Task InitializeAndUpload_MissingFile_Returns400()
     {
         var metadata = new FileTransferInitalizeExt
@@ -173,5 +197,4 @@ public class InitializeAndUploadFormDataTests : IClassFixture<CustomWebApplicati
         return multipart;
     }
 }
-
 
