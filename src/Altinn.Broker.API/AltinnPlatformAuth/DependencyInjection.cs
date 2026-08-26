@@ -1,8 +1,7 @@
 using Altinn.Broker.API.AltinnPlatformAuth.Options;
-using Altinn.Broker.Core.Options;
+using Altinn.Broker.API.Configuration;
 
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Altinn.Broker.API.AltinnPlatformAuth;
 
@@ -14,5 +13,13 @@ public static class DependencyInjection
         services.AddHttpClient<IAltinnPlatformAuthenticationClient, AltinnPlatformAuthenticationClient>();
         services.AddSingleton<IAltinnPlatformJwtCookieReader, AltinnPlatformJwtCookieReader>();
         return services;
+    }
+
+    public static AuthenticationBuilder AddAltinnPlatformJwtCookie(
+        this AuthenticationBuilder builder)
+    {
+        return builder.AddScheme<AuthenticationSchemeOptions, AltinnPlatformJwtCookieAuthenticationHandler>(
+            AuthorizationConstants.AltinnPlatformJwtCookie,
+            _ => { });
     }
 }

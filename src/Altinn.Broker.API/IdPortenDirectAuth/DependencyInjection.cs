@@ -50,7 +50,7 @@ public static class DependencyInjection
                 options.Cookie.Name = settings.CookieName;
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SameSite = AuthCookieDefaults.SameSite;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(IdPortenDirectAuthDefaults.CookieLifetimeMinutes);
                 options.SlidingExpiration = true;
                 options.EventsType = typeof(AltinnTokenCookieEvents);

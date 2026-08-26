@@ -72,6 +72,30 @@ public class OidcBackChannelLogoutTests
     }
 
     [Fact]
+    public async Task SessionStore_RevokePrefersSid_DoesNotStoreSub()
+    {
+        var store = CreateStore();
+
+        await store.RevokeAsync("sid-only", "sub-ignored", TimeSpan.FromMinutes(5));
+
+        Assert.True(await store.IsRevokedAsync("sid-only", null));
+        Assert.False(await store.IsRevokedAsync(null, "sub-ignored"));
+    }
+
+    [Fact]
+    public async Task SessionStore_SubRevocation_IgnoresCookiesIssuedAfterLogout()
+    {
+        var store = CreateStore();
+        var beforeLogout = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+        await store.RevokeAsync(null, "user-sub", TimeSpan.FromMinutes(5));
+        var afterLogout = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        Assert.True(await store.IsRevokedAsync(null, "user-sub", beforeLogout));
+        Assert.False(await store.IsRevokedAsync(null, "user-sub", afterLogout));
+    }
+
+    [Fact]
     public async Task SessionStore_DuplicateJti_IsRejected()
     {
         var store = CreateStore();

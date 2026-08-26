@@ -112,7 +112,6 @@ resource brokerToApimRule 'Microsoft.Cdn/profiles/ruleSets/rules@2023-05-01' = i
           typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
           operator: 'BeginsWith'
           negateCondition: false
-          // AFD UrlPath may be with or without a leading slash depending on SKU/version.
           matchValues: [
             'broker'
             '/broker'
@@ -128,7 +127,6 @@ resource brokerToApimRule 'Microsoft.Cdn/profiles/ruleSets/rules@2023-05-01' = i
         name: 'RouteConfigurationOverride'
         parameters: {
           typeName: 'DeliveryRuleRouteConfigurationOverrideActionParameters'
-          // Omit cacheConfiguration → caching disabled for overridden requests.
           originGroupOverride: {
             originGroup: {
               id: apiOriginGroup!.id

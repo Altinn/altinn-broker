@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 using Altinn.Broker.API.AltinnPlatformAuth.Options;
+using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Core.Options;
 
 using Microsoft.Extensions.Options;
@@ -49,6 +50,10 @@ public sealed class AltinnPlatformJwtCookieReader : IAltinnPlatformJwtCookieRead
         try
         {
             var configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
+            // Altinn platform end-user JWTs are not issued with a Broker-specific audience.
+            // No ValidAudience is configured on AltinnPlatformAuthSettings. ValidateAudience stays
+            // disabled (same as JwtBearerDefaults for Altinn tokens). This reader is used by the
+            // AltinnPlatformJwtCookie auth scheme and as a fallback for AuthenticationController.Me.
             var parameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
@@ -62,7 +67,13 @@ public sealed class AltinnPlatformJwtCookieReader : IAltinnPlatformJwtCookieRead
             };
 
             var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
-            return handler.ValidateToken(token, parameters, out _);
+            var principal = handler.ValidateToken(token, parameters, out _);
+            var identity = new ClaimsIdentity(
+                principal.Claims,
+                AuthorizationConstants.AltinnPlatformJwtCookie,
+                ClaimTypes.Name,
+                ClaimTypes.Role);
+            return new ClaimsPrincipal(identity);
         }
         catch
         {

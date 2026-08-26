@@ -136,7 +136,7 @@ public class IdPortenDirectAuthController : ControllerBase
 
         await _logoutSessionStore.RevokeAsync(
             claims.Sid,
-            claims.Sub,
+            string.IsNullOrEmpty(claims.Sid) ? claims.Sub : null,
             IdPortenDirectAuthDefaults.SessionRevocationLifetime,
             cancellationToken);
 
@@ -159,7 +159,10 @@ public class IdPortenDirectAuthController : ControllerBase
             return;
         }
 
-        await _logoutSessionStore.RevokeAsync(sid, sub, IdPortenDirectAuthDefaults.SessionRevocationLifetime);
+        await _logoutSessionStore.RevokeAsync(
+            sid,
+            string.IsNullOrEmpty(sid) ? sub : null,
+            IdPortenDirectAuthDefaults.SessionRevocationLifetime);
     }
 
     private static string? GetItem(AuthenticationProperties? properties, string key)

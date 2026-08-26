@@ -109,7 +109,7 @@ Fixed in code (not configurable): callback `/broker/api/v1/authentication/callba
 - `IdPortenSettings__ClientSecret` ← Key Vault
 - `IdPortenSettings__SpaBaseUrl` ← `FRONTEND_BASE_URL`
 
-**Local Development example** (`appsettings.Development.json`):
+**Local Development example** (`appsettings.local.json`):
 
 ```json
 "IdPortenSettings": {

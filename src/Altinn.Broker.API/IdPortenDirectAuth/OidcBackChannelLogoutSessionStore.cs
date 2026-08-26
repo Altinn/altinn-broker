@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace Altinn.Broker.API.IdPortenDirectAuth;
@@ -20,30 +22,71 @@ public sealed class OidcBackChannelLogoutSessionStore(IDistributedCache cache) :
     public async Task RevokeAsync(string? sid, string? sub, TimeSpan timeToLive, CancellationToken cancellationToken = default)
     {
         var options = CacheOptions(timeToLive);
+        var revokedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+
+        // Prefer sid; only fall back to sub when no session id exists.
         if (!string.IsNullOrEmpty(sid))
         {
-            await cache.SetStringAsync(SidKey(sid), "1", options, cancellationToken);
+            await cache.SetStringAsync(SidKey(sid), revokedAt, options, cancellationToken);
+            return;
         }
 
         if (!string.IsNullOrEmpty(sub))
         {
-            await cache.SetStringAsync(SubKey(sub), "1", options, cancellationToken);
+            await cache.SetStringAsync(SubKey(sub), revokedAt, options, cancellationToken);
         }
     }
 
-    public async Task<bool> IsRevokedAsync(string? sid, string? sub, CancellationToken cancellationToken = default)
+    public async Task<bool> IsRevokedAsync(
+        string? sid,
+        string? sub,
+        DateTimeOffset? cookieIssuedUtc = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrEmpty(sid) && !string.IsNullOrEmpty(await cache.GetStringAsync(SidKey(sid), cancellationToken)))
+        if (!string.IsNullOrEmpty(sid))
         {
-            return true;
+            var sidValue = await cache.GetStringAsync(SidKey(sid), cancellationToken);
+            if (IsActiveRevocation(sidValue, cookieIssuedUtc))
+            {
+                return true;
+            }
         }
 
-        if (!string.IsNullOrEmpty(sub) && !string.IsNullOrEmpty(await cache.GetStringAsync(SubKey(sub), cancellationToken)))
+        if (!string.IsNullOrEmpty(sub))
         {
-            return true;
+            var subValue = await cache.GetStringAsync(SubKey(sub), cancellationToken);
+            if (IsActiveRevocation(subValue, cookieIssuedUtc))
+            {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// A revocation applies when present and the cookie was issued at or before the revocation time.
+    /// Cookies issued after logout (re-login) remain valid.
+    /// </summary>
+    private static bool IsActiveRevocation(string? storedValue, DateTimeOffset? cookieIssuedUtc)
+    {
+        if (string.IsNullOrEmpty(storedValue))
+        {
+            return false;
+        }
+
+        if (cookieIssuedUtc is null)
+        {
+            return true;
+        }
+
+        if (!DateTimeOffset.TryParse(storedValue, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var revokedAt))
+        {
+            // Legacy "1" entries: treat as revoked.
+            return true;
+        }
+
+        return cookieIssuedUtc <= revokedAt;
     }
 
     private static DistributedCacheEntryOptions CacheOptions(TimeSpan timeToLive) => new()

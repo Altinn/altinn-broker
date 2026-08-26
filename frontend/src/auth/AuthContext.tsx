@@ -22,21 +22,23 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function fetchCurrentUser(): Promise<AuthUser | null | 'html'> {
+/** null = confirmed unauthenticated; 'unavailable' = API/network failure (do not start login). */
+async function fetchCurrentUser(): Promise<AuthUser | null | 'unavailable'> {
   try {
     const me = await apiFetch<MeResponse>(`${AUTH_BASE_PATH}/me`, {
       redirectOnUnauthorized: false,
     })
     // Front Door misroute: /broker hits static website → index.html instead of JSON.
     if (typeof me === 'string') {
-      return 'html'
+      return 'unavailable'
     }
     if (!me?.authenticated) {
       return null
     }
     return { authenticated: true, claims: me.claims ?? [] }
   } catch {
-    return null
+    // Network failures and non-401 API errors — treat as unavailable, not logged-out.
+    return 'unavailable'
   }
 }
 
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const user = await fetchCurrentUser()
-    if (user === 'html') {
+    if (user === 'unavailable') {
       setState({ status: 'api_unreachable' })
       return
     }

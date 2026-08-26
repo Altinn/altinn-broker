@@ -47,12 +47,12 @@ public class AltinnTokenExchangeService : IAltinnTokenExchangeService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning(
-                "Altinn ID-Porten token exchange failed. Status={StatusCode} Url={Url} Body={Body}. " +
+                "Altinn ID-Porten token exchange failed. Status={StatusCode} Url={Url} BodyLength={BodyLength}. " +
                 "Common causes: access token missing an altinn:* scope (Platform returns 403), " +
                 "missing pid/acr claims, person not in Altinn Register, or missing PlatformSubscriptionKey (APIM 401).",
                 (int)response.StatusCode,
                 exchangeUrl,
-                Truncate(body, 500));
+                body.Length);
             return null;
         }
 
@@ -62,7 +62,11 @@ public class AltinnTokenExchangeService : IAltinnTokenExchangeService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to parse Altinn token exchange response. Body={Body}", Truncate(body, 200));
+            _logger.LogWarning(
+                ex,
+                "Failed to parse Altinn token exchange response. BodyLength={BodyLength} LooksLikeJwt={LooksLikeJwt}",
+                body.Length,
+                body.TrimStart().StartsWith("eyJ", StringComparison.Ordinal));
             return null;
         }
     }
@@ -94,16 +98,7 @@ public class AltinnTokenExchangeService : IAltinnTokenExchangeService
                 ?? throw new InvalidOperationException("Altinn token exchange returned an empty access_token.");
         }
 
-        throw new InvalidOperationException($"Unexpected Altinn token exchange response: {Truncate(body, 200)}");
-    }
-
-    private static string Truncate(string? value, int maxLength)
-    {
-        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
-        {
-            return value ?? string.Empty;
-        }
-
-        return value[..maxLength] + "…";
+        throw new InvalidOperationException(
+            $"Unexpected Altinn token exchange response shape: {document.RootElement.ValueKind}.");
     }
 }

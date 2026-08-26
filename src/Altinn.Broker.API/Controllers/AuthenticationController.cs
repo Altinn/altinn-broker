@@ -42,6 +42,8 @@ public class AuthenticationController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "no-store";
+
         var result = await HttpContext.AuthenticateAsync(AuthorizationConstants.EndUserCookie);
         var principal = result.Succeeded && result.Principal?.Identity?.IsAuthenticated == true
             ? result.Principal
@@ -52,11 +54,11 @@ public class AuthenticationController : ControllerBase
             return Ok(new { authenticated = false, claims = Array.Empty<object>() });
         }
 
+        // Exclude sensitive identifiers (e.g. pid). SPA only needs display name and Altinn party claims.
         var claims = principal.Claims
             .Where(c =>
-                c.Type.StartsWith("urn:altinn:")
-                || c.Type is "pid" or "name" or "acr" or "sid"
-                || c.Type.Contains("authnclassreference", StringComparison.OrdinalIgnoreCase))
+                c.Type.StartsWith("urn:altinn:", StringComparison.Ordinal)
+                || c.Type is "name")
             .Select(c => new { c.Type, c.Value });
         return Ok(new { authenticated = true, claims });
     }
@@ -90,7 +92,7 @@ public class AuthenticationController : ControllerBase
                 HttpOnly = true,
                 Secure = true,
                 IsEssential = true,
-                SameSite = SameSiteMode.Lax
+                SameSite = AuthCookieDefaults.SameSite
             };
 
             if (!string.IsNullOrWhiteSpace(_platformAuthSettings.CookieDomain))

@@ -44,7 +44,7 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
     {
         var sid = GetItem(context.Properties, OidcSessionKeys.Sid);
         var sub = GetItem(context.Properties, OidcSessionKeys.Sub);
-        if (await _logoutSessionStore.IsRevokedAsync(sid, sub))
+        if (await _logoutSessionStore.IsRevokedAsync(sid, sub, context.Properties.IssuedUtc))
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);

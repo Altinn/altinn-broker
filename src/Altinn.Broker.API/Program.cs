@@ -139,9 +139,13 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
             | ForwardedHeaders.XForwardedProto
             | ForwardedHeaders.XForwardedHost;
-        // Local Vite proxy — trust forwarded headers from loopback.
-        options.KnownNetworks.Clear();
-        options.KnownProxies.Clear();
+        // Only trust loopback for local Vite proxy. In deployed environments keep the
+        // default KnownNetworks/KnownProxies so arbitrary clients cannot spoof X-Forwarded-*.
+        if (hostEnvironment.IsDevelopment())
+        {
+            options.KnownNetworks.Clear();
+            options.KnownProxies.Clear();
+        }
     });
 
     // Add distributed cache for rate limiting and TUS upload expiration tracking.
@@ -228,6 +232,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 OnChallenge = AltinnTokenEventsHelper.OnChallenge
             };
         })
+        .AddAltinnPlatformJwtCookie()
         .AddIdPortenDirectAuth(config);
 
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
@@ -243,7 +248,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.EndUser, policy =>
         {
-            policy.AddAuthenticationSchemes(AuthorizationConstants.EndUserCookie);
+            policy.AddAuthenticationSchemes(
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie);
             policy.RequireAuthenticatedUser();
             policy.AddRequirements(new EndUserRequirement());
         });
