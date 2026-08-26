@@ -160,8 +160,10 @@ In Azure, Front Door can proxy API and SPA on one origin:
 
 1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `altinn-dev-api.azure-api.net`)
 2. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
-3. Set `FRONTEND_BASE_URL` → `IdPortenSettings__SpaBaseUrl` (Front Door URL)
+3. Set `FRONTEND_BASE_URL` → `IdPortenSettings__SpaBaseUrl` (Front Door URL from the deploy log)
 4. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
+
+Front Door endpoint names are globally unique. The name is derived from `AZURE_NAME_PREFIX`. After deploy, use the hostname printed in the workflow log for `FRONTEND_BASE_URL` and ID-Porten.
 
 Verify routing after deploy:
 
