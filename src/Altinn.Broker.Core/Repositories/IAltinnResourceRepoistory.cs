@@ -11,5 +11,12 @@ public interface IAltinnResourceRepository
     /// </summary>
     Task<string?> GetServiceOwnerNameOfResource(string resourceId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets access-list memberships for a party and resource.
+    /// </summary>
+    /// <returns>
+    /// The memberships, an empty list when the party has no membership, or <see langword="null"/>
+    /// when the party is invalid or cannot be found.
+    /// </returns>
     Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default);
 }
