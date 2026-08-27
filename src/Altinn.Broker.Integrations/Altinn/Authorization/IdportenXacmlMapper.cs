@@ -18,22 +18,14 @@ internal static class IdportenXacmlMapper
     private const string DefaultType = "string";
 
     internal static bool IsIdportenToken(ClaimsPrincipal user)
-    {
-        var issuer = user.FindFirst("iss")?.Value;
-        if (!Uri.TryCreate(issuer, UriKind.Absolute, out var issuerUri) || issuerUri.Scheme != Uri.UriSchemeHttps)
-        {
-            return false;
-        }
-
-        return issuerUri.Host.Equals(IdportenHost, StringComparison.OrdinalIgnoreCase)
-            || issuerUri.Host.Equals(TestIdportenHost, StringComparison.OrdinalIgnoreCase);
-    }
+        => FindIdportenIdentity(user) is not null;
 
     internal static bool TryCreateSubjectCategory(ClaimsPrincipal user, out XacmlJsonCategory subjectCategory)
     {
         subjectCategory = new XacmlJsonCategory { Attribute = [] };
 
-        var pidClaim = user.FindFirst("pid");
+        var idportenIdentity = FindIdportenIdentity(user);
+        var pidClaim = idportenIdentity?.FindFirst("pid");
         if (string.IsNullOrWhiteSpace(pidClaim?.Value))
         {
             return false;
@@ -100,8 +92,9 @@ internal static class IdportenXacmlMapper
 
     private static bool TryGetAuthenticationLevel(ClaimsPrincipal user, out int authenticationLevel)
     {
-        var authenticationContext = user.FindFirst(AuthenticationContextClaim)?.Value
-            ?? user.FindFirst(MappedAuthenticationContextClaim)?.Value;
+        var idportenIdentity = FindIdportenIdentity(user);
+        var authenticationContext = idportenIdentity?.FindFirst(AuthenticationContextClaim)?.Value
+            ?? idportenIdentity?.FindFirst(MappedAuthenticationContextClaim)?.Value;
 
         authenticationLevel = authenticationContext switch
         {
@@ -113,5 +106,21 @@ internal static class IdportenXacmlMapper
         };
 
         return authenticationLevel >= 0;
+    }
+
+    private static ClaimsIdentity? FindIdportenIdentity(ClaimsPrincipal user)
+        => user.Identities.FirstOrDefault(identity =>
+            identity.FindAll("iss").Any(claim => IsIdportenIssuer(claim.Value)));
+
+    private static bool IsIdportenIssuer(string issuer)
+    {
+        if (!Uri.TryCreate(issuer, UriKind.Absolute, out var issuerUri)
+            || issuerUri.Scheme != Uri.UriSchemeHttps)
+        {
+            return false;
+        }
+
+        return issuerUri.Host.Equals(IdportenHost, StringComparison.OrdinalIgnoreCase)
+            || issuerUri.Host.Equals(TestIdportenHost, StringComparison.OrdinalIgnoreCase);
     }
 }

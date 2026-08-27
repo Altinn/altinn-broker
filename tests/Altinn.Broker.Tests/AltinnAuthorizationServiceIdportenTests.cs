@@ -67,6 +67,37 @@ public class AltinnAuthorizationServiceIdportenTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task CheckAccessAsSender_WithCombinedPrincipal_UsesIdportenIdentityForPdp()
+    {
+        var handler = new PdpResponseHandler(CreatePermitResponse(minimumAuthenticationLevel: 4));
+        var service = CreateService(handler);
+        var altinnIdentity = new ClaimsIdentity(
+        [
+            new Claim("iss", "https://platform.tt02.altinn.no/authentication/api/v1/openid/"),
+            new Claim("pid", "altinn-token-person"),
+            new Claim(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-high")
+        ], "EndUserCookie");
+        var idportenIdentity = new ClaimsIdentity(
+        [
+            new Claim("iss", IdportenIssuer, ClaimValueTypes.String, IdportenIssuer),
+            new Claim("pid", "idporten-person", ClaimValueTypes.String, IdportenIssuer),
+            new Claim(
+                IdportenXacmlMapper.AuthenticationContextClaim,
+                "idporten-loa-substantial",
+                ClaimValueTypes.String,
+                IdportenIssuer)
+        ], "IdPorten");
+        var user = new ClaimsPrincipal([altinnIdentity, idportenIdentity]);
+
+        var hasAccess = await service.CheckAccessAsSender(user, ResourceId, OrganizationNumber);
+
+        Assert.False(hasAccess);
+        Assert.NotNull(handler.LastRequestJson);
+        Assert.Contains("idporten-person", handler.LastRequestJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("altinn-token-person", handler.LastRequestJson, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-high", 4, true)]
     [InlineData(IdportenXacmlMapper.MappedAuthenticationContextClaim, "idporten-loa-high", 4, true)]
