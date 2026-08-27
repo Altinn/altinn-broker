@@ -4,8 +4,6 @@ using Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
 /// Configuration for direct ID-Porten OIDC login (Broker as confidential client + session cookie).
-/// Bound from the <c>IdPortenSettings</c> configuration section for deployment compatibility.
-/// Paths, ACR, and session lifetime are fixed — see <see cref="IdPortenDirectAuthDefaults"/>.
 /// </summary>
 public class IdPortenDirectAuthSettings
 {
