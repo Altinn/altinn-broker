@@ -20,9 +20,9 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         var services = builder.Services;
-        services.Configure<IdPortenDirectAuthSettings>(configuration.GetSection(ConfigurationSectionName));
+        services.Configure<IdPortenDirectAuthSettings>(configuration.GetSection(nameof(IdPortenDirectAuthSettings)));
 
-        var settings = configuration.GetSection("IdPortenDirectAuthSettings").Get<IdPortenDirectAuthSettings>()
+        var settings = configuration.GetSection(nameof(IdPortenDirectAuthSettings)).Get<IdPortenDirectAuthSettings>()
             ?? new IdPortenDirectAuthSettings();
 
         services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
