@@ -26,6 +26,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -148,16 +149,20 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         }
     });
 
-    // Add distributed cache for rate limiting and TUS upload expiration tracking.
+    // Shared Redis for distributed cache, TUS, and ASP.NET Data Protection keys
+    // (OIDC state/correlation cookies must decrypt on any Container App replica).
     var distributedCacheOptions = config.GetSection(DistributedCacheOptions.SectionName).Get<DistributedCacheOptions>();
     if (!string.IsNullOrWhiteSpace(distributedCacheOptions?.RedisConnectionString))
     {
+        var redis = ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString);
+        services.AddSingleton<IConnectionMultiplexer>(redis);
         services.AddStackExchangeRedisCache(options =>
         {
             options.Configuration = distributedCacheOptions.RedisConnectionString;
         });
-        services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(distributedCacheOptions.RedisConnectionString));
+        services.AddDataProtection()
+            .SetApplicationName("Altinn.Broker.API")
+            .PersistKeysToStackExchangeRedis(redis, "Altinn.Broker.API-DataProtection-Keys");
     }
     else
     {
