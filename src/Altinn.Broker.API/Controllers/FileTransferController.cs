@@ -37,6 +37,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// <response code="400"><ul>
     /// <li>Service owner needs to be configured to use the broker API</li>
     /// <li>In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack</li>
+    /// <li>One or more recipients are invalid or could not be found</li>
     /// </ul></response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
@@ -131,6 +132,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     /// <response code="400"><ul>
     /// <li>Service owner needs to be configured to use the broker API</li>
     /// <li>In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack</li>
+    /// <li>One or more recipients are invalid or could not be found</li>
     /// </ul></response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
