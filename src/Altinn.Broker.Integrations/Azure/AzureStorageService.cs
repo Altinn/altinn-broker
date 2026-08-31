@@ -322,9 +322,10 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
         var destinationBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
+        CommittedStripes? committedStripes = null;
         try
         {
-            var committedStripes = await CommittedStripes.ReadAsync(
+            committedStripes = await ReadCommittedStripesAsync(
                 blobContainerClient,
                 fileTransferEntity.FileTransferId,
                 cancellationToken);
@@ -346,8 +347,8 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                     committedStripes.StripeCount,
                     committedStripes.TotalLength);
 
-                await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-                await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                await DeleteBlobIfExistsAsync(blockStagingBlobClient, cancellationToken);
+                await DeleteBlobIfExistsAsync(appendStagingBlobClient, cancellationToken);
                 return (destinationChecksum, committedStripes.TotalLength, committedStripes.StripeSizeBytes);
             }
 
@@ -405,9 +406,9 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                     cancellationToken: cancellationToken);
             }
 
-            await stagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await DeleteBlobIfExistsAsync(stagingBlobClient, cancellationToken);
+            await DeleteBlobIfExistsAsync(appendStagingBlobClient, cancellationToken);
+            await DeleteBlobIfExistsAsync(blockStagingBlobClient, cancellationToken);
 
             logger.LogInformation(
                 "Finalized TUS upload for {fileTransferId}, size {contentLength}",
@@ -421,19 +422,36 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 "Error finalizing TUS upload for {fileTransferId}: {errorMessage}",
                 fileTransferEntity.FileTransferId,
                 ex.Message);
-            await foreach (var blob in blobContainerClient.GetBlobsAsync(
-                BlobTraits.None,
-                BlobStates.None,
-                prefix: StripeLayout.GetStripeBlobPrefix(fileTransferEntity.FileTransferId),
-                cancellationToken: cancellationToken))
+            if (committedStripes is { StripeCount: 0 })
             {
-                await blobContainerClient.DeleteBlobIfExistsAsync(blob.Name, cancellationToken: cancellationToken);
+                try
+                {
+                    // Not the request token: it may already be cancelled, which would mask the fault above.
+                    await DeleteBlobIfExistsAsync(destinationBlobClient, CancellationToken.None);
+                }
+                catch (RequestFailedException cleanupException)
+                {
+                    logger.LogError(
+                        "Failed to remove the partially copied destination blob for {fileTransferId}: {errorMessage}",
+                        fileTransferEntity.FileTransferId,
+                        cleanupException.Message);
+                }
             }
+
             throw;
         }
     }
 
-    private static async Task<BlobClient?> ResolveTusStagingBlobClientAsync(
+    protected virtual Task<CommittedStripes> ReadCommittedStripesAsync(
+        BlobContainerClient blobContainerClient,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+        => CommittedStripes.ReadAsync(blobContainerClient, fileTransferId, cancellationToken);
+
+    protected virtual async Task DeleteBlobIfExistsAsync(BlobBaseClient blobClient, CancellationToken cancellationToken)
+        => await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+
+    protected virtual async Task<BlobClient?> ResolveTusStagingBlobClientAsync(
         BlobClient blockStagingBlobClient,
         BlobClient appendStagingBlobClient,
         CancellationToken cancellationToken)
@@ -453,7 +471,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         return null;
     }
 
-        public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
+    public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
     {
         try
         {
