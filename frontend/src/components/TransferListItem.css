@@ -1,0 +1,38 @@
+.transfer-list-item {
+  list-style: none;
+}
+
+.transfer-list-item__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #d2d5d8;
+  border-radius: 0.25rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.transfer-list-item__link:hover {
+  border-color: #1eadf7;
+  text-decoration: none;
+}
+
+.transfer-list-item__title {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.transfer-list-item__subtitle {
+  font-size: 0.875rem;
+  color: #545c7a;
+  margin-top: 0.25rem;
+}
+
+.transfer-list-item__chevron {
+  font-size: 1.25rem;
+  color: #545c7a;
+  flex-shrink: 0;
+}

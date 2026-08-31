@@ -1,0 +1,21 @@
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9eaec;
+}
+
+.detail-field:last-child {
+  border-bottom: none;
+}
+
+.detail-field__label {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.detail-field__value {
+  font-size: 0.875rem;
+  color: #545c7a;
+}

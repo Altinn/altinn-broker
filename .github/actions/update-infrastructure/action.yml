@@ -39,6 +39,12 @@ inputs:
   MASKINPORTEN_CLIENT_ID:
     description: "Client ID for maskinporten"
     required: true
+  IDPORTEN_CLIENT_ID:
+    description: "Client ID for ID-porten"
+    required: true
+  IDPORTEN_CLIENT_SECRET:
+    description: "Client secret for ID-porten"
+    required: true
   PLATFORM_SUBSCRIPTION_KEY:
     description: "Subscription key for platform"
     required: true
@@ -108,6 +114,8 @@ runs:
         BACKUP_STORAGE_ACCOUNT_NAME: ${{ inputs.AZURE_BACKUP_STORAGE_ACCOUNT_NAME }}
         MASKINPORTEN_JWK: ${{ inputs.MASKINPORTEN_JWK }}
         MASKINPORTEN_CLIENT_ID: ${{ inputs.MASKINPORTEN_CLIENT_ID }}
+        IDPORTEN_CLIENT_ID: ${{ inputs.IDPORTEN_CLIENT_ID }}
+        IDPORTEN_CLIENT_SECRET: ${{ inputs.IDPORTEN_CLIENT_SECRET }}
         PLATFORM_SUBSCRIPTION_KEY: ${{ inputs.PLATFORM_SUBSCRIPTION_KEY }}
         SLACK_URL: ${{ inputs.SLACK_URL }}
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}

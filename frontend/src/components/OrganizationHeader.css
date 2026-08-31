@@ -1,0 +1,30 @@
+.org-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.org-header__avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.25rem;
+  background: #783123;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.org-header__name {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.org-header__number {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  color: #545c7a;
+}
