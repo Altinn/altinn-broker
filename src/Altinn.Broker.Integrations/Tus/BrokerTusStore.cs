@@ -1271,34 +1271,48 @@ public class BrokerTusStore(
         var layout = await GetConcatLayoutAsync(fileId, uploadLength, checkpoint, cancellationToken);
         var stripeIndex = checkpoint.PreparedStripeCount;
         var expectedStripeLength = layout.LengthOfStripe(stripeIndex);
+        var committedLength = await storageResolver.GetStripeBlobLengthAsync(fileId, stripeIndex, cancellationToken);
 
-        var stagedSnapshot = await storageResolver.TryGetStripeStagedBlocksSnapshotAsync(fileId, stripeIndex, cancellationToken);
-        if (stagedSnapshot is not { BlockIds.Count: > 0 })
+        int preparedBlockCount;
+        long preparedLength;
+        if (committedLength >= expectedStripeLength)
         {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
+            preparedBlockCount = 0;
+            preparedLength = expectedStripeLength;
         }
-
-        if (stagedSnapshot.TotalLength != expectedStripeLength)
+        else
         {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} staged " +
-                $"{stagedSnapshot.TotalLength} bytes, expected {expectedStripeLength}.");
-        }
+            var stagedSnapshot = await storageResolver.TryGetStripeStagedBlocksSnapshotAsync(fileId, stripeIndex, cancellationToken);
+            if (stagedSnapshot is not { BlockIds.Count: > 0 })
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
+            }
 
-        if (stagedSnapshot.BlockIds.Count > _maxBlocksPerStripe)
-        {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} block count " +
-                $"{stagedSnapshot.BlockIds.Count} exceeds the limit of {_maxBlocksPerStripe}.");
+            if (stagedSnapshot.TotalLength != expectedStripeLength)
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} staged " +
+                    $"{stagedSnapshot.TotalLength} bytes, expected {expectedStripeLength}.");
+            }
+
+            if (stagedSnapshot.BlockIds.Count > _maxBlocksPerStripe)
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} block count " +
+                    $"{stagedSnapshot.BlockIds.Count} exceeds the limit of {_maxBlocksPerStripe}.");
+            }
+
+            preparedBlockCount = stagedSnapshot.BlockIds.Count;
+            preparedLength = stagedSnapshot.TotalLength;
         }
 
         var preparedStripeCount = stripeIndex + 1;
         var allStripesPrepared = preparedStripeCount >= layout.StripeCount;
         var nextCheckpoint = checkpoint with
         {
-            BlockCount = checkpoint.BlockCount + stagedSnapshot.BlockIds.Count,
-            StagedLength = checkpoint.StagedLength + stagedSnapshot.TotalLength,
+            BlockCount = checkpoint.BlockCount + preparedBlockCount,
+            StagedLength = checkpoint.StagedLength + preparedLength,
             PreparedStripeCount = preparedStripeCount,
             StripeSizeBytes = layout.StripeSize,
             StripeCount = layout.StripeCount,
@@ -1318,8 +1332,8 @@ public class BrokerTusStore(
             preparedStripeCount,
             layout.StripeCount,
             fileId,
-            stagedSnapshot.BlockIds.Count,
-            stagedSnapshot.TotalLength,
+            preparedBlockCount,
+            preparedLength,
             partialFileIds.Length);
 
         return new TusConcatChainStepResult(
