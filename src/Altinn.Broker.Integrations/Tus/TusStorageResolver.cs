@@ -844,7 +844,8 @@ public class TusStorageResolver(
     {
         fileId = TusRouteHelper.NormalizePartialFileId(fileId);
 
-        // Blocks stage on background tasks that outlive their PATCH, and a disposed HttpContext throws.
+        // Blocks stage on background tasks that outlive their PATCH. Reading a torn-down HttpContext
+        // throws ObjectDisposedException or, once Kestrel has recycled it, NullReferenceException.
         // The route is only a hint: the lookups below resolve the same transfer without it.
         try
         {
@@ -862,7 +863,7 @@ public class TusStorageResolver(
                 return pathFileTransferId;
             }
         }
-        catch (ObjectDisposedException)
+        catch (Exception exception) when (exception is ObjectDisposedException or NullReferenceException)
         {
             timing?.Step("resolve.fileTransferId.requestEnded");
         }
