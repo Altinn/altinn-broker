@@ -85,6 +85,41 @@ public class TusPartialUploadRegistryTests
     }
 
     [Fact]
+    public async Task TryGetUploadLengthAsync_LengthEntryEvicted_RecoversLengthFromPartialInfo()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        await registry.RegisterPartialAsync(
+            PartialUploadId,
+            Guid.Parse(FileTransferId),
+            uploadLength: 4096,
+            CancellationToken.None);
+
+        // A partial's length is written under two keys, which can be evicted independently. Reading zero
+        // here would let a concatenation pass a size limit the assembled transfer then exceeds.
+        await scope.DistributedCache.RemoveAsync($"tus-upload-length:{PartialUploadId}", CancellationToken.None);
+
+        Assert.Equal(4096, await registry.TryGetUploadLengthAsync(PartialUploadId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TryGetUploadLengthAsync_RemovedPartial_ReturnsNull()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        await registry.RegisterPartialAsync(
+            PartialUploadId,
+            Guid.Parse(FileTransferId),
+            uploadLength: 4096,
+            CancellationToken.None);
+
+        await registry.RemovePartialAsync(PartialUploadId, CancellationToken.None);
+
+        Assert.Null(await registry.TryGetUploadLengthAsync(PartialUploadId, CancellationToken.None));
+        Assert.False(await registry.IsKnownUploadAsync(PartialUploadId, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task TryBeginConcatJobAsync_SecondCallerFailsWhileFirstHoldsClaim()
     {
         await using var scope = TestHybridCacheFactory.CreateScope();

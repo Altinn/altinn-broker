@@ -205,7 +205,15 @@ public static class TusEndpointExtensions
             foreach (var partialFile in finalConcat.Files)
             {
                 var partialId = TusRouteHelper.NormalizePartialFileId(partialFile);
-                concatenatedLength += await partialUploadRegistry.TryGetUploadLengthAsync(partialId, context.CancellationToken) ?? 0;
+                if (await partialUploadRegistry.TryGetUploadLengthAsync(partialId, context.CancellationToken) is not long partialLength)
+                {
+                    context.FailRequest(
+                        HttpStatusCode.NotFound,
+                        $"Partial upload {partialId} could not be resolved. It may have expired.");
+                    return;
+                }
+
+                concatenatedLength += partialLength;
             }
 
             await ValidateTotalUploadSizeAsync(context, finalFileTransferId, concatenatedLength, singleUploadLength: null);

@@ -207,7 +207,11 @@ public sealed class TusPartialUploadRegistry(
     public async Task<long?> TryGetUploadLengthAsync(string fileId, CancellationToken cancellationToken)
     {
         var value = await distributedCache.GetStringAsync(UploadLengthKey(fileId), cancellationToken);
-        return long.TryParse(value, out var uploadLength) ? uploadLength : null;
+        if (long.TryParse(value, out var uploadLength))
+        {
+            return uploadLength;
+        }
+        return (await TryGetPartialInfoAsync(fileId, cancellationToken))?.UploadLength;
     }
 
     public async Task<bool> IsKnownUploadAsync(string fileId, CancellationToken cancellationToken)
