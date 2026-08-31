@@ -136,12 +136,12 @@ public abstract class StripedUploadTestBase
             $"Final concat returned {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
     }
 
-    protected static byte[] CreateContent(int length)
+    protected static byte[] CreateContent(int length, int startIndex = 0)
     {
         var content = new byte[length];
         for (var i = 0; i < length; i++)
         {
-            content[i] = (byte)('a' + (i % 26));
+            content[i] = (byte)('a' + ((startIndex + i) % 26));
         }
 
         return content;
@@ -186,7 +186,10 @@ public class TusStripedUploadTests(StripedStorageWebApplicationFactory factory)
     {
         // Arrange
         var fileTransferId = await InitializeFileTransfer();
-        var partialContents = Enumerable.Range(0, 4).Select(_ => CreateContent(25)).ToList();
+        const int partialLength = 25;
+        var partialContents = Enumerable.Range(0, 4)
+            .Select(partialIndex => CreateContent(partialLength, startIndex: partialIndex * partialLength))
+            .ToList();
         var locations = new List<Uri>();
         foreach (var partialContent in partialContents)
         {

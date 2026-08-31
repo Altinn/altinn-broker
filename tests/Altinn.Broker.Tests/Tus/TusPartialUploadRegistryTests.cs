@@ -66,6 +66,9 @@ public class TusPartialUploadRegistryTests
         Assert.Equal(1, await registry.IncrementStripeBlockCountAsync(fileTransferId, 1, 1, CancellationToken.None));
 
         await registry.ClearStripeBlockCountsAsync(fileTransferId, CancellationToken.None);
+
+        Assert.Equal(1, await registry.IncrementStripeBlockCountAsync(fileTransferId, 0, 1, CancellationToken.None));
+        Assert.Equal(1, await registry.IncrementStripeBlockCountAsync(fileTransferId, 1, 1, CancellationToken.None));
     }
 
     [Fact]

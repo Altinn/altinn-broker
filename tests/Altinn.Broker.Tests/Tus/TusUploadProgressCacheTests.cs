@@ -38,6 +38,36 @@ public class TusUploadProgressCacheTests
     }
 
     [Fact]
+    public async Task TryAcceptChunk_ChunkSpanningSeveralStripes_ReservesEveryBlockIndex()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var cache = scope.CreateProgressCache();
+
+        const string fileId = "partial-4";
+        await cache.InitializeAsync(fileId, uploadLength: 128 * 1024 * 1024, CancellationToken.None);
+
+        var straddling = await cache.TryAcceptChunkAsync(
+            fileId,
+            expectedOffset: 0,
+            chunkLength: 32 * 1024 * 1024,
+            blockCount: 3,
+            CancellationToken.None);
+        var following = await cache.TryAcceptChunkAsync(
+            fileId,
+            expectedOffset: straddling.NewAcceptedOffset,
+            chunkLength: 32 * 1024 * 1024,
+            blockCount: 1,
+            CancellationToken.None);
+
+        Assert.Equal(0, straddling.BlockIndex);
+        Assert.Equal(3, following.BlockIndex);
+
+        var progress = await cache.GetAsync(fileId, CancellationToken.None);
+        Assert.NotNull(progress);
+        Assert.Equal(4, progress!.NextBlockIndex);
+    }
+
+    [Fact]
     public async Task IncrementCommittedOffset_UpdatesProgress()
     {
         await using var scope = TestHybridCacheFactory.CreateScope();

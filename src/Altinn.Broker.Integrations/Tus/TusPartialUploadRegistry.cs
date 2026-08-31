@@ -171,10 +171,14 @@ public sealed class TusPartialUploadRegistry(
             return count;
         }
 
-        var field = $"{key}:{stripeIndex}";
-        var current = await distributedCache.GetStringAsync(field, cancellationToken);
-        var next = (long.TryParse(current, out var parsed) ? parsed : 0) + delta;
-        await SetCachedValueAsync(field, next.ToString(), cancellationToken);
+        var json = await distributedCache.GetStringAsync(key, cancellationToken);
+        var counts = string.IsNullOrWhiteSpace(json)
+            ? []
+            : JsonSerializer.Deserialize<Dictionary<int, long>>(json, JsonOptions) ?? [];
+        counts.TryGetValue(stripeIndex, out var current);
+        var next = current + delta;
+        counts[stripeIndex] = next;
+        await SetCachedValueAsync(key, JsonSerializer.Serialize(counts, JsonOptions), cancellationToken);
         return next;
     }
 
@@ -185,8 +189,7 @@ public sealed class TusPartialUploadRegistry(
             return _database.KeyDeleteAsync(StripeBlockCountKey(fileTransferId));
         }
 
-        // Without Redis the per-stripe counters are individually keyed and expire on their own.
-        return Task.CompletedTask;
+        return distributedCache.RemoveAsync(StripeBlockCountKey(fileTransferId), cancellationToken);
     }
 
     public Task RegisterUploadAsync(string fileId, long uploadLength, CancellationToken cancellationToken)
