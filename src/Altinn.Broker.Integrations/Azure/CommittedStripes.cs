@@ -11,6 +11,10 @@ namespace Altinn.Broker.Integrations.Azure;
 /// </summary>
 public sealed record CommittedStripes(int StripeCount, long TotalLength, IReadOnlyList<long> StripeLengths)
 {
+    /// <summary>
+    /// Every stripe but the last is exactly the stripe size, which the concatenation chain asserts before
+    /// committing, so stripe 0's length is the stripe size whenever the content spans more than one blob.
+    /// </summary>
     public long? StripeSizeBytes => StripeCount > 1 ? StripeLengths[0] : null;
 
     public static async Task<CommittedStripes> ReadAsync(
