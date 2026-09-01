@@ -52,7 +52,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
     public async Task<BrokerFileDownload> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, ByteRange? range, CancellationToken cancellationToken)
     {
         var blobContainerClient = await GetBlobContainerClient(fileTransfer, serviceOwnerEntity);
-        var layout = StripeLayout.For(fileTransfer);
+        var layout = StripeLayout.ForStoredContent(fileTransfer);
         try
         {
             if (layout.IsStriped)
@@ -530,7 +530,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             logger.LogError("Did not set checksum content hash because checksum was not found on file transfer");
             return;
         }
-        if (StripeLayout.For(fileTransferEntity).IsStriped)
+        if (StripeLayout.ForStoredContent(fileTransferEntity).IsStriped)
         {
             logger.LogInformation(
                 "Skipping Content-MD5 for striped file transfer {fileTransferId}; the whole file checksum is held on the file transfer",
@@ -560,7 +560,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             return null;
         }
 
-        var layout = StripeLayout.For(fileTransferEntity);
+        var layout = StripeLayout.ForStoredContent(fileTransferEntity);
         if (!layout.IsStriped)
         {
             await using var contentStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);

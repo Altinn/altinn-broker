@@ -133,7 +133,6 @@ public class BrokerTusStore(
                 blockIds[i] = partialInfo is not null
                     ? TusBlockIds.BuildNamespacedBlockId(partialInfo.Value.PartialIndex, acceptResult.BlockIndex + i)
                     : TusBlockIds.BuildSequentialBlockId(acceptResult.BlockIndex + i);
-                state.AddBlockId(fragments[i].StripeIndex, blockIds[i]);
             }
 
             state.AcceptedOffset = acceptResult.NewAcceptedOffset;
@@ -189,7 +188,7 @@ public class BrokerTusStore(
     {
         var lookupId = partialInfo?.FileTransferId.ToString() ?? fileId;
         var stripeSize = await storageResolver.GetStripeSizeAsync(lookupId, cancellationToken);
-        return new StripeLayout(partialInfo is null ? uploadLength : 0, stripeSize);
+        return StripeLayout.ForUpload(uploadLength, stripeSize, isConcatenationPartial: partialInfo is not null);
     }
 
     /// <summary>

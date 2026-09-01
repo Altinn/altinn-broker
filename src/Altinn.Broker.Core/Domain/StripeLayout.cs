@@ -105,7 +105,19 @@ public readonly record struct StripeLayout(long TotalLength, long StripeSize)
         return fullestStripe <= 0 ? 1 : (fullestStripe + maxBlocksPerStripe - 1) / maxBlocksPerStripe;
     }
 
-    public static StripeLayout For(FileTransferEntity fileTransfer) =>
+    /// <summary>
+    /// How bytes still being written will land. Only concatenation partials are routed to destination
+    /// stripes; a plain upload is staged on a single blob, so its block budget covers the whole file
+    /// rather than one stripe.
+    /// </summary>
+    public static StripeLayout ForUpload(long uploadLength, long stripeSize, bool isConcatenationPartial) =>
+        new(uploadLength, isConcatenationPartial ? stripeSize : 0);
+
+    /// <summary>
+    /// How bytes already stored are laid out, for reading them back. The stripe size is the one frozen
+    /// on the transfer at initialize; null means the content is a single blob.
+    /// </summary>
+    public static StripeLayout ForStoredContent(FileTransferEntity fileTransfer) =>
         new(fileTransfer.FileTransferSize, fileTransfer.StripeSizeBytes ?? 0);
 
     /// <summary>

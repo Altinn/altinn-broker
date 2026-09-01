@@ -251,6 +251,46 @@ public class StripeLayoutTests
         Assert.Equal(expected, minimumChunkSize);
     }
 
+    [Fact]
+    public void ForUpload_SmallPartial_IsBoundedByItsOwnLengthNotTheStripeSize()
+    {
+        // Arrange
+        const long partialLength = 1024 * 1024;
+
+        // Act
+        var layout = StripeLayout.ForUpload(partialLength, 256 * GiB, isConcatenationPartial: true);
+
+        // Assert
+        Assert.Equal((partialLength + 49_999) / 50_000, layout.MinimumChunkSize(50_000));
+    }
+
+    [Fact]
+    public void ForUpload_PlainUpload_IsBoundedByTheWholeFileBecauseItIsNotStriped()
+    {
+        // Arrange
+        var uploadLength = 1 * TiB;
+
+        // Act
+        var layout = StripeLayout.ForUpload(uploadLength, 256 * GiB, isConcatenationPartial: false);
+
+        // Assert
+        Assert.False(layout.IsStriped);
+        Assert.Equal((uploadLength + 49_999) / 50_000, layout.MinimumChunkSize(50_000));
+    }
+
+    [Fact]
+    public void ForUpload_LargePartial_IsBoundedByTheStripeSize()
+    {
+        // Arrange
+        var partialLength = 4 * TiB;
+
+        // Act
+        var layout = StripeLayout.ForUpload(partialLength, 256 * GiB, isConcatenationPartial: true);
+
+        // Assert
+        Assert.Equal(((256 * GiB) + 49_999) / 50_000, layout.MinimumChunkSize(50_000));
+    }
+
     [Theory]
     [InlineData(50_000, 19)]
     [InlineData(8, 111_111)]
