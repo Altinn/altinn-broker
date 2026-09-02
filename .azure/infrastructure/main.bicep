@@ -19,8 +19,6 @@ param migrationsStorageAccountName string
 @secure()
 param backupStorageAccountName string
 @secure()
-param maskinportenJwk string
-@secure()
 param maskinportenClientId string
 @secure()
 param idportenClientId string
@@ -65,10 +63,7 @@ var secrets = [
     name: 'maskinporten-client-id'
     value: maskinportenClientId
   }
-  {
-    name: 'maskinporten-jwk'
-    value: maskinportenJwk
-  }
+  // maskinporten-jwk is bootstrapped directly in Key Vault and subsequently owned by the rotation job.
   {
     name: 'idporten-client-id'
     value: idportenClientId
