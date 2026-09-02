@@ -21,6 +21,10 @@ param backupStorageAccountName string
 @secure()
 param maskinportenClientId string
 @secure()
+param idportenClientId string
+@secure()
+param idportenClientSecret string
+@secure()
 param platformSubscriptionKey string
 @secure()
 param slackUrl string
@@ -60,6 +64,14 @@ var secrets = [
     value: maskinportenClientId
   }
   // maskinporten-jwk is bootstrapped directly in Key Vault and subsequently owned by the rotation job.
+  {
+    name: 'idporten-client-id'
+    value: idportenClientId
+  }
+  {
+    name: 'idporten-client-secret'
+    value: idportenClientSecret
+  }
   {
     name: 'platform-subscription-key'
     value: platformSubscriptionKey
