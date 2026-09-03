@@ -87,7 +87,7 @@ This mirrors how other `*.ui.altinn.no` apps reuse the shared Altinn session.
 
 Settings live in the Broker API (`appsettings.json`, `appsettings.Development.json`, or environment variables).
 
-### `IdPortenSettings` (IdPortenDirectAuth)
+### `IdPortenDirectAuthSettings` (IdPortenDirectAuth)
 
 Used for direct ID-Porten login. Section name is unchanged for existing deployments.
 
@@ -104,15 +104,15 @@ Fixed in code (not configurable): callback `/broker/api/v1/authentication/callba
 
 **Deploy environment variables** (Container App):
 
-- `IdPortenSettings__Authority` ← `IDPORTEN_AUTHORITY`
-- `IdPortenSettings__ClientId` ← Key Vault
-- `IdPortenSettings__ClientSecret` ← Key Vault
-- `IdPortenSettings__SpaBaseUrl` ← `FRONTEND_BASE_URL`
+- `IdPortenDirectAuthSettings__Authority` ← `IDPORTEN_AUTHORITY`
+- `IdPortenDirectAuthSettings__ClientId` ← Key Vault
+- `IdPortenDirectAuthSettings__ClientSecret` ← Key Vault
+- `IdPortenDirectAuthSettings__SpaBaseUrl` ← `FRONTEND_BASE_URL`
 
 **Local Development example** (`appsettings.local.json`):
 
 ```json
-"IdPortenSettings": {
+"IdPortenDirectAuthSettings": {
   "Authority": "https://test.idporten.no",
   "ClientId": "<from Samarbeidsportalen>",
   "ClientSecret": "<from Samarbeidsportalen>",
@@ -160,7 +160,7 @@ In Azure, Front Door can proxy API and SPA on one origin:
 
 1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `altinn-dev-api.azure-api.net`)
 2. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
-3. Set `FRONTEND_BASE_URL` → `IdPortenSettings__SpaBaseUrl` (Front Door URL from the deploy log)
+3. Set `FRONTEND_BASE_URL` → `IdPortenDirectAuthSettings__SpaBaseUrl` (Front Door URL from the deploy log)
 4. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
 
 Front Door endpoint names are globally unique. The name is derived from `AZURE_NAME_PREFIX`. After deploy, use the hostname printed in the workflow log for `FRONTEND_BASE_URL` and ID-Porten.

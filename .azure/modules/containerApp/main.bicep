@@ -72,10 +72,10 @@ var containerAppEnvVars = concat([
   { name: 'AltinnOptions__PlatformSubscriptionKey', secretRef: 'platform-subscription-key' }
   { name: 'MaskinportenSettings__Environment', value: maskinporten_environment } 
   { name: 'MaskinportenSettings__ClientId', secretRef: 'maskinporten-client-id' }
-  { name: 'IdPortenSettings__ClientId', secretRef: 'idporten-client-id' }
-  { name: 'IdPortenSettings__ClientSecret', secretRef: 'idporten-client-secret' }
-  { name: 'IdPortenSettings__Authority', value: idporten_authority }
-  { name: 'IdPortenSettings__SpaBaseUrl', value: frontend_base_url }
+  { name: 'IdPortenDirectAuthSettings__ClientId', secretRef: 'idporten-client-id' }
+  { name: 'IdPortenDirectAuthSettings__ClientSecret', secretRef: 'idporten-client-secret' }
+  { name: 'IdPortenDirectAuthSettings__Authority', value: idporten_authority }
+  { name: 'IdPortenDirectAuthSettings__SpaBaseUrl', value: frontend_base_url }
   {
     name: 'MaskinportenSettings__Scope'
     value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:serviceowner altinn:authorization/authorize.admin altinn:resourceregistry/resource.admin'

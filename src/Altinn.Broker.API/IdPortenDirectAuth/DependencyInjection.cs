@@ -15,26 +15,21 @@ namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 public static class DependencyInjection
 {
-    /// <summary>
-    /// Configuration section name (kept as <c>IdPortenSettings</c> for existing deployments).
-    /// </summary>
-    public const string ConfigurationSectionName = "IdPortenSettings";
-
     public static AuthenticationBuilder AddIdPortenDirectAuth(
         this AuthenticationBuilder builder,
         IConfiguration configuration)
     {
         var services = builder.Services;
-        services.Configure<IdPortenDirectAuthSettings>(configuration.GetSection(ConfigurationSectionName));
+        services.Configure<IdPortenDirectAuthSettings>(configuration.GetSection(nameof(IdPortenDirectAuthSettings)));
 
-        var settings = configuration.GetSection(ConfigurationSectionName).Get<IdPortenDirectAuthSettings>()
+        var settings = configuration.GetSection(nameof(IdPortenDirectAuthSettings)).Get<IdPortenDirectAuthSettings>()
             ?? new IdPortenDirectAuthSettings();
 
         services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
         {
-            var idPortenSettings = sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>().Value;
-            var metadataAddress = $"{idPortenSettings.Authority.TrimEnd('/')}/.well-known/openid-configuration";
+            var idPortenDirectAuthSettings = sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>().Value;
+            var metadataAddress = $"{idPortenDirectAuthSettings.Authority.TrimEnd('/')}/.well-known/openid-configuration";
             return new ConfigurationManager<OpenIdConnectConfiguration>(
                 metadataAddress,
                 new OpenIdConnectConfigurationRetriever(),
