@@ -126,6 +126,10 @@ public static class DependencyInjection
                             context.Properties!.Items[OidcSessionKeys.Sub] = sub;
                         }
 
+                        var idPortenIdentity = IdPortenPrincipalClaims.CreateIdentity(
+                            context.Principal!,
+                            context.SecurityToken.Issuer);
+
                         var refreshToken = context.TokenEndpointResponse?.RefreshToken ?? string.Empty;
                         context.Properties!.StoreTokens(
                         [
@@ -140,7 +144,8 @@ public static class DependencyInjection
                             AuthorizationConstants.EndUserCookie,
                             System.Security.Claims.ClaimTypes.Name,
                             System.Security.Claims.ClaimTypes.Role);
-                        context.Principal = new System.Security.Claims.ClaimsPrincipal(identity);
+                        context.Principal = new System.Security.Claims.ClaimsPrincipal(
+                            [identity, idPortenIdentity]);
                     }
                 };
             });

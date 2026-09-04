@@ -11,8 +11,8 @@ using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Tests.Helpers;
 
 using Hangfire;
-using Hangfire.MemoryStorage;
 using Hangfire.Logging;
+using Hangfire.MemoryStorage;
 using Hangfire.PostgreSql;
 
 using Microsoft.AspNetCore.Authentication;
@@ -118,7 +118,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                             return jwt;
                         }
                     };
-                });
+                })
+                .AddCookie(AuthorizationConstants.EndUserCookie, _ => { })
+                .AddCookie(AuthorizationConstants.AltinnPlatformJwtCookie, _ => { });
             ReplaceHangfireForTests(services);
             services.RemoveAll<ITusFinalizeUploadEnqueuer>();
             services.AddSingleton<ITusFinalizeUploadEnqueuer, InlineTusFinalizeUploadEnqueuer>();

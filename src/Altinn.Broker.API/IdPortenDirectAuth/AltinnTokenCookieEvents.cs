@@ -90,7 +90,10 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             identity.AddClaim(new Claim("sid", sid));
         }
 
-        context.ReplacePrincipal(new ClaimsPrincipal(identity));
+        var idPortenIdentity = IdPortenPrincipalClaims.CopyIdentity(context.Principal);
+        context.ReplacePrincipal(idPortenIdentity is null
+            ? new ClaimsPrincipal(identity)
+            : new ClaimsPrincipal([identity, idPortenIdentity]));
         context.ShouldRenew = false;
     }
 

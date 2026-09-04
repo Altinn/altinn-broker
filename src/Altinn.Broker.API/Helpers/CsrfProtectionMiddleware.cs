@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Altinn.Broker.API.Configuration;
 
 namespace Altinn.Broker.API.Helpers;
@@ -22,8 +24,7 @@ public class CsrfProtectionMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         if (!SafeMethods.Contains(context.Request.Method)
-            && context.User.Identity?.IsAuthenticated == true
-            && context.User.Identity.AuthenticationType == AuthorizationConstants.EndUserCookie
+            && IsCookieAuthenticated(context.User)
             && !context.Request.Headers.ContainsKey("X-Requested-With"))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -33,4 +34,10 @@ public class CsrfProtectionMiddleware
 
         await _next(context);
     }
+
+    private static bool IsCookieAuthenticated(ClaimsPrincipal user)
+        => user.Identities.Any(identity =>
+            identity.IsAuthenticated
+            && identity.AuthenticationType is AuthorizationConstants.EndUserCookie
+                or AuthorizationConstants.AltinnPlatformJwtCookie);
 }
