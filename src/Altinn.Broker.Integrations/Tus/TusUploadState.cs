@@ -16,8 +16,6 @@ public sealed class TusUploadState : IDisposable
 
     public object SyncRoot { get; } = new();
 
-    public List<string> BlockIds { get; } = new();
-
     public long UploadLength { get; }
 
     public long AcceptedOffset { get; set; }

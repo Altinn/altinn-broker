@@ -121,7 +121,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<MaskinportenJwkRotationSettings>(config.GetSection(key: nameof(MaskinportenJwkRotationSettings)));
-    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.AddSingleton<IValidateOptions<AzureStorageOptions>, AzureStorageOptionsValidator>();
+    services.AddOptions<AzureStorageOptions>()
+        .Bind(config.GetSection(key: nameof(AzureStorageOptions)))
+        .ValidateOnStart();
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));

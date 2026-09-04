@@ -6,6 +6,7 @@ using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Core.Services.Enums;
@@ -14,6 +15,7 @@ using Hangfire;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -30,6 +32,7 @@ public class InitializeFileTransferHandler(
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     IAltinnRegisterService altinnRegisterService,
+    IOptions<AzureStorageOptions> azureStorageOptions,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -135,7 +138,9 @@ public class InitializeFileTransferHandler(
 
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var senderVendor = user?.GetCallerVendorId()?.WithPrefix();
-        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
+        // Frozen here so a later change to the configured stripe size cannot relayout this transfer and break it.
+        var stripeSizeBytes = azureStorageOptions.Value.StripeSizeBytes;
+        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, stripeSizeBytes, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId.WithoutPrefix().WithPrefix(), null, cancellationToken));
         try
