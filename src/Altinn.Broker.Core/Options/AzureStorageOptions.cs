@@ -38,9 +38,22 @@ public class AzureStorageOptions
     public int MaxBlocksPerStripe { get; set; } = 50_000;
 
     /// <summary>
-    /// The largest file transfer that can be stored, and therefore the ceiling for a resource's
-    /// configured maximum transfer size. Bounded by the stripe index width in the blob name, not by
-    /// any configured stripe count.
+    /// Partials one concatenation can list. The concat-final request carries every partial's path in a
+    /// single Upload-Concat header, roughly 117 bytes each, sharing Kestrel's
+    /// MaxRequestHeadersTotalSize budget with the bearer token. Raise this only together with that
+    /// limit: a transfer needing more partials than the header can carry fails at the final request,
+    /// after all of its content has already been uploaded.
     /// </summary>
-    public long MaxTotalTransferBytes => StripeSizeBytes * (StripeLayout.MaxStripeIndex + 1L);
+    public int MaxConcatPartials { get; set; } = 250;
+
+    /// <summary>
+    /// The largest file transfer that can be stored, and therefore the ceiling for a resource's
+    /// configured maximum transfer size. The lesser of what the stripe index can name and what one
+    /// concatenation can list; the partial count binds first at the default configuration. Capping it
+    /// here means an unreachable size is rejected when a resource is configured, rather than at the
+    /// concat-final request once the content has already been transferred.
+    /// </summary>
+    public long MaxTotalTransferBytes => Math.Min(
+        StripeSizeBytes * (StripeLayout.MaxStripeIndex + 1L),
+        MaxConcatPartials * StripeLayout.MaxPartialLength(StripeSizeBytes, MaxBlocksPerStripe));
 }

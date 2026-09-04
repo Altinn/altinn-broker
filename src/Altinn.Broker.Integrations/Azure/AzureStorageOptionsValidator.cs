@@ -33,6 +33,11 @@ public sealed class AzureStorageOptionsValidator(IHostEnvironment hostEnvironmen
             failures.Add($"{nameof(AzureStorageOptions.StripeSizeBytes)} must be greater than 0.");
         }
 
+        if (options.MaxConcatPartials <= 0)
+        {
+            failures.Add($"{nameof(AzureStorageOptions.MaxConcatPartials)} must be greater than 0.");
+        }
+
         if (options.MaxBlocksPerStripe > 0
             && options.StripeSizeBytes > (long)options.MaxBlocksPerStripe * AzureStorageConstants.MaxBlockSizeBytes)
         {
