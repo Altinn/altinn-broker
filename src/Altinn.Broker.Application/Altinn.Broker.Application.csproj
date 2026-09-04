@@ -7,7 +7,7 @@
   </PropertyGroup>
    
   <ItemGroup>
-    <PackageReference Include="Altinn.Authorization.ProblemDetails" Version="5.4.0" />
+    <PackageReference Include="Altinn.Authorization.ProblemDetails" Version="6.0.0" />
     <PackageReference Include="Hangfire.Core" Version="1.8.23" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.10" />
