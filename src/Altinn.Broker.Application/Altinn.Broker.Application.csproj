@@ -8,13 +8,13 @@
    
   <ItemGroup>
     <PackageReference Include="Altinn.Authorization.ProblemDetails" Version="5.4.0" />
-    <PackageReference Include="Hangfire.Core" Version="1.8.23" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.7.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.25" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.9.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageReference Include="OneOf" Version="3.0.271" />
-    <PackageReference Include="Parquet.Net" Version="6.0.3" />
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Slack.Webhooks" Version="1.1.6" />
   </ItemGroup>
