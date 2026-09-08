@@ -7,12 +7,9 @@ import { BROKER_API_PREFIX } from './config'
  */
 export type AuthorizedResource = {
   resourceId: string
-  /** Title from the Resource Registry. Null when the resource is unavailable there. */
   name: string | null
   serviceOwnerName: string | null
-  /** The party can initiate file transfers on the resource. */
   canSend: boolean
-  /** The party can find and download file transfers on the resource. */
   canReceive: boolean
 }
 

@@ -240,11 +240,7 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
     }
 
-    /// <summary>
-    /// Stands in for Altinn Authorization: answers one decision per requested (resource, action)
-    /// pair, echoing the resource and action back the way the PDP does for attributes that are
-    /// requested with includeInResult.
-    /// </summary>
+    // Answers one decision per requested (resource, action) pair, the way Authorization does.
     private sealed class FakePdp(
         Func<string, string, bool> permit,
         bool echoCategories = true,

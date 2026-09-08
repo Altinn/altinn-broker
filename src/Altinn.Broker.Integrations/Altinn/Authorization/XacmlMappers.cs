@@ -116,7 +116,6 @@ public static class XacmlMappers
     /// resources, for one subject and one party. The resource id and action id are echoed back in
     /// each result, so the caller does not have to rely on the order of the decisions.
     /// </summary>
-    /// <returns>The request together with the decisions it asks for, in request order.</returns>
     internal static MultiDecisionRequest CreateMultiDecisionRequest(
         XacmlJsonCategory subjectCategory,
         string party,

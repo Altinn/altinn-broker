@@ -24,10 +24,7 @@ public class AltinnAuthorizationService : IAuthorizationService
     private readonly HttpClient _httpClient;
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
-    /// <summary>
-    /// Upper bound on decisions in one multi-decision request to Authorization. Larger resource
-    /// sets are split across several requests.
-    /// </summary>
+    // Larger resource sets are split across several multi-decision requests.
     private const int MaxDecisionsPerRequest = 100;
     private const string PolicyObligationMinAuthnLevel = "urn:altinn:minimum-authenticationlevel";
     private const string PolicyObligationMinAuthnLevelOrg = "urn:altinn:minimum-authenticationlevel-org";

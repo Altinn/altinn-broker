@@ -115,8 +115,7 @@ public class ResourceController : Controller
     /// <response code="400">The party is not a valid organization number</response>
     /// <response code="401">You must be logged in as an end user</response>
     /// <response code="503">Altinn Authorization could not be reached</response>
-    // The literal "authorized" segment takes precedence over the "{resourceId}" route of the
-    // service owner endpoint above.
+    // The literal "authorized" segment takes route precedence over "{resourceId}" above.
     [HttpGet]
     [Route("authorized")]
     [Authorize(Policy = AuthorizationConstants.EndUser)]

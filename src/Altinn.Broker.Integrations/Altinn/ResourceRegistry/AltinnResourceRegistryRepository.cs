@@ -92,9 +92,6 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 
     
 
-    /// <returns>
-    /// The deserialized resource, or <see langword="null"/> when Resource Registry does not know the resource.
-    /// </returns>
     private async Task<GetResourceResponse?> GetResourceFromRegistry(string resourceId, CancellationToken cancellationToken)
     {
         var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);

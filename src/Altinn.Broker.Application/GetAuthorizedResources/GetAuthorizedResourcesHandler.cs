@@ -14,9 +14,7 @@ using OneOf;
 namespace Altinn.Broker.Application.GetAuthorizedResources;
 
 /// <summary>
-/// Lists the broker resources ("Dine formidlingstjenester") an authenticated end user has access
-/// to on behalf of a party. Access is decided by a single multi-decision PDP request covering every
-/// resource configured in broker.
+/// Lists the broker resources an end user has access to on behalf of a party.
 /// </summary>
 public class GetAuthorizedResourcesHandler(
     IAuthorizationService authorizationService,
@@ -84,10 +82,6 @@ public class GetAuthorizedResourcesHandler(
             .ToList();
     }
 
-    /// <summary>
-    /// Reads the presentation metadata for a resource. Resource Registry failures degrade to a
-    /// listing without name and owner rather than failing the whole request.
-    /// </summary>
     private async Task<AltinnResourceMetadata?> GetResourceMetadata(string resourceId, CancellationToken cancellationToken)
     {
         try
