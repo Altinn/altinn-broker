@@ -1,4 +1,5 @@
 ﻿using System.Net.Http.Json;
+using System.Text.Json;
 using System.Security.Claims;
 
 using Altinn.Authorization.ABAC.Xacml;
@@ -23,6 +24,11 @@ public class AltinnAuthorizationService : IAuthorizationService
     private readonly HttpClient _httpClient;
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
+    /// <summary>
+    /// Upper bound on decisions in one multi-decision request to Authorization. Larger resource
+    /// sets are split across several requests.
+    /// </summary>
+    private const int MaxDecisionsPerRequest = 100;
     private const string PolicyObligationMinAuthnLevel = "urn:altinn:minimum-authenticationlevel";
     private const string PolicyObligationMinAuthnLevelOrg = "urn:altinn:minimum-authenticationlevel-org";
 
@@ -58,6 +64,90 @@ public class AltinnAuthorizationService : IAuthorizationService
     public async Task<bool> CheckAccessAsSenderOrRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default)
     {
         return await CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId.WithoutPrefix(), cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
+    }
+
+    public async Task<List<AuthorizedResource>> GetAuthorizedResources(ClaimsPrincipal? user, string party, IReadOnlyList<string> resourceIds, CancellationToken cancellationToken = default)
+    {
+        if (user is null)
+        {
+            throw new InvalidOperationException("This operation cannot be called outside an authenticated HttpContext");
+        }
+        if (resourceIds.Count == 0)
+        {
+            return [];
+        }
+
+        bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
+        bool isIdportenToken = IdportenXacmlMapper.IsIdportenToken(user);
+        XacmlJsonCategory? idportenSubjectCategory = null;
+        if (isIdportenToken && !IdportenXacmlMapper.TryCreateSubjectCategory(user, out idportenSubjectCategory))
+        {
+            _logger.LogWarning("ID-porten token does not contain the required pid claim");
+            return [];
+        }
+
+        var sendAction = GetActionId(ResourceAccessLevel.Write);
+        var receiveAction = GetActionId(ResourceAccessLevel.Read);
+        string[] actions = [sendAction, receiveAction];
+        var resourcesPerRequest = MaxDecisionsPerRequest / actions.Length;
+        var distinctResourceIds = resourceIds.Distinct(StringComparer.Ordinal).ToList();
+        var access = distinctResourceIds.ToDictionary(resourceId => resourceId, _ => (CanSend: false, CanReceive: false), StringComparer.Ordinal);
+
+        foreach (var batch in distinctResourceIds.Chunk(resourcesPerRequest))
+        {
+            var subjectCategory = idportenSubjectCategory ?? CreateSubjectCategory(user);
+            var multiDecisionRequest = XacmlMappers.CreateMultiDecisionRequest(subjectCategory, party.WithoutPrefix(), batch, actions);
+            var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", multiDecisionRequest.Request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"Authorization returned {(int)response.StatusCode} for multi decision request", null, response.StatusCode);
+            }
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseContent = JsonSerializer.Deserialize<XacmlJsonResponse>(responseBody, JsonSerializerOptions.Web);
+            if (responseContent?.Response is null)
+            {
+                throw new HttpRequestException($"Unexpected null or invalid json response from Authorization. Response: {responseBody}");
+            }
+            if (responseContent.Response.Count != multiDecisionRequest.Decisions.Count)
+            {
+                throw new HttpRequestException($"Authorization returned {responseContent.Response.Count} decisions for {multiDecisionRequest.Decisions.Count} requested decisions. Response: {responseBody}");
+            }
+
+            for (var i = 0; i < multiDecisionRequest.Decisions.Count; i++)
+            {
+                var result = responseContent.Response[i];
+                var requested = multiDecisionRequest.Decisions[i];
+                // Prefer the echoed attributes so the mapping does not depend on the order of the decisions.
+                var resourceId = XacmlMappers.ReadEchoedResourceId(result) ?? requested.ResourceId;
+                var action = XacmlMappers.ReadEchoedAction(result) ?? requested.Action;
+                if (!access.TryGetValue(resourceId, out var resourceAccess))
+                {
+                    _logger.LogWarning("Authorization returned a decision for a resource that was not requested");
+                    continue;
+                }
+
+                var isPermitted = isIdportenToken
+                    ? IdportenXacmlMapper.IsPermittedResult(result, user)
+                    : ValidateDecisionResult(result, user, isMaskinportenToken);
+                if (!isPermitted)
+                {
+                    continue;
+                }
+
+                access[resourceId] = action == sendAction
+                    ? (true, resourceAccess.CanReceive)
+                    : (resourceAccess.CanSend, true);
+            }
+        }
+
+        return access
+            .Select(entry => new AuthorizedResource
+            {
+                ResourceId = entry.Key,
+                CanSend = entry.Value.CanSend,
+                CanReceive = entry.Value.CanReceive
+            })
+            .ToList();
     }
 
     private async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, string party, string? fileTransferId, List<ResourceAccessLevel> rights, CancellationToken cancellationToken = default)

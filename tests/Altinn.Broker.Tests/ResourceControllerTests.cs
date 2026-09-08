@@ -35,6 +35,22 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
+    public async Task Get_Authorized_Resources_Without_End_User_Session_Returns_Unauthorized()
+    {
+        var response = await _factory.CreateClient().GetAsync("broker/api/v1/resource/authorized?party=991825827");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Authorized_Resources_Is_Not_Available_With_A_Maskinporten_Token()
+    {
+        var response = await _serviceOwnerClient.GetAsync("broker/api/v1/resource/authorized?party=991825827");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Update_Resource_Max_Upload_Size()
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt

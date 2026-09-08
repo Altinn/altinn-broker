@@ -1,6 +1,7 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
 using Altinn.Broker.API.Helpers;
@@ -12,7 +13,6 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/resource")]
-[Authorize(Policy = AuthorizationConstants.ServiceOwner)]
 public class ResourceController : Controller
 {
     /// <summary>
@@ -36,6 +36,7 @@ public class ResourceController : Controller
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpPut]
+    [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -75,6 +76,7 @@ public class ResourceController : Controller
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpGet]
+    [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -100,5 +102,51 @@ public class ResourceController : Controller
             Problem
         );
     }
+    /// <summary>
+    /// Gets the resources ("Dine formidlingstjenester") the authenticated end user has access to on behalf of a party
+    /// </summary>
+    /// <remarks>
+    /// Requires an authenticated end user session (ID-porten login or Altinn portal session). <br/>
+    /// Every resource configured in broker is checked against the end user in one multi-decision
+    /// request to Altinn Authorization. Only resources the user can send and/or receive file
+    /// transfers on for the given party are returned.
+    /// </remarks>
+    /// <response code="200">The resources the end user has access to for the party</response>
+    /// <response code="400">The party is not a valid organization number</response>
+    /// <response code="401">You must be logged in as an end user</response>
+    /// <response code="503">Altinn Authorization could not be reached</response>
+    // The literal "authorized" segment takes precedence over the "{resourceId}" route of the
+    // service owner endpoint above.
+    [HttpGet]
+    [Route("authorized")]
+    [Authorize(Policy = AuthorizationConstants.EndUser)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<AuthorizedResourceExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult> GetAuthorizedResources(
+        [FromQuery] string party,
+        [FromServices] GetAuthorizedResourcesHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Process(new GetAuthorizedResourcesRequest()
+        {
+            Party = party
+        }, HttpContext.User, cancellationToken);
+
+        return result.Match(
+            (resources) => Ok(resources.Select(resource => new AuthorizedResourceExt()
+            {
+                ResourceId = resource.ResourceId,
+                Name = resource.Name,
+                ServiceOwnerName = resource.ServiceOwnerName,
+                CanSend = resource.CanSend,
+                CanReceive = resource.CanReceive
+            }).ToList()),
+            Problem
+        );
+    }
+
     private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

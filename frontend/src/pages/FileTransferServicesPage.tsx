@@ -1,81 +1,122 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CardLink } from '../components/CardLink'
+import { Alert, Heading, List, ResourceListItem, Searchbar } from '@altinn/altinn-components'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, type LinkProps } from 'react-router-dom'
+import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
 import { OrganizationHeader } from '../components/OrganizationHeader'
-import { fileTransferServices } from '../data/mockData'
+import { currentOrganization } from '../data/mockData'
 import { servicePath } from './routes'
 import './pages.css'
 
+// TODO: hardcoded for local verification against TT02. Use the party the user selects
+// once Broker exposes the end user's authorized parties.
+const currentParty = '313193748'
+
+const serviceName = (service: AuthorizedResource) => service.name ?? service.resourceId
+
 export function FileTransferServicesPage() {
   const [search, setSearch] = useState('')
+  const [services, setServices] = useState<AuthorizedResource[]>([])
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'failed'>('loading')
 
-  const creatable = fileTransferServices.filter((s) => s.canCreate)
-  const other = fileTransferServices.filter((s) => !s.canCreate)
+  useEffect(() => {
+    let active = true
+    fetchAuthorizedResources(currentParty)
+      .then((authorized) => {
+        if (!active) {
+          return
+        }
+        setServices(authorized)
+        setStatus('loaded')
+      })
+      .catch(() => {
+        if (active) {
+          setStatus('failed')
+        }
+      })
 
-  const filterBySearch = (name: string) =>
-    name.toLowerCase().includes(search.trim().toLowerCase())
+    return () => {
+      active = false
+    }
+  }, [])
 
-  const filteredCreatable = useMemo(
-    () => creatable.filter((s) => filterBySearch(s.name)),
-    [creatable, search],
-  )
-  const filteredOther = useMemo(
-    () => other.filter((s) => filterBySearch(s.name)),
-    [other, search],
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return services.filter((service) => serviceName(service).toLowerCase().includes(query))
+  }, [services, search])
+
+  const creatable = filtered.filter((service) => service.canSend)
+  const other = filtered.filter((service) => !service.canSend)
+
+  const serviceItem = (service: AuthorizedResource, variant: 'default' | 'subtle') => (
+    <ResourceListItem
+      key={service.resourceId}
+      id={service.resourceId}
+      resourceName={serviceName(service)}
+      ownerName={service.serviceOwnerName ?? 'Ukjent eier'}
+      description={service.serviceOwnerName ? `Eid av ${service.serviceOwnerName}` : undefined}
+      variant={variant}
+      interactive
+      as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
+    />
   )
 
   return (
     <div className="page">
       <OrganizationHeader />
 
-      <div className="search-field">
-        <label className="sr-only" htmlFor="service-search">
-          Søk etter formidlingstjenester
-        </label>
-        <input
-          id="service-search"
-          type="search"
-          className="input"
-          placeholder="Søk etter formidlingstjenester"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <Searchbar
+        name="service-search"
+        value={search}
+        placeholder="Søk etter formidlingstjenester"
+        onChange={(event) => setSearch((event.target as HTMLInputElement).value)}
+        onClear={() => setSearch('')}
+      />
 
-      {filteredCreatable.length > 0 && (
+      {status === 'loading' && (
+        <List spacing="sm">
+          {[1, 2, 3].map((placeholder) => (
+            <ResourceListItem
+              key={placeholder}
+              id={`placeholder-${placeholder}`}
+              resourceName="Laster formidlingstjeneste"
+              ownerName="Laster eier"
+              loading
+            />
+          ))}
+        </List>
+      )}
+
+      {status === 'failed' && (
+        <Alert
+          variant="danger"
+          heading="Kunne ikke hente formidlingstjenester"
+          message="Prøv igjen senere."
+        />
+      )}
+
+      {status === 'loaded' && services.length === 0 && (
+        <Alert
+          variant="info"
+          heading="Ingen formidlingstjenester"
+          message={`${currentOrganization.name} har ikke tilgang til noen formidlingstjenester.`}
+        />
+      )}
+
+      {creatable.length > 0 && (
         <section className="page-section">
-          <h2 className="page-heading">Formidlingstjenester Brønnøy sykehus kan opprette</h2>
-          <ul className="card-list">
-            {filteredCreatable.map((service) => (
-              <li key={service.id}>
-                <CardLink
-                  to={servicePath(service.id)}
-                  title={service.name}
-                  description={`Eid av ${service.owner}`}
-                  avatarLetter={service.name[0]}
-                />
-              </li>
-            ))}
-          </ul>
+          <Heading size="sm" as="h2">
+            Formidlingstjenester {currentOrganization.name} kan opprette
+          </Heading>
+          <List spacing="sm">{creatable.map((service) => serviceItem(service, 'default'))}</List>
         </section>
       )}
 
-      {filteredOther.length > 0 && (
+      {other.length > 0 && (
         <section className="page-section">
-          <h2 className="page-heading">Andre formidlingstjenester Brønnøy sykehus er delaktig i</h2>
-          <ul className="card-list">
-            {filteredOther.map((service) => (
-              <li key={service.id}>
-                <Link to={servicePath(service.id)} className="menu-link">
-                  <span>
-                    <span className="menu-link__title">{service.name}</span>
-                    <span className="menu-link__description">Eid av {service.owner}</span>
-                  </span>
-                  <span aria-hidden="true">›</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <Heading size="sm" as="h2">
+            Andre formidlingstjenester {currentOrganization.name} er delaktig i
+          </Heading>
+          <List spacing="sm">{other.map((service) => serviceItem(service, 'subtle'))}</List>
         </section>
       )}
     </div>

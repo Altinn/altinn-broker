@@ -48,21 +48,16 @@ internal static class IdportenXacmlMapper
             return false;
         }
 
-        foreach (var result in response.Response)
-        {
-            if (!string.Equals(result.Decision, XacmlContextDecision.Permit.ToString(), StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (!MeetsAuthenticationLevelObligations(result, user))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return response.Response.All(result => IsPermittedResult(result, user));
     }
+
+    /// <summary>
+    /// Whether a single decision permits the user, taking the minimum authentication level
+    /// obligation into account.
+    /// </summary>
+    internal static bool IsPermittedResult(XacmlJsonResult result, ClaimsPrincipal user)
+        => string.Equals(result.Decision, XacmlContextDecision.Permit.ToString(), StringComparison.Ordinal)
+            && MeetsAuthenticationLevelObligations(result, user);
 
     private static bool MeetsAuthenticationLevelObligations(XacmlJsonResult result, ClaimsPrincipal user)
     {
