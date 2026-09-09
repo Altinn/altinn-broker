@@ -24,8 +24,9 @@ public class AltinnAuthorizationService : IAuthorizationService
     private readonly HttpClient _httpClient;
     private readonly IResourceRepository _resourceRepository;
     private readonly ILogger<AltinnAuthorizationService> _logger;
-    // Larger resource sets are split across several multi-decision requests.
-    private const int MaxDecisionsPerRequest = 100;
+    // Larger resource sets are split across several multi-decision requests. Authorization was
+    // measured to handle at least 500 sub-requests in TT02; this stays well below that.
+    private const int MaxDecisionsPerRequest = 400;
     private const string PolicyObligationMinAuthnLevel = "urn:altinn:minimum-authenticationlevel";
     private const string PolicyObligationMinAuthnLevelOrg = "urn:altinn:minimum-authenticationlevel-org";
 
@@ -90,10 +91,10 @@ public class AltinnAuthorizationService : IAuthorizationService
         var distinctResourceIds = resourceIds.Distinct(StringComparer.Ordinal).ToList();
         var access = distinctResourceIds.ToDictionary(resourceId => resourceId, _ => (CanSend: false, CanReceive: false), StringComparer.Ordinal);
 
-        foreach (var batch in distinctResourceIds.Chunk(resourcesPerRequest))
+        async Task ApplyDecisions(IReadOnlyList<string> resourcesToCheck)
         {
             var subjectCategory = idportenSubjectCategory ?? CreateSubjectCategory(user);
-            var multiDecisionRequest = XacmlMappers.CreateMultiDecisionRequest(subjectCategory, party.WithoutPrefix(), batch, actions);
+            var multiDecisionRequest = XacmlMappers.CreateMultiDecisionRequest(subjectCategory, party.WithoutPrefix(), resourcesToCheck, actions);
             var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", multiDecisionRequest.Request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
@@ -134,6 +135,39 @@ public class AltinnAuthorizationService : IAuthorizationService
                 access[resourceId] = action == sendAction
                     ? (true, resourceAccess.CanReceive)
                     : (resourceAccess.CanSend, true);
+            }
+        }
+
+        foreach (var batch in distinctResourceIds.Chunk(resourcesPerRequest))
+        {
+            try
+            {
+                await ApplyDecisions(batch);
+            }
+            catch (HttpRequestException batchFailure) when (batch.Length > 1)
+            {
+                // A single resource Authorization cannot resolve fails the whole multi decision
+                // request, so retry one at a time to let that resource hide only itself.
+                _logger.LogWarning(batchFailure, "Multi decision request for {ResourceCount} resources failed, retrying one resource at a time", batch.Length);
+                var failures = 0;
+                foreach (var resourceId in batch)
+                {
+                    try
+                    {
+                        await ApplyDecisions([resourceId]);
+                    }
+                    catch (HttpRequestException resourceFailure)
+                    {
+                        failures++;
+                        _logger.LogWarning(resourceFailure, "Authorization could not decide access for a single resource");
+                    }
+                }
+                // Every retry failing means Authorization is unavailable, not that the data is bad.
+                // Returning an empty list would tell the user they have no access at all.
+                if (failures == batch.Length)
+                {
+                    throw;
+                }
             }
         }
 

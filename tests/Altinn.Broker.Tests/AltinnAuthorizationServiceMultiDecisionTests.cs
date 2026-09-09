@@ -127,14 +127,14 @@ public class AltinnAuthorizationServiceMultiDecisionTests
     {
         var pdp = new FakePdp(permit: (_, _) => true);
         var service = CreateService(pdp);
-        var resourceIds = Enumerable.Range(1, 51).Select(number => $"resource-{number}").ToList();
+        var resourceIds = Enumerable.Range(1, 201).Select(number => $"resource-{number}").ToList();
 
         var authorized = await service.GetAuthorizedResources(CreateIdportenUser(), Party, resourceIds);
 
-        Assert.Equal(51, authorized.Count);
+        Assert.Equal(201, authorized.Count);
         Assert.All(authorized, resource => Assert.True(resource.CanSend && resource.CanReceive));
         Assert.Equal(2, pdp.Requests.Count);
-        Assert.Equal([50, 1], pdp.Requests.Select(CountResources));
+        Assert.Equal([200, 1], pdp.Requests.Select(CountResources));
     }
 
     [Fact]
@@ -198,10 +198,61 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         Assert.Empty(pdp.Requests);
     }
 
-    private static int CountResources(string requestJson)
+    [Fact]
+    public async Task GetAuthorizedResources_WhenOneResourceCannotBeResolved_StillReturnsTheOthers()
+    {
+        var pdp = new FakePdp(
+            permit: (_, _) => true,
+            failFor: resources => resources.Contains("resource-broken"));
+        var service = CreateService(pdp);
+
+        var authorized = await service.GetAuthorizedResources(
+            CreateIdportenUser(),
+            Party,
+            ["resource-a", "resource-broken", "resource-b"]);
+
+        Assert.True(authorized.Single(resource => resource.ResourceId == "resource-a").CanSend);
+        Assert.True(authorized.Single(resource => resource.ResourceId == "resource-b").CanSend);
+        var broken = authorized.Single(resource => resource.ResourceId == "resource-broken");
+        Assert.False(broken.CanSend);
+        Assert.False(broken.CanReceive);
+        // The failed batch, then one request per resource in it.
+        Assert.Equal(4, pdp.Requests.Count);
+    }
+
+    [Fact]
+    public async Task GetAuthorizedResources_WhenAuthorizationFailsForEveryResource_Throws()
+    {
+        var pdp = new FakePdp(permit: (_, _) => true, failFor: _ => true);
+        var service = CreateService(pdp);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            service.GetAuthorizedResources(CreateIdportenUser(), Party, ["resource-a", "resource-b"]));
+    }
+
+    [Fact]
+    public async Task GetAuthorizedResources_WithASingleResourceThatFails_DoesNotRetry()
+    {
+        var pdp = new FakePdp(permit: (_, _) => true, failFor: _ => true);
+        var service = CreateService(pdp);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            service.GetAuthorizedResources(CreateIdportenUser(), Party, ["resource-a"]));
+
+        Assert.Single(pdp.Requests);
+    }
+
+    private static int CountResources(string requestJson) => RequestedResources(requestJson).Count;
+
+    private static List<string> RequestedResources(string requestJson)
     {
         using var document = JsonDocument.Parse(requestJson);
-        return document.RootElement.GetProperty("request").GetProperty("resource").GetArrayLength();
+        return document.RootElement
+            .GetProperty("request")
+            .GetProperty("resource")
+            .EnumerateArray()
+            .Select(resource => AttributeValue(resource, AltinnXacmlUrns.ResourceId)!)
+            .ToList();
     }
 
     private static string? AttributeValue(JsonElement category, string attributeId)
@@ -247,7 +298,8 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         bool reverseDecisions = false,
         int? minimumAuthenticationLevel = null,
         HttpStatusCode statusCode = HttpStatusCode.OK,
-        string? responseOverride = null) : HttpMessageHandler
+        string? responseOverride = null,
+        Func<List<string>, bool>? failFor = null) : HttpMessageHandler
     {
         public List<string> Requests { get; } = [];
 
@@ -256,11 +308,23 @@ public class AltinnAuthorizationServiceMultiDecisionTests
             var requestJson = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
             Requests.Add(requestJson);
 
+            if (failFor?.Invoke(RequestedResources(requestJson)) == true)
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(IndeterminateResponse, Encoding.UTF8, "application/json")
+                };
+            }
+
             return new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(responseOverride ?? CreateResponse(requestJson), Encoding.UTF8, "application/json")
             };
         }
+
+        // What real Authorization answers when it cannot resolve one of the resources.
+        private const string IndeterminateResponse =
+            """{ "response": [{ "decision": "Indeterminate" }] }""";
 
         private string CreateResponse(string requestJson)
         {
