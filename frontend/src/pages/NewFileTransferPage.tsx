@@ -90,56 +90,53 @@ export function NewFileTransferPage() {
         >
           {form.loadError && <Alert data-color="warning">{form.loadError}</Alert>}
 
-          <PartyField
-            label="Avsender"
-            description="Du formidler på vegne av denne organisasjonen."
-            name={currentOrganization.name}
-            organizationNumber={senderOrgNumber}
-          />
+          <fieldset className="new-transfer__fields" disabled={form.sending}>
+            <PartyField
+              label="Avsender"
+              description="Du formidler på vegne av denne organisasjonen."
+              name={currentOrganization.name}
+              organizationNumber={senderOrgNumber}
+            />
 
-          <RecipientsField
-            id={fieldId('recipients')}
-            rules={form.rules}
-            selected={values.recipients}
-            error={errors.recipients}
-            disabled={form.sending}
-            onChange={(recipients) => setValue('recipients', recipients)}
-          />
+            <RecipientsField
+              id={fieldId('recipients')}
+              rules={form.rules}
+              selected={values.recipients}
+              error={errors.recipients}
+              onChange={(recipients) => setValue('recipients', recipients)}
+            />
 
-          <Textfield
-            id={fieldId('reference')}
-            label="Referanse"
-            description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
-            value={values.reference}
-            error={errors.reference}
-            disabled={form.sending}
-            maxLength={MAX_REFERENCE_LENGTH}
-            onChange={(event) => setValue('reference', event.target.value)}
-          />
+            <Textfield
+              id={fieldId('reference')}
+              label="Referanse"
+              description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
+              value={values.reference}
+              error={errors.reference}
+              maxLength={MAX_REFERENCE_LENGTH}
+              onChange={(event) => setValue('reference', event.target.value)}
+            />
 
-          <MetadataFields
-            id={fieldId('metadata')}
-            entries={values.metadata}
-            error={errors.metadata}
-            disabled={form.sending}
-            onChange={(metadata) => setValue('metadata', metadata)}
-          />
+            <MetadataFields
+              id={fieldId('metadata')}
+              entries={values.metadata}
+              error={errors.metadata}
+              onChange={(metadata) => setValue('metadata', metadata)}
+            />
 
-          <UploadFile
-            id={fieldId('file')}
-            file={values.file}
-            maxFileSize={form.maxFileSize}
-            error={errors.file}
-            disabled={form.sending}
-            onChange={(file) => setValue('file', file)}
-          />
+            <UploadFile
+              id={fieldId('file')}
+              file={values.file}
+              maxFileSize={form.maxFileSize}
+              error={errors.file}
+              onChange={(file) => setValue('file', file)}
+            />
 
-          <VirusScanField
-            checked={values.virusScan}
-            locked={form.virusScanLocked}
-            disabled={form.sending}
-            onChange={(virusScan) => setValue('virusScan', virusScan)}
-          />
+            <VirusScanField
+              checked={values.virusScan}
+              locked={form.virusScanLocked}
+              onChange={(virusScan) => setValue('virusScan', virusScan)}
+            />
+          </fieldset>
 
           {failedFields.length > 0 && (
             <div ref={errorSummaryRef} tabIndex={-1} className="new-transfer__error-summary">

@@ -9,6 +9,37 @@
   gap: var(--ds-size-6);
 }
 
+.new-transfer__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-size-6);
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+/*
+ * One dim for the whole set. Designsystemet dims each disabled control on its own, but skips
+ * labels, legends, readonly fields and static text.
+ */
+.new-transfer__fields:disabled {
+  cursor: not-allowed;
+  opacity: var(--ds-opacity-disabled);
+}
+
+/* Every Designsystemet disabled style reads this token, so neutralising it inside the set stops
+ * the per-control dimming from compounding with the dim above. */
+.new-transfer__fields:disabled * {
+  --ds-opacity-disabled: 100%;
+}
+
+.ds-suggestion:has(> input:disabled),
+.ds-file-upload:has(input:disabled) {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .new-transfer__metadata-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
