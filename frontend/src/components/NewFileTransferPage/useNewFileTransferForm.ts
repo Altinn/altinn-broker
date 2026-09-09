@@ -14,7 +14,7 @@ import {
   getResourceConfiguration,
   resolveMaxFileTransferSize,
   type ResourceConfiguration,
-} from '../../api/resources'
+} from '../../api/resourceConfiguration'
 import {
   emptyValues,
   hasErrors,
