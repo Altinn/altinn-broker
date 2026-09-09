@@ -37,6 +37,8 @@ public static class Errors
     public static Error InvalidByteRange = new Error(29, "The requested byte range is not satisfiable.", HttpStatusCode.RequestedRangeNotSatisfiable);
     public static Error MalwareScanResultNotReady = new Error(30, "File transfer is not yet in UploadProcessing. Retry when upload completion has been recorded.", HttpStatusCode.ServiceUnavailable);
     public static Error InvalidRecipient = new Error(31, "One or more recipients are invalid or could not be found.", HttpStatusCode.BadRequest);
+    public static Error InvalidParty = new Error(32, "The party must be a valid organization number", HttpStatusCode.BadRequest);
+    public static Error AuthorizationUnavailable = new Error(33, "Could not determine which resources you have access to. Please try again later.", HttpStatusCode.ServiceUnavailable);
 }
 
 public static class StatisticsErrors

@@ -62,11 +62,11 @@ public static class XacmlMappers
     /// Creates XACML resource category for authorization requests.
     /// If id is required this should be included by the caller. 
     /// Attribute eventId is tagged with `includeInResponse`</remarks>
-    internal static XacmlJsonCategory CreateResourceCategory(string resourceId, string party, string? instanceId)
+    internal static XacmlJsonCategory CreateResourceCategory(string resourceId, string party, string? instanceId, bool includeResourceIdInResult = false)
     {
         XacmlJsonCategory resourceCategory = new() { Attribute = new List<XacmlJsonAttribute>() };
 
-        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceId, resourceId, DefaultType, DefaultIssuer));
+        resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(AltinnXacmlUrns.ResourceId, resourceId, DefaultType, DefaultIssuer, includeResourceIdInResult));
         resourceCategory.Attribute.Add(DecisionHelper.CreateXacmlJsonAttribute(UrnConstants.OrganizationNumberAttribute, party, DefaultType, DefaultIssuer));
         if (instanceId is not null)
         {
@@ -110,6 +110,76 @@ public static class XacmlMappers
         xacmlJsonCategory.Attribute = list;
         return xacmlJsonCategory;
     }
+
+    /// <summary>
+    /// Creates a multi-decision request asking for every combination of the given actions and
+    /// resources, for one subject and one party. The resource id and action id are echoed back in
+    /// each result, so the caller does not have to rely on the order of the decisions.
+    /// </summary>
+    internal static MultiDecisionRequest CreateMultiDecisionRequest(
+        XacmlJsonCategory subjectCategory,
+        string party,
+        IReadOnlyList<string> resourceIds,
+        IReadOnlyList<string> actions)
+    {
+        subjectCategory.Id = $"{SubjectId}1";
+        XacmlJsonRequest request = new()
+        {
+            AccessSubject = new List<XacmlJsonCategory> { subjectCategory },
+            Action = new List<XacmlJsonCategory>(),
+            Resource = new List<XacmlJsonCategory>(),
+            MultiRequests = new XacmlJsonMultiRequests { RequestReference = new List<XacmlJsonRequestReference>() }
+        };
+
+        for (var actionIndex = 0; actionIndex < actions.Count; actionIndex++)
+        {
+            var actionCategory = CreateActionCategory(actions[actionIndex], includeResult: true);
+            actionCategory.Id = $"{ActionId}{actionIndex + 1}";
+            request.Action.Add(actionCategory);
+        }
+
+        for (var resourceIndex = 0; resourceIndex < resourceIds.Count; resourceIndex++)
+        {
+            var resourceCategory = CreateResourceCategory(resourceIds[resourceIndex], party, instanceId: null, includeResourceIdInResult: true);
+            resourceCategory.Id = $"{ResourceId}{resourceIndex + 1}";
+            request.Resource.Add(resourceCategory);
+        }
+
+        var decisions = new List<MultiDecisionKey>(resourceIds.Count * actions.Count);
+        for (var resourceIndex = 0; resourceIndex < resourceIds.Count; resourceIndex++)
+        {
+            for (var actionIndex = 0; actionIndex < actions.Count; actionIndex++)
+            {
+                request.MultiRequests.RequestReference.Add(new XacmlJsonRequestReference
+                {
+                    ReferenceId = new List<string>
+                    {
+                        subjectCategory.Id,
+                        request.Action[actionIndex].Id,
+                        request.Resource[resourceIndex].Id
+                    }
+                });
+                decisions.Add(new MultiDecisionKey(resourceIds[resourceIndex], actions[actionIndex]));
+            }
+        }
+
+        return new MultiDecisionRequest(new XacmlJsonRequestRoot { Request = request }, decisions);
+    }
+
+    /// <summary>
+    /// Reads an attribute that was requested with <c>includeInResult</c> back from a decision.
+    /// </summary>
+    internal static string? ReadEchoedAttribute(XacmlJsonResult result, string attributeId)
+        => result.Category?
+            .SelectMany(category => category.Attribute ?? [])
+            .FirstOrDefault(attribute => string.Equals(attribute.AttributeId, attributeId, StringComparison.Ordinal))
+            ?.Value;
+
+    internal static string? ReadEchoedResourceId(XacmlJsonResult result)
+        => ReadEchoedAttribute(result, AltinnXacmlUrns.ResourceId);
+
+    internal static string? ReadEchoedAction(XacmlJsonResult result)
+        => ReadEchoedAttribute(result, MatchAttributeIdentifiers.ActionId);
 
     private static bool IsValidUrn(string value)
     {
