@@ -1,4 +1,10 @@
-import { ApiError, apiFetch, hasProblemCode, redirectToLogin } from './client'
+import {
+  ApiError,
+  apiFetch,
+  brokerRequestHeaders,
+  parseResponseBody,
+  throwIfUnsuccessful,
+} from './client'
 import { BROKER_API_PREFIX, apiUrl } from './config'
 import { toOrgIdentifier } from '../helpers/orgIdentifierHelper'
 
@@ -103,7 +109,10 @@ function buildInitializeRequest(input: SendFileTransferInput): FileTransferIniti
 
 /**
  * Uploads the file body to an initialized file transfer.
- * Uses XMLHttpRequest rather than fetch because fetch cannot report upload progress.
+ *
+ * Uses XMLHttpRequest rather than fetch because fetch cannot report upload progress: there is no
+ * request-side equivalent of a response body reader. Credentials, headers and the failure contract
+ * come from the shared client helpers, so this differs from `apiFetch` only in the transport.
  */
 function uploadFileTransfer(
   fileTransferId: string,
@@ -123,10 +132,11 @@ function uploadFileTransfer(
 
     xhr.open('POST', apiUrl(`${FILE_TRANSFER_PATH}/${fileTransferId}/upload`))
     xhr.withCredentials = true
-    xhr.responseType = 'json'
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
-    xhr.setRequestHeader('Accept', 'application/json')
+    // responseType is deliberately left as text: with 'json' the browser blocks responseText, and
+    // a body that is not JSON would be lost rather than reaching the ApiError.
+    brokerRequestHeaders('POST', { 'Content-Type': 'application/octet-stream' }).forEach(
+      (value, name) => xhr.setRequestHeader(name, value),
+    )
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) {
@@ -140,17 +150,18 @@ function uploadFileTransfer(
     }
 
     xhr.onload = () => {
-      const body = xhr.response as { fileTransferId?: string } | null
-      if (xhr.status === 401 && !hasProblemCode(body)) {
-        redirectToLogin()
-        reject(new ApiError('Unauthorized', 401, body))
+      const body = parseResponseBody(xhr.responseText)
+      try {
+        throwIfUnsuccessful({
+          status: xhr.status,
+          body,
+          message: `Upload failed: ${xhr.status}`,
+        })
+      } catch (error) {
+        reject(error)
         return
       }
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new ApiError(`Upload failed: ${xhr.status}`, xhr.status, body))
-        return
-      }
-      resolve(body?.fileTransferId ?? fileTransferId)
+      resolve((body as { fileTransferId?: string } | null)?.fileTransferId ?? fileTransferId)
     }
 
     xhr.onerror = () => reject(new ApiError('Upload failed: network error', 0))
