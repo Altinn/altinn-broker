@@ -33,6 +33,21 @@ public class IdPortenAuthorizationPipelineTests
         Assert.Contains(AuthorizationConstants.AltinnPlatformJwtCookie, policy.AuthenticationSchemes);
     }
 
+    [Fact]
+    public async Task EndUserPolicy_OnlyAcceptsCookieAuthenticationSchemes()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var policyProvider = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        var policy = await policyProvider.GetPolicyAsync(AuthorizationConstants.EndUser);
+
+        Assert.NotNull(policy);
+        Assert.Equal(
+            [AuthorizationConstants.EndUserCookie, AuthorizationConstants.AltinnPlatformJwtCookie],
+            policy.AuthenticationSchemes);
+        Assert.Contains(policy.Requirements, requirement => requirement is EndUserRequirement);
+    }
+
     [Theory]
     [InlineData(AuthorizationConstants.EndUserCookie)]
     [InlineData(AuthorizationConstants.AltinnPlatformJwtCookie)]

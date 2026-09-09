@@ -27,22 +27,10 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
-        var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
-        {
-            return null;
-        }
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            _logger.LogError("Failed to get resource from Altinn Resource Registry. Status code: {StatusCode}", response.StatusCode);
-            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(cancellationToken));
-            throw new BadHttpRequestException("Failed to get resource from Altinn Resource Registry");
-        }
-        var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: cancellationToken);
+        var altinnResourceResponse = await GetResourceFromRegistry(resourceId, cancellationToken);
         if (altinnResourceResponse is null)
         {
-            _logger.LogError("Failed to deserialize response from Altinn Resource Registry");
-            throw new BadHttpRequestException("Failed to process response from Altinn Resource Registry");
+            return null;
         }
         if (altinnResourceResponse.HasCompetentAuthority.Orgcode.ToLowerInvariant() == "ttd")
         {
@@ -65,25 +53,24 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 
     public async Task<string?> GetServiceOwnerNameOfResource(string resourceId, CancellationToken cancellationToken = default)
     {
-        var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
+        var altinnResourceResponse = await GetResourceFromRegistry(resourceId, cancellationToken);
+
+        return altinnResourceResponse is null ? null : GetNameOfResourceResponse(altinnResourceResponse);
+    }
+
+    public async Task<AltinnResourceMetadata?> GetResourceMetadata(string resourceId, CancellationToken cancellationToken = default)
+    {
+        var altinnResourceResponse = await GetResourceFromRegistry(resourceId, cancellationToken);
+        if (altinnResourceResponse is null)
         {
             return null;
         }
-        if (response.StatusCode != HttpStatusCode.OK)
+
+        return new AltinnResourceMetadata
         {
-            _logger.LogError("Failed to get resource from Altinn Resource Registry. Status code: {StatusCode}", response.StatusCode);
-            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(cancellationToken));
-            throw new BadHttpRequestException("Failed to get resource from Altinn Resource Registry");
-        }
-        var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: cancellationToken);
-        if (altinnResourceResponse is null)
-        {
-            _logger.LogError("Failed to deserialize response from Altinn Resource Registry");
-            throw new BadHttpRequestException("Failed to process response from Altinn Resource Registry");
-        }
-        
-        return GetNameOfResourceResponse(altinnResourceResponse);
+            Title = PickPreferredLanguage(altinnResourceResponse.Title),
+            ServiceOwnerName = GetNameOfResourceResponse(altinnResourceResponse)
+        };
     }
 
     public async Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default)
@@ -105,18 +92,45 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
 
     
 
-    private string GetNameOfResourceResponse(GetResourceResponse resourceResponse)
+    private async Task<GetResourceResponse?> GetResourceFromRegistry(string resourceId, CancellationToken cancellationToken)
     {
-        var nameAttributes = new List<string> { "nb", "nn", "en" };
-        string? name = null;
-        foreach (var nameAttribute in nameAttributes)
+        var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
         {
-            if (resourceResponse.HasCompetentAuthority.Name?.ContainsKey(nameAttribute) == true)
+            return null;
+        }
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            _logger.LogError("Failed to get resource from Altinn Resource Registry. Status code: {StatusCode}", response.StatusCode);
+            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(cancellationToken));
+            throw new BadHttpRequestException("Failed to get resource from Altinn Resource Registry");
+        }
+        var altinnResourceResponse = await response.Content.ReadFromJsonAsync<GetResourceResponse>(cancellationToken: cancellationToken);
+        if (altinnResourceResponse is null)
+        {
+            _logger.LogError("Failed to deserialize response from Altinn Resource Registry");
+            throw new BadHttpRequestException("Failed to process response from Altinn Resource Registry");
+        }
+        return altinnResourceResponse;
+    }
+
+    private string GetNameOfResourceResponse(GetResourceResponse resourceResponse)
+        => PickPreferredLanguage(resourceResponse.HasCompetentAuthority.Name) ?? string.Empty;
+
+    private static string? PickPreferredLanguage(Dictionary<string, string>? translations)
+    {
+        if (translations is null)
+        {
+            return null;
+        }
+
+        foreach (var language in new[] { "nb", "nn", "en" })
+        {
+            if (translations.TryGetValue(language, out var translation) && !string.IsNullOrWhiteSpace(translation))
             {
-                name = resourceResponse.HasCompetentAuthority.Name[nameAttribute];
-                break;
+                return translation;
             }
         }
-        return name ?? string.Empty;
+        return null;
     }
 }

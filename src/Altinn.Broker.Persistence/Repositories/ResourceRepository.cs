@@ -7,54 +7,81 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class ResourceRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IResourceRepository
 {
+    private const string ResourceColumns =
+        "resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period, use_manifest_file_shim, external_service_code_legacy, external_service_edition_code_legacy, required_party, approved_for_disabled_virus_scan";
+
     public async Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT resource_id_pk, organization_number, max_file_transfer_size, file_transfer_time_to_live, created, service_owner_id_fk, purge_file_transfer_after_all_recipients_confirmed, purge_file_transfer_grace_period, use_manifest_file_shim, external_service_code_legacy, external_service_edition_code_legacy, required_party, approved_for_disabled_virus_scan " +
+            $"SELECT {ResourceColumns} " +
             "FROM broker.altinn_resource " +
             "WHERE resource_id_pk = @resourceId " +
             "ORDER BY created desc");
         command.Parameters.AddWithValue("@resourceId", resourceId);
 
         ResourceEntity? resource = null;
-        
+
         await using (var reader = await commandExecutor.ExecuteWithRetry(command.ExecuteReaderAsync, cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                string? requiredParty = null;
-                var requiredPartyValue = reader.GetValue(reader.GetOrdinal("required_party"));
-                if (requiredPartyValue is string requiredPartyFromDb)
-                {
-                    requiredParty = requiredPartyFromDb;
-                }
-                else if (requiredPartyValue is bool requiredPartyEnabled && requiredPartyEnabled)
-                {
-                    // Backward compatibility for environments where required_party is still BOOLEAN.
-                    requiredParty = reader.GetString(reader.GetOrdinal("service_owner_id_fk"));
-                }
-
-                resource = new ResourceEntity
-                {
-                    Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
-                    OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
-                    MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
-                    FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                    ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
-                    PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
-                    PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
-                    UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
-                    ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
-                    ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy")),
-                    RequiredParty = requiredParty,
-                    ApprovedForDisabledVirusScan = reader.GetBoolean(reader.GetOrdinal("approved_for_disabled_virus_scan"))
-                };
+                resource = MapResource(reader);
             }
         }
         return resource;
     }
-    
+
+    public async Task<List<ResourceEntity>> GetResources(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            $"SELECT {ResourceColumns} " +
+            "FROM broker.altinn_resource " +
+            "ORDER BY resource_id_pk");
+
+        var resources = new List<ResourceEntity>();
+
+        await using (var reader = await commandExecutor.ExecuteWithRetry(command.ExecuteReaderAsync, cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                resources.Add(MapResource(reader));
+            }
+        }
+        return resources;
+    }
+
+    private static ResourceEntity MapResource(NpgsqlDataReader reader)
+    {
+        string? requiredParty = null;
+        var requiredPartyValue = reader.GetValue(reader.GetOrdinal("required_party"));
+        if (requiredPartyValue is string requiredPartyFromDb)
+        {
+            requiredParty = requiredPartyFromDb;
+        }
+        else if (requiredPartyValue is bool requiredPartyEnabled && requiredPartyEnabled)
+        {
+            // Backward compatibility for environments where required_party is still BOOLEAN.
+            requiredParty = reader.GetString(reader.GetOrdinal("service_owner_id_fk"));
+        }
+
+        return new ResourceEntity
+        {
+            Id = reader.GetString(reader.GetOrdinal("resource_id_pk")),
+            OrganizationNumber = reader.GetString(reader.GetOrdinal("organization_number")),
+            MaxFileTransferSize = reader.IsDBNull(reader.GetOrdinal("max_file_transfer_size")) ? null : reader.GetInt64(reader.GetOrdinal("max_file_transfer_size")),
+            FileTransferTimeToLive = reader.IsDBNull(reader.GetOrdinal("file_transfer_time_to_live")) ? null : reader.GetTimeSpan(reader.GetOrdinal("file_transfer_time_to_live")),
+            Created = reader.GetDateTime(reader.GetOrdinal("created")),
+            ServiceOwnerId = reader.GetString(reader.GetOrdinal("service_owner_id_fk")),
+            PurgeFileTransferAfterAllRecipientsConfirmed = reader.GetBoolean(reader.GetOrdinal("purge_file_transfer_after_all_recipients_confirmed")),
+            PurgeFileTransferGracePeriod = reader.IsDBNull(reader.GetOrdinal("purge_file_transfer_grace_period")) ? null : reader.GetTimeSpan(reader.GetOrdinal("purge_file_transfer_grace_period")),
+            UseManifestFileShim = reader.IsDBNull(reader.GetOrdinal("use_manifest_file_shim")) ? null : reader.GetBoolean(reader.GetOrdinal("use_manifest_file_shim")),
+            ExternalServiceCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_code_legacy")) ? null : reader.GetString(reader.GetOrdinal("external_service_code_legacy")),
+            ExternalServiceEditionCodeLegacy = reader.IsDBNull(reader.GetOrdinal("external_service_edition_code_legacy")) ? null : reader.GetInt32(reader.GetOrdinal("external_service_edition_code_legacy")),
+            RequiredParty = requiredParty,
+            ApprovedForDisabledVirusScan = reader.GetBoolean(reader.GetOrdinal("approved_for_disabled_virus_scan"))
+        };
+    }
+
     public async Task<ResourceEntity> CreateResource(ResourceEntity resource, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
