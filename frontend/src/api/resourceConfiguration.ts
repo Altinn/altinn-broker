@@ -28,8 +28,8 @@ export async function getResourceConfiguration(resourceId: string): Promise<Reso
     return toConfiguration(body)
   } catch (error) {
     // Falling back to the mock keeps the form bounded instead of leaving it without limits.
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      return toConfiguration(MOCK_CONFIGURATIONS[resourceId] ?? {})
+    if (isAccessDenied(error)) {
+      return toConfiguration(MOCK_CONFIGURATIONS[resourceId])
     }
     throw error
   }
@@ -39,12 +39,19 @@ export function resolveMaxFileTransferSize(configuration: ResourceConfiguration)
   return configuration.maxFileTransferSize ?? MAX_VIRUS_SCAN_FILE_SIZE
 }
 
-function toConfiguration(body: Partial<ResourceConfiguration>): ResourceConfiguration {
-  return {
-    maxFileTransferSize: body.maxFileTransferSize ?? null,
-    requiredParty: body.requiredParty ?? null,
-    approvedForDisabledVirusScan: body.approvedForDisabledVirusScan ?? false,
-  }
+function isAccessDenied(error: unknown): boolean {
+  return error instanceof ApiError && [401, 403].includes(error.status)
+}
+
+const UNCONFIGURED: ResourceConfiguration = {
+  maxFileTransferSize: null,
+  requiredParty: null,
+  approvedForDisabledVirusScan: false,
+}
+
+/** Absent fields fall back to the unconfigured defaults; nulls from the API are kept as null. */
+function toConfiguration(body: Partial<ResourceConfiguration> = {}): ResourceConfiguration {
+  return { ...UNCONFIGURED, ...body }
 }
 
 const MOCK_CONFIGURATIONS: Record<string, Partial<ResourceConfiguration>> = {

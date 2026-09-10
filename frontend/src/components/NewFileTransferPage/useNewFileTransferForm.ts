@@ -5,11 +5,8 @@ import {
   type AccessListMember,
 } from '../../api/accessListMembers'
 import { ApiError } from '../../api/client'
-import {
-  FileTransferValidationError,
-  sendFileTransfer,
-  type UploadProgress,
-} from '../../api/fileTransfers'
+import { FileTransferValidationError, sendFileTransfer } from '../../api/fileTransfers'
+import type { UploadProgress } from '../../api/xhrClient'
 import {
   getResourceConfiguration,
   resolveMaxFileTransferSize,
@@ -108,6 +105,39 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
 
+  const send = useCallback(
+    async (file: File, signal: AbortSignal) => {
+      // Only needed if the upload half fails: the transfer exists by then and can be followed up.
+      let fileTransferId = ''
+      try {
+        await sendFileTransfer(
+          {
+            resourceId,
+            sender: senderOrgNumber,
+            recipients: values.recipients,
+            file,
+            reference: values.reference,
+            propertyList: toPropertyList(values.metadata),
+            disableVirusScan: !values.virusScan,
+          },
+          {
+            onInitialized: (id) => {
+              fileTransferId = id
+            },
+            onProgress: setProgress,
+            signal,
+          },
+        )
+        onSent()
+      } catch (error) {
+        if (!isAbortError(error)) {
+          setSubmitError(describeError(error, fileTransferId))
+        }
+      }
+    },
+    [onSent, resourceId, senderOrgNumber, values],
+  )
+
   const submit = useCallback(async () => {
     setSubmitAttempts((attempts) => attempts + 1)
     setSubmitError('')
@@ -121,40 +151,13 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
     setSending(true)
     setProgress(null)
 
-    // Only needed if the upload half fails: the transfer exists by then and can be followed up.
-    let fileTransferId = ''
-    try {
-      await sendFileTransfer(
-        {
-          resourceId,
-          sender: senderOrgNumber,
-          recipients: values.recipients,
-          file: values.file,
-          reference: values.reference,
-          propertyList: toPropertyList(values.metadata),
-          disableVirusScan: !values.virusScan,
-        },
-        {
-          onInitialized: (id) => {
-            fileTransferId = id
-          },
-          onProgress: setProgress,
-          signal: controller.signal,
-        },
-      )
-      onSent()
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return
-      }
-      setSubmitError(describeError(error, fileTransferId))
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null
-      }
-      setSending(false)
+    await send(values.file, controller.signal)
+
+    if (abortRef.current === controller) {
+      abortRef.current = null
     }
-  }, [errors, onSent, resourceId, sending, senderOrgNumber, values])
+    setSending(false)
+  }, [errors, send, sending, values])
 
   const abort = useCallback(() => abortRef.current?.abort(), [])
 
@@ -176,19 +179,26 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
   }
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
 /** `fileTransferId` is set once initialization succeeded, so a failed upload can be followed up. */
 function describeError(error: unknown, fileTransferId: string): string {
   if (error instanceof FileTransferValidationError) {
     return error.message
   }
-
   if (error instanceof ApiError) {
-    const detail = (error.body as { detail?: string } | null)?.detail
-    const message = detail ?? `Formidlingen feilet (HTTP ${error.status}).`
-    return fileTransferId
-      ? `${message} Formidlingen ble opprettet med id ${fileTransferId}, men filen ble ikke lastet opp.`
-      : message
+    return describeApiError(error, fileTransferId)
   }
-
   return 'Formidlingen feilet. Prøv igjen.'
+}
+
+function describeApiError(error: ApiError, fileTransferId: string): string {
+  const detail = (error.body as { detail?: string } | null)?.detail
+  const message = detail ?? `Formidlingen feilet (HTTP ${error.status}).`
+  if (!fileTransferId) {
+    return message
+  }
+  return `${message} Formidlingen ble opprettet med id ${fileTransferId}, men filen ble ikke lastet opp.`
 }

@@ -1,4 +1,4 @@
-import type { UploadProgress as Progress } from '../../api/fileTransfers'
+import type { UploadProgress as Progress } from '../../api/xhrClient'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 
 type UploadProgressProps = {
