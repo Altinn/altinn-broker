@@ -7,7 +7,7 @@ import {
 import { useMemo } from 'react'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import { PartyField } from './PartyField'
-import type { RecipientRules } from './newFileTransferForm'
+import type { RecipientRules } from './recipientRules'
 
 type RecipientsFieldProps = {
   id: string

@@ -6,21 +6,21 @@ import {
 } from '../../api/accessListMembers'
 import { ApiError } from '../../api/client'
 import { sendFileTransfer } from '../../api/fileTransfers'
-import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
-import type { UploadProgress } from '../../api/xhrClient'
 import {
   getResourceConfiguration,
   resolveMaxFileTransferSize,
   type ResourceConfiguration,
 } from '../../api/resourceConfiguration'
+import type { UploadProgress } from '../../api/xhrClient'
+import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import {
   emptyValues,
-  hasErrors,
-  resolveRecipientRules,
   toPropertyList,
-  validate,
+  type NewFileTransferErrors,
   type NewFileTransferValues,
-} from './newFileTransferForm'
+} from './formFields'
+import { hasErrors, validate } from './formValidation'
+import { resolveRecipientRules } from './recipientRules'
 
 type Options = {
   resourceId: string
@@ -40,15 +40,28 @@ type LoadedResource = {
  * and the two-step send. The page itself only lays the fields out.
  */
 export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: Options) {
-  const [loaded, setLoaded] = useState<LoadedResource | null>(null)
-  const [draft, setDraft] = useState<NewFileTransferValues>(emptyValues)
-  const [submitAttempts, setSubmitAttempts] = useState(0)
-  const [sending, setSending] = useState(false)
-  const [progress, setProgress] = useState<UploadProgress | null>(null)
-  const [submitError, setSubmitError] = useState('')
+  const { configuration, members, loading, loadError } = useResourceContext(resourceId)
+  const form = useFormValues(configuration, members, senderOrgNumber)
+  const submission = useSubmission({
+    resourceId,
+    senderOrgNumber,
+    values: form.values,
+    errors: form.errors,
+    onSent,
+  })
 
-  const abortRef = useRef<AbortController | null>(null)
-  useEffect(() => () => abortRef.current?.abort(), [])
+  return {
+    ...form,
+    ...submission,
+    loading,
+    loadError,
+    errors: submission.submitAttempts > 0 ? form.errors : {},
+  }
+}
+
+/** What the resource allows, and who may receive on it. */
+function useResourceContext(resourceId: string) {
+  const [loaded, setLoaded] = useState<LoadedResource | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -74,18 +87,29 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
 
   // Anything loaded for another resource belongs to a previous route, so it counts as not loaded.
   const resource = loaded?.resourceId === resourceId ? loaded : null
-  const configuration = resource?.configuration ?? null
   const members = useMemo(() => resource?.members ?? [], [resource])
+
+  return {
+    configuration: resource?.configuration ?? null,
+    members,
+    loading: resource === null,
+    loadError: resource?.error ?? '',
+  }
+}
+
+/** The draft the user is editing, narrowed to what the API accepts, and its validation errors. */
+function useFormValues(
+  configuration: ResourceConfiguration | null,
+  members: AccessListMember[],
+  senderOrgNumber: string,
+) {
+  const [draft, setDraft] = useState<NewFileTransferValues>(emptyValues)
 
   const rules = useMemo(
     () => resolveRecipientRules(members, configuration?.requiredParty ?? null, senderOrgNumber),
     [members, configuration, senderOrgNumber],
   )
-
   const maxFileSize = configuration ? resolveMaxFileTransferSize(configuration) : null
-
-  // What the API will actually accept, which is not always what the user is free to choose:
-  // a required party is the only possible recipient, and virus scanning stays on unless approved.
   const requiredParty = rules.requiredParty
   const virusScanLocked = !configuration?.approvedForDisabledVirusScan
   const values = useMemo<NewFileTransferValues>(
@@ -105,6 +129,30 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
   )
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
+
+  return { rules, maxFileSize, virusScanLocked, values, setValue, errors }
+}
+
+type SubmissionOptions = Options & {
+  values: NewFileTransferValues
+  errors: NewFileTransferErrors
+}
+
+/** The two-step send, and the progress and failure it reports back. */
+function useSubmission({
+  resourceId,
+  senderOrgNumber,
+  values,
+  errors,
+  onSent,
+}: SubmissionOptions) {
+  const [submitAttempts, setSubmitAttempts] = useState(0)
+  const [sending, setSending] = useState(false)
+  const [progress, setProgress] = useState<UploadProgress | null>(null)
+  const [submitError, setSubmitError] = useState('')
+
+  const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const send = useCallback(
     async (file: File, signal: AbortSignal) => {
@@ -162,22 +210,7 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
 
   const abort = useCallback(() => abortRef.current?.abort(), [])
 
-  return {
-    rules,
-    maxFileSize,
-    virusScanLocked,
-    loading: resource === null,
-    loadError: resource?.error ?? '',
-    values,
-    setValue,
-    errors: submitAttempts > 0 ? errors : {},
-    submitAttempts,
-    sending,
-    progress,
-    submitError,
-    submit,
-    abort,
-  }
+  return { submitAttempts, sending, progress, submitError, submit, abort }
 }
 
 function isAbortError(error: unknown): boolean {

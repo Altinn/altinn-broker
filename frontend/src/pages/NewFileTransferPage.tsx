@@ -19,9 +19,9 @@ import { VirusScanField } from '../components/NewFileTransferPage/VirusScanField
 import {
   fieldId,
   fieldLabels,
-  MAX_REFERENCE_LENGTH,
   type NewFileTransferField,
-} from '../components/NewFileTransferPage/newFileTransferForm'
+} from '../components/NewFileTransferPage/formFields'
+import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
 import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNewFileTransferForm'
 import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { currentOrganization, getServiceById } from '../data/mockData'

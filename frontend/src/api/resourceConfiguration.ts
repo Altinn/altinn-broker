@@ -3,21 +3,18 @@ import { BROKER_API_PREFIX } from './config'
 
 const RESOURCE_PATH = `${BROKER_API_PREFIX}/resource`
 
-/** The ceiling the API enforces for virus scanned transfers (ApplicationConstants.MaxVirusScanUploadSize). */
+/** The ceiling the API enforces for virus scanned transfers. */
 const MAX_VIRUS_SCAN_FILE_SIZE = 50 * 1000 * 1000 * 1000
 
 /** The parts of the API's ResourceExt that the form needs. */
 export type ResourceConfiguration = {
   maxFileTransferSize: number | null
-  /** Must be either sender or the single recipient of every transfer on the resource. */
   requiredParty: string | null
-  /** Approval is granted by Altinn, so virus scanning is mandatory on all other resources. */
   approvedForDisabledVirusScan: boolean
 }
 
 /**
- * Reads the broker configuration for a resource. Open to any signed in caller, so no party has to
- * be supplied — the session cookie is what the API requires.
+ * Reads the broker configuration for a resource.
  */
 export async function getResourceConfiguration(resourceId: string): Promise<ResourceConfiguration> {
   try {
@@ -27,7 +24,7 @@ export async function getResourceConfiguration(resourceId: string): Promise<Reso
     )
     return toConfiguration(body)
   } catch (error) {
-    // Falling back to the mock keeps the form bounded instead of leaving it without limits.
+    // Fall back to mock until the API endpoint is open to senders.
     if (isAccessDenied(error)) {
       return toConfiguration(MOCK_CONFIGURATIONS[resourceId])
     }

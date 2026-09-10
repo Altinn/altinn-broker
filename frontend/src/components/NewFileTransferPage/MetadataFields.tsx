@@ -1,12 +1,11 @@
 import { Button, Fieldset, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
 import { PlusIcon, TrashIcon } from '@navikt/aksel-icons'
+import { createMetadataEntry, type MetadataEntry } from './formFields'
 import {
-  createMetadataEntry,
   MAX_METADATA_ENTRIES,
   MAX_METADATA_KEY_LENGTH,
   MAX_METADATA_VALUE_LENGTH,
-  type MetadataEntry,
-} from './newFileTransferForm'
+} from './formValidation'
 
 type MetadataFieldsProps = {
   id: string

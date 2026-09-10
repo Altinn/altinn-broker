@@ -1,6 +1,12 @@
-import type { AccessListMember } from '../../api/accessListMembers'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
-import { formatOrgNumber, toOrgNumber } from '../../helpers/orgIdentifierHelper'
+import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
+import {
+  filledMetadata,
+  type MetadataEntry,
+  type NewFileTransferErrors,
+  type NewFileTransferValues,
+} from './formFields'
+import type { RecipientRules } from './recipientRules'
 
 /** Limits enforced by the API */
 export const MAX_METADATA_ENTRIES = 10
@@ -9,80 +15,7 @@ export const MAX_METADATA_VALUE_LENGTH = 3000
 export const MAX_REFERENCE_LENGTH = 4096
 const MAX_FILE_NAME_LENGTH = 255
 
-export type MetadataEntry = {
-  id: string
-  key: string
-  value: string
-}
-
-export type NewFileTransferValues = {
-  reference: string
-  recipients: string[]
-  metadata: MetadataEntry[]
-  file: File | null
-  virusScan: boolean
-}
-
-export type NewFileTransferField = 'reference' | 'recipients' | 'metadata' | 'file'
-export type NewFileTransferErrors = Partial<Record<NewFileTransferField, string>>
-
-export const fieldLabels: Record<NewFileTransferField, string> = {
-  reference: 'Referanse',
-  recipients: 'Mottakere',
-  metadata: 'Metadata',
-  file: 'Fil',
-}
-
-/** Namespaced so the error summary can link to the control that failed. */
-export function fieldId(field: NewFileTransferField): string {
-  return `new-transfer-${field}`
-}
-
-export type RecipientRules = {
-  /** The organizations the sender is allowed to pick, sender itself excluded. */
-  options: AccessListMember[]
-  /** Set when the resource forces this organization to be the one and only recipient. */
-  requiredParty: AccessListMember | null
-}
-
-export function createMetadataEntry(): MetadataEntry {
-  return { id: crypto.randomUUID(), key: '', value: '' }
-}
-
-export function emptyValues(): NewFileTransferValues {
-  return {
-    reference: '',
-    recipients: [],
-    metadata: [createMetadataEntry()],
-    file: null,
-    virusScan: true,
-  }
-}
-
-/**
- * Narrows the access list to what the API will accept from this sender.
- * A resource with a required party only allows transfers that party is in, so a sender that is
- * not the required party can send to it and nobody else.
- */
-export function resolveRecipientRules(
-  members: AccessListMember[],
-  requiredPartyIdentifier: string | null,
-  senderOrgNumber: string,
-): RecipientRules {
-  const options = members.filter((member) => member.organizationNumber !== senderOrgNumber)
-  const requiredPartyNumber = requiredPartyIdentifier ? toOrgNumber(requiredPartyIdentifier) : null
-
-  if (!requiredPartyNumber || requiredPartyNumber === senderOrgNumber) {
-    return { options, requiredParty: null }
-  }
-
-  const requiredParty = options.find(
-    (member) => member.organizationNumber === requiredPartyNumber,
-  ) ?? { organizationNumber: requiredPartyNumber, name: formatOrgNumber(requiredPartyNumber) }
-
-  return { options: [requiredParty], requiredParty }
-}
-
+/** Validates the entire new file transfer form and returns an object mapping field names to error messages. */
 export function validate(
   values: NewFileTransferValues,
   maxFileSize: number | null,
@@ -98,11 +31,6 @@ export function validate(
 
 export function hasErrors(errors: NewFileTransferErrors): boolean {
   return Object.values(errors).some(Boolean)
-}
-
-/** Filled entries only — a blank row is a row the user has not started on. */
-export function toPropertyList(metadata: MetadataEntry[]): Record<string, string> {
-  return Object.fromEntries(filledMetadata(metadata).map(({ key, value }) => [key.trim(), value]))
 }
 
 function validateReference(reference: string): string | undefined {
@@ -173,8 +101,4 @@ function validateFile(file: File | null, maxFileSize: number | null): string | u
     return `Filen er ${formatFileSize(file.size)}. Tjenesten tillater maks ${formatFileSize(maxFileSize)}.`
   }
   return undefined
-}
-
-function filledMetadata(metadata: MetadataEntry[]): MetadataEntry[] {
-  return metadata.filter((entry) => entry.key.trim() || entry.value.trim())
 }

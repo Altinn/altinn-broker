@@ -3,12 +3,6 @@ import { toOrgNumber } from '../helpers/orgIdentifierHelper'
 
 /**
  * Members of the access list that decides who may receive a file transfer on a resource.
- *
- * The real source is GET /resourceregistry/api/v1/access-lists/{owner}/{identifier}/members.
- * It needs an AccessListRead token the browser session does not hold, and answers
- * `{ data: [{ id, since, identifiers }], links: { next } }` without organization names — so it
- * has to be proxied and name-resolved through the Broker API first. Until then the members come
- * from mock data, and only the body of `getAccessListMembers` has to change.
  */
 export type AccessListReference = {
   owner: string
