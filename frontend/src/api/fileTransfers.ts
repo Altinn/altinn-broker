@@ -1,14 +1,12 @@
 import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
 import { uploadBinary, type UploadOptions } from './xhrClient'
-import { toOrgIdentifier } from '../helpers/orgIdentifierHelper'
+import { requireOrgIdentifier } from '../helpers/orgIdentifierHelper'
 
 const FILE_TRANSFER_PATH = `${BROKER_API_PREFIX}/filetransfer`
 
 /**
  * Creates a file transfer and uploads its file.
- * The two calls are separate on the API, so an upload failure leaves the transfer created
- * but empty; the id is reported through `onInitialized` before the bytes go.
  */
 export async function sendFileTransfer(
   input: SendFileTransferInput,
@@ -19,7 +17,6 @@ export async function sendFileTransfer(
 
   return uploadFileTransfer(fileTransferId, input.file, options)
 }
-
 
 /** Creates the file transfer metadata and returns the id the file is then uploaded to. */
 async function initializeFileTransfer(
@@ -37,23 +34,19 @@ async function initializeFileTransfer(
 }
 
 /**
- * Maps form input to the API payload. Only the organization numbers are checked here,
- * because they have to be rewritten to the API's identifier format and that can fail.
- * Everything else is validated by the API.
+ * Maps form input to the API payload.
  */
 function buildInitializeRequest(input: SendFileTransferInput): FileTransferInitializeRequestBody {
   return {
     fileName: input.file.name,
     resourceId: input.resourceId.trim(),
-    sender: requireOrgIdentifier(input.sender, 'sender'),
-    recipients: input.recipients.map((recipient) => requireOrgIdentifier(recipient, 'recipients')),
+    sender: requireOrgIdentifier(input.sender),
+    recipients: input.recipients.map((recipient) => requireOrgIdentifier(recipient)),
     sendersFileTransferReference: input.reference?.trim() || undefined,
     propertyList: input.propertyList ?? {},
     disableVirusScan: input.disableVirusScan ?? false,
   }
 }
-
-
 
 /** Uploads the file body to an initialized file transfer, reporting progress as it goes. */
 async function uploadFileTransfer(
@@ -95,24 +88,3 @@ export type SendFileTransferOptions = UploadOptions & {
   onInitialized?: (fileTransferId: string) => void
 }
 
-function requireOrgIdentifier(
-  orgNumber: string,
-  field: keyof SendFileTransferInput,
-): string {
-  const identifier = toOrgIdentifier(orgNumber)
-  if (!identifier) {
-    throw new FileTransferValidationError(field, `Invalid ${field} organization number: ${orgNumber}`)
-  }
-  return identifier
-}
-
-/** Thrown before any request is made, when the input cannot produce a valid payload. */
-export class FileTransferValidationError extends Error {
-  public readonly field: keyof SendFileTransferInput
-
-  constructor(field: keyof SendFileTransferInput, message: string) {
-    super(message)
-    this.name = 'FileTransferValidationError'
-    this.field = field
-  }
-}

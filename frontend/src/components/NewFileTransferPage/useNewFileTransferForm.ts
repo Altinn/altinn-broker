@@ -5,7 +5,8 @@ import {
   type AccessListMember,
 } from '../../api/accessListMembers'
 import { ApiError } from '../../api/client'
-import { FileTransferValidationError, sendFileTransfer } from '../../api/fileTransfers'
+import { sendFileTransfer } from '../../api/fileTransfers'
+import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import type { UploadProgress } from '../../api/xhrClient'
 import {
   getResourceConfiguration,
@@ -185,7 +186,7 @@ function isAbortError(error: unknown): boolean {
 
 /** `fileTransferId` is set once initialization succeeded, so a failed upload can be followed up. */
 function describeError(error: unknown, fileTransferId: string): string {
-  if (error instanceof FileTransferValidationError) {
+  if (error instanceof InvalidOrgNumberError) {
     return error.message
   }
   if (error instanceof ApiError) {

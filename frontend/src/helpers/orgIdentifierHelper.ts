@@ -19,6 +19,18 @@ export function toOrgNumber(value: string): string | null {
 }
 
 /**
+ * Ensures that the given organization number is valid and returns it in the API-accepted identifier format.
+ * Throws an `InvalidOrgNumberError` if the input is not a valid organization number.
+ */
+export function requireOrgIdentifier(orgNumber: string): string {
+  const identifier = toOrgIdentifier(orgNumber)
+  if (!identifier) {
+    throw new InvalidOrgNumberError(orgNumber)
+  }
+  return identifier
+}
+
+/**
  * Turns an organization number into the identifier the API validates against.
  * Returns null for anything that is not a valid organization number.
  */
@@ -32,3 +44,15 @@ export function formatOrgNumber(orgNumber: string): string {
   const digits = toOrgNumber(orgNumber)
   return digits ? digits.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3') : orgNumber
 }
+
+/** Thrown when a value that has to be an organization number is not one. */
+export class InvalidOrgNumberError extends Error {
+  public readonly value: string
+
+  constructor(value: string) {
+    super(`Invalid organization number: ${value}`)
+    this.name = 'InvalidOrgNumberError'
+    this.value = value
+  }
+}
+
