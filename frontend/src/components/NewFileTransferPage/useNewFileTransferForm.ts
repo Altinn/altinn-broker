@@ -5,7 +5,7 @@ import {
   type AccessListMember,
 } from '../../api/accessListMembers'
 import { ApiError } from '../../api/client'
-import { sendFileTransfer } from '../../api/fileTransfers'
+import { sendFileTransfer } from '../../api/sendFileTransfer'
 import {
   getResourceConfiguration,
   resolveMaxFileTransferSize,
