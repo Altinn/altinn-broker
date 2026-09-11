@@ -69,14 +69,16 @@ public class ResourceController : Controller
     /// Gets information about a resource configuration in broker
     /// </summary>
     /// <remarks>
-    /// One of the scopes: <br/> 
+    /// One of the scopes: <br/>
     /// - altinn:serviceowner <br/>
+    /// - altinn:broker.write <br/>
+    /// - altinn:broker.read <br/>
     /// </remarks>
     /// <response code="200">Detailed information about the resource</response>
-    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="401">You must use a bearer token with one of the broker scopes</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpGet]
-    [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
+    [Authorize(Policy = AuthorizationConstants.AnyBrokerScope)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -97,7 +99,8 @@ public class ResourceController : Controller
                 PurgeFileTransferAfterAllRecipientsConfirmed = resource.PurgeFileTransferAfterAllRecipientsConfirmed,
                 PurgeFileTransferGracePeriod = resource.PurgeFileTransferGracePeriod.HasValue ? resource.PurgeFileTransferGracePeriod.Value.ToString() : null,
                 UseManifestFileShim = resource.UseManifestFileShim,
-                RequiredParty = resource.RequiredParty
+                RequiredParty = resource.RequiredParty,
+                ApprovedForDisabledVirusScan = resource.ApprovedForDisabledVirusScan
             }),
             Problem
         );

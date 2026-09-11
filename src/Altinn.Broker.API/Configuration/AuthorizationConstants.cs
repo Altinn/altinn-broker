@@ -6,6 +6,7 @@ public static class AuthorizationConstants
     public const string Recipient = "Recipient";
     public const string SenderOrRecipient = "SenderOrRecipient";
     public const string ServiceOwner = "ServiceOwner";
+    public const string AnyBrokerScope = "AnyBrokerScope";
     public const string Maintenance = "Maintenance";
     public const string LegacyAndMaskinporten = "LegacyAndMaskinporten";
     public const string TusUploadSession = "TusUploadSession";
