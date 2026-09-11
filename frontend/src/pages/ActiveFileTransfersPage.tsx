@@ -13,21 +13,28 @@ const current_org = "312936496"
 export function ActiveFileTransfersPage() {
   const [resources, setResources] = useState<AuthorizedResource[]>([])
   const [overviews, setOverviews] = useState<ActiveFileTransfers[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    void fetchAuthorizedResources(current_org).then((authorizedResources) => {
-      setResources(authorizedResources)
+    async function loadActiveFileTransfers() {
+      try {
+        const authorizedResources = await fetchAuthorizedResources(current_org)
+        setResources(authorizedResources)
 
-      const resourceIds = authorizedResources.map((resource) => resource.resourceId)
-      if (resourceIds.length === 0) {
-        setOverviews([])
-        return
+        const resourceIds = authorizedResources.map((resource) => resource.resourceId)
+        if (resourceIds.length === 0) {
+          setOverviews([])
+          return
+        }
+        setOverviews(await getActiveFileTransfers(resourceIds, current_org))
+      } catch {
+        setLoadError(true)
       }
-      void getActiveFileTransfers(resourceIds, current_org).then(setOverviews)
-    })
+    }
+    void loadActiveFileTransfers()
   }, [])
 
   const filtered = useMemo(() => {
@@ -100,9 +107,11 @@ export function ActiveFileTransfersPage() {
         </div>
       </div>
 
-      {overviews === null && <p className="empty-state">Laster aktive formidlinger …</p>}
+      {loadError && <p className="empty-state">Klarte ikke å hente aktive formidlinger.</p>}
 
-      {overviews !== null && cards.length === 0 && (
+      {!loadError && overviews === null && <p className="empty-state">Laster aktive formidlinger …</p>}
+
+      {!loadError && overviews !== null && cards.length === 0 && (
         <p className="empty-state">Ingen aktive formidlinger funnet.</p>
       )}
 
