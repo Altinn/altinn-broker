@@ -26,7 +26,6 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// <response code="200">Returns the list of active file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     [HttpGet("active-file-transfers")]
-    [ApiExplorerSettings(IgnoreApi = false)]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(List<ActiveFileTransferExt>), StatusCodes.Status200OK)]
