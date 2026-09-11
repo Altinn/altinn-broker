@@ -1,5 +1,6 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.IdPortenDirectAuth.Options;
+using Altinn.Broker.Common;
 using Altinn.Broker.Integrations.Altinn;
 
 using Microsoft.AspNetCore.Authentication;
@@ -102,9 +103,9 @@ public static class DependencyInjection
                         var requiredAcr = IdPortenDirectAuthDefaults.RequiredAcr;
                         var acr = context.Principal?.FindFirst(ClaimConstants.UserFlow)?.Value
                             ?? context.Principal?.FindFirst("acr")?.Value;
-                        if (!string.IsNullOrEmpty(requiredAcr) && acr != requiredAcr)
+                        if (!string.IsNullOrEmpty(requiredAcr) && !IdPortenAuthenticationLevel.IsSufficient(acr, requiredAcr))
                         {
-                            context.Fail($"Insufficient authentication level. Required: {requiredAcr}, got: {acr}");
+                            context.Fail($"Insufficient authentication level. Required at least: {requiredAcr}, got: {acr}");
                             return;
                         }
 
