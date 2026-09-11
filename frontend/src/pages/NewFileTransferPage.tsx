@@ -62,6 +62,10 @@ export function NewFileTransferPage() {
     (field) => errors[field],
   )
 
+  // The metadata summary entry points at the row input that failed instead of the entire metadata field.
+  const metadataErrorTargetId = (field: NewFileTransferField) =>
+    (field === 'metadata' ? form.metadataErrorInputId : undefined) ?? fieldId(field)
+
   return (
     <DialogLayout
       color="company"
@@ -119,7 +123,7 @@ export function NewFileTransferPage() {
             <MetadataFields
               id={fieldId('metadata')}
               entries={values.metadata}
-              error={errors.metadata}
+              rowErrors={form.metadataRowErrors}
               onChange={(metadata) => setValue('metadata', metadata)}
             />
 
@@ -145,7 +149,7 @@ export function NewFileTransferPage() {
                 <ErrorSummary.List>
                   {failedFields.map((field) => (
                     <ErrorSummary.Item key={field}>
-                      <ErrorSummary.Link href={`#${fieldId(field)}`}>
+                      <ErrorSummary.Link href={`#${metadataErrorTargetId(field)}`}>
                         {fieldLabels[field]}: {errors[field]}
                       </ErrorSummary.Link>
                     </ErrorSummary.Item>

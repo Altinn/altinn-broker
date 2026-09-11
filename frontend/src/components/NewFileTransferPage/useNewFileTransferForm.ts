@@ -15,11 +15,18 @@ import type { UploadProgress } from '../../api/xhrClient'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import {
   emptyValues,
+  metadataInputId,
   toPropertyList,
+  type MetadataEntry,
   type NewFileTransferErrors,
   type NewFileTransferValues,
 } from './formFields'
-import { hasErrors, validate } from './formValidation'
+import {
+  hasErrors,
+  validate,
+  validateMetadataRows,
+  type MetadataRowError,
+} from './formValidation'
 import { resolveRecipientRules } from './recipientRules'
 
 type Options = {
@@ -56,6 +63,7 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
     loading,
     loadError,
     errors: submission.submitAttempts > 0 ? form.errors : {},
+    metadataRowErrors: submission.submitAttempts > 0 ? form.metadataRowErrors : [],
   }
 }
 
@@ -129,8 +137,34 @@ function useFormValues(
   )
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
+  const metadataRowErrors = useMemo(() => validateMetadataRows(values.metadata), [values.metadata])
+  const metadataErrorInputId = useMemo(
+    () => firstMetadataErrorInputId(values.metadata, metadataRowErrors),
+    [values.metadata, metadataRowErrors],
+  )
 
-  return { rules, maxFileSize, virusScanLocked, values, setValue, errors }
+  return {
+    rules,
+    maxFileSize,
+    virusScanLocked,
+    values,
+    setValue,
+    errors,
+    metadataRowErrors,
+    metadataErrorInputId,
+  }
+}
+
+/** The summary has to land the user on an input; this selects the first metadata error input's ID */
+function firstMetadataErrorInputId(
+  metadata: MetadataEntry[],
+  rowErrors: MetadataRowError[],
+): string | undefined {
+  const index = rowErrors.findIndex((row) => row.key ?? row.value)
+  if (index < 0) {
+    return undefined
+  }
+  return metadataInputId(metadata[index].id, rowErrors[index].key ? 'key' : 'value')
 }
 
 type SubmissionOptions = Options & {
