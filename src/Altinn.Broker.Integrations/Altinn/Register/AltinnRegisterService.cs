@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 using Altinn.Platform.Register.Models;
@@ -62,5 +63,27 @@ public class AltinnRegisterService : IAltinnRegisterService
             return null;
         }
         return party.OrgNumber;
+    }
+
+    public async Task<string?> LookupOrganizationName(string organizationId, CancellationToken cancellationToken = default)
+    {
+        organizationId = organizationId.WithoutPrefix();
+        var partyLookup = new PartyLookup()
+        {
+            OrgNo = organizationId
+        };
+        var response = await _httpClient.PostAsJsonAsync("register/api/v1/parties/lookup", partyLookup, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Error when looking up organization in Altinn Register.Statuscode was: {statusCode}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
+            return null;
+        }
+        var party = await response.Content.ReadFromJsonAsync<Party>();
+        if (party is null)
+        {
+            _logger.LogError("Unexpected json response when looking up organization in Altinn Register");
+            return null;
+        }
+        return party.Name.ToString();
     }
 }
