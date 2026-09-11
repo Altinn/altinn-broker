@@ -72,7 +72,7 @@
   margin: 1rem 0 1.5rem;
 }
 
-.filter-row .field {
+.filter-row > * {
   flex: 1;
   min-width: 200px;
 }
@@ -199,4 +199,10 @@
 .empty-state {
   color: #545c7a;
   font-size: 0.9375rem;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
 }
