@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 
 using Altinn.Broker.Common;
@@ -60,10 +61,14 @@ public class GetActiveFileTransfersHandler(
             .Distinct()
             .ToList();
 
-        var organizationNameLookups = await Task.WhenAll(uniqueOrganizationIds.Select(async organizationId =>
-            (organizationId, name: await altinnRegisterService.LookupOrganizationName(organizationId, cancellationToken))));
-
-        var organizationNameById = organizationNameLookups.ToDictionary(lookup => lookup.organizationId, lookup => lookup.name);
+        var organizationNameById = new ConcurrentDictionary<string, string?>();
+        await Parallel.ForEachAsync(
+            uniqueOrganizationIds,
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = cancellationToken },
+            async (organizationId, ct) =>
+            {
+                organizationNameById[organizationId] = await altinnRegisterService.LookupOrganizationName(organizationId, ct);
+            });
 
         foreach (var summary in summaries)
         {
