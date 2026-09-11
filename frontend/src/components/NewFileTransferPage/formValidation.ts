@@ -1,7 +1,6 @@
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import {
-  filledMetadata,
   type MetadataEntry,
   type NewFileTransferErrors,
   type NewFileTransferValues,
@@ -64,27 +63,66 @@ function validateRecipients(recipients: string[], rules: RecipientRules): string
     : undefined
 }
 
-function validateMetadata(metadata: MetadataEntry[]): string | undefined {
-  const filled = filledMetadata(metadata)
+export type MetadataRowError = {
+  key?: string
+  value?: string
+}
 
-  if (filled.length > MAX_METADATA_ENTRIES) {
-    return `Du kan legge til maks ${MAX_METADATA_ENTRIES} metadata.`
+export function validateMetadataRows(metadata: MetadataEntry[]): MetadataRowError[] {
+  const duplicates = duplicateKeys(metadata)
+  return metadata.map((entry) => ({
+    key: metadataKeyError(entry.key, duplicates),
+    value: metadataValueError(entry.value),
+  }))
+}
+
+function metadataKeyError(rawKey: string, duplicates: Set<string>): string | undefined {
+  const key = rawKey.trim()
+  if (!key) {
+    return 'Nøkkel må fylles ut.'
   }
-  if (metadata.some((entry) => !entry.key.trim() && entry.value.trim())) {
-    return 'Metadata med verdi må også ha en nøkkel.'
-  }
-  if (metadata.some((entry) => entry.key.trim() && !entry.value.trim())) {
-    return 'Metadata med nøkkel må også ha en verdi.'
-  }
-  if (filled.some((entry) => entry.key.trim().length > MAX_METADATA_KEY_LENGTH)) {
+  if (key.length > MAX_METADATA_KEY_LENGTH) {
     return `Nøkkel kan være maks ${MAX_METADATA_KEY_LENGTH} tegn.`
   }
-  if (filled.some((entry) => entry.value.length > MAX_METADATA_VALUE_LENGTH)) {
+  if (duplicates.has(key)) {
+    return 'To metadata kan ikke ha samme nøkkel.'
+  }
+  return undefined
+}
+
+function metadataValueError(value: string): string | undefined {
+  if (!value.trim()) {
+    return 'Verdi må fylles ut.'
+  }
+  if (value.length > MAX_METADATA_VALUE_LENGTH) {
     return `Verdi kan være maks ${MAX_METADATA_VALUE_LENGTH} tegn.`
   }
+  return undefined
+}
 
-  const keys = filled.map((entry) => entry.key.trim())
-  return new Set(keys).size === keys.length ? undefined : 'To metadata kan ikke ha samme nøkkel.'
+function duplicateKeys(metadata: MetadataEntry[]): Set<string> {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+  for (const { key } of metadata) {
+    const trimmed = key.trim()
+    if (!trimmed) {
+      continue
+    }
+    if (seen.has(trimmed)) {
+      duplicates.add(trimmed)
+    }
+    seen.add(trimmed)
+  }
+  return duplicates
+}
+
+/** Summarises the rows for the error summary; the rows themselves carry the message the user acts on. */
+function validateMetadata(metadata: MetadataEntry[]): string | undefined {
+  if (metadata.length > MAX_METADATA_ENTRIES) {
+    return `Du kan legge til maks ${MAX_METADATA_ENTRIES} metadata.`
+  }
+  const failed = validateMetadataRows(metadata).find((row) => row.key ?? row.value)
+  return failed?.key ?? failed?.value
 }
 
 function validateFile(file: File | null, maxFileSize: number | null): string | undefined {

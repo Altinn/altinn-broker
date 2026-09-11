@@ -119,7 +119,7 @@ export function NewFileTransferPage() {
             <MetadataFields
               id={fieldId('metadata')}
               entries={values.metadata}
-              error={errors.metadata}
+              rowErrors={form.metadataRowErrors}
               onChange={(metadata) => setValue('metadata', metadata)}
             />
 

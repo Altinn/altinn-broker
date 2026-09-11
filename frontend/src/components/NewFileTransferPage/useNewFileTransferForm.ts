@@ -19,7 +19,7 @@ import {
   type NewFileTransferErrors,
   type NewFileTransferValues,
 } from './formFields'
-import { hasErrors, validate } from './formValidation'
+import { hasErrors, validate, validateMetadataRows } from './formValidation'
 import { resolveRecipientRules } from './recipientRules'
 
 type Options = {
@@ -56,6 +56,7 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
     loading,
     loadError,
     errors: submission.submitAttempts > 0 ? form.errors : {},
+    metadataRowErrors: submission.submitAttempts > 0 ? form.metadataRowErrors : [],
   }
 }
 
@@ -129,8 +130,9 @@ function useFormValues(
   )
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
+  const metadataRowErrors = useMemo(() => validateMetadataRows(values.metadata), [values.metadata])
 
-  return { rules, maxFileSize, virusScanLocked, values, setValue, errors }
+  return { rules, maxFileSize, virusScanLocked, values, setValue, errors, metadataRowErrors }
 }
 
 type SubmissionOptions = Options & {

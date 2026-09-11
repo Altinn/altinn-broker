@@ -39,18 +39,13 @@ export function emptyValues(): NewFileTransferValues {
   return {
     reference: '',
     recipients: [],
-    metadata: [createMetadataEntry()],
+    metadata: [],
     file: null,
     virusScan: true,
   }
 }
 
-/** A row the user has not started on is not a metadata entry, it is an empty row. */
-export function filledMetadata(metadata: MetadataEntry[]): MetadataEntry[] {
-  return metadata.filter((entry) => entry.key.trim() || entry.value.trim())
-}
-
-/** The metadata field as the API takes it: a dictionary of the filled entries. */
+/** The metadata field as the API takes it: a dictionary of the entered pairs. */
 export function toPropertyList(metadata: MetadataEntry[]): Record<string, string> {
-  return Object.fromEntries(filledMetadata(metadata).map(({ key, value }) => [key.trim(), value]))
+  return Object.fromEntries(metadata.map(({ key, value }) => [key.trim(), value]))
 }
