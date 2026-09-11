@@ -160,10 +160,17 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task GetResource_WithoutPermissions_ReturnsUnauthorized()
+    public async Task GetResource_WithoutToken_ReturnsUnauthorized()
+    {
+        var response = await _factory.CreateClient().GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}");
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task GetResource_WithBrokerScopeOfDifferentServiceOwner_ReturnsOk()
     {
         var response = await _serviceOwnerClientNotConfigured.GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}");
-        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
