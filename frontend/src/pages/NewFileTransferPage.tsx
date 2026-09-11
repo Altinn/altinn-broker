@@ -1,190 +1,174 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { currentOrganization, getServiceById, organizations } from '../data/mockData'
+import { DialogLayout } from '@altinn/altinn-components'
+import {
+  Alert,
+  Button,
+  ErrorSummary,
+  Heading,
+  Paragraph,
+  Spinner,
+  Textfield,
+} from '@digdir/designsystemet-react'
+import { useCallback, useEffect, useRef } from 'react'
+import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
+import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
+import { PartyField } from '../components/NewFileTransferPage/PartyField'
+import { RecipientsField } from '../components/NewFileTransferPage/RecipientsField'
+import { UploadFile } from '../components/NewFileTransferPage/UploadFile'
+import { UploadProgress } from '../components/NewFileTransferPage/UploadProgress'
+import { VirusScanField } from '../components/NewFileTransferPage/VirusScanField'
+import {
+  fieldId,
+  fieldLabels,
+  type NewFileTransferField,
+} from '../components/NewFileTransferPage/formFields'
+import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
+import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNewFileTransferForm'
+import '../components/NewFileTransferPage/newFileTransferPage.css'
+import { currentOrganization, getServiceById } from '../data/mockData'
+import { toOrgNumber } from '../helpers/orgIdentifierHelper'
 import { servicePath } from './routes'
-import './pages.css'
+
+const senderOrgNumber = toOrgNumber(currentOrganization.orgNumber) ?? ''
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
   const service = getServiceById(serviceId)
+  const errorSummaryRef = useRef<HTMLDivElement>(null)
 
-  const [reference, setReference] = useState('2026/123987')
-  const [metadata, setMetadata] = useState('')
-  const [senderId, setSenderId] = useState('922194912')
-  const [recipientId, setRecipientId] = useState('889640782')
-  const [virusScan, setVirusScan] = useState(true)
-  const [notifyEmail, setNotifyEmail] = useState(true)
-  const [notifySms, setNotifySms] = useState(false)
-  const [fileName, setFileName] = useState('')
+  const onSent = useCallback(() => {
+    navigate(servicePath(serviceId), { replace: true })
+  }, [navigate, serviceId])
+
+  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, onSent })
+  const { errors, setValue, submitAttempts, values } = form
+
+  useEffect(() => {
+    if (submitAttempts > 0) {
+      errorSummaryRef.current?.focus()
+    }
+  }, [submitAttempts])
 
   if (!service) {
     return <p>Fant ikke formidlingstjenesten.</p>
   }
 
-  const sender = organizations.find((o) => o.orgNumber.replace(/\s/g, '') === senderId)
-  const recipient = organizations.find((o) => o.orgNumber.replace(/\s/g, '') === recipientId)
-  const displayFileName = fileName || 'formidling'
+  const cancel = () => {
+    form.abort()
+    navigate(servicePath(service.id))
+  }
 
-  const canSubmit = reference && senderId && recipientId && fileName
+  const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
+    (field) => errors[field],
+  )
 
   return (
-    <div className="page">
-      <div className="page-actions">
-        <Link to={servicePath(service.id)} className="button button--secondary">
-          ← Avbryt ny formidling
-        </Link>
-      </div>
+    <DialogLayout
+      color="company"
+      backButton={{
+        label: 'Tilbake',
+        as: (props: LinkProps) => <Link {...props} to={servicePath(service.id)} />,
+      }}
+    >
+      <header className="new-transfer__header">
+        <Heading level={2} data-size="md">
+          Ny formidling
+        </Heading>
+        <Paragraph data-size="sm">{service.name}</Paragraph>
+      </header>
 
-      <div className="form-card">
-        <h2 className="page-heading">Ny formidling</h2>
-        <p className="page-subheading">{service.name}</p>
+      {form.loading ? (
+        <Spinner aria-label="Henter oppsettet for tjenesten" />
+      ) : (
+        <form
+          className="new-transfer__form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void form.submit()
+          }}
+        >
+          {form.loadError && <Alert data-color="warning">{form.loadError}</Alert>}
 
-        <form className="form-stack" onSubmit={(e) => e.preventDefault()}>
-          <div className="field">
-            <label className="label" htmlFor="referanse">
-              Referanse
-            </label>
-            <input
-              id="referanse"
-              className="input"
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
+          <fieldset className="new-transfer__fields" disabled={form.sending}>
+            <PartyField
+              label="Avsender"
+              description="Du formidler på vegne av denne organisasjonen."
+              name={currentOrganization.name}
+              organizationNumber={senderOrgNumber}
             />
-          </div>
 
-          <div className="field">
-            <label className="label" htmlFor="metadata">
-              Andre metadata
-            </label>
-            <input
-              id="metadata"
-              className="input"
-              type="text"
-              value={metadata}
-              onChange={(e) => setMetadata(e.target.value)}
+            <RecipientsField
+              id={fieldId('recipients')}
+              rules={form.rules}
+              selected={values.recipients}
+              error={errors.recipients}
+              onChange={(recipients) => setValue('recipients', recipients)}
             />
-          </div>
 
-          <div className="field">
-            <label className="label" htmlFor="avsender">
-              Avsender
-            </label>
-            <select
-              id="avsender"
-              className="input"
-              value={senderId}
-              onChange={(e) => setSenderId(e.target.value)}
-            >
-              <option value="">Velg avsender</option>
-              <option value="922194912">922 194 912 – Brønnøy sykehus</option>
-              <option value="985616167">985 616 167 – Sandnessjøen sykehus</option>
-            </select>
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="mottaker">
-              Mottaker
-            </label>
-            <select
-              id="mottaker"
-              className="input"
-              value={recipientId}
-              onChange={(e) => setRecipientId(e.target.value)}
-            >
-              <option value="">Velg mottaker</option>
-              <option value="985616167">985 616 167 – Sandnessjøen sykehus</option>
-              <option value="985627706">985 627 706 – St. Olavs hospital</option>
-              <option value="889640782">889 640 782 – Haukeland sykehus</option>
-              <option value="985399077">985 399 077 – Lovisenberg diakonale sykehus</option>
-            </select>
-          </div>
-
-          <div className="field field--inline">
-            <input
-              id="virusskanning"
-              type="checkbox"
-              checked={virusScan}
-              onChange={(e) => setVirusScan(e.target.checked)}
+            <Textfield
+              id={fieldId('reference')}
+              label="Referanse"
+              description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
+              value={values.reference}
+              error={errors.reference}
+              maxLength={MAX_REFERENCE_LENGTH}
+              onChange={(event) => setValue('reference', event.target.value)}
             />
-            <label className="label" htmlFor="virusskanning">
-              Virusskanning
-            </label>
-          </div>
 
-          <div className="field">
-            <label className="label" htmlFor="fil">
-              Fil
-            </label>
-            <input
-              id="fil"
-              className="input"
-              type="file"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
+            <MetadataFields
+              id={fieldId('metadata')}
+              entries={values.metadata}
+              error={errors.metadata}
+              onChange={(metadata) => setValue('metadata', metadata)}
             />
-          </div>
 
-          <fieldset className="fieldset">
-            <legend className="label">
-              Send melding til mottaker når filen er klar for nedlasting
-            </legend>
-            <p className="help-text">Velg alle alternativene som er relevante for deg.</p>
+            <UploadFile
+              id={fieldId('file')}
+              file={values.file}
+              maxFileSize={form.maxFileSize}
+              error={errors.file}
+              onChange={(file) => setValue('file', file)}
+            />
 
-            <div className="field field--inline">
-              <input
-                id="varsling-epost"
-                type="checkbox"
-                checked={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.checked)}
-              />
-              <label className="label" htmlFor="varsling-epost">
-                E-post
-              </label>
-            </div>
-            {notifyEmail && (
-              <p className="notification-preview">
-                Hei. {sender?.name ?? currentOrganization.name} ({sender?.orgNumber ?? currentOrganization.orgNumber}) har
-                sendt en fil ({displayFileName}) med Referanse {reference} til{' '}
-                {recipient?.name ?? 'Haukeland sykehus'} ({recipient?.orgNumber ?? '889 640 782'}) i Altinn på vegne av
-                Helsedirektoratet. Logg inn på altinn.no, representer {recipient?.name ?? 'Haukeland sykehus'} og velg
-                Meny → Formidling for å laste ned filen.
-              </p>
-            )}
-
-            <div className="field field--inline">
-              <input
-                id="varsling-sms"
-                type="checkbox"
-                checked={notifySms}
-                onChange={(e) => setNotifySms(e.target.checked)}
-              />
-              <label className="label" htmlFor="varsling-sms">
-                SMS
-              </label>
-            </div>
-            {notifySms && (
-              <p className="notification-preview">
-                Hei. {sender?.name ?? currentOrganization.name} har sendt en fil ({displayFileName}) til{' '}
-                {recipient?.name ?? 'Haukeland sykehus'} i Altinn. Logg inn på altinn.no for å laste ned filen.
-              </p>
-            )}
+            <VirusScanField
+              checked={values.virusScan}
+              locked={form.virusScanLocked}
+              onChange={(virusScan) => setValue('virusScan', virusScan)}
+            />
           </fieldset>
 
-          <div className="form-actions">
-            <button type="button" className="button" disabled={!canSubmit}>
-              Lagre og start opplasting
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => navigate(servicePath(service.id))}
-            >
+          {failedFields.length > 0 && (
+            <div ref={errorSummaryRef} tabIndex={-1} className="new-transfer__error-summary">
+              <ErrorSummary>
+                <ErrorSummary.Heading>Rett opp disse før du sender</ErrorSummary.Heading>
+                <ErrorSummary.List>
+                  {failedFields.map((field) => (
+                    <ErrorSummary.Item key={field}>
+                      <ErrorSummary.Link href={`#${fieldId(field)}`}>
+                        {fieldLabels[field]}: {errors[field]}
+                      </ErrorSummary.Link>
+                    </ErrorSummary.Item>
+                  ))}
+                </ErrorSummary.List>
+              </ErrorSummary>
+            </div>
+          )}
+
+          {form.submitError && <Alert data-color="danger">{form.submitError}</Alert>}
+
+          {form.sending && <UploadProgress progress={form.progress} />}
+
+          <div className="new-transfer__actions">
+            <Button type="submit" loading={form.sending}>
+              {form.sending ? 'Laster opp…' : 'Send formidling'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={cancel}>
               Avbryt
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      )}
+    </DialogLayout>
   )
 }

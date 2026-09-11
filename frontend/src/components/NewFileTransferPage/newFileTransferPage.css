@@ -1,0 +1,113 @@
+/* The panel, its padding and the spacing between its children come from DialogLayout. */
+.new-transfer__header > * {
+  margin: 0;
+}
+
+.new-transfer__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-size-6);
+}
+
+.new-transfer__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-size-6);
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+/*
+ * One dim for the whole set. Designsystemet dims each disabled control on its own, but skips
+ * labels, legends, readonly fields and static text.
+ */
+.new-transfer__fields:disabled {
+  cursor: not-allowed;
+  opacity: var(--ds-opacity-disabled);
+}
+
+/* Every Designsystemet disabled style reads this token, so neutralising it inside the set stops
+ * the per-control dimming from compounding with the dim above. */
+.new-transfer__fields:disabled * {
+  --ds-opacity-disabled: 100%;
+}
+
+.ds-suggestion:has(> input:disabled),
+.ds-file-upload:has(input:disabled) {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.new-transfer__metadata-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: end;
+  gap: var(--ds-size-3);
+}
+
+.new-transfer__add-metadata {
+  justify-self: start;
+  width: fit-content;
+}
+
+.new-transfer__file {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-size-3);
+  padding: var(--ds-size-3) var(--ds-size-4);
+  border: 1px solid var(--ds-color-neutral-border-subtle);
+  border-radius: var(--ds-border-radius-md);
+  background: var(--ds-color-neutral-surface-tinted);
+}
+
+.new-transfer__file-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.new-transfer__file-size {
+  color: var(--ds-color-neutral-text-subtle);
+  font-size: var(--ds-body-sm-font-size);
+  white-space: nowrap;
+}
+
+.new-transfer__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-size-2);
+}
+
+.new-transfer__progress > progress {
+  width: 100%;
+  height: var(--ds-size-2);
+}
+
+.new-transfer__progress > p {
+  margin: 0;
+  color: var(--ds-color-neutral-text-subtle);
+  font-size: var(--ds-body-sm-font-size);
+}
+
+.new-transfer__error-summary:focus {
+  outline: none;
+}
+
+.new-transfer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-size-3);
+}
+
+@media (max-width: 40rem) {
+  .new-transfer__metadata-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .new-transfer__metadata-row > :first-child {
+    grid-column: 1 / -1;
+  }
+}
