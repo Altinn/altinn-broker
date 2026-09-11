@@ -28,6 +28,10 @@ inputs:
     description: "APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). Front Door forwards /broker/* here. Leave empty for SPA-only Front Door."
     required: false
     default: ""
+  FRONT_DOOR_CUSTOM_DOMAIN_NAME:
+    description: "Existing AFD custom domain resource name (not the FQDN). When set, routes use this domain only and *.azurefd.net is disabled."
+    required: false
+    default: ""
   VITE_API_BASE_URL:
     description: "Broker API origin baked into the SPA at build time. Leave empty when Front Door proxies /broker/* (same-origin cookies)."
     required: false
@@ -81,6 +85,7 @@ runs:
         DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ env.DEPLOYMENT_PRINCIPAL_OBJECT_ID }}
         FRONTEND_STORAGE_ACCOUNT: ${{ inputs.FRONTEND_STORAGE_ACCOUNT }}
         API_ORIGIN_HOST_NAME: ${{ inputs.API_ORIGIN_HOST_NAME }}
+        FRONT_DOOR_CUSTOM_DOMAIN_NAME: ${{ inputs.FRONT_DOOR_CUSTOM_DOMAIN_NAME }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
