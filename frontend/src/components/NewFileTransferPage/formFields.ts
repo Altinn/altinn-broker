@@ -31,6 +31,11 @@ export function fieldId(field: NewFileTransferField): string {
   return `new-transfer-${field}`
 }
 
+/** Metadata rows come and go, so the summary links to one of their inputs rather than the fieldset. */
+export function metadataInputId(entryId: string, part: 'key' | 'value'): string {
+  return `${fieldId('metadata')}-${part}-${entryId}`
+}
+
 export function createMetadataEntry(): MetadataEntry {
   return { id: crypto.randomUUID(), key: '', value: '' }
 }

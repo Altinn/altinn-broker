@@ -1,7 +1,7 @@
 import { Button, Fieldset, Textfield } from '@digdir/designsystemet-react'
 import { PlusIcon, TrashIcon } from '@navikt/aksel-icons'
 import { useEffect, useRef } from 'react'
-import { createMetadataEntry, type MetadataEntry } from './formFields'
+import { createMetadataEntry, metadataInputId, type MetadataEntry } from './formFields'
 import {
   MAX_METADATA_ENTRIES,
   MAX_METADATA_KEY_LENGTH,
@@ -66,6 +66,7 @@ export function MetadataFields({
                 keyInputs.current.set(entry.id, element)
               }
             }}
+            id={metadataInputId(entry.id, 'key')}
             label="Nøkkel"
             value={entry.key}
             error={rowErrors[index]?.key}
@@ -74,6 +75,7 @@ export function MetadataFields({
             onChange={(event) => update(entry.id, { key: event.target.value })}
           />
           <Textfield
+            id={metadataInputId(entry.id, 'value')}
             label="Verdi"
             value={entry.value}
             error={rowErrors[index]?.value}
