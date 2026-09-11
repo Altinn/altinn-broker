@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 
 using Altinn.Broker.Common;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
 using Altinn.Platform.Register.Models;
@@ -72,18 +73,26 @@ public class AltinnRegisterService : IAltinnRegisterService
         {
             OrgNo = organizationId
         };
-        var response = await _httpClient.PostAsJsonAsync("register/api/v1/parties/lookup", partyLookup, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            _logger.LogError("Error when looking up organization in Altinn Register.Statuscode was: {statusCode}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
+            var response = await _httpClient.PostAsJsonAsync("register/api/v1/parties/lookup", partyLookup, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Error when looking up organization in Altinn Register.Statuscode was: {statusCode}, error was: {error}", response.StatusCode, await response.Content.ReadAsStringAsync());
+                return null;
+            }
+            var party = await response.Content.ReadFromJsonAsync<Party>(cancellationToken);
+            if (party is null)
+            {
+                _logger.LogError("Unexpected json response when looking up organization in Altinn Register");
+                return null;
+            }
+            return party.Name.ToString();
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Failed to look up organization name for {organizationId} in Altinn Register", organizationId.SanitizeForLogs());
             return null;
         }
-        var party = await response.Content.ReadFromJsonAsync<Party>();
-        if (party is null)
-        {
-            _logger.LogError("Unexpected json response when looking up organization in Altinn Register");
-            return null;
-        }
-        return party.Name.ToString();
     }
 }
