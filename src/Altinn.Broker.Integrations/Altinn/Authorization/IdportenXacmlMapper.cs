@@ -91,16 +91,7 @@ internal static class IdportenXacmlMapper
         var authenticationContext = idportenIdentity?.FindFirst(AuthenticationContextClaim)?.Value
             ?? idportenIdentity?.FindFirst(MappedAuthenticationContextClaim)?.Value;
 
-        authenticationLevel = authenticationContext switch
-        {
-            "idporten-loa-high" => 4,
-            "idporten-loa-substantial" => 3,
-            "idporten-loa-low" => 2,
-            "selfregistered-email" => 0,
-            _ => -1
-        };
-
-        return authenticationLevel >= 0;
+        return IdPortenAuthenticationLevel.TryGetLevel(authenticationContext, out authenticationLevel);
     }
 
     private static ClaimsIdentity? FindIdportenIdentity(ClaimsPrincipal user)
