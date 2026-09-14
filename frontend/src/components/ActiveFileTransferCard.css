@@ -1,0 +1,24 @@
+.active-file-transfer-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.active-file-transfer-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.active-file-transfer-card__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.active-file-transfer-card__chevron {
+  display: inline-flex;
+  align-items: center;
+  margin: auto;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
