@@ -104,6 +104,9 @@ public class AltinnAuthorizationServiceIdportenTests
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-substantial", 3, true)]
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-substantial", 4, false)]
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-low", 2, true)]
+    [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "eidas-loa-high", 4, true)]
+    [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "eidas-loa-substantial", 3, true)]
+    [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "eidas-loa-substantial", 4, false)]
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "selfregistered-email", 1, false)]
     [InlineData(IdportenXacmlMapper.AuthenticationContextClaim, "unknown", 0, false)]
     public async Task CheckAccessAsSender_WithAuthenticationLevelObligation_UsesIdportenAcr(
