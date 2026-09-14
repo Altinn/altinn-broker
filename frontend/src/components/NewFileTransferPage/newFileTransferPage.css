@@ -40,11 +40,26 @@
   pointer-events: none;
 }
 
+/*
+ * Three shared rows — label, input, validation message — so the pair stays lined up whether one,
+ * both or neither half has an error. Bottom-aligning instead would drop the error-free input by
+ * the height of the other one's message.
+ */
 .new-transfer__metadata-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
-  align-items: end;
-  gap: var(--ds-size-3);
+  grid-template-rows: auto auto auto;
+  column-gap: var(--ds-size-3);
+}
+
+.new-transfer__metadata-row > .ds-field:not([hidden]) {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+}
+
+.new-transfer__metadata-row > button {
+  grid-row: 2;
 }
 
 .new-transfer__add-metadata {
@@ -102,12 +117,27 @@
   gap: var(--ds-size-3);
 }
 
+/* Stacked, so the two halves no longer share rows: three rows each, key above value. */
 @media (max-width: 40rem) {
   .new-transfer__metadata-row {
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: repeat(6, auto);
   }
 
-  .new-transfer__metadata-row > :first-child {
+  .new-transfer__metadata-row > .ds-field:not([hidden]):first-of-type {
     grid-column: 1 / -1;
+    grid-row: 1 / 4;
+  }
+
+  .new-transfer__metadata-row > .ds-field:not([hidden]):nth-of-type(2) {
+    grid-column: 1;
+    grid-row: 4 / 7;
+    margin-block-start: var(--ds-size-3);
+  }
+
+  .new-transfer__metadata-row > button {
+    grid-column: 2;
+    grid-row: 5;
+    margin-block-start: var(--ds-size-3);
   }
 }

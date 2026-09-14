@@ -271,6 +271,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 AuthorizationConstants.EndUserCookie,
                 AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.AnyBrokerScope, policy => policy
+            .AddRequirements(new ScopeAccessRequirement(
+                [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.EndUser, policy =>
         {

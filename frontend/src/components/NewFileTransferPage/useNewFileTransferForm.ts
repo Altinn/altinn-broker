@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  getAccessListMembers,
-  mockAccessList,
-  type AccessListMember,
-} from '../../api/accessListMembers'
+import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import { ApiError } from '../../api/client'
 import { sendFileTransfer } from '../../api/sendFileTransfer'
 import {
@@ -15,11 +11,18 @@ import type { UploadProgress } from '../../api/xhrClient'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import {
   emptyValues,
+  metadataInputId,
   toPropertyList,
+  type MetadataEntry,
   type NewFileTransferErrors,
   type NewFileTransferValues,
 } from './formFields'
-import { hasErrors, validate } from './formValidation'
+import {
+  hasErrors,
+  validate,
+  validateMetadataRows,
+  type MetadataRowError,
+} from './formValidation'
 import { resolveRecipientRules } from './recipientRules'
 
 type Options = {
@@ -31,7 +34,7 @@ type Options = {
 type LoadedResource = {
   resourceId: string
   configuration: ResourceConfiguration | null
-  members: AccessListMember[]
+  recipients: AllowedRecipient[]
   error: string
 }
 
@@ -40,8 +43,11 @@ type LoadedResource = {
  * and the two-step send. The page itself only lays the fields out.
  */
 export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: Options) {
-  const { configuration, members, loading, loadError } = useResourceContext(resourceId)
-  const form = useFormValues(configuration, members, senderOrgNumber)
+  const { configuration, recipients, loading, loadError } = useResourceContext(
+    resourceId,
+    senderOrgNumber,
+  )
+  const form = useFormValues(configuration, recipients, senderOrgNumber)
   const submission = useSubmission({
     resourceId,
     senderOrgNumber,
@@ -56,22 +62,26 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
     loading,
     loadError,
     errors: submission.submitAttempts > 0 ? form.errors : {},
+    metadataRowErrors: submission.submitAttempts > 0 ? form.metadataRowErrors : [],
   }
 }
 
 /** What the resource allows, and who may receive on it. */
-function useResourceContext(resourceId: string) {
+function useResourceContext(resourceId: string, senderOrgNumber: string) {
   const [loaded, setLoaded] = useState<LoadedResource | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([getResourceConfiguration(resourceId), getAccessListMembers(mockAccessList)])
-      .then(([configuration, members]) => ({ resourceId, configuration, members, error: '' }))
+    Promise.all([
+      getResourceConfiguration(resourceId),
+      getAllowedRecipients(resourceId, senderOrgNumber),
+    ])
+      .then(([configuration, recipients]) => ({ resourceId, configuration, recipients, error: '' }))
       .catch(() => ({
         resourceId,
         configuration: null,
-        members: [],
+        recipients: [],
         error: 'Kunne ikke hente oppsettet for tjenesten. Prøv å laste siden på nytt.',
       }))
       .then((result) => {
@@ -83,15 +93,15 @@ function useResourceContext(resourceId: string) {
     return () => {
       cancelled = true
     }
-  }, [resourceId])
+  }, [resourceId, senderOrgNumber])
 
   // Anything loaded for another resource belongs to a previous route, so it counts as not loaded.
   const resource = loaded?.resourceId === resourceId ? loaded : null
-  const members = useMemo(() => resource?.members ?? [], [resource])
+  const recipients = useMemo(() => resource?.recipients ?? [], [resource])
 
   return {
     configuration: resource?.configuration ?? null,
-    members,
+    recipients,
     loading: resource === null,
     loadError: resource?.error ?? '',
   }
@@ -100,14 +110,14 @@ function useResourceContext(resourceId: string) {
 /** The draft the user is editing, narrowed to what the API accepts, and its validation errors. */
 function useFormValues(
   configuration: ResourceConfiguration | null,
-  members: AccessListMember[],
+  recipients: AllowedRecipient[],
   senderOrgNumber: string,
 ) {
   const [draft, setDraft] = useState<NewFileTransferValues>(emptyValues)
 
   const rules = useMemo(
-    () => resolveRecipientRules(members, configuration?.requiredParty ?? null, senderOrgNumber),
-    [members, configuration, senderOrgNumber],
+    () => resolveRecipientRules(recipients, configuration?.requiredParty ?? null, senderOrgNumber),
+    [recipients, configuration, senderOrgNumber],
   )
   const maxFileSize = configuration ? resolveMaxFileTransferSize(configuration) : null
   const requiredParty = rules.requiredParty
@@ -129,8 +139,34 @@ function useFormValues(
   )
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
+  const metadataRowErrors = useMemo(() => validateMetadataRows(values.metadata), [values.metadata])
+  const metadataErrorInputId = useMemo(
+    () => firstMetadataErrorInputId(values.metadata, metadataRowErrors),
+    [values.metadata, metadataRowErrors],
+  )
 
-  return { rules, maxFileSize, virusScanLocked, values, setValue, errors }
+  return {
+    rules,
+    maxFileSize,
+    virusScanLocked,
+    values,
+    setValue,
+    errors,
+    metadataRowErrors,
+    metadataErrorInputId,
+  }
+}
+
+/** The summary has to land the user on an input; this selects the first metadata error input's ID */
+function firstMetadataErrorInputId(
+  metadata: MetadataEntry[],
+  rowErrors: MetadataRowError[],
+): string | undefined {
+  const index = rowErrors.findIndex((row) => row.key ?? row.value)
+  if (index < 0) {
+    return undefined
+  }
+  return metadataInputId(metadata[index].id, rowErrors[index].key ? 'key' : 'value')
 }
 
 type SubmissionOptions = Options & {
