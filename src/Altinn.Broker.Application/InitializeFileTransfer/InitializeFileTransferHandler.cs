@@ -104,7 +104,7 @@ public class InitializeFileTransferHandler(
                 {
                     return Errors.RecipientNotInAccessList;
                 }
-                var recipientId = await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken);
+                var recipientId = (await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken))?.OrgNumber;
                 if (recipientId is null || recipientId != recipient.WithoutPrefix())
                 {
                     return Errors.RecipientNotInAccessList;
