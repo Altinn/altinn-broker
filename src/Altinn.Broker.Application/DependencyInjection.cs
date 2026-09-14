@@ -3,6 +3,7 @@ using Altinn.Broker.Application.DownloadFile;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
+using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.GetResource;
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<EventBusMiddleware>();
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
+        services.AddScoped<GetAuthorizedPartiesHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();

@@ -12,6 +12,7 @@ using Altinn.Broker.API.Swagger;
 using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
@@ -243,6 +244,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
+    services.AddScoped<IEndUserTokenProvider, EndUserTokenProvider>();
     services.AddTransient<IAuthorizationHandler, EndUserAuthorizationHandler>();
     services.AddTransient<IAuthorizationHandler, EndUserScopeAccessHandler>();
     services.AddAuthorization(options =>

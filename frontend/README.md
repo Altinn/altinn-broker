@@ -83,6 +83,20 @@ This mirrors how other `*.ui.altinn.no` apps reuse the shared Altinn session.
 | `POST /broker/api/v1/authentication/callback` | OIDC callback (IdPortenDirectAuth) |
 | `GET /broker/api/v1/authentication/logout` | Logout (IdPortenDirectAuth) |
 
+## Choosing an actor
+
+The header lets the user pick which organization they act on behalf of. The list comes from
+`GET /broker/api/v1/party/authorized`, which asks Altinn Access Management
+(`enduser/authorizedparties`) with the end user's own Altinn token. Only organizations are
+offered, since the Broker API identifies parties by organization number.
+
+The selected party is kept in `localStorage` and drives the `party` parameter on API calls such
+as `GET /broker/api/v1/resource/authorized`.
+
+**The ID-Porten client must be registered with the scope `altinn:accessmanagement/authorizedparties`**
+in Samarbeidsportalen. Without it the exchanged Altinn token is rejected by Access Management and
+the actor selector stays empty.
+
 ## Configuration
 
 Settings live in the Broker API (`appsettings.json`, `appsettings.Development.json`, or environment variables).
@@ -96,7 +110,7 @@ Used for direct ID-Porten login. Section name is unchanged for existing deployme
 | `Authority` | Yes | ID-Porten issuer (e.g. `https://test.idporten.no`) |
 | `ClientId` | Yes | ID-Porten client id (Key Vault secret in deploy) |
 | `ClientSecret` | Yes | ID-Porten client secret (Key Vault secret in deploy) |
-| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) |
+| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`), plus `altinn:accessmanagement/authorizedparties` for the actor selector |
 | `SpaBaseUrl` | Dev / split-origin | Public SPA origin (e.g. `https://localhost:5173`). OIDC callback and post-login redirect use this host. Leave empty when SPA and API share the same origin (Front Door + APIM). |
 | `CookieName` | No | Broker session cookie name (default `AltinnBrokerSession`) |
 
@@ -116,7 +130,7 @@ Fixed in code (not configurable): callback `/broker/api/v1/authentication/callba
   "Authority": "https://test.idporten.no",
   "ClientId": "<from Samarbeidsportalen>",
   "ClientSecret": "<from Samarbeidsportalen>",
-  "Scopes": ["openid", "profile", "altinn:portal/enduser"],
+  "Scopes": ["openid", "profile", "altinn:portal/enduser", "altinn:accessmanagement/authorizedparties"],
   "SpaBaseUrl": "https://localhost:5173"
 }
 ```

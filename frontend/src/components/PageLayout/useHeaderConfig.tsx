@@ -2,19 +2,24 @@ import type { GlobalHeaderProps } from '@altinn/altinn-components'
 import { useAccountSelector } from '@altinn/altinn-components'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import { useParties } from '../../parties/PartiesContext'
 import { PageRoutes } from '../../pages/routes'
-import { mockAuthorizedParties, mockCurrentAccountUuid } from './mockParties'
 import { useSidebarMenu } from './useSidebarMenu'
+
+// Stable reference: useAccountSelector rebuilds the whole list when this array changes identity.
+const NO_FAVORITES: string[] = []
 
 export function useHeaderConfig(): GlobalHeaderProps {
   const sidebarMenu = useSidebarMenu()
   const { logout } = useAuth()
+  const { status, parties, selectedParty, selectParty } = useParties()
 
   const accountSelector = useAccountSelector({
-    partyListDTO: mockAuthorizedParties,
-    currentAccountUuid: mockCurrentAccountUuid,
-    favoriteAccountUuids: [],
-    isLoading: false,
+    partyListDTO: parties,
+    currentAccountUuid: selectedParty?.partyUuid,
+    favoriteAccountUuids: NO_FAVORITES,
+    isLoading: status === 'loading',
+    onSelectAccount: selectParty,
     languageCode: 'nb',
   })
 
