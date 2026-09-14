@@ -19,7 +19,7 @@
     <PackageReference Include="Altinn.Common.PEP" Version="4.2.3" />
     <PackageReference Include="Altinn.Platform.Models" Version="1.6.1" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.14.0" />
     <PackageReference Include="Azure.ResourceManager.Network" Version="1.17.0" />
     <PackageReference Include="Azure.ResourceManager.Storage" Version="1.7.0" />
     <PackageReference Include="Azure.ResourceManager.AppContainers" Version="1.5.0" />
