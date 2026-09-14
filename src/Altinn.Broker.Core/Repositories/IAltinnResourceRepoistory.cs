@@ -25,4 +25,12 @@ public interface IAltinnResourceRepository
     /// when the party is invalid or cannot be found.
     /// </returns>
     Task<List<string>?> GetAccessListOfResource(string resourceId, string party, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the parties on every access list connected to a resource.
+    /// </summary>
+    /// <returns>
+    /// The access list, or <see langword="null"/> when the resource is unknown to Resource Registry.
+    /// </returns>
+    Task<ResourceAccessList?> GetAccessListMembersOfResource(string resourceId, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,7 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
@@ -69,14 +70,16 @@ public class ResourceController : Controller
     /// Gets information about a resource configuration in broker
     /// </summary>
     /// <remarks>
-    /// One of the scopes: <br/> 
+    /// One of the scopes: <br/>
     /// - altinn:serviceowner <br/>
+    /// - altinn:broker.write <br/>
+    /// - altinn:broker.read <br/>
     /// </remarks>
     /// <response code="200">Detailed information about the resource</response>
-    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="401">You must use a bearer token with one of the broker scopes</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpGet]
-    [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
+    [Authorize(Policy = AuthorizationConstants.AnyBrokerScope)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -97,7 +100,8 @@ public class ResourceController : Controller
                 PurgeFileTransferAfterAllRecipientsConfirmed = resource.PurgeFileTransferAfterAllRecipientsConfirmed,
                 PurgeFileTransferGracePeriod = resource.PurgeFileTransferGracePeriod.HasValue ? resource.PurgeFileTransferGracePeriod.Value.ToString() : null,
                 UseManifestFileShim = resource.UseManifestFileShim,
-                RequiredParty = resource.RequiredParty
+                RequiredParty = resource.RequiredParty,
+                ApprovedForDisabledVirusScan = resource.ApprovedForDisabledVirusScan
             }),
             Problem
         );
@@ -142,6 +146,54 @@ public class ResourceController : Controller
                 ServiceOwnerName = resource.ServiceOwnerName,
                 CanSend = resource.CanSend,
                 CanReceive = resource.CanReceive
+            }).ToList()),
+            Problem
+        );
+    }
+
+    /// <summary>
+    /// Gets the organizations the sending party may address a file transfer to on a resource
+    /// </summary>
+    /// <remarks>
+    /// Requires an authenticated end user session (ID-porten login or Altinn portal session). <br/>
+    /// The list can be used as it stands: it is the organizations the API will accept as recipients,
+    /// and needs no further filtering. <br/>
+    /// Normally these are the parties on the resource's access lists in the Resource Registry, resolved
+    /// to organization numbers and names, with the sending party removed. When the resource requires a
+    /// specific party and the sender is not that party, the required party is the only entry, and it is
+    /// omitted altogether if the resource has an access list it is not on. <br/>
+    /// An empty list means either that the resource has no access list or that no organization can
+    /// currently receive on it.
+    /// </remarks>
+    /// <response code="200">The organizations that may receive file transfers from the party</response>
+    /// <response code="400">The party is not a valid organization number, or the resource is not configured in broker</response>
+    /// <response code="401">You must be logged in as an end user</response>
+    /// <response code="403">The resource is not registered in the Resource Registry</response>
+    [HttpGet]
+    [Route("{resourceId}/allowed-recipients")]
+    [Authorize(Policy = AuthorizationConstants.EndUser)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<AllowedRecipientExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult> GetAllowedRecipients(
+        string resourceId,
+        [FromQuery] string party,
+        [FromServices] GetAllowedRecipientsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Process(new GetAllowedRecipientsRequest()
+        {
+            ResourceId = resourceId,
+            Party = party
+        }, HttpContext.User, cancellationToken);
+
+        return result.Match(
+            (recipients) => Ok(recipients.Select(recipient => new AllowedRecipientExt()
+            {
+                OrganizationNumber = recipient.OrganizationNumber,
+                Name = recipient.Name
             }).ToList()),
             Problem
         );

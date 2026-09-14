@@ -9,6 +9,7 @@ using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Hangfire;
 using Altinn.Broker.Tests.Helpers;
+using Altinn.Platform.Register.Models;
 
 using Hangfire;
 using Hangfire.Logging;
@@ -206,9 +207,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var altinnRegisterService = new Mock<IAltinnRegisterService>();
             altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((string?)null);
+                .ReturnsAsync((Party?)null);
             altinnRegisterService.Setup(x => x.LookupPartyByUuid(It.Is("gl908ae2-ci9f-481m-9700-1t7brok12345", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
-                .ReturnsAsync("311764837");
+                .ReturnsAsync(new Party { PartyId = 50012345, OrgNumber = "311764837", Name = "Test recipient" });
             services.AddSingleton(altinnRegisterService.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
