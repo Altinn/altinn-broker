@@ -64,6 +64,19 @@ public class AltinnAuthorizationService : IAuthorizationService
         return await CheckAccessAsSender(user, fileTransfer.ResourceId, fileTransfer.Sender.ActorExternalId.WithoutPrefix(), cancellationToken) || await CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
     }
 
+    public async Task<bool> CheckIdPortenAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, string onBehalfOf, CancellationToken cancellationToken = default)
+    {
+        return await CheckUserAccess(user, fileTransfer.ResourceId, onBehalfOf.WithoutPrefix(),fileTransfer.FileTransferId.ToString(), new List<ResourceAccessLevel> { ResourceAccessLevel.Read }, cancellationToken);
+    }
+
+    public async Task<bool> IsIdPortenToken(ClaimsPrincipal? user)
+    {
+        if (user is null)
+        {
+            throw new InvalidOperationException("This operation cannot be called outside an authenticated HttpContext");
+        }
+        return IdportenXacmlMapper.IsIdportenToken(user);
+    }
     public async Task<List<AuthorizedResource>> GetAuthorizedResources(ClaimsPrincipal? user, string party, IReadOnlyList<string> resourceIds, CancellationToken cancellationToken = default)
     {
         if (user is null)
