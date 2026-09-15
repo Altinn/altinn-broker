@@ -31,8 +31,3 @@ export function flattenParties(parties: AuthorizedPartyDto[]): AuthorizedPartyDt
 export function canBeRepresented(party: AuthorizedPartyDto): boolean {
   return Boolean(party.organizationNumber) && !party.onlyHierarchyElementWithNoAccess && !party.isDeleted
 }
-
-/** 922194912 → 922 194 912 */
-export function formatOrganizationNumber(organizationNumber: string): string {
-  return organizationNumber.replace(/(\d{3})(?=\d)/g, '$1 ')
-}

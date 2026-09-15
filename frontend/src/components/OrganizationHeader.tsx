@@ -1,5 +1,6 @@
+import { Avatar, Heading } from '@altinn/altinn-components'
+import { formatOrgNumber } from '../helpers/orgIdentifierHelper'
 import { useParties } from '../parties/PartiesContext'
-import { formatOrganizationNumber } from '../parties/mapAuthorizedParty'
 import './OrganizationHeader.css'
 
 export function OrganizationHeader() {
@@ -11,13 +12,13 @@ export function OrganizationHeader() {
 
   return (
     <div className="org-header">
-      <span className="org-header__avatar" aria-hidden="true">
-        {selectedParty.name.charAt(0).toUpperCase()}
-      </span>
+      <Avatar name={selectedParty.name} type="company" size="lg" />
       <div>
-        <h1 className="org-header__name">{selectedParty.name}</h1>
+        <Heading size="sm" as="h1">
+          {selectedParty.name}
+        </Heading>
         <p className="org-header__number">
-          Org.nr. {formatOrganizationNumber(selectedParty.organizationNumber)}
+          Org.nr. {formatOrgNumber(selectedParty.organizationNumber)}
         </p>
       </div>
     </div>
