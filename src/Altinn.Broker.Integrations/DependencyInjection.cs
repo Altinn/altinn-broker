@@ -5,6 +5,7 @@ using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Altinn.AccessManagement;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Register;
@@ -77,6 +78,10 @@ public static class DependencyInjection
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnResourceRepository>()
                     .AddStandardRetryPolicy();
         }
+        // Calls on behalf of the logged in end user, so it carries their Altinn token instead of a Maskinporten token.
+        services.AddHttpClient<IAltinnAccessManagementService, AltinnAccessManagementService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
+
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
         if (string.IsNullOrWhiteSpace(generalSettings.SlackUrl))
