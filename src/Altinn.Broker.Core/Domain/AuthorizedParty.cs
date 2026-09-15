@@ -14,9 +14,6 @@ public sealed record AuthorizedParty
 
     /// <summary>Party type as reported by Access Management: Person, Organization, SelfIdentified or None.</summary>
     public required string Type { get; init; }
-
-    /// <summary>Organization unit type, e.g. AS or BEDR. Null for parties that are not organizations.</summary>
-    public string? UnitType { get; init; }
     public bool IsDeleted { get; init; }
 
     /// <summary>The party is only present to carry its subunits. The user has no access to the party itself.</summary>

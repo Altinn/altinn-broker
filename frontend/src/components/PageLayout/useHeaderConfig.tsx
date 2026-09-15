@@ -6,9 +6,6 @@ import { useParties } from '../../parties/PartiesContext'
 import { PageRoutes } from '../../pages/routes'
 import { useSidebarMenu } from './useSidebarMenu'
 
-// Stable reference: useAccountSelector rebuilds the whole list when this array changes identity.
-const NO_FAVORITES: string[] = []
-
 export function useHeaderConfig(): GlobalHeaderProps {
   const sidebarMenu = useSidebarMenu()
   const { logout } = useAuth()
@@ -18,7 +15,6 @@ export function useHeaderConfig(): GlobalHeaderProps {
     partyListDTO: parties,
     currentAccountUuid: selectedParty?.partyUuid,
     selfAccountUuid: selfPartyUuid,
-    favoriteAccountUuids: NO_FAVORITES,
     isLoading: status === 'loading',
     virtualized: parties.length > 20,
     onSelectAccount: selectParty,

@@ -9,7 +9,6 @@ export function toAuthorizedParty(party: AuthorizedPartyDto): AuthorizedParty {
     organizationNumber: party.organizationNumber ?? undefined,
     partyId: String(party.partyId),
     type: party.type,
-    unitType: party.unitType ?? undefined,
     isDeleted: party.isDeleted,
     onlyHierarchyElementWithNoAccess: party.onlyHierarchyElementWithNoAccess,
     // Broker does not ask Access Management for roles or resources per party, only for the party list.

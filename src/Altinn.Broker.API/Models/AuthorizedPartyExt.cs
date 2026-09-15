@@ -38,12 +38,6 @@ public class AuthorizedPartyExt
     public required string Type { get; set; }
 
     /// <summary>
-    /// Organization unit type, e.g. AS or BEDR. Null for parties that are not organizations
-    /// </summary>
-    [JsonPropertyName("unitType")]
-    public string? UnitType { get; set; }
-
-    /// <summary>
     /// The party is deleted in Altinn Register
     /// </summary>
     [JsonPropertyName("isDeleted")]

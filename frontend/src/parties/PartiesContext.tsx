@@ -15,7 +15,7 @@ import { canBeRepresented, flattenParties, toAuthorizedParty } from './mapAuthor
 
 const SELECTED_PARTY_STORAGE_KEY = 'brokerbox.selectedPartyUuid'
 
-/** Placeholder uuid for the user's own account, which has no party in the filtered list. */
+/** Placeholder uuid for the user's own account, which is not part of the organization list. */
 const SELF_ACCOUNT_UUID = 'self'
 
 /** The party the user currently acts on behalf of. */
@@ -85,9 +85,9 @@ export function PartiesProvider({ children }: { children: ReactNode }) {
   const allParties = useMemo(() => flattenParties(authorizedParties), [authorizedParties])
 
   /**
-   * The account selector renders nothing without an account for the user themselves, but the
-   * party list only holds organizations with a broker resource. The user's own party is
-   * therefore built from their token claims. It is shown, never selected.
+   * The account selector renders nothing without an account for the user themselves, and the
+   * list holds organizations only. The user's own account is therefore built from their token
+   * claims. It is shown, never selected.
    */
   const selfAccount = useMemo<AuthorizedParty | null>(() => {
     if (!user) {

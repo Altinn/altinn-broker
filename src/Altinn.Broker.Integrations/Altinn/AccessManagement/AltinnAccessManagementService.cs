@@ -91,7 +91,6 @@ public class AltinnAccessManagementService : IAltinnAccessManagementService
         OrganizationNumber = party.OrganizationNumber,
         PartyId = party.PartyId,
         Type = party.Type ?? "None",
-        UnitType = party.UnitType,
         IsDeleted = party.IsDeleted,
         OnlyHierarchyElementWithNoAccess = party.OnlyHierarchyElementWithNoAccess,
         Subunits = party.Subunits?

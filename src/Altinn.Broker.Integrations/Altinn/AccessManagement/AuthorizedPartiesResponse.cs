@@ -38,9 +38,6 @@ internal sealed class AuthorizedPartyDto
     [JsonPropertyName("type")]
     public string? Type { get; set; }
 
-    [JsonPropertyName("unitType")]
-    public string? UnitType { get; set; }
-
     [JsonPropertyName("isDeleted")]
     public bool IsDeleted { get; set; }
 

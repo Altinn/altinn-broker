@@ -13,7 +13,6 @@ export type AuthorizedPartyDto = {
   partyId: number
   /** 'Person', 'Organization', 'SelfIdentified' or 'None'. */
   type: string
-  unitType: string | null
   isDeleted: boolean
   /** The party only carries its subunits; the user has no access to the party itself. */
   onlyHierarchyElementWithNoAccess: boolean

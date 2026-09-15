@@ -50,7 +50,6 @@ public class PartyController : Controller
         OrganizationNumber = party.OrganizationNumber,
         PartyId = party.PartyId,
         Type = party.Type,
-        UnitType = party.UnitType,
         IsDeleted = party.IsDeleted,
         OnlyHierarchyElementWithNoAccess = party.OnlyHierarchyElementWithNoAccess,
         Subunits = party.Subunits.Select(MapParty).ToList()
