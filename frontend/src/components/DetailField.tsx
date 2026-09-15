@@ -1,15 +1,19 @@
+import { ListItem } from '@altinn/altinn-components'
 import './DetailField.css'
 
 type DetailFieldProps = {
   label: string
-  value: string
+  value: string | null | undefined
 }
 
 export function DetailField({ label, value }: DetailFieldProps) {
   return (
-    <li className="detail-field">
-      <span className="detail-field__label">{label}</span>
-      <span className="detail-field__value">{value}</span>
-    </li>
+    <ListItem
+      className="data-list-item"
+      shadow="none"
+      interactive={false}
+      title={label}
+      description={value}
+    />
   )
 }

@@ -43,6 +43,11 @@ export function formatOrgNumber(orgNumber: string): string {
   return digits ? digits.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3') : orgNumber
 }
 
+/** Joins a resolved organization name and number into one display string, e.g. "Sender AS - Org.nr. 912 345 678". */
+export function formatOrganizationDisplay(name: string, orgNumber: string): string {
+  return `${name} - Org.nr. ${formatOrgNumber(orgNumber)}`
+}
+
 export class InvalidOrgNumberError extends Error {
   public readonly value: string
 

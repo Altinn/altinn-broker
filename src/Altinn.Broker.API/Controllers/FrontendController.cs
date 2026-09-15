@@ -1,6 +1,7 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.GetActiveFileTransferDetails;
 using Altinn.Broker.Application.GetActiveFileTransfers;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
@@ -44,6 +45,29 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             summaries => Ok(summaries.Select(ActiveFileTransferExtMapper.MapToExternalModel).ToList()),
+            Problem
+        );
+    }
+
+    [HttpGet("active-file-transfer/{fileTransferId}")]
+    [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(GetActiveFileTransferDetailsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<GetActiveFileTransferDetailsResponse>> GetActiveFileTransferDetails(
+        [FromRoute] Guid fileTransferId,
+        [FromQuery] string? onBehalfOf,
+        [FromServices] GetActiveFileTransferDetailsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Getting active file transfer details for {fileTransferId}", fileTransferId);
+        var queryResult = await handler.Process(new GetActiveFileTransferDetailsRequest()
+        {
+            FileTransferId = fileTransferId,
+            OnBehalfOf = onBehalfOf ?? string.Empty
+        }, HttpContext.User, cancellationToken);
+        return queryResult.Match(
+            details => Ok(details),
             Problem
         );
     }
