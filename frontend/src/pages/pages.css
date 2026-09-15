@@ -206,3 +206,20 @@
   justify-content: center;
   margin-top: 1rem;
 }
+
+ul.service-owner-list {
+  --dsc-spacing: 0;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 3rem;
+}
+
+ul.service-owner-list li.service-owner-list-item {
+  --dsc-item-my: 0;
+  --dsc-item-px: 1.5rem;
+  --dsc-item-py: 1rem;
+  background: transparent;
+  border-radius: 0;
+}
