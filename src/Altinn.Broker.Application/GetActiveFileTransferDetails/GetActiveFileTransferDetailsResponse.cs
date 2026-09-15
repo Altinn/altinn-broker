@@ -8,7 +8,6 @@ public class GetActiveFileTransferDetailsResponse
     public string? SendersFileTransferReference { get; set; }
     public string? FileName { get; set; }
     public string? FileTransferSize { get; set; }
-    // public string? Status { get; set; }
     public string? Created { get; set; }
     public bool? UseVirusScan { get; set; }
     public string? Published { get; set; }

@@ -20,7 +20,6 @@ public class GetActiveFileTransferDetailsHandler(
     IActorRepository actorRepository,
     IAltinnRegisterService altinnRegisterService,
     IFileTransferStatusRepository fileTransferStatusRepository,
-    IServiceOwnerRepository serviceOwnerRepository,
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     ILogger<GetActiveFileTransferDetailsHandler> logger) : IHandler<GetActiveFileTransferDetailsRequest, GetActiveFileTransferDetailsResponse>
@@ -64,8 +63,6 @@ public class GetActiveFileTransferDetailsHandler(
         var resourceName = resourceResponse?.Title ?? fileTransfer.ResourceId;
         var resourceServiceOwner = resourceResponse?.ServiceOwnerName;
 
-
-
         List<FileTransferActor> fileTransferActors = new List<FileTransferActor>()
         {
             new FileTransferActor()
@@ -74,8 +71,6 @@ public class GetActiveFileTransferDetailsHandler(
                 Recipients = fileTransfer.RecipientCurrentStatuses.Select(recipient => recipient.Actor.ActorExternalId).ToList()
             }
         };
-
-
 
         var organizationNameById = new ConcurrentDictionary<string, string?>();
         await Parallel.ForEachAsync(

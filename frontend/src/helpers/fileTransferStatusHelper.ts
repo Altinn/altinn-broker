@@ -5,6 +5,8 @@ export function formatFileTransferStatusMessage(status: string | undefined, expi
       return `Venter på nedlasting. Må gjøres innen ${expirationTime}.`
     case 'AwaitingOtherRecipients':
       return 'Venter på nedlasting av resterende mottakere.'
+    case 'AllDownloaded':
+      return 'Alle mottakere har lastet ned filen.'
     default:
       return status ?? ''
   }
