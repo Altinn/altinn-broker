@@ -12,13 +12,15 @@ const NO_FAVORITES: string[] = []
 export function useHeaderConfig(): GlobalHeaderProps {
   const sidebarMenu = useSidebarMenu()
   const { logout } = useAuth()
-  const { status, parties, selectedParty, selectParty } = useParties()
+  const { status, parties, selfPartyUuid, selectedParty, selectParty } = useParties()
 
   const accountSelector = useAccountSelector({
     partyListDTO: parties,
     currentAccountUuid: selectedParty?.partyUuid,
+    selfAccountUuid: selfPartyUuid,
     favoriteAccountUuids: NO_FAVORITES,
     isLoading: status === 'loading',
+    virtualized: parties.length > 20,
     onSelectAccount: selectParty,
     languageCode: 'nb',
   })

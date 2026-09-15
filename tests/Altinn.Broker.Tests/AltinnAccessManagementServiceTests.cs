@@ -47,7 +47,7 @@ public class AltinnAccessManagementServiceTests
         }));
         var service = CreateService(httpClient);
 
-        var parties = await service.GetAuthorizedParties();
+        var parties = await service.GetAuthorizedParties([]);
 
         var party = Assert.Single(parties);
         Assert.Equal("Brønnøy sykehus", party.Name);
@@ -74,7 +74,7 @@ public class AltinnAccessManagementServiceTests
         });
         var service = CreateService(httpClient);
 
-        var parties = await service.GetAuthorizedParties();
+        var parties = await service.GetAuthorizedParties([]);
 
         Assert.Equal(2, parties.Count);
         Assert.Equal(
@@ -83,6 +83,26 @@ public class AltinnAccessManagementServiceTests
                 "/accessmanagement/api/v1/enduser/authorizedparties?token=next-page"
             ],
             requestedPaths);
+    }
+
+    [Fact]
+    public async Task GetAuthorizedParties_WithResourceIds_AsksOnlyForPartiesHoldingThem()
+    {
+        string? requestedPath = null;
+        using var httpClient = CreateHttpClient(request =>
+        {
+            requestedPath = request.RequestUri?.PathAndQuery;
+            return Page([]);
+        });
+        var service = CreateService(httpClient);
+
+        await service.GetAuthorizedParties(["altinn-broker-test-resource-1", "digdir-brokerbox-utvikling"]);
+
+        Assert.Equal(
+            "/accessmanagement/api/v1/enduser/authorizedparties?includeSubParties=true"
+            + "&anyOfResourceIds=altinn-broker-test-resource-1"
+            + "&anyOfResourceIds=digdir-brokerbox-utvikling",
+            requestedPath);
     }
 
     [Fact]
@@ -96,7 +116,7 @@ public class AltinnAccessManagementServiceTests
         });
         var service = CreateService(httpClient);
 
-        await service.GetAuthorizedParties();
+        await service.GetAuthorizedParties([]);
 
         Assert.Equal("Bearer end-user-altinn-token", authorization);
     }
@@ -107,7 +127,7 @@ public class AltinnAccessManagementServiceTests
         using var httpClient = CreateHttpClient(_ => Page([]));
         var service = CreateService(httpClient, altinnToken: null);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetAuthorizedParties());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetAuthorizedParties([]));
     }
 
     [Fact]
@@ -116,7 +136,7 @@ public class AltinnAccessManagementServiceTests
         using var httpClient = CreateHttpClient(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var service = CreateService(httpClient);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => service.GetAuthorizedParties());
+        await Assert.ThrowsAsync<HttpRequestException>(() => service.GetAuthorizedParties([]));
     }
 
     private static object Organization(string partyUuid, string organizationNumber) => new

@@ -35,7 +35,7 @@ public class AltinnAccessManagementService : IAltinnAccessManagementService
         _logger = logger;
     }
 
-    public async Task<List<AuthorizedParty>> GetAuthorizedParties(CancellationToken cancellationToken = default)
+    public async Task<List<AuthorizedParty>> GetAuthorizedParties(IReadOnlyList<string> anyOfResourceIds, CancellationToken cancellationToken = default)
     {
         var altinnToken = await _endUserTokenProvider.GetAltinnToken();
         if (string.IsNullOrWhiteSpace(altinnToken))
@@ -44,7 +44,7 @@ public class AltinnAccessManagementService : IAltinnAccessManagementService
         }
 
         var parties = new List<AuthorizedParty>();
-        var url = AuthorizedPartiesPath;
+        var url = BuildFirstPageUrl(anyOfResourceIds);
         for (var pageNumber = 0; pageNumber < MaxPages && url is not null; pageNumber++)
         {
             var page = await GetPage(url, altinnToken, cancellationToken);
@@ -60,6 +60,19 @@ public class AltinnAccessManagementService : IAltinnAccessManagementService
         }
 
         return parties;
+    }
+
+    private static string BuildFirstPageUrl(IReadOnlyList<string> anyOfResourceIds)
+    {
+        if (anyOfResourceIds.Count == 0)
+        {
+            return AuthorizedPartiesPath;
+        }
+
+        var resourceFilter = string.Join(
+            string.Empty,
+            anyOfResourceIds.Select(resourceId => $"&anyOfResourceIds={Uri.EscapeDataString(resourceId)}"));
+        return AuthorizedPartiesPath + resourceFilter;
     }
 
     private async Task<AuthorizedPartiesResponse> GetPage(string url, string altinnToken, CancellationToken cancellationToken)
