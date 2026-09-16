@@ -30,10 +30,6 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             {
                 return Errors.InvalidResourceDefinition;
             }
-            if (altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
-            {
-                return Errors.NoAccessToResource;
-            }
             if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is null)
             {
                 return Errors.ServiceOwnerHasNotBeenConfigured;
