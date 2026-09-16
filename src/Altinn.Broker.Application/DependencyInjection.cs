@@ -4,6 +4,7 @@ using Altinn.Broker.Application.GetActiveFileTransfers;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
+using Altinn.Broker.Application.GetActiveFileTransferDetails;
 using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetAllowedRecipients;
@@ -59,5 +60,6 @@ public static class DependencyInjection
         services.AddScoped<CleanupUseCaseTestsHandler>();
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
+        services.AddScoped<GetActiveFileTransferDetailsHandler>();
     }
 }

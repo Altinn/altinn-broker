@@ -39,7 +39,8 @@ public static class Errors
     public static Error InvalidRecipient = new Error(31, "One or more recipients are invalid or could not be found.", HttpStatusCode.BadRequest);
     public static Error InvalidParty = new Error(32, "The party must be a valid organization number", HttpStatusCode.BadRequest);
     public static Error AuthorizationUnavailable = new Error(33, "Could not determine which resources you have access to. Please try again later.", HttpStatusCode.ServiceUnavailable);
-    public static Error AuthorizedPartiesUnavailable = new Error(34, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
+    public static Error MissingOnBehalfOf = new Error(34, "Missing on behalf of parameter for IdPorten token", HttpStatusCode.BadRequest);
+    public static Error AuthorizedPartiesUnavailable = new Error(35, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
 }
 
 public static class StatisticsErrors

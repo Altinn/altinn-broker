@@ -1,14 +1,43 @@
 import { Link, useParams } from 'react-router-dom'
-import { DetailField } from '../components/DetailField'
-import { formatOrganization, getActiveTransferById } from '../data/mockData'
+import { FileTransferDetailList } from '../components/FileTransferDetailList'
+import { FileTransferActions } from '../components/FileTransferActions'
+import { getActiveFileTransferDetails } from '../api/activeFileTransferDetail'
 import { PageRoutes } from './routes'
 import './pages.css'
+import { useEffect, useRef, useState } from 'react'
+import { List, ListItem } from '@altinn/altinn-components'
+
+const current_org = "312936496"
 
 export function ActiveFileTransferDetailPage() {
   const { transferId = '' } = useParams()
-  const transfer = getActiveTransferById(transferId)
+  const [transferDetails, setTransferDetails] = useState(null)
+  const transferIdRef = useRef(transferId)
+  transferIdRef.current = transferId
 
-  if (!transfer) {
+  async function loadTransferDetails() {
+    const requestedTransferId = transferId
+    try {
+      const transferDetails = await getActiveFileTransferDetails(requestedTransferId, current_org)
+      if (transferIdRef.current === requestedTransferId) {
+        setTransferDetails(transferDetails)
+      }
+    } catch (error) {
+      console.error('Error fetching transfer details:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (transferId) {
+      void loadTransferDetails()
+    }
+  }, [transferId])
+
+  if (!transferId) {
+    return <p>Ingen formidling valgt.</p>
+  }
+
+  if (!transferDetails) {
     return <p>Fant ikke formidlingen.</p>
   }
 
@@ -21,34 +50,27 @@ export function ActiveFileTransferDetailPage() {
       </div>
 
       <section className="page-section">
-        <h2 className="page-heading">{transfer.serviceName}</h2>
-        <p className="page-subheading">{transfer.subtitle}</p>
+        <div>Navn og eier</div>
+        <List className="service-owner-list">
+          <ListItem
+            className="service-owner-list-item"
+            icon={{ name: transferDetails.serviceOwner ?? 'serviceOwner', type: 'company' }}
+            title={transferDetails.resourceName}
+            interactive={false}
+            description={transferDetails.serviceOwner}
+          />
+        </List>
 
-        <ul className="detail-list">
-          <DetailField label="Referanse" value={transfer.reference} />
-          <DetailField label="Opprettet" value={transfer.createdAt} />
-          <DetailField label="Avsender" value={formatOrganization(transfer.sender)} />
-          <DetailField label="Mottaker" value={formatOrganization(transfer.recipient)} />
-          <DetailField label="Filnavn" value={transfer.fileName} />
-          {transfer.uploadedAt && <DetailField label="Opplastet" value={transfer.uploadedAt} />}
-          <DetailField label="Filstørrelse" value={transfer.fileSize} />
-          {transfer.virusScanned && <DetailField label="Virusskannet" value={transfer.virusScanned} />}
-          {transfer.status && <DetailField label="Status" value={transfer.status} />}
-        </ul>
+        <p className="page-subheading">{transferDetails.subtitle}</p>
 
-        <div className="action-row">
-          <button type="button" className="button" disabled>
-            Start nedlasting
-          </button>
-          {transfer.statusNote && <span className="action-note">{transfer.statusNote}</span>}
-        </div>
+        <FileTransferDetailList transferDetails={transferDetails} />
 
-        <div className="action-row">
-          <button type="button" className="button">
-            Kanseller formidling
-          </button>
-          <span className="action-note">Kan bare utføres av Brønnøy sykehus</span>
-        </div>
+        <FileTransferActions
+          transferDetails={transferDetails}
+          onBehalfOf={current_org}
+          onDownloadConfirmed={loadTransferDetails}
+          onDownloadStarted={loadTransferDetails}
+        />
       </section>
     </div>
   )
