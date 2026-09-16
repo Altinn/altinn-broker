@@ -32,7 +32,10 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       <DetailField label="Andre metadata" value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ')} />
-      <DetailField label="Status" value={formatFileTransferStatusMessage(transferDetails.status, transferDetails.expirationTime)} />
+      <DetailField
+        label="Status"
+        value={formatFileTransferStatusMessage(transferDetails.status, transferDetails.expirationTime, transferDetails.actorDownloadStatus)}
+      />
     </List>
   )
 }
