@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { FileTransferDetailList } from '../components/FileTransferDetailList'
 import { FileTransferActions } from '../components/FileTransferActions'
-import { getActiveFileTransferDetails } from '../api/activeFileTransferDetail'
+import { getActiveFileTransferDetails, type ActiveFileTransferDetails } from '../api/activeFileTransferDetail'
 import { PageRoutes } from './routes'
 import './pages.css'
 import { useEffect, useRef, useState } from 'react'
@@ -11,7 +11,7 @@ const current_org = "312936496"
 
 export function ActiveFileTransferDetailPage() {
   const { transferId = '' } = useParams()
-  const [transferDetails, setTransferDetails] = useState(null)
+  const [transferDetails, setTransferDetails] = useState<ActiveFileTransferDetails | null>(null)
   const transferIdRef = useRef(transferId)
   transferIdRef.current = transferId
 
@@ -60,8 +60,6 @@ export function ActiveFileTransferDetailPage() {
             description={transferDetails.serviceOwner}
           />
         </List>
-
-        <p className="page-subheading">{transferDetails.subtitle}</p>
 
         <FileTransferDetailList transferDetails={transferDetails} />
 
