@@ -40,13 +40,6 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             }
             altinnResourceToCreate = altinnResource;
         }
-        else
-        {
-            if (existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
-            {
-                return Errors.NoAccessToResource;
-            }
-        }
 
         var resourceForValidation = existingResource ?? altinnResourceToCreate;
 
