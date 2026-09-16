@@ -337,6 +337,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     public async Task<ActionResult> DownloadFile(
         Guid fileTransferId,
         [FromServices] DownloadFileHandler handler,
+        [FromQuery] string? onBehalfOf,
          CancellationToken cancellationToken)
     {
         logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
@@ -344,7 +345,8 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Range = byteRange
+            Range = byteRange,
+            OnBehalfOf = onBehalfOf
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result =>
@@ -394,13 +396,15 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> ConfirmDownload(
         Guid fileTransferId,
+        [FromQuery] string? onBehalfOf,
         [FromServices] ConfirmDownloadHandler handler,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
         var requestData = new ConfirmDownloadRequest()
         {
-            FileTransferId = fileTransferId
+            FileTransferId = fileTransferId,
+            OnBehalfOf = onBehalfOf
         };
         var commandResult = await handler.Process(requestData, HttpContext.User, cancellationToken);
         return commandResult.Match(

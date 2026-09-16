@@ -39,11 +39,31 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
-        if (!hasAccess)
+        string? caller;
+        var isIdportenToken = await authorizationService.IsIdPortenToken(user);
+        if (isIdportenToken)
         {
-            return Errors.NoAccessToResource;
-        };
+            if (string.IsNullOrWhiteSpace(request.OnBehalfOf))
+            {
+                return Errors.MissingOnBehalfOf;
+            }
+            var onBehalfOf = request.OnBehalfOf;
+            var hasAccess = await authorizationService.CheckIdPortenAccessAsRecipient(user, fileTransfer, onBehalfOf, cancellationToken);
+            if (!hasAccess)
+            {
+                return Errors.NoAccessToResource;
+            }
+            caller = onBehalfOf.WithPrefix();
+        }
+        else
+        {
+            var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
+            if (!hasAccess)
+            {
+                return Errors.NoAccessToResource;
+            }
+            caller = user?.GetCallerOrganizationId()?.WithPrefix();
+        }
         if (string.IsNullOrWhiteSpace(fileTransfer?.FileLocation))
         {
             return Errors.NoFileUploaded;
@@ -52,7 +72,6 @@ public class ConfirmDownloadHandler(
         {
             return Errors.FileTransferNotPublished;
         }
-        var caller = user?.GetCallerOrganizationId()?.WithPrefix();
         if (string.IsNullOrWhiteSpace(caller))
         {
             logger.LogError("Caller is not set");

@@ -5,4 +5,5 @@ public class DownloadFileRequest
 {
     public Guid FileTransferId { get; set; }
     public ByteRangeRequest? Range { get; set; }
+    public string? OnBehalfOf { get; set; }
 }
