@@ -3,39 +3,62 @@ import { useEffect, useMemo, useState } from 'react'
 import { getActiveFileTransfers, type ActiveFileTransfers } from '../api/activeFileTransfers'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
 import { ActiveFileTransferCard } from '../components/ActiveFileTransferCard'
+import { useParties } from '../parties/PartiesContext'
 import { activeTransferPath } from './routes'
 import './pages.css'
 
 const PAGE_SIZE = 5
 
-const current_org = "312936496"
+/** What was loaded for one party. Anything for another party is stale after an actor switch. */
+type LoadedTransfers = {
+  party: string
+  resources: AuthorizedResource[]
+  overviews: ActiveFileTransfers[]
+}
 
 export function ActiveFileTransfersPage() {
-  const [resources, setResources] = useState<AuthorizedResource[]>([])
-  const [overviews, setOverviews] = useState<ActiveFileTransfers[] | null>(null)
-  const [loadError, setLoadError] = useState(false)
+  const { status: partiesStatus, selectedParty } = useParties()
+  const [loaded, setLoaded] = useState<LoadedTransfers | null>(null)
+  const [failedParty, setFailedParty] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
   const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    async function loadActiveFileTransfers() {
-      try {
-        const authorizedResources = await fetchAuthorizedResources(current_org)
-        setResources(authorizedResources)
+  const party = selectedParty?.organizationNumber
 
+  useEffect(() => {
+    if (!party) {
+      return
+    }
+
+    let active = true
+    async function loadActiveFileTransfers(partyId: string) {
+      try {
+        const authorizedResources = await fetchAuthorizedResources(partyId)
         const resourceIds = authorizedResources.map((resource) => resource.resourceId)
-        if (resourceIds.length === 0) {
-          setOverviews([])
-          return
+        const overviews =
+          resourceIds.length === 0 ? [] : await getActiveFileTransfers(resourceIds, partyId)
+
+        if (active) {
+          setLoaded({ party: partyId, resources: authorizedResources, overviews })
         }
-        setOverviews(await getActiveFileTransfers(resourceIds, current_org))
       } catch {
-        setLoadError(true)
+        if (active) {
+          setFailedParty(partyId)
+        }
       }
     }
-    void loadActiveFileTransfers()
-  }, [])
+    void loadActiveFileTransfers(party)
+
+    return () => {
+      active = false
+    }
+  }, [party])
+
+  const current = loaded?.party === party ? loaded : null
+  const resources = useMemo(() => current?.resources ?? [], [current])
+  const overviews = current?.overviews ?? null
+  const loadError = failedParty === party
 
   const filtered = useMemo(() => {
     if (!overviews) return []
@@ -46,16 +69,21 @@ export function ActiveFileTransfersPage() {
       const matchesResource = !resourceFilter || overview.resourceId === resourceFilter
       return matchesSearch && matchesResource
     })
-  }, [overviews, resources, search, resourceFilter])
+  }, [overviews, search, resourceFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const cards = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((overview) => ({
-    fileTransferId: overview.fileTransferId,
-    resourceName: resources.find((r) => r.resourceId === overview.resourceId)?.name ?? overview.resourceId,
-    sender: overview.sender,
-    recipient: overview.recipients.join(', '),
-    reference: overview.sendersFileTransferReference || overview.fileTransferId,
-  }))
+  // An actor switch can leave fewer results than the page the user was on.
+  const currentPage = Math.min(page, totalPages)
+  const cards = filtered
+    .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    .map((overview) => ({
+      fileTransferId: overview.fileTransferId,
+      resourceName:
+        resources.find((r) => r.resourceId === overview.resourceId)?.name ?? overview.resourceId,
+      sender: overview.sender,
+      recipient: overview.recipients.join(', '),
+      reference: overview.sendersFileTransferReference || overview.fileTransferId,
+    }))
 
   function handleSearch(value: string) {
     setSearch(value)
@@ -107,11 +135,19 @@ export function ActiveFileTransfersPage() {
         </div>
       </div>
 
-      {loadError && <p className="empty-state">Klarte ikke å hente aktive formidlinger.</p>}
+      {partiesStatus === 'failed' && <p className="empty-state">Klarte ikke å hente aktører.</p>}
 
-      {!loadError && overviews === null && <p className="empty-state">Laster aktive formidlinger …</p>}
+      {partiesStatus === 'loaded' && !party && (
+        <p className="empty-state">Du kan ikke representere noen virksomheter i BrokerBox.</p>
+      )}
 
-      {!loadError && overviews !== null && cards.length === 0 && (
+      {party && loadError && <p className="empty-state">Klarte ikke å hente aktive formidlinger.</p>}
+
+      {partiesStatus !== 'failed' && !loadError && (!party || overviews === null) && (
+        <p className="empty-state">Laster aktive formidlinger …</p>
+      )}
+
+      {party && !loadError && overviews !== null && cards.length === 0 && (
         <p className="empty-state">Ingen aktive formidlinger funnet.</p>
       )}
 
@@ -131,13 +167,13 @@ export function ActiveFileTransfersPage() {
 
       <div className="pagination-row">
       {totalPages > 1 && (
-        <Pagination aria-label="Sidenavigering" data-current={String(page)} data-total={String(totalPages)}>
+        <Pagination aria-label="Sidenavigering" data-current={String(currentPage)} data-total={String(totalPages)}>
           <Pagination.List>
             <Pagination.Item>
               <Pagination.Button
                 aria-label="Forrige side"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
               >
                 Forrige
               </Pagination.Button>
@@ -146,7 +182,7 @@ export function ActiveFileTransfersPage() {
               <Pagination.Item key={n}>
                 <Pagination.Button
                   aria-label={`Side ${n}`}
-                  aria-current={n === page ? 'page' : undefined}
+                  aria-current={n === currentPage ? 'page' : undefined}
                   onClick={() => setPage(n)}
                 >
                   {n}
@@ -156,8 +192,8 @@ export function ActiveFileTransfersPage() {
             <Pagination.Item>
               <Pagination.Button
                 aria-label="Neste side"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
               >
                 Neste
               </Pagination.Button>
