@@ -35,7 +35,7 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> InitializeServiceOwner([FromBody] ServiceOwnerInitializeExt serviceOwnerInitializeExt, CancellationToken cancellationToken)
     {
-        var callerOrganizationId = HttpContext.User.GetCallerOrganizationId();
+        var callerOrganizationId = serviceOwnerInitializeExt.OrganizationId ?? HttpContext.User.GetCallerOrganizationId();
         if (callerOrganizationId is null)
         {
             return Problem(ServiceOwnerErrors.CallerOrganizationIdNotFound);

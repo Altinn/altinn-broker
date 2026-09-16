@@ -9,4 +9,6 @@ public class ServiceOwnerInitializeExt
     /// The name of the service owner.
     /// </summary>
     public required string Name { get; set; }
+
+    public string OrganizationId { get; set; }
 }
