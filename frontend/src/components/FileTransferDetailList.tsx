@@ -1,5 +1,6 @@
 import { List } from '@altinn/altinn-components'
 import { DetailField } from './DetailField'
+import { formatFileSize } from '../helpers/fileSizeHelper'
 import { formatOrganizationDisplay } from '../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../helpers/fileTransferStatusHelper'
 import type { ActiveFileTransferDetails } from '../api/activeFileTransferDetail'
@@ -26,7 +27,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       />
       <DetailField label="Opprettet" value={transferDetails.created} />
       {transferDetails.published && <DetailField label="Opplastet" value={transferDetails.published} />}
-      <DetailField label="Filstørrelse" value={transferDetails.fileTransferSize} />
+      <DetailField label="Filstørrelse" value={formatFileSize(transferDetails.fileTransferSize)} />
       {transferDetails.useVirusScan && <DetailField label="Virusskannet" value={transferDetails.useVirusScan ? "Utført" : "Ikke utført"} />}
       <DetailField label="Andre metadata" value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)

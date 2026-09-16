@@ -14,7 +14,7 @@ export type ActiveFileTransferDetails = {
     fileName?: string
     sendersFileTransferReference?: string
     useVirusScan?: boolean
-    fileTransferSize?: string
+    fileTransferSize?: number
     created?: string | null
     sender?: string
     senderName?: string

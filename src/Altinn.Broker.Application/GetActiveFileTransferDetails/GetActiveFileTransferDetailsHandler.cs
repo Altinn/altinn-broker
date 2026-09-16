@@ -104,7 +104,7 @@ public class GetActiveFileTransferDetailsHandler(
             ResourceName = resourceName,
             SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
             FileName = fileTransfer.FileName,
-            FileTransferSize = FormatFileSize(fileTransfer.FileTransferSize),
+            FileTransferSize = fileTransfer.FileTransferSize,
             Created = initializedEvent is not null ? FormatTimestamp(initializedEvent.Date) : null,
             Published = publishedEvent is not null ? FormatTimestamp(publishedEvent.Date) : null,
             UseVirusScan = fileTransfer.UseVirusScan,
@@ -122,23 +122,6 @@ public class GetActiveFileTransferDetailsHandler(
 
     private static string FormatTimestamp(DateTimeOffset timestamp) => timestamp.ToString("dd.MM.yyyy HH:mm");
 
-    private static readonly string[] FileSizeUnits = ["B", "KB", "MB", "GB", "TB"];
-
-    /// <summary>
-    /// Formats a raw byte count into a human-readable string with the largest fitting unit, e.g. 2 930 000 000 -> "2.73 GB".
-    /// </summary>
-    private static string FormatFileSize(long bytes)
-    {
-        double size = bytes;
-        var unitIndex = 0;
-        while (size >= 1024 && unitIndex < FileSizeUnits.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return $"{size.ToString(unitIndex == 0 ? "0" : "0.##")} {FileSizeUnits[unitIndex]}";
-    }
 
     /// <summary>
     /// Derives a single frontend-facing status describing what the calling actor should see:
