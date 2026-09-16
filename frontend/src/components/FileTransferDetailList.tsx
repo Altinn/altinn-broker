@@ -26,9 +26,9 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
           .join(', ')}
       />
       <DetailField label="Opprettet" value={transferDetails.created} />
-      {transferDetails.published && <DetailField label="Opplastet" value={transferDetails.published} />}
+      <DetailField label="Opplastet" value={transferDetails.published} />
       <DetailField label="Filstørrelse" value={formatFileSize(transferDetails.fileTransferSize)} />
-      {transferDetails.useVirusScan && <DetailField label="Virusskannet" value={transferDetails.useVirusScan ? "Utført" : "Ikke utført"} />}
+      <DetailField label="Virusskannet" value={transferDetails.useVirusScan ? "Utført" : "Ikke utført"} />
       <DetailField label="Andre metadata" value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ')} />

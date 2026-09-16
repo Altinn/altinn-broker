@@ -11,6 +11,7 @@ export type RecipientDetail = {
 export type ActiveFileTransferDetails = {
     fileTransferId?: string
     resourceId?: string
+    resourceName?: string
     fileName?: string
     sendersFileTransferReference?: string
     useVirusScan?: boolean
