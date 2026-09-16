@@ -1,3 +1,4 @@
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 
 using Npgsql;
@@ -92,6 +93,53 @@ public class TestDataHelper(NpgsqlDataSource dataSource)
         command.Parameters.AddWithValue("@statusDate", statusDate.UtcDateTime);
         command.Parameters.AddWithValue("@detailedStatus", (object?)detailedStatus ?? DBNull.Value);
         command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public async Task<ActorEntity> GetOrCreateActor(string actorExternalId)
+    {
+        var actorId = await EnsureActor(actorExternalId);
+        return new ActorEntity { ActorId = actorId, ActorExternalId = actorExternalId };
+    }
+
+    /// <summary>
+    /// Registers <paramref name="actorExternalId"/> as a recipient of the file transfer, in the same
+    /// denormalized "latest status" table that active-transfer searches read from
+    /// (broker.actor_file_transfer_latest_status is upserted directly here rather than going through
+    /// broker.actor_file_transfer_status, since nothing populates the former from the latter automatically).
+    /// </summary>
+    public async Task InsertRecipient(Guid fileTransferId, string actorExternalId, ActorFileTransferStatus status = ActorFileTransferStatus.Initialized, DateTimeOffset? statusDate = null)
+    {
+        var actorId = await EnsureActor(actorExternalId);
+
+        await using var command = dataSource.CreateCommand(
+            @"INSERT INTO broker.actor_file_transfer_latest_status (file_transfer_id_fk, actor_id_fk, latest_actor_status_id, latest_actor_status_date)
+              VALUES (@fileTransferId, @actorId, @status, @statusDate)
+              ON CONFLICT (file_transfer_id_fk, actor_id_fk) DO UPDATE SET
+                  latest_actor_status_id = EXCLUDED.latest_actor_status_id,
+                  latest_actor_status_date = EXCLUDED.latest_actor_status_date");
+
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddWithValue("@actorId", actorId);
+        command.Parameters.AddWithValue("@status", (int)status);
+        command.Parameters.AddWithValue("@statusDate", (statusDate ?? DateTimeOffset.UtcNow).UtcDateTime);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Sets the denormalized latest_file_status_id/latest_file_status_date columns on broker.file_transfer
+    /// directly, since nothing populates them from broker.file_transfer_status automatically in tests.
+    /// </summary>
+    public async Task SetLatestFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset? statusDate = null)
+    {
+        await using var command = dataSource.CreateCommand(
+            @"UPDATE broker.file_transfer
+              SET latest_file_status_id = @status, latest_file_status_date = @statusDate
+              WHERE file_transfer_id_pk = @fileTransferId");
+
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddWithValue("@status", (int)status);
+        command.Parameters.AddWithValue("@statusDate", (statusDate ?? DateTimeOffset.UtcNow).UtcDateTime);
         await command.ExecuteNonQueryAsync();
     }
 

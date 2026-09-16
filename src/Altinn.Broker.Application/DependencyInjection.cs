@@ -1,10 +1,12 @@
 using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.DownloadFile;
+using Altinn.Broker.Application.GetActiveFileTransfers;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetAuthorizedResources;
+using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Application.GenerateReport;
@@ -40,11 +42,13 @@ public static class DependencyInjection
         services.AddScoped<DownloadFileHandler>();
         services.AddScoped<ConfirmDownloadHandler>();
         services.AddScoped<GetFileTransfersHandler>();
+        services.AddScoped<GetActiveFileTransfersHandler>();
         services.AddScoped<PurgeFileTransferHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
         services.AddScoped<ConfigureResourceHandler>();
         services.AddScoped<EventBusMiddleware>();
         services.AddScoped<GetResourceHandler>();
+        services.AddScoped<GetAllowedRecipientsHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
         services.AddScoped<GetAuthorizedPartiesHandler>();
         services.AddScoped<StuckFileTransferHandler>();

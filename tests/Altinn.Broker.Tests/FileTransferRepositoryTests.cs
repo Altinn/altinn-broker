@@ -1,3 +1,5 @@
+using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Helpers;
 
@@ -155,6 +157,157 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Empty(result);
 		Assert.Equal(1, await CountFileTransfer(id1)); // Original file still exists
 	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_SenderMatch_ReturnsTransferWithAllRecipients()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var recipient1 = NewOrgId();
+		var recipient2 = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "my-reference");
+		await _dataHelper.InsertRecipient(fileTransferId, recipient1);
+		await _dataHelper.InsertRecipient(fileTransferId, recipient2);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			Status = FileTransferStatus.Published
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(fileTransferId, summary.FileTransferId);
+		Assert.Equal(resourceId, summary.ResourceId);
+		Assert.Equal(senderExternalId, summary.Sender);
+		Assert.Equal("my-reference", summary.SendersFileTransferReference);
+		Assert.Equal(new[] { recipient1, recipient2 }.OrderBy(r => r), summary.Recipients.OrderBy(r => r));
+	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTransfer()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var recipientExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId);
+		await _dataHelper.InsertRecipient(fileTransferId, recipientExternalId);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
+		var actor = await _dataHelper.GetOrCreateActor(recipientExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			Status = FileTransferStatus.Published
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(fileTransferId, summary.FileTransferId);
+	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesResourceIdsNotRequested()
+	{
+		// Arrange
+		var requestedResourceId = $"active-transfers-{Guid.NewGuid()}";
+		var otherResourceId = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+
+		await _dataHelper.InsertFileTransfer(requestedResourceId, senderExternalId: senderExternalId);
+		var otherId = await _dataHelper.InsertFileTransfer(otherResourceId, senderExternalId: senderExternalId);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [requestedResourceId],
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.DoesNotContain(result, summary => summary.FileTransferId == otherId);
+	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_MultipleResourceIds_ReturnsTransfersAcrossAllOfThem()
+	{
+		// Arrange
+		var resourceId1 = $"active-transfers-{Guid.NewGuid()}";
+		var resourceId2 = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+
+		var id1 = await _dataHelper.InsertFileTransfer(resourceId1, senderExternalId: senderExternalId);
+		var id2 = await _dataHelper.InsertFileTransfer(resourceId2, senderExternalId: senderExternalId);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId1, resourceId2],
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.Contains(result, summary => summary.FileTransferId == id1);
+		Assert.Contains(result, summary => summary.FileTransferId == id2);
+	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesNonMatchingStatus()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Initialized);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			Status = FileTransferStatus.Published
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.DoesNotContain(result, summary => summary.FileTransferId == fileTransferId);
+	}
+
+	[Fact]
+	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesUnrelatedActor()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var unrelatedExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId);
+		var unrelatedActor = await _dataHelper.GetOrCreateActor(unrelatedExternalId);
+
+		// Act
+		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		{
+			Actor = unrelatedActor,
+			ResourceIds = [resourceId],
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.DoesNotContain(result, summary => summary.FileTransferId == fileTransferId);
+	}
+
+	private static string NewOrgId() => $"0192:{Random.Shared.Next(100000000, 999999999)}";
 
 	private async Task<int> CountFileTransfer(Guid fileTransferId)
 	{

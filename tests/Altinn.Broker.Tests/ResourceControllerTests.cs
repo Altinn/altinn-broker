@@ -51,6 +51,24 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
+    public async Task GetAllowedRecipients_WithoutEndUserSession_ReturnsUnauthorized()
+    {
+        var response = await _factory.CreateClient()
+            .GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}/allowed-recipients?party=991825827");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllowedRecipients_IsNotAvailableWithAMaskinportenToken()
+    {
+        var response = await _serviceOwnerClient
+            .GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}/allowed-recipients?party=991825827");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Update_Resource_Max_Upload_Size()
     {
         var response = await _serviceOwnerClient.PutAsJsonAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}", new ResourceExt
@@ -160,10 +178,17 @@ public class ResourceControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task GetResource_WithoutPermissions_ReturnsUnauthorized()
+    public async Task GetResource_WithoutToken_ReturnsUnauthorized()
+    {
+        var response = await _factory.CreateClient().GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}");
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task GetResource_WithBrokerScopeOfDifferentServiceOwner_ReturnsOk()
     {
         var response = await _serviceOwnerClientNotConfigured.GetAsync($"broker/api/v1/resource/{TestConstants.RESOURCE_FOR_TEST}");
-        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, await response.Content.ReadAsStringAsync());
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
