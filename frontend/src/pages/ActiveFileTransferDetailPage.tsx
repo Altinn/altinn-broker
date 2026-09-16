@@ -4,7 +4,7 @@ import { FileTransferActions } from '../components/FileTransferActions'
 import { getActiveFileTransferDetails } from '../api/activeFileTransferDetail'
 import { PageRoutes } from './routes'
 import './pages.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { List, ListItem } from '@altinn/altinn-components'
 
 const current_org = "312936496"
@@ -12,11 +12,16 @@ const current_org = "312936496"
 export function ActiveFileTransferDetailPage() {
   const { transferId = '' } = useParams()
   const [transferDetails, setTransferDetails] = useState(null)
+  const transferIdRef = useRef(transferId)
+  transferIdRef.current = transferId
 
   async function loadTransferDetails() {
+    const requestedTransferId = transferId
     try {
-      const transferDetails = await getActiveFileTransferDetails(transferId, current_org)
-      setTransferDetails(transferDetails)
+      const transferDetails = await getActiveFileTransferDetails(requestedTransferId, current_org)
+      if (transferIdRef.current === requestedTransferId) {
+        setTransferDetails(transferDetails)
+      }
     } catch (error) {
       console.error('Error fetching transfer details:', error)
     }
