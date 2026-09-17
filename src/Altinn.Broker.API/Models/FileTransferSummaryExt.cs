@@ -1,9 +1,9 @@
 namespace Altinn.Broker.Models;
 
 /// <summary>
-/// Lean summary of an active (published) file transfer, for list views
+/// Lean summary of a file transfer, for list views (active or historical)
 /// </summary>
-public class ActiveFileTransferExt
+public class FileTransferSummaryExt
 {
     public Guid FileTransferId { get; set; }
 

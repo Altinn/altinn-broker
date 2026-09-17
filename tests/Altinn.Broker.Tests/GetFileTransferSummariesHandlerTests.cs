@@ -1,8 +1,9 @@
 using System.Security.Claims;
 
 using Altinn.Broker.Application;
-using Altinn.Broker.Application.GetActiveFileTransfers;
+using Altinn.Broker.Application.GetFileTransferSummaries;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
@@ -15,7 +16,7 @@ using Xunit;
 
 namespace Altinn.Broker.Tests;
 
-public class GetActiveFileTransfersHandlerTests
+public class GetFileTransferSummariesHandlerTests
 {
     private const string OrganizationNumber = "991825827";
 
@@ -29,7 +30,7 @@ public class GetActiveFileTransfersHandlerTests
         var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
         var user = new ClaimsPrincipal(new ClaimsIdentity());
 
-        var result = await handler.Process(new GetActiveFileTransfersRequest { ResourceIds = ["resource-a"] }, user, CancellationToken.None);
+        var result = await handler.Process(new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], View = FileTransferListView.Active }, user, CancellationToken.None);
 
         Assert.True(result.IsT1);
         Assert.Equal(Errors.NoAccessToResource, result.AsT1);
@@ -48,7 +49,7 @@ public class GetActiveFileTransfersHandlerTests
         var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
 
         var result = await handler.Process(
-            new GetActiveFileTransfersRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber }, null, CancellationToken.None);
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
         Assert.Empty(result.AsT0);
@@ -68,7 +69,7 @@ public class GetActiveFileTransfersHandlerTests
         var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
 
         var result = await handler.Process(
-            new GetActiveFileTransfersRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber }, null, CancellationToken.None);
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
         Assert.Empty(result.AsT0);
@@ -90,14 +91,14 @@ public class GetActiveFileTransfersHandlerTests
         List<string>? queriedResourceIds = null;
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<ActiveFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
-            .Callback<ActiveFileTransferSearchEntity, CancellationToken>((search, _) => queriedResourceIds = search.ResourceIds)
+            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedResourceIds = search.ResourceIds)
             .ReturnsAsync([]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
         var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
 
         var result = await handler.Process(
-            new GetActiveFileTransfersRequest { ResourceIds = ["resource-a", "resource-b"], OnBehalfOf = OrganizationNumber }, null, CancellationToken.None);
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a", "resource-b"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
         Assert.Equal(["resource-a"], queriedResourceIds);
@@ -119,7 +120,7 @@ public class GetActiveFileTransfersHandlerTests
         };
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<ActiveFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([summary]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>();
         altinnRegisterService.Setup(service => service.LookupOrganizationName("0192:111111111", It.IsAny<CancellationToken>())).ReturnsAsync("Sender AS");
@@ -128,7 +129,7 @@ public class GetActiveFileTransfersHandlerTests
         var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
 
         var result = await handler.Process(
-            new GetActiveFileTransfersRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber }, null, CancellationToken.None);
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
         var resultSummary = Assert.Single(result.AsT0);
@@ -159,14 +160,60 @@ public class GetActiveFileTransfersHandlerTests
         var user = TestTokenHelper.CreateAltinnUser("999999999"); // different org - should be ignored when OnBehalfOf is set
 
         var result = await handler.Process(
-            new GetActiveFileTransfersRequest { ResourceIds = ["resource-a"], OnBehalfOf = onBehalfOfOrg }, user, CancellationToken.None);
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = onBehalfOfOrg, View = FileTransferListView.Active }, user, CancellationToken.None);
 
         Assert.True(result.IsT0);
         Assert.Equal(onBehalfOfOrg, authorizedParty);
         Assert.Equal($"0192:{onBehalfOfOrg}", actorLookupArgument);
     }
 
-    private static GetActiveFileTransfersHandler CreateHandler(
+    [Fact]
+    public async Task Process_ActiveView_QueriesRepositoryWithOnlyPublishedStatus()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        List<FileTransferStatus>? queriedStatuses = null;
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedStatuses = search.Statuses)
+            .ReturnsAsync([]);
+        var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Equal([FileTransferStatus.Published], queriedStatuses);
+    }
+
+    [Fact]
+    public async Task Process_HistoricalView_QueriesRepositoryWithTerminalStatuses()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        List<FileTransferStatus>? queriedStatuses = null;
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedStatuses = search.Statuses)
+            .ReturnsAsync([]);
+        var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Historical }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Equal(
+            [FileTransferStatus.Cancelled, FileTransferStatus.AllConfirmedDownloaded, FileTransferStatus.Purged, FileTransferStatus.Failed],
+            queriedStatuses);
+    }
+
+    private static GetFileTransferSummariesHandler CreateHandler(
         Mock<IAuthorizationService> authorizationService,
         Mock<IFileTransferRepository> fileTransferRepository,
         Mock<IActorRepository> actorRepository,
@@ -176,7 +223,7 @@ public class GetActiveFileTransfersHandlerTests
             fileTransferRepository.Object,
             actorRepository.Object,
             altinnRegisterService.Object,
-            NullLogger<GetActiveFileTransfersHandler>.Instance);
+            NullLogger<GetFileTransferSummariesHandler>.Instance);
 
     private static Mock<IActorRepository> CreateActorRepository(ActorEntity actor)
     {

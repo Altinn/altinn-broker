@@ -298,7 +298,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task<List<FileTransferSummaryEntity>> GetActiveFileTransferSummariesAssociatedWithActor(ActiveFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
+    public async Task<List<FileTransferSummaryEntity>> GetActiveFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
         bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
@@ -308,11 +308,13 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         if (includeRecipient) actorConditions.Add("EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId)");
         string actorCondition = string.Join(" OR ", actorConditions);
 
-        string statusCondition = fileTransferSearch.Status.HasValue
-            ? "AND f.latest_file_status_id = @fileTransferStatus"
+        bool hasStatusFilter = fileTransferSearch.Statuses is { Count: > 0 };
+
+        string statusCondition = hasStatusFilter
+            ? "AND f.latest_file_status_id = ANY(@fileTransferStatuses)"
             : "";
 
-        string timestampColumn = fileTransferSearch.Status.HasValue
+        string timestampColumn = hasStatusFilter
             ? "f.latest_file_status_date"
             : "f.created";
 
@@ -367,8 +369,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
-        if (fileTransferSearch.Status.HasValue)
-            command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.Status);
+        if (hasStatusFilter)
+            command.Parameters.AddWithValue("@fileTransferStatuses", fileTransferSearch.Statuses!.Select(status => (int)status).ToArray());
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);
         if (fileTransferSearch.To.HasValue)
