@@ -24,6 +24,7 @@ export function FileTransferFilters({
         </label>
         <Search>
           <Search.Input
+            id="search"
             aria-label="Søk på referanse"
             placeholder="Søk..."
             value={search}
