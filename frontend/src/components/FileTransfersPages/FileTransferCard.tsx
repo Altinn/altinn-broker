@@ -1,8 +1,8 @@
 import { Card, Heading, Paragraph } from '@digdir/designsystemet-react'
 import { Link } from 'react-router-dom'
-import './ActiveFileTransferCard.css'
+import './FileTransferCard.css'
 
-type ActiveFileTransferCardProps = {
+type FileTransferCardProps = {
   resourceName: string
   sender: string
   recipient: string
@@ -10,17 +10,17 @@ type ActiveFileTransferCardProps = {
   to: string
 }
 
-export function ActiveFileTransferCard({
+export function FileTransferCard({
   resourceName,
   sender,
   recipient,
   reference,
   to,
-}: ActiveFileTransferCardProps) {
+}: FileTransferCardProps) {
   return (
-    <Link to={to} className="active-file-transfer-card-link">
-      <Card className="active-file-transfer-card">
-        <div className="active-file-transfer-card__content">
+    <Link to={to} className="file-transfer-card-link">
+      <Card className="file-transfer-card">
+        <div className="file-transfer-card__content">
           <Heading level={3} data-size="xs">
             {resourceName}
           </Heading>
@@ -28,7 +28,7 @@ export function ActiveFileTransferCard({
             {sender} → {recipient} - {reference}
           </Paragraph>
         </div>
-        <span className="active-file-transfer-card__chevron" aria-hidden="true">
+        <span className="file-transfer-card__chevron" aria-hidden="true">
           ›
         </span>
       </Card>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { ActiveFileTransferDetails } from '../api/activeFileTransferDetail'
-import { confirmFileTransferDownload } from '../api/confirmFileTransferDownload'
-import { getFileTransferDownloadUrl } from '../api/downloadFileTransfer'
+import type { ActiveFileTransferDetails } from '../../api/activeFileTransferDetail'
+import { confirmFileTransferDownload } from '../../api/confirmFileTransferDownload'
+import { getFileTransferDownloadUrl } from '../../api/downloadFileTransfer'
 
 const REFRESH_AFTER_DOWNLOAD_START_DELAY_MS = 1500
 
