@@ -91,7 +91,7 @@ public class GetFileTransferSummariesHandlerTests
         List<string>? queriedResourceIds = null;
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
             .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedResourceIds = search.ResourceIds)
             .ReturnsAsync([]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
@@ -120,7 +120,7 @@ public class GetFileTransferSummariesHandlerTests
         };
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([summary]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>();
         altinnRegisterService.Setup(service => service.LookupOrganizationName("0192:111111111", It.IsAny<CancellationToken>())).ReturnsAsync("Sender AS");
@@ -176,7 +176,7 @@ public class GetFileTransferSummariesHandlerTests
         List<FileTransferStatus>? queriedStatuses = null;
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
             .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedStatuses = search.Statuses)
             .ReturnsAsync([]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
@@ -198,7 +198,7 @@ public class GetFileTransferSummariesHandlerTests
         List<FileTransferStatus>? queriedStatuses = null;
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
-            .Setup(repository => repository.GetActiveFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
             .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedStatuses = search.Statuses)
             .ReturnsAsync([]);
         var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);

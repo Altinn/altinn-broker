@@ -159,7 +159,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_SenderMatch_ReturnsTransferWithAllRecipients()
+	public async Task GetFileTransferSummariesAssociatedWithActor_SenderMatch_ReturnsTransferWithAllRecipients()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -174,7 +174,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
@@ -191,7 +191,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTransfer()
+	public async Task GetFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTransfer()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -203,7 +203,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(recipientExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
@@ -216,7 +216,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesResourceIdsNotRequested()
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesResourceIdsNotRequested()
 	{
 		// Arrange
 		var requestedResourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -228,7 +228,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [requestedResourceId],
@@ -239,7 +239,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_MultipleResourceIds_ReturnsTransfersAcrossAllOfThem()
+	public async Task GetFileTransferSummariesAssociatedWithActor_MultipleResourceIds_ReturnsTransfersAcrossAllOfThem()
 	{
 		// Arrange
 		var resourceId1 = $"active-transfers-{Guid.NewGuid()}";
@@ -251,7 +251,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId1, resourceId2],
@@ -263,7 +263,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesNonMatchingStatus()
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesNonMatchingStatus()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -274,7 +274,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
@@ -286,7 +286,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesUnrelatedActor()
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesUnrelatedActor()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -297,7 +297,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var unrelatedActor = await _dataHelper.GetOrCreateActor(unrelatedExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = unrelatedActor,
 			ResourceIds = [resourceId],

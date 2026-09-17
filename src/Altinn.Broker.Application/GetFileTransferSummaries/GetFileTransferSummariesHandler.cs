@@ -64,7 +64,7 @@ public class GetFileTransferSummariesHandler(
         }
 
         var statuses = request.View == FileTransferListView.Active ? ActiveStatuses : HistoricalStatuses;
-        var summaries = await fileTransferRepository.GetActiveFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
+        var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
             ResourceIds = authorizedResourceIds,

@@ -298,7 +298,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task<List<FileTransferSummaryEntity>> GetActiveFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
+    public async Task<List<FileTransferSummaryEntity>> GetFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
         bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
