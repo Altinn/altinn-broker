@@ -2,7 +2,7 @@ using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GetActiveFileTransferDetails;
-using Altinn.Broker.Application.GetActiveFileTransfers;
+using Altinn.Broker.Application.GetFileTransferSummaries;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 
@@ -29,22 +29,59 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     [HttpGet("active-file-transfers")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
-    [ProducesResponseType(typeof(List<ActiveFileTransferExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<FileTransferSummaryExt>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<List<ActiveFileTransferExt>>> GetActiveFileTransfers(
+    public async Task<ActionResult<List<FileTransferSummaryExt>>> GetActiveFileTransfers(
         [FromQuery] List<string> resourceIds,
         [FromQuery] string? onBehalfOf,
-        [FromServices] GetActiveFileTransfersHandler handler,
+        [FromServices] GetFileTransferSummariesHandler handler,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting active file transfers for {count} resources", resourceIds.Count);
-        var queryResult = await handler.Process(new GetActiveFileTransfersRequest()
+        var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
         {
             ResourceIds = resourceIds,
-            OnBehalfOf = onBehalfOf ?? string.Empty
+            OnBehalfOf = onBehalfOf ?? string.Empty,
+            View = FileTransferListView.Active
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
-            summaries => Ok(summaries.Select(ActiveFileTransferExtMapper.MapToExternalModel).ToList()),
+            summaries => Ok(summaries.Select(FileTransferSummaryExtMapper.MapToExternalModel).ToList()),
+            Problem
+        );
+    }
+
+    /// <summary>
+    /// Get a lean summary of historical (past Published - cancelled, purged, failed, or fully
+    /// confirmed downloaded) file transfers across multiple resources in a single call
+    /// </summary>
+    /// <remarks>
+    /// One of the scopes: <br />
+    /// - altinn:broker.read <br/>
+    /// - altinn:broker.write <br/>
+    /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
+    /// </remarks>
+    /// <response code="200">Returns the list of historical file transfer summaries</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    [HttpGet("historical-file-transfers")]
+    [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<FileTransferSummaryExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<FileTransferSummaryExt>>> GetHistoricalFileTransfers(
+        [FromQuery] List<string> resourceIds,
+        [FromQuery] string? onBehalfOf,
+        [FromServices] GetFileTransferSummariesHandler handler,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Getting historical file transfers for {count} resources", resourceIds.Count);
+        var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
+        {
+            ResourceIds = resourceIds,
+            OnBehalfOf = onBehalfOf ?? string.Empty,
+            View = FileTransferListView.Historical
+        }, HttpContext.User, cancellationToken);
+        return queryResult.Match(
+            summaries => Ok(summaries.Select(FileTransferSummaryExtMapper.MapToExternalModel).ToList()),
             Problem
         );
     }
