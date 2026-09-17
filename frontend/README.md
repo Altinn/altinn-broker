@@ -83,6 +83,19 @@ This mirrors how other `*.ui.altinn.no` apps reuse the shared Altinn session.
 | `POST /broker/api/v1/authentication/callback` | OIDC callback (IdPortenDirectAuth) |
 | `GET /broker/api/v1/authentication/logout` | Logout (IdPortenDirectAuth) |
 
+## Choosing an actor
+
+The header lets the user pick which organization they act on behalf of. The list comes from
+`GET /broker/api/v1/party/authorized`, which asks Altinn Access Management
+(`enduser/authorizedparties`) with the end user's own Altinn token. Only organizations are
+offered, since the Broker API identifies parties by organization number.
+
+The selected party is kept in `localStorage` and drives the `party` parameter on API calls such
+as `GET /broker/api/v1/resource/authorized`.
+
+No extra ID-Porten scope is needed: Access Management answers the end user's own Altinn token
+with `altinn:portal/enduser` alone.
+
 ## Configuration
 
 Settings live in the Broker API (`appsettings.json`, `appsettings.Development.json`, or environment variables).
