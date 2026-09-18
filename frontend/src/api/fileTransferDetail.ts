@@ -1,14 +1,14 @@
 import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
 
-const ACTIVE_FILETRANSFER_DETAILS_PATH = `${BROKER_API_PREFIX}/frontend/active-file-transfer/{fileTransferId}`
+const ACTIVE_FILETRANSFER_DETAILS_PATH = `${BROKER_API_PREFIX}/frontend/file-transfer-details/{fileTransferId}`
 
 export type RecipientDetail = {
     recipient: string
     recipientName?: string
 }
 
-export type ActiveFileTransferDetails = {
+export type FileTransferDetails = {
     fileTransferId?: string
     resourceId?: string
     resourceName?: string
@@ -29,13 +29,13 @@ export type ActiveFileTransferDetails = {
     actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
 }
 
-export function getActiveFileTransferDetails(
+export function getFileTransferDetails(
     fileTransferId: string,
     onBehalfOf?: string,
-): Promise<ActiveFileTransferDetails> {
+): Promise<FileTransferDetails> {
     const params = new URLSearchParams()
     if (onBehalfOf) params.set('onBehalfOf', onBehalfOf)
-    return apiFetch<ActiveFileTransferDetails>(
+    return apiFetch<FileTransferDetails>(
         ACTIVE_FILETRANSFER_DETAILS_PATH.replace('{fileTransferId}', fileTransferId) + `?${params.toString()}`,
         { redirectOnUnauthorized: false },
     )

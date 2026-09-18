@@ -3,10 +3,10 @@ import { DetailField } from '../DetailField'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
-import type { ActiveFileTransferDetails, RecipientDetail } from '../../api/activeFileTransferDetail'
+import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
 
 type FileTransferDetailListProps = {
-  transferDetails: ActiveFileTransferDetails
+  transferDetails: FileTransferDetails
 }
 
 export function FileTransferDetailList({ transferDetails }: FileTransferDetailListProps) {

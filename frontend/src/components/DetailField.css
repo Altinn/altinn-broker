@@ -15,6 +15,12 @@ ul.data-list li.data-list-item {
   border-bottom: 1px solid #e9eaec;
 }
 
+ul.data-list li.data-list-item,
+ul.data-list li.data-list-item * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 ul.data-list li.data-list-item:last-child {
   border-bottom: none;
 }

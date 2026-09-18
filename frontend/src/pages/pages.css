@@ -223,3 +223,9 @@ ul.service-owner-list li.service-owner-list-item {
   background: transparent;
   border-radius: 0;
 }
+
+ul.service-owner-list li.service-owner-list-item,
+ul.service-owner-list li.service-owner-list-item * {
+  -webkit-user-select: text;
+  user-select: text;
+}

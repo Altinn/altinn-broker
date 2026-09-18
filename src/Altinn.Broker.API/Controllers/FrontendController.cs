@@ -86,7 +86,7 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         );
     }
 
-    [HttpGet("active-file-transfer/{fileTransferId}")]
+    [HttpGet("file-transfer-details/{fileTransferId}")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(GetActiveFileTransferDetailsResponse), StatusCodes.Status200OK)]
