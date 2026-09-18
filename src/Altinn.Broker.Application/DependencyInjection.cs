@@ -5,6 +5,7 @@ using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetActiveFileTransferDetails;
+using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<GetAllowedRecipientsHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
+        services.AddScoped<GetAuthorizedPartiesHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();

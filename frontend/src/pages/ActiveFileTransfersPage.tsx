@@ -15,5 +15,6 @@ export function ActiveFileTransfersPage() {
       fetchTransfers={getActiveFileTransfers}
       toPath={activeTransferPath}
     />
+
   )
 }
