@@ -16,6 +16,7 @@ type FileTransferDetailPageProps = {
 export function FileTransferDetailPage({ backPath, showActions = false }: FileTransferDetailPageProps) {
   const { transferId = '' } = useParams()
   const [transferDetails, setTransferDetails] = useState<FileTransferDetails | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const transferIdRef = useRef(transferId)
   transferIdRef.current = transferId
 
@@ -25,9 +26,13 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
       const transferDetails = await getFileTransferDetails(requestedTransferId, current_org)
       if (transferIdRef.current === requestedTransferId) {
         setTransferDetails(transferDetails)
+        setLoadError(false)
       }
     } catch (error) {
       console.error('Error fetching transfer details:', error)
+      if (transferIdRef.current === requestedTransferId) {
+        setLoadError(true)
+      }
     }
   }
 
@@ -41,8 +46,12 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
     return <p>Ingen formidling valgt.</p>
   }
 
-  if (!transferDetails) {
+  if (loadError) {
     return <p>Fant ikke formidlingen.</p>
+  }
+
+  if (!transferDetails) {
+    return <p>Laster …</p>
   }
 
   return (
