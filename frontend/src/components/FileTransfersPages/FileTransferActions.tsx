@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import type { ActiveFileTransferDetails } from '../../api/activeFileTransferDetail'
+import type { FileTransferDetails } from '../../api/fileTransferDetail'
 import { confirmFileTransferDownload } from '../../api/confirmFileTransferDownload'
 import { getFileTransferDownloadUrl } from '../../api/downloadFileTransfer'
 
 const REFRESH_AFTER_DOWNLOAD_START_DELAY_MS = 1500
 
 type FileTransferActionsProps = {
-  transferDetails: ActiveFileTransferDetails
+  transferDetails: FileTransferDetails
   onBehalfOf?: string
   onDownloadConfirmed?: () => void
   onDownloadStarted?: () => void
