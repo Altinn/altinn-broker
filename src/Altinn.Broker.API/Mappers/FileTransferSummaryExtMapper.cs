@@ -3,11 +3,11 @@ using Altinn.Broker.Models;
 
 namespace Altinn.Broker.Mappers;
 
-internal static class ActiveFileTransferExtMapper
+internal static class FileTransferSummaryExtMapper
 {
-    internal static ActiveFileTransferExt MapToExternalModel(FileTransferSummaryEntity summary)
+    internal static FileTransferSummaryExt MapToExternalModel(FileTransferSummaryEntity summary)
     {
-        return new ActiveFileTransferExt()
+        return new FileTransferSummaryExt()
         {
             FileTransferId = summary.FileTransferId,
             ResourceId = summary.ResourceId,

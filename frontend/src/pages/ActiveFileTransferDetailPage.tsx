@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
-import { FileTransferDetailList } from '../components/FileTransferDetailList'
-import { FileTransferActions } from '../components/FileTransferActions'
+import { FileTransferDetailList } from '../components/FileTransfersPages/FileTransferDetailList'
+import { FileTransferActions } from '../components/FileTransfersPages/FileTransferActions'
 import { getActiveFileTransferDetails, type ActiveFileTransferDetails } from '../api/activeFileTransferDetail'
 import { PageRoutes } from './routes'
 import './pages.css'

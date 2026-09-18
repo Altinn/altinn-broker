@@ -1,23 +1,19 @@
-import { historicalTransfers } from '../data/mockData'
-import { TransferListItem } from '../components/TransferListItem'
+import { getHistoricalFileTransfers } from '../api/historicalFileTransfers'
+import { FileTransferList } from '../components/FileTransfersPages/FileTransferList'
 import { historicalTransferPath } from './routes'
-import './pages.css'
+
+const current_org = "312936496"
 
 export function HistoricalFileTransfersPage() {
   return (
-    <div className="page">
-      <h2 className="page-heading">Historiske formidlinger Brønnøy sykehus har vært delaktig i</h2>
-
-      <ul className="transfer-list">
-        {historicalTransfers.map((transfer) => (
-          <TransferListItem
-            key={transfer.id}
-            serviceName={transfer.serviceName}
-            subtitle={transfer.subtitle}
-            to={historicalTransferPath(transfer.id)}
-          />
-        ))}
-      </ul>
-    </div>
+    <FileTransferList
+      heading="Historiske formidlinger"
+      loadingText="Laster historiske formidlinger …"
+      loadErrorText="Klarte ikke å hente historiske formidlinger."
+      emptyStateText="Ingen historiske formidlinger funnet."
+      currentOrg={current_org}
+      fetchTransfers={getHistoricalFileTransfers}
+      toPath={historicalTransferPath}
+    />
   )
 }

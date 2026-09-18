@@ -1,9 +1,9 @@
 import { List } from '@altinn/altinn-components'
-import { DetailField } from './DetailField'
-import { formatFileSize } from '../helpers/fileSizeHelper'
-import { formatOrganizationDisplay } from '../helpers/orgIdentifierHelper'
-import { formatFileTransferStatusMessage } from '../helpers/fileTransferStatusHelper'
-import type { ActiveFileTransferDetails } from '../api/activeFileTransferDetail'
+import { DetailField } from '../DetailField'
+import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
+import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
+import type { ActiveFileTransferDetails, RecipientDetail } from '../../api/activeFileTransferDetail'
 
 type FileTransferDetailListProps = {
   transferDetails: ActiveFileTransferDetails
@@ -22,7 +22,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       <DetailField
         label={(transferDetails.recipients?.length ?? 0) > 1 ? 'Mottakere' : 'Mottaker'}
         value={(transferDetails.recipients ?? [])
-          .map((recipient) => formatOrganizationDisplay(recipient.recipientName ?? recipient.recipient, recipient.recipient))
+          .map((recipient: RecipientDetail) => formatOrganizationDisplay(recipient.recipientName ?? recipient.recipient, recipient.recipient))
           .join(', ')}
       />
       <DetailField label="Opprettet" value={transferDetails.created} />

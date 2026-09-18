@@ -12,18 +12,32 @@ using Microsoft.Extensions.Logging;
 
 using OneOf;
 
-namespace Altinn.Broker.Application.GetActiveFileTransfers;
+namespace Altinn.Broker.Application.GetFileTransferSummaries;
 
-public class GetActiveFileTransfersHandler(
+public class GetFileTransferSummariesHandler(
     IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
     IActorRepository actorRepository,
     IAltinnRegisterService altinnRegisterService,
-    ILogger<GetActiveFileTransfersHandler> logger) : IHandler<GetActiveFileTransfersRequest, List<FileTransferSummaryEntity>>
+    ILogger<GetFileTransferSummariesHandler> logger) : IHandler<GetFileTransferSummariesRequest, List<FileTransferSummaryEntity>>
 {
-    public async Task<OneOf<List<FileTransferSummaryEntity>, Error>> Process(GetActiveFileTransfersRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
+    private static readonly List<FileTransferStatus> ActiveStatuses = [FileTransferStatus.Published];
+
+    /// <summary>
+    /// A file transfer is historical once it has moved past Published into any of these terminal
+    /// states - mirrors the terminal-state set used to derive the active-detail page's Status field.
+    /// </summary>
+    private static readonly List<FileTransferStatus> HistoricalStatuses =
+    [
+        FileTransferStatus.Cancelled,
+        FileTransferStatus.AllConfirmedDownloaded,
+        FileTransferStatus.Purged,
+        FileTransferStatus.Failed,
+    ];
+
+    public async Task<OneOf<List<FileTransferSummaryEntity>, Error>> Process(GetFileTransferSummariesRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Getting active file transfers across {count} requested resources", request.ResourceIds.Count);
+        logger.LogInformation("Getting {view} file transfers across {count} requested resources", request.View, request.ResourceIds.Count);
 
         string? caller = request.OnBehalfOf != string.Empty ? request.OnBehalfOf : user?.GetCallerOrganizationId();
         if (caller is null)
@@ -37,7 +51,7 @@ public class GetActiveFileTransfersHandler(
         {
             return new List<FileTransferSummaryEntity>();
         }
-        
+
         var authorizedResources = await authorizationService.GetAuthorizedResources(user, caller, request.ResourceIds, cancellationToken);
         var authorizedResourceIds = authorizedResources
             .Where(resource => resource.CanSend || resource.CanReceive)
@@ -49,11 +63,12 @@ public class GetActiveFileTransfersHandler(
             return new List<FileTransferSummaryEntity>();
         }
 
-        var summaries = await fileTransferRepository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity()
+        var statuses = request.View == FileTransferListView.Active ? ActiveStatuses : HistoricalStatuses;
+        var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
             ResourceIds = authorizedResourceIds,
-            Status = FileTransferStatus.Published,
+            Statuses = statuses,
         }, cancellationToken);
 
         var uniqueOrganizationIds = summaries
