@@ -1,48 +1,42 @@
-import { Link, useParams } from 'react-router-dom'
-import { CardLink } from '../components/CardLink'
-import { DetailField } from '../components/DetailField'
-import { getServiceById } from '../data/mockData'
-import { newFileTransferPath, PageRoutes } from './routes'
+import { Alert } from '@altinn/altinn-components'
+import { useParams } from 'react-router-dom'
+import {
+  LoadingServiceDetails,
+  ServiceDetails,
+} from '../components/FileTransferServiceDetailPage/ServiceDetails'
+import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
+import { useParties } from '../parties/PartiesContext'
 import './pages.css'
 
 export function FileTransferServiceDetailPage() {
   const { serviceId = '' } = useParams()
-  const service = getServiceById(serviceId)
+  const { selectedParty } = useParties()
+  const state = useFileTransferService(serviceId, selectedParty?.organizationNumber)
 
-  if (!service) {
-    return <p>Fant ikke formidlingstjenesten.</p>
-  }
-
-  return (
-    <div className="page">
-      <section className="page-section">
-        <h2 className="page-heading">Navn og eier</h2>
-        <CardLink
-          to={PageRoutes.services}
-          title={service.name}
-          description={service.owner}
-          avatarLetter={service.name[0]}
-        />
-      </section>
-
-      {service.canCreate && (
-        <div className="page-actions">
-          <Link to={newFileTransferPath(service.id)} className="button button--secondary">
-            + Opprett ny formidling
-          </Link>
+  switch (state?.status) {
+    case 'loaded':
+      return <ServiceDetails {...state.service} />
+    case 'missing':
+      return (
+        <div className="page">
+          <Alert
+            variant="info"
+            heading="Fant ikke formidlingstjenesten"
+            message={`${selectedParty?.name} har ikke tilgang til denne formidlingstjenesten.`}
+          />
         </div>
-      )}
-
-      {service.lockedVariables && service.lockedVariables.length > 0 && (
-        <section className="page-section">
-          <h2 className="page-heading">Låste variabler for tjenesten</h2>
-          <ul className="detail-list">
-            {service.lockedVariables.map((variable) => (
-              <DetailField key={variable.name} label={variable.name} value={variable.description} />
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
-  )
+      )
+    case 'failed':
+      return (
+        <div className="page">
+          <Alert
+            variant="danger"
+            heading="Kunne ikke hente formidlingstjenesten"
+            message="Prøv igjen senere."
+          />
+        </div>
+      )
+    default:
+      return <LoadingServiceDetails />
+  }
 }

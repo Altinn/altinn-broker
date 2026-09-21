@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import { ApiError } from '../../api/client'
 import { sendFileTransfer } from '../../api/sendFileTransfer'
-import {
-  getResourceConfiguration,
-  resolveMaxFileTransferSize,
-  type ResourceConfiguration,
-} from '../../api/resourceConfiguration'
+import { getResourceConfiguration, type ResourceConfiguration } from '../../api/resourceConfiguration'
 import type { UploadProgress } from '../../api/xhrClient'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import {
@@ -119,7 +115,7 @@ function useFormValues(
     () => resolveRecipientRules(recipients, configuration?.requiredParty ?? null, senderOrgNumber),
     [recipients, configuration, senderOrgNumber],
   )
-  const maxFileSize = configuration ? resolveMaxFileTransferSize(configuration) : null
+  const maxFileSize = configuration?.maxFileTransferSize ?? null
   const requiredParty = rules.requiredParty
   const virusScanLocked = !configuration?.approvedForDisabledVirusScan
   const values = useMemo<NewFileTransferValues>(

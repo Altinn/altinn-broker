@@ -1,0 +1,24 @@
+.service-detail__back {
+  display: flex;
+  margin-inline-start: calc(var(--ds-spacing-3) * -1);
+}
+
+.service-detail__heading {
+  margin-block-end: var(--ds-spacing-4);
+}
+
+ul.service-detail__resource {
+  --dsc-spacing: 0;
+  background: var(--ds-color-background-default);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+ul.service-detail__resource li {
+  --dsc-item-my: 0;
+  --dsc-item-px: 1.5rem;
+  --dsc-item-py: 1rem;
+  background: transparent;
+  border-radius: 0;
+}
