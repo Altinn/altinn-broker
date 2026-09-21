@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileTransferSummary } from '../../api/fileTransferSummary'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../../api/resources'
 import { FileTransferCard } from './FileTransferCard'
@@ -6,6 +6,7 @@ import { FileTransferFilters } from './FileTransferFilters'
 import { FileTransferPagination } from './FileTransferPagination'
 import '../../pages/pages.css'
 import { List } from '@altinn/altinn-components'
+import type { SelectedParty } from '../../parties/PartiesContext'
 
 const PAGE_SIZE = 5
 
@@ -14,8 +15,8 @@ type FileTransferListProps = {
   loadingText: string
   loadErrorText: string
   emptyStateText: string
-  currentOrg: string
-  fetchTransfers: (resourceIds: string[], onBehalfOf: string) => Promise<FileTransferSummary[]>
+  currentOrg: SelectedParty
+  fetchTransfers: (resourceIds: string[], onBehalfOf: SelectedParty) => Promise<FileTransferSummary[]>
   toPath: (transferId: string) => string
 }
 
@@ -34,11 +35,24 @@ export function FileTransferList({
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
   const [page, setPage] = useState(1)
+  const currentOrgRef = useRef(currentOrg.partyUuid)
+  currentOrgRef.current = currentOrg.partyUuid
 
   useEffect(() => {
+    const requestedOrgUuid = currentOrg.partyUuid
+
+    setSearch('')
+    setResourceFilter('')
+    setPage(1)
+    setOverviews(null)
+    setLoadError(false)
+
     async function loadFileTransfers() {
       try {
-        const authorizedResources = await fetchAuthorizedResources(currentOrg)
+        const authorizedResources = await fetchAuthorizedResources(currentOrg.organizationNumber)
+        if (currentOrgRef.current !== requestedOrgUuid) {
+          return
+        }
         setResources(authorizedResources)
 
         const resourceIds = authorizedResources.map((resource) => resource.resourceId)
@@ -46,13 +60,18 @@ export function FileTransferList({
           setOverviews([])
           return
         }
-        setOverviews(await fetchTransfers(resourceIds, currentOrg))
+        const transfers = await fetchTransfers(resourceIds, currentOrg)
+        if (currentOrgRef.current === requestedOrgUuid) {
+          setOverviews(transfers)
+        }
       } catch {
-        setLoadError(true)
+        if (currentOrgRef.current === requestedOrgUuid) {
+          setLoadError(true)
+        }
       }
     }
     void loadFileTransfers()
-  }, [])
+  }, [currentOrg])
 
   const filtered = useMemo(() => {
     if (!overviews) return []
