@@ -10,6 +10,7 @@ import {
 } from '@digdir/designsystemet-react'
 import { useCallback, useEffect, useRef } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
 import { PartyField } from '../components/NewFileTransferPage/PartyField'
 import { RecipientsField } from '../components/NewFileTransferPage/RecipientsField'
@@ -26,7 +27,7 @@ import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNew
 import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
-import { servicePath } from './routes'
+import { activeTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
@@ -36,9 +37,13 @@ export function NewFileTransferPage() {
   const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
 
-  const onSent = useCallback(() => {
-    navigate(servicePath(serviceId), { replace: true })
-  }, [navigate, serviceId])
+  const onSent = useCallback(
+    (fileTransferId: string) => {
+      toast.success('Formidlingen er sendt, og filen er lastet opp.')
+      navigate(activeTransferPath(fileTransferId), { replace: true })
+    },
+    [navigate],
+  )
 
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, onSent })
   const { errors, setValue, submitAttempts, values } = form
