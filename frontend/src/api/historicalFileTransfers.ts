@@ -1,3 +1,4 @@
+import type { SelectedParty } from '../parties/PartiesContext'
 import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
 import type { FileTransferSummary } from './fileTransferSummary'
@@ -11,11 +12,11 @@ const HISTORICAL_FILETRANSFERS_PATH = `${BROKER_API_PREFIX}/frontend/historical-
  */
 export function getHistoricalFileTransfers(
   resourceIds: string[],
-  onBehalfOf?: string,
+  onBehalfOf?: SelectedParty,
 ): Promise<FileTransferSummary[]> {
   const params = new URLSearchParams()
   resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
-  if (onBehalfOf) params.set('onBehalfOf', onBehalfOf)
+  if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
   return apiFetch<FileTransferSummary[]>(`${HISTORICAL_FILETRANSFERS_PATH}?${params}`, {
     redirectOnUnauthorized: false,
   })

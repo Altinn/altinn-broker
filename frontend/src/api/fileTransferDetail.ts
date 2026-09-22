@@ -1,3 +1,4 @@
+import type { SelectedParty } from '../parties/PartiesContext'
 import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
 
@@ -31,10 +32,10 @@ export type FileTransferDetails = {
 
 export function getFileTransferDetails(
     fileTransferId: string,
-    onBehalfOf?: string,
+    onBehalfOf?: SelectedParty,
 ): Promise<FileTransferDetails> {
     const params = new URLSearchParams()
-    if (onBehalfOf) params.set('onBehalfOf', onBehalfOf)
+    if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
     return apiFetch<FileTransferDetails>(
         ACTIVE_FILETRANSFER_DETAILS_PATH.replace('{fileTransferId}', fileTransferId) + `?${params.toString()}`,
         { redirectOnUnauthorized: false },

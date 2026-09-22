@@ -28,7 +28,8 @@ type Options = {
 }
 
 type LoadedResource = {
-  resourceId: string
+  /** The sender and resource the content belongs to. */
+  key: string
   configuration: ResourceConfiguration | null
   recipients: AllowedRecipient[]
   error: string
@@ -65,17 +66,23 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber, onSent }: 
 /** What the resource allows, and who may receive on it. */
 function useResourceContext(resourceId: string, senderOrgNumber: string) {
   const [loaded, setLoaded] = useState<LoadedResource | null>(null)
+  // Allowed recipients depend on the sender, so both identify what was loaded.
+  const key = `${senderOrgNumber}:${resourceId}`
 
   useEffect(() => {
+    if (!senderOrgNumber) {
+      return
+    }
+
     let cancelled = false
 
     Promise.all([
       getResourceConfiguration(resourceId),
       getAllowedRecipients(resourceId, senderOrgNumber),
     ])
-      .then(([configuration, recipients]) => ({ resourceId, configuration, recipients, error: '' }))
+      .then(([configuration, recipients]) => ({ key, configuration, recipients, error: '' }))
       .catch(() => ({
-        resourceId,
+        key,
         configuration: null,
         recipients: [],
         error: 'Kunne ikke hente oppsettet for tjenesten. Prøv å laste siden på nytt.',
@@ -89,10 +96,10 @@ function useResourceContext(resourceId: string, senderOrgNumber: string) {
     return () => {
       cancelled = true
     }
-  }, [resourceId, senderOrgNumber])
+  }, [key, resourceId, senderOrgNumber])
 
-  // Anything loaded for another resource belongs to a previous route, so it counts as not loaded.
-  const resource = loaded?.resourceId === resourceId ? loaded : null
+  // Anything loaded for another resource or party belongs to a previous route, so it counts as not loaded.
+  const resource = loaded?.key === key ? loaded : null
   const recipients = useMemo(() => resource?.recipients ?? [], [resource])
 
   return {

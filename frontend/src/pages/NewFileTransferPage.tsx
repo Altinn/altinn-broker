@@ -25,16 +25,16 @@ import {
 import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
 import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNewFileTransferForm'
 import '../components/NewFileTransferPage/newFileTransferPage.css'
-import { currentOrganization, getServiceById } from '../data/mockData'
-import { toOrgNumber } from '../helpers/orgIdentifierHelper'
+import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
+import { useParties } from '../parties/PartiesContext'
 import { activeTransferPath, servicePath } from './routes'
-
-const senderOrgNumber = toOrgNumber(currentOrganization.orgNumber) ?? ''
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
-  const service = getServiceById(serviceId)
+  const { status: partiesStatus, selectedParty } = useParties()
+  const senderOrgNumber = selectedParty?.organizationNumber ?? ''
+  const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
 
   const onSent = useCallback(
@@ -54,13 +54,31 @@ export function NewFileTransferPage() {
     }
   }, [submitAttempts])
 
-  if (!service) {
+  if (partiesStatus === 'failed') {
+    return <p>Klarte ikke å hente aktører.</p>
+  }
+
+  if (partiesStatus === 'loaded' && !selectedParty) {
+    return <p>Du kan ikke representere noen virksomheter i BrokerBox.</p>
+  }
+
+  if (serviceState === null) {
+    return <Spinner aria-label="Henter formidlingstjenesten" />
+  }
+
+  if (serviceState.status === 'failed') {
+    return <p>Klarte ikke å hente formidlingstjenesten.</p>
+  }
+
+  if (serviceState.status === 'missing') {
     return <p>Fant ikke formidlingstjenesten.</p>
   }
 
+  const service = serviceState.service.resource
+
   const cancel = () => {
     form.abort()
-    navigate(servicePath(service.id))
+    navigate(servicePath(service.resourceId))
   }
 
   const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
@@ -76,14 +94,14 @@ export function NewFileTransferPage() {
       color="company"
       backButton={{
         label: 'Tilbake',
-        as: (props: LinkProps) => <Link {...props} to={servicePath(service.id)} />,
+        as: (props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />,
       }}
     >
       <header className="new-transfer__header">
         <Heading level={2} data-size="md">
           Ny formidling
         </Heading>
-        <Paragraph data-size="sm">{service.name}</Paragraph>
+        <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
       </header>
 
       {form.loading ? (
@@ -103,7 +121,7 @@ export function NewFileTransferPage() {
             <PartyField
               label="Avsender"
               description="Du formidler på vegne av denne organisasjonen."
-              name={currentOrganization.name}
+              name={selectedParty?.name ?? ''}
               organizationNumber={senderOrgNumber}
             />
 
