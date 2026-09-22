@@ -22,7 +22,7 @@ All three clients share the same environment variables and defaults:
 | `RESOURCE_ID` | yes | — |
 | `ORG_NO` | yes | — |
 | `BASE_URL` | no | `https://platform.tt02.altinn.no` |
-| `CHUNK_SIZE_MB` | no | `8` |
+| `CHUNK_SIZE_MB` | no | `8` (server max is 100 MiB via `TusOptions:MaxChunkSizeBytes`) |
 | `TUS_PARALLEL_PARTIAL_UPLOADS` | no | `4` |
 | `GIGABYTES_TO_UPLOAD` | no | **64 MiB** smoke-test size when unset |
 | `UPLOAD_FILE_PATH` | no | — (use with `generate-file.ps1`; ignores `GIGABYTES_TO_UPLOAD`) |
