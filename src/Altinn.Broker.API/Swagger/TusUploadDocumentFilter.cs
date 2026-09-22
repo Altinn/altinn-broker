@@ -149,6 +149,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Description = BuildDescription(
             "Appends a chunk of file data at the offset given in the <c>Upload-Offset</c> request header. " +
             "Repeat until the server offset equals <c>Upload-Length</c>. " +
+            "Each chunk must not exceed the configured maximum (default 100 MiB / 104857600 bytes; <c>TusOptions:MaxChunkSizeBytes</c>). " +
             "On completion the file is finalized and the file transfer status is updated. " +
             "For concatenation partial uploads, use the two-segment partial URL instead."),
         OperationId = "TusUploadPatch",
@@ -212,6 +213,7 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Summary = "Upload the next chunk to a partial upload",
         Description = BuildDescription(
             "Appends a chunk to a concatenation partial upload at the offset given in the <c>Upload-Offset</c> request header. " +
+            "Each chunk must not exceed the configured maximum (default 100 MiB / 104857600 bytes; <c>TusOptions:MaxChunkSizeBytes</c>). " +
             "Repeat until the server offset equals the partial <c>Upload-Length</c>."),
         OperationId = "TusPartialUploadPatch",
         Parameters =
