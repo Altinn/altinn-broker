@@ -303,16 +303,23 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
         bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
 
+        bool hasSenderStatusFilter = fileTransferSearch.SenderStatuses is { Count: > 0 };
+        bool hasRecipientStatusFilter = fileTransferSearch.RecipientStatuses is { Count: > 0 };
+
         var actorConditions = new List<string>();
-        if (includeSender) actorConditions.Add("f.sender_actor_id_fk = @actorId");
-        if (includeRecipient) actorConditions.Add("EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId)");
+        if (includeSender)
+        {
+            string senderStatusCondition = hasSenderStatusFilter ? " AND f.latest_file_status_id = ANY(@senderStatuses)" : "";
+            actorConditions.Add($"(f.sender_actor_id_fk = @actorId{senderStatusCondition})");
+        }
+        if (includeRecipient)
+        {
+            string recipientStatusCondition = hasRecipientStatusFilter ? " AND f.latest_file_status_id = ANY(@recipientStatuses)" : "";
+            actorConditions.Add($"(EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId){recipientStatusCondition})");
+        }
         string actorCondition = string.Join(" OR ", actorConditions);
 
-        bool hasStatusFilter = fileTransferSearch.Statuses is { Count: > 0 };
-
-        string statusCondition = hasStatusFilter
-            ? "AND f.latest_file_status_id = ANY(@fileTransferStatuses)"
-            : "";
+        bool hasStatusFilter = hasSenderStatusFilter || hasRecipientStatusFilter;
 
         string timestampColumn = hasStatusFilter
             ? "f.latest_file_status_date"
@@ -350,7 +357,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
                 WHERE f.resource_id = ANY(@resourceIds)
                 AND ({actorCondition})
-                {statusCondition}
                 {dateCondition}
                 ORDER BY sort_date {orderDirection}
                 LIMIT 100
@@ -369,8 +375,10 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
-        if (hasStatusFilter)
-            command.Parameters.AddWithValue("@fileTransferStatuses", fileTransferSearch.Statuses!.Select(status => (int)status).ToArray());
+        if (hasSenderStatusFilter)
+            command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
+        if (hasRecipientStatusFilter)
+            command.Parameters.AddWithValue("@recipientStatuses", fileTransferSearch.RecipientStatuses!.Select(status => (int)status).ToArray());
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);
         if (fileTransferSearch.To.HasValue)
@@ -386,11 +394,13 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
                 if (!summaries.TryGetValue(fileTransferId, out var summary))
                 {
+                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
                     summary = new FileTransferSummaryEntity()
                     {
                         FileTransferId = fileTransferId,
                         ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
-                        Sender = reader.GetString(reader.GetOrdinal("sender_actor_external_id")),
+                        Sender = senderActorExternalId,
+                        IsSender = senderActorExternalId == fileTransferSearch.Actor.ActorExternalId,
                         SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
                         Recipients = new List<string>()
                     };

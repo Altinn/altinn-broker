@@ -5,7 +5,12 @@ namespace Altinn.Broker.Core.Domain;
 public class FrontendFileTransferSearchEntity
 {
     public required ActorEntity Actor { get; set; }
-    public List<FileTransferStatus>? Statuses { get; set; }
+
+    /// <summary>Statuses to match when a file transfer matched the actor as its sender. Null/empty means no filter.</summary>
+    public List<FileTransferStatus>? SenderStatuses { get; set; }
+
+    /// <summary>Statuses to match when a file transfer matched the actor as a recipient. Null/empty means no filter.</summary>
+    public List<FileTransferStatus>? RecipientStatuses { get; set; }
     public ActorFileTransferStatus? RecipientStatus { get; set; }
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
