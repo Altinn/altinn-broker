@@ -15,6 +15,41 @@
   min-width: 0;
 }
 
+.file-transfer-card__heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.file-transfer-card__party {
+  margin-top: 0.15rem;
+}
+
+.file-transfer-card__counterparty-extra {
+  margin-left: 0.25em;
+  color: #68707c;
+  font-style: italic;
+}
+
+.file-transfer-card__reference {
+  color: #545c7a;
+}
+
+.ds-tooltip {
+  white-space: pre-line;
+  background-color: lightgray;
+  color: black;
+}
+
+/* This page also loads @digdir/designsystemet-react's Pagination/Search, which pull in
+   their own independent copy of the same [data-tooltip] engine @altinn/altinn-components
+   already bundles - both react to the same trigger and each append their own .ds-tooltip
+   popover to <body>, so only keep whichever one was appended first. */
+.ds-tooltip ~ .ds-tooltip {
+  display: none !important;
+}
+
 .file-transfer-card__chevron {
   display: inline-flex;
   align-items: center;
