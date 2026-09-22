@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FileTransferDetails } from '../../api/fileTransferDetail'
+import type { SelectedParty } from '../../parties/PartiesContext'
 import { confirmFileTransferDownload } from '../../api/confirmFileTransferDownload'
 import { getFileTransferDownloadUrl } from '../../api/downloadFileTransfer'
 
@@ -7,7 +8,7 @@ const REFRESH_AFTER_DOWNLOAD_START_DELAY_MS = 1500
 
 type FileTransferActionsProps = {
   transferDetails: FileTransferDetails
-  onBehalfOf?: string
+  onBehalfOf?: SelectedParty
   onDownloadConfirmed?: () => void
   onDownloadStarted?: () => void
 }
