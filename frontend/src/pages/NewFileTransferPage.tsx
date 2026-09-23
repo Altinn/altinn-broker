@@ -24,6 +24,7 @@ import {
 import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
 import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNewFileTransferForm'
 import '../components/NewFileTransferPage/newFileTransferPage.css'
+import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
@@ -70,6 +71,15 @@ export function NewFileTransferPage() {
   }
 
   const service = serviceState.service.resource
+
+  // Reachable by url even when the service detail page withholds the action.
+  if (serviceState.service.allowedRecipients.length === 0) {
+    return (
+      <div className="page">
+        <NoRecipientsNotice />
+      </div>
+    )
+  }
 
   const cancel = () => {
     form.abort()
