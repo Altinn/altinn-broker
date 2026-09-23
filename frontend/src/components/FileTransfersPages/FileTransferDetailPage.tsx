@@ -21,6 +21,8 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
   const [loadError, setLoadError] = useState(false)
   const transferIdRef = useRef(transferId)
   transferIdRef.current = transferId
+  const selectedPartyUuidRef = useRef(selectedParty?.partyUuid)
+  selectedPartyUuidRef.current = selectedParty?.partyUuid
   const previousPartyUuidRef = useRef(selectedParty?.partyUuid)
 
   async function loadTransferDetails() {
@@ -28,15 +30,16 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
       return
     }
     const requestedTransferId = transferId
+    const requestedPartyUuidRef = selectedParty?.partyUuid
     try {
       const transferDetails = await getFileTransferDetails(requestedTransferId, selectedParty)
-      if (transferIdRef.current === requestedTransferId) {
+      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuidRef) {
         setTransferDetails(transferDetails)
         setLoadError(false)
       }
     } catch (error) {
       console.error('Error fetching transfer details:', error)
-      if (transferIdRef.current === requestedTransferId) {
+      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuidRef) {
         setLoadError(true)
       }
     }
