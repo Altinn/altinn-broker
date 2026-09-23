@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Slide, ToastContainer } from 'react-toastify'
 import { RequireAuth } from './auth/RequireAuth'
 import { ActiveFileTransferDetailPage } from './pages/ActiveFileTransferDetailPage'
 import { ActiveFileTransfersPage } from './pages/ActiveFileTransfersPage'
@@ -11,12 +12,15 @@ import { HistoricalFileTransfersPage } from './pages/HistoricalFileTransfersPage
 import { NewFileTransferPage } from './pages/NewFileTransferPage'
 import { PartiesProvider } from './parties/PartiesContext'
 import { PageRoutes } from './pages/routes'
+import 'react-toastify/dist/ReactToastify.css'
+import './toast.css'
 import './App.css'
 
 function App() {
   return (
     <RequireAuth>
       <PartiesProvider>
+        <ToastContainer position="top-center" theme="colored" transition={Slide} draggable={false} />
         <Routes>
           <Route path="/" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
           <Route element={<FileTransfersLayout />}>
