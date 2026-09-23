@@ -41,6 +41,7 @@ public class BrokerTusStore(
     private readonly ConcurrentDictionary<string, string> _uploadMetadata = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
     private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
+    private readonly long _maxChunkSizeBytes = ResolveMaxChunkSizeBytes(tusOptions.Value.MaxChunkSizeBytes);
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
@@ -51,17 +52,14 @@ public class BrokerTusStore(
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
         timing.Step("getOrCreateUploadState");
 
+        RejectOversizedChunkContentLength(fileId);
+
         using var chunkBuffer = new MemoryStream();
-        await stream.CopyToAsync(chunkBuffer, cancellationToken);
+        await CopyChunkToBufferAsync(fileId, stream, chunkBuffer, cancellationToken);
         timing.Step("readRequestBody", chunkBuffer.Length);
         if (chunkBuffer.Length == 0)
         {
             return 0;
-        }
-
-        if (chunkBuffer.Length > int.MaxValue)
-        {
-            throw new TusStoreException($"TUS chunk size exceeds maximum supported size for file id {fileId}.");
         }
 
         var chunk = chunkBuffer.ToArray();
@@ -160,6 +158,50 @@ public class BrokerTusStore(
 
         return chunkLength;
     }
+
+    private void RejectOversizedChunkContentLength(string fileId)
+    {
+        var contentLength = httpContextAccessor.HttpContext?.Request.ContentLength;
+        if (contentLength is > 0 && contentLength.Value > _maxChunkSizeBytes)
+        {
+            throw CreateChunkTooLargeException(fileId, contentLength.Value);
+        }
+    }
+
+    private async Task CopyChunkToBufferAsync(
+        string fileId,
+        Stream source,
+        MemoryStream destination,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long totalRead = 0;
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            totalRead += bytesRead;
+            if (totalRead > _maxChunkSizeBytes)
+            {
+                throw CreateChunkTooLargeException(fileId, totalRead);
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+        }
+    }
+
+    private TusStoreException CreateChunkTooLargeException(string fileId, long actualBytes)
+        => new(
+            $"TUS chunk size {actualBytes} bytes exceeds maximum allowed size of {_maxChunkSizeBytes} bytes for file id {fileId}.");
+
+    private static long ResolveMaxChunkSizeBytes(long configuredMaxChunkSizeBytes)
+        => configuredMaxChunkSizeBytes > 0
+            ? configuredMaxChunkSizeBytes
+            : TusOptions.DefaultMaxChunkSizeBytes;
 
     private async Task LogUploadCompletionProbeAsync(
         string fileId,
