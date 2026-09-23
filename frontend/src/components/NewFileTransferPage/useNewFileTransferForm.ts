@@ -24,7 +24,7 @@ import { resolveRecipientRules } from './recipientRules'
 type Options = {
   resourceId: string
   senderOrgNumber: string
-  onSent: () => void
+  onSent: (fileTransferId: string) => void
 }
 
 type LoadedResource = {
@@ -198,7 +198,7 @@ function useSubmission({
       // Only needed if the upload half fails: the transfer exists by then and can be followed up.
       let fileTransferId = ''
       try {
-        await sendFileTransfer(
+        const sentFileTransferId = await sendFileTransfer(
           {
             resourceId,
             sender: senderOrgNumber,
@@ -216,7 +216,7 @@ function useSubmission({
             signal,
           },
         )
-        onSent()
+        onSent(sentFileTransferId)
       } catch (error) {
         if (!isAbortError(error)) {
           setSubmitError(describeError(error, fileTransferId))
