@@ -21,7 +21,8 @@ public class GetFileTransferSummariesHandler(
     IAltinnRegisterService altinnRegisterService,
     ILogger<GetFileTransferSummariesHandler> logger) : IHandler<GetFileTransferSummariesRequest, List<FileTransferSummaryEntity>>
 {
-    private static readonly List<FileTransferStatus> ActiveStatuses = [FileTransferStatus.Published];
+    private static readonly List<FileTransferStatus> ActiveSenderStatuses = [FileTransferStatus.UploadProcessing, FileTransferStatus.Published];
+    private static readonly List<FileTransferStatus> ActiveRecipientStatuses = [FileTransferStatus.Published];
 
     /// <summary>
     /// A file transfer is historical once it has moved past Published into any of these terminal
@@ -63,12 +64,14 @@ public class GetFileTransferSummariesHandler(
             return new List<FileTransferSummaryEntity>();
         }
 
-        var statuses = request.View == FileTransferListView.Active ? ActiveStatuses : HistoricalStatuses;
+        var senderStatuses = request.View == FileTransferListView.Active ? ActiveSenderStatuses : HistoricalStatuses;
+        var recipientStatuses = request.View == FileTransferListView.Active ? ActiveRecipientStatuses : HistoricalStatuses;
         var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
             ResourceIds = authorizedResourceIds,
-            Statuses = statuses,
+            SenderStatuses = senderStatuses,
+            RecipientStatuses = recipientStatuses,
         }, cancellationToken);
 
         var uniqueOrganizationIds = summaries

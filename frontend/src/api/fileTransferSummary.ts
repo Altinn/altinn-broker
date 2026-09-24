@@ -4,5 +4,6 @@ export type FileTransferSummary = {
   resourceId: string
   sendersFileTransferReference: string
   sender: string
+  isSender: boolean
   recipients: string[]
 }

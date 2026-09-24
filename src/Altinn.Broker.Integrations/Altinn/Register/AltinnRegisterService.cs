@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 
 using Altinn.Broker.Application;
+using Altinn.Broker.Common;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
@@ -125,9 +126,10 @@ public class AltinnRegisterService : IAltinnRegisterService
 
     public async Task<string?> LookupOrganizationName(string organizationId, CancellationToken cancellationToken = default)
     {
+        var organizationNumber = organizationId.WithoutPrefix();
         try
         {
-            return (await LookupPartyByOrganizationNumber(organizationId, cancellationToken))?.Name;
+            return (await LookupPartyByOrganizationNumber(organizationNumber, cancellationToken))?.Name;
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
