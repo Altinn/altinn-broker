@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { FileTransferDetailList } from './FileTransferDetailList'
 import { FileTransferActions } from './FileTransferActions'
 import { getFileTransferDetails, type FileTransferDetails } from '../../api/fileTransferDetail'
+import { ApiError } from '../../api/client'
 import { useParties } from '../../parties/PartiesContext'
+import { SelectedPartyMessage } from '../../parties/SelectedPartyMessage'
 import '../../pages/pages.css'
 
 type FileTransferDetailPageProps = {
@@ -17,7 +19,7 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
   const { selectedParty } = useParties()
   const navigate = useNavigate()
   const [transferDetails, setTransferDetails] = useState<FileTransferDetails | null>(null)
-  const [loadError, setLoadError] = useState(false)
+  const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null)
   const transferIdRef = useRef(transferId)
   transferIdRef.current = transferId
   const selectedPartyUuidRef = useRef(selectedParty?.partyUuid)
@@ -34,12 +36,13 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
       const transferDetails = await getFileTransferDetails(requestedTransferId, selectedParty)
       if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuid) {
         setTransferDetails(transferDetails)
-        setLoadError(false)
+        setLoadError(null)
       }
     } catch (error) {
       console.error('Error fetching transfer details:', error)
       if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuid) {
-        setLoadError(true)
+        // Only a 404 means the transfer is gone. Anything else is worth retrying.
+        setLoadError(error instanceof ApiError && error.status === 404 ? 'missing' : 'failed')
       }
     }
   }
@@ -63,11 +66,17 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
   }
 
   if (!selectedParty) {
-    return <p>Ingen aktør valgt.</p>
+    return <SelectedPartyMessage loadingText="Laster formidlingen …" />
   }
 
-  if (loadError) {
-    return <p>Fant ikke formidlingen.</p>
+  if (loadError === 'missing') {
+    return <p className="empty-state">Fant ikke formidlingen.</p>
+  }
+
+  if (loadError === 'failed') {
+    return (
+      <p className="empty-state">Klarte ikke å hente formidlingen. Prøv igjen senere.</p>
+    )
   }
 
   if (!transferDetails) {
@@ -87,7 +96,7 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
         <List className="service-owner-list">
           <ListItem
             className="service-owner-list-item"
-            icon={{ name: transferDetails.serviceOwner ?? 'serviceOwner', type: 'company' }}
+            icon={{ name: transferDetails.serviceOwner ?? transferDetails.resourceName ?? '', type: 'company' }}
             title={transferDetails.resourceName}
             interactive={false}
             description={transferDetails.serviceOwner}
