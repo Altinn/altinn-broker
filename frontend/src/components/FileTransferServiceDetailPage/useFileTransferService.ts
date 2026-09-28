@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import { getResourceConfiguration, type ResourceConfiguration } from '../../api/resourceConfiguration'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../../api/resources'
 
 export type FileTransferService = {
   resource: AuthorizedResource
   configuration: ResourceConfiguration
+  /** Empty means no one may receive on the resource, so no file transfer can be created. */
+  allowedRecipients: AllowedRecipient[]
 }
 
 export type FileTransferServiceState =
@@ -45,13 +48,16 @@ export function useFileTransferService(
 
 async function loadService(resourceId: string, party: string): Promise<FileTransferServiceState> {
   try {
-    const [resources, configuration] = await Promise.all([
+    const [resources, configuration, allowedRecipients] = await Promise.all([
       fetchAuthorizedResources(party),
       getResourceConfiguration(resourceId),
+      getAllowedRecipients(resourceId, party),
     ])
 
     const resource = resources.find((candidate) => candidate.resourceId === resourceId)
-    return resource ? { status: 'loaded', service: { resource, configuration } } : { status: 'missing' }
+    return resource
+      ? { status: 'loaded', service: { resource, configuration, allowedRecipients } }
+      : { status: 'missing' }
   } catch {
     return { status: 'failed' }
   }

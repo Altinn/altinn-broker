@@ -12,6 +12,8 @@ from generate_file import create_upload_file
 DEFAULT_CHUNK_SIZE_MB = 8
 DEFAULT_PARALLEL_UPLOADS = 4
 DEFAULT_UPLOAD_MIB = 64
+# Broker rejects TUS PATCH bodies larger than this (TusOptions:MaxChunkSizeBytes).
+BROKER_MAX_CHUNK_SIZE_BYTES = 100 * 1024 * 1024
 
 
 def read_env(name: str, fallback: str | None) -> str | None:
@@ -38,6 +40,51 @@ def format_mib(bytes_value: int | float) -> str:
 
 def log_upload_size(upload_bytes: int) -> None:
     print(f"Upload size: {format_gib(upload_bytes)} GiB ({format_mib(upload_bytes)} MiB)")
+
+
+def validate_python_parallel_limits(
+    *,
+    upload_bytes: int,
+    parallel_uploads: int,
+    chunk_size: int,
+) -> None:
+    """Fail fast for tus-py-client parallel mode constraints.
+
+    In parallel mode, tus-py-client ignores chunk_size and PATCHes each entire
+    partial in one request. Broker caps PATCH bodies at ~100 MiB, so each part
+    must be <= that. Raising parallel_uploads to shrink parts can then make the
+    final Upload-Concat header too long for platform proxies (~16 KiB).
+    """
+    if parallel_uploads <= 1:
+        if chunk_size > BROKER_MAX_CHUNK_SIZE_BYTES:
+            raise RuntimeError(
+                f"CHUNK_SIZE_MB exceeds Broker max TUS chunk size "
+                f"({BROKER_MAX_CHUNK_SIZE_BYTES // (1024 * 1024)} MiB)."
+            )
+        return
+
+    part_size = (upload_bytes + parallel_uploads - 1) // parallel_uploads
+    if part_size > BROKER_MAX_CHUNK_SIZE_BYTES:
+        min_partials = (
+            upload_bytes + BROKER_MAX_CHUNK_SIZE_BYTES - 1
+        ) // BROKER_MAX_CHUNK_SIZE_BYTES
+        raise RuntimeError(
+            "tus-py-client parallel mode ignores CHUNK_SIZE_MB and uploads each "
+            f"partial as a single PATCH (~{format_mib(part_size)} MiB with "
+            f"{parallel_uploads} partials). Broker rejects chunks over "
+            f"{BROKER_MAX_CHUNK_SIZE_BYTES // (1024 * 1024)} MiB.\n"
+            f"Use at least TUS_PARALLEL_PARTIAL_UPLOADS={min_partials}, or set "
+            "TUS_PARALLEL_PARTIAL_UPLOADS=1 (chunked single-stream), or use the "
+            ".NET/JavaScript harnesses which chunk inside each partial.\n"
+            "Note: very high parallel counts can hit HTTP 400 "
+            "'Header Field Too Long' on the final Upload-Concat POST."
+        )
+
+    print(
+        "Note: tus-py-client parallel mode ignores CHUNK_SIZE_MB; "
+        f"each of {parallel_uploads} partials is one PATCH "
+        f"(~{format_mib(part_size)} MiB)."
+    )
 
 
 def upload_with_tus_py_client(
@@ -152,6 +199,12 @@ def main() -> None:
         print(f"UPLOAD_FILE_PATH: {file_path}")
     else:
         print(f"Temporary upload file: {file_path}")
+
+    validate_python_parallel_limits(
+        upload_bytes=upload_bytes,
+        parallel_uploads=parallel_uploads,
+        chunk_size=chunk_size,
+    )
 
     try:
         upload_with_tus_py_client(
