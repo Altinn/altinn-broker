@@ -45,10 +45,11 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
 
   useEffect(() => {
     setDisplayed(configuration)
-    if (!editing) {
-      setDraft(toDraft(configuration))
-    }
-  }, [configuration, editing])
+    setDraft(toDraft(configuration))
+    setEditing(false)
+    setErrors({})
+    setSaveError(null)
+  }, [configuration])
 
   const setEditingEnabled = useCallback(
     (enabled: boolean) => {

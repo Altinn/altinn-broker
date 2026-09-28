@@ -43,8 +43,8 @@ export function ResourceConfigurationList({
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
   const publishNotice = canPublish ? null : publishAccessNotice(resourceId)
   const partyOptions = useMemo(
-    () => buildRequiredPartyOptions(sender, recipients, configuration.requiredParty),
-    [sender, recipients, configuration.requiredParty],
+    () => buildRequiredPartyOptions(sender, recipients, editor.configuration.requiredParty),
+    [sender, recipients, editor.configuration.requiredParty],
   )
 
   return (
