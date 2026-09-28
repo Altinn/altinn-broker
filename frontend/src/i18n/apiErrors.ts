@@ -2,9 +2,13 @@
  * Localized messages for Broker API error codes shown in the SPA.
  * Keys match the numeric `errorCode` extension on ProblemDetails responses.
  */
+const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'ttd-brokerbox-utvikling'
+
 const nbMessages: Record<number, (context: ApiErrorMessageContext) => string> = {
   36: () =>
-    'Du må ha en rolle eller tilgangspakke som gir tilgangsrettigheten «publish» for denne tjenesten.',
+    `Du må ha en rolle eller tilgangspakke som gir tilgangsrettigheten «publish» på tjenesten ${BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID} for den valgte virksomheten.`,
+  37: () => 'Virksomheten er ikke satt opp som tjenesteeier i Broker.',
+  38: () => 'Du kan bare endre oppsett for tjenester som eies av virksomheten du representerer.',
 }
 
 export type ApiErrorMessageContext = {
@@ -24,12 +28,12 @@ export function tjenesteoversiktenResourceUrl(resourceId: string): string {
   return `https://tjenesteoversikten.no/resource/${encodeURIComponent(resourceId)}`
 }
 
-/** Notice shown when the user lacks publish access to configure a resource. */
-export function publishAccessNotice(resourceId: string): LocalizedApiError {
+/** Notice shown when the user lacks publish access to configure Broker resources. */
+export function publishAccessNotice(_resourceId?: string): LocalizedApiError {
   return {
     errorCode: 36,
-    message: nbMessages[36]({ resourceId }),
-    linkHref: tjenesteoversiktenResourceUrl(resourceId),
+    message: nbMessages[36]({}),
+    linkHref: tjenesteoversiktenResourceUrl(BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID),
     linkLabel: 'Se tilgangsrettigheter på tjenesteoversikten.no',
   }
 }
@@ -47,7 +51,7 @@ export function localizeApiError(
   const detail = readDetail(body)
   const messages = locale === 'nb' ? nbMessages : nbMessages
 
-  if (errorCode === 36 && context.resourceId) {
+  if (errorCode === 36) {
     return publishAccessNotice(context.resourceId)
   }
 
@@ -72,7 +76,7 @@ function readErrorCode(body: unknown): number | undefined {
   const record = body as Record<string, unknown>
   const direct = record.errorCode
   if (typeof direct === 'number' && Number.isFinite(direct)) {
-    return direct
+    return Number(direct)
   }
   if (typeof direct === 'string' && /^\d+$/.test(direct)) {
     return Number(direct)

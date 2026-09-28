@@ -38,7 +38,9 @@ public class AuthorizedResourceExt
     public bool CanReceive { get; set; }
 
     /// <summary>
-    /// The user has the <c>publish</c> action on the resource for the party, and may configure it
+    /// The party is a Broker service owner and the user has <c>publish</c> on
+    /// <c>ttd-brokerbox-utvikling</c> for that party, so they may configure this resource
+    /// (when it is owned by the party).
     /// </summary>
     [JsonPropertyName("canPublish")]
     public bool CanPublish { get; set; }

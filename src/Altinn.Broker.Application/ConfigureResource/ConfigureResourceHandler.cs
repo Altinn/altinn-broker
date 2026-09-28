@@ -39,12 +39,19 @@ public class ConfigureResourceHandler(
             }
         }
 
+        var onBehalfOfParty = request.OnBehalfOf?.WithoutPrefix();
+
         if (existingResource is null)
         {
             var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
             if (altinnResource is null || string.IsNullOrWhiteSpace(altinnResource.ServiceOwnerId))
             {
                 return Errors.InvalidResourceDefinition;
+            }
+            if (isIdportenToken
+                && altinnResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
+            {
+                return Errors.ResourceNotOwnedByParty;
             }
             if (!isIdportenToken
                 && altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
@@ -56,6 +63,11 @@ public class ConfigureResourceHandler(
                 return Errors.ServiceOwnerHasNotBeenConfigured;
             }
             altinnResourceToCreate = altinnResource;
+        }
+        else if (isIdportenToken
+            && existingResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
+        {
+            return Errors.ResourceNotOwnedByParty;
         }
         else if (!isIdportenToken
             && existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
@@ -138,14 +150,25 @@ public class ConfigureResourceHandler(
             return Errors.MissingOnBehalfOf;
         }
 
+        var party = request.OnBehalfOf.WithoutPrefix();
+        if (!party.IsOrganizationNumber())
+        {
+            return Errors.InvalidParty;
+        }
+
+        if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
+        {
+            return Errors.PartyIsNotBrokerServiceOwner;
+        }
+
         var hasAccess = await authorizationService.CheckAccessAsPublisher(
             user,
-            request.ResourceId,
-            request.OnBehalfOf,
+            ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+            party,
             cancellationToken);
         if (!hasAccess)
         {
-            return Errors.NoPublishAccessToResource(request.ResourceId);
+            return Errors.NoPublishAccessToConfigureResource;
         }
 
         return null;

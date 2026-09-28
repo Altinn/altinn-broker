@@ -11,7 +11,7 @@ export type AuthorizedResource = {
   serviceOwnerName: string | null
   canSend: boolean
   canReceive: boolean
-  /** The user has the publish action and may configure the resource. */
+  /** Party is a Broker service owner and the user has publish on ttd-brokerbox-utvikling for that party. */
   canPublish: boolean
 }
 

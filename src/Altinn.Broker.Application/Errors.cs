@@ -1,4 +1,6 @@
-using System.Net;
+﻿using System.Net;
+
+using Altinn.Broker.Application.Settings;
 
 namespace Altinn.Broker.Application;
 
@@ -43,16 +45,22 @@ public static class Errors
     public static Error AuthorizedPartiesUnavailable = new Error(35, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
 
     /// <summary>
-    /// Returned when an ID-porten caller lacks the <c>publish</c> action on the resource policy.
+    /// Returned when an ID-porten caller lacks publish on the BrokerBox configuration gatekeeper resource.
     /// </summary>
-    public static Error NoPublishAccessToResource(string resourceId)
-    {
-        var overviewUrl = $"https://tjenesteoversikten.no/resource/{Uri.EscapeDataString(resourceId)}";
-        return new Error(
-            36,
-            $"You must have a role or access package that grants the \"publish\" access right (tilgangsrettighet) for this resource. See access rights at: {overviewUrl}",
-            HttpStatusCode.Forbidden);
-    }
+    public static Error NoPublishAccessToConfigureResource = new Error(
+        36,
+        $"You must have a role or access package that grants the \"publish\" access right (tilgangsrettighet) on the resource \"{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}\" for the selected organization. See access rights at: https://tjenesteoversikten.no/resource/{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}",
+        HttpStatusCode.Forbidden);
+
+    public static Error PartyIsNotBrokerServiceOwner = new Error(
+        37,
+        "The selected party is not configured as a Broker service owner.",
+        HttpStatusCode.Forbidden);
+
+    public static Error ResourceNotOwnedByParty = new Error(
+        38,
+        "You can only configure resources owned by the organization you act on behalf of.",
+        HttpStatusCode.Forbidden);
 }
 
 public static class StatisticsErrors
