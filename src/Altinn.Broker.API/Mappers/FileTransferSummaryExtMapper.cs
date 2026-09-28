@@ -12,6 +12,7 @@ internal static class FileTransferSummaryExtMapper
             FileTransferId = summary.FileTransferId,
             ResourceId = summary.ResourceId,
             Sender = summary.Sender,
+            IsSender = summary.IsSender,
             Recipients = summary.Recipients,
             SendersFileTransferReference = summary.SendersFileTransferReference
         };

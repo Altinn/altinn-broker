@@ -96,8 +96,9 @@ export function FileTransferList({
   const cards = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((overview) => ({
     fileTransferId: overview.fileTransferId,
     resourceName: resources.find((r) => r.resourceId === overview.resourceId)?.name ?? overview.resourceId,
+    isSender: overview.isSender,
     sender: overview.sender,
-    recipient: overview.recipients.join(', '),
+    recipients: overview.recipients,
     reference: overview.sendersFileTransferReference || overview.fileTransferId,
   }))
 
@@ -136,8 +137,10 @@ export function FileTransferList({
           <li key={card.fileTransferId}>
             <FileTransferCard
               resourceName={card.resourceName}
+              isSender={card.isSender}
               sender={card.sender}
-              recipient={card.recipient}
+              recipients={card.recipients}
+              currentActorName={currentOrg.name}
               reference={card.reference}
               to={toPath(card.fileTransferId)}
             />
