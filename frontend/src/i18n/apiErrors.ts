@@ -24,6 +24,16 @@ export function tjenesteoversiktenResourceUrl(resourceId: string): string {
   return `https://tjenesteoversikten.no/resource/${encodeURIComponent(resourceId)}`
 }
 
+/** Notice shown when the user lacks publish access to configure a resource. */
+export function publishAccessNotice(resourceId: string): LocalizedApiError {
+  return {
+    errorCode: 36,
+    message: nbMessages[36]({ resourceId }),
+    linkHref: tjenesteoversiktenResourceUrl(resourceId),
+    linkLabel: 'Se tilgangsrettigheter på tjenesteoversikten.no',
+  }
+}
+
 /**
  * Maps a Broker API error body to a localized UI message.
  * Falls back to the API detail text when no translation exists for the code.
@@ -37,16 +47,15 @@ export function localizeApiError(
   const detail = readDetail(body)
   const messages = locale === 'nb' ? nbMessages : nbMessages
 
+  if (errorCode === 36 && context.resourceId) {
+    return publishAccessNotice(context.resourceId)
+  }
+
   if (errorCode !== undefined && messages[errorCode]) {
-    const localized: LocalizedApiError = {
+    return {
       errorCode,
       message: messages[errorCode](context),
     }
-    if (errorCode === 36 && context.resourceId) {
-      localized.linkHref = tjenesteoversiktenResourceUrl(context.resourceId)
-      localized.linkLabel = 'Se tilgangsrettigheter på tjenesteoversikten.no'
-    }
-    return localized
   }
 
   return {

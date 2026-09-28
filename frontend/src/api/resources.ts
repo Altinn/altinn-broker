@@ -11,6 +11,8 @@ export type AuthorizedResource = {
   serviceOwnerName: string | null
   canSend: boolean
   canReceive: boolean
+  /** The user has the publish action and may configure the resource. */
+  canPublish: boolean
 }
 
 export function fetchAuthorizedResources(party: string): Promise<AuthorizedResource[]> {

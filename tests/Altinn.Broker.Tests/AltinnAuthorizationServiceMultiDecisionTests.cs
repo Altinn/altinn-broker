@@ -26,6 +26,7 @@ public class AltinnAuthorizationServiceMultiDecisionTests
     private const string PersonIdentifier = "11887766554";
     private const string WriteAction = "write";
     private const string ReadAction = "read";
+    private const string PublishAction = "publish";
 
     [Fact]
     public async Task GetAuthorizedResources_AsksForEveryResourceAndActionInOneRequest()
@@ -46,8 +47,8 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         Assert.Equal(PersonIdentifier, subjectAttribute.GetProperty("value").GetString());
 
         var actions = requestElement.GetProperty("action").EnumerateArray().ToList();
-        Assert.Equal(["a1", "a2"], actions.Select(action => action.GetProperty("id").GetString()));
-        Assert.Equal([WriteAction, ReadAction], actions.Select(action => AttributeValue(action, XacmlConstants.MatchAttributeIdentifiers.ActionId)));
+        Assert.Equal(["a1", "a2", "a3"], actions.Select(action => action.GetProperty("id").GetString()));
+        Assert.Equal([WriteAction, ReadAction, PublishAction], actions.Select(action => AttributeValue(action, XacmlConstants.MatchAttributeIdentifiers.ActionId)));
 
         var resources = requestElement.GetProperty("resource").EnumerateArray().ToList();
         Assert.Equal(["r1", "r2", "r3"], resources.Select(resource => resource.GetProperty("id").GetString()));
@@ -57,7 +58,7 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         Assert.All(resources, resource => Assert.Equal(Party, AttributeValue(resource, UrnConstants.OrganizationNumberAttribute)));
 
         var references = requestElement.GetProperty("multiRequests").GetProperty("requestReference").EnumerateArray().ToList();
-        Assert.Equal(6, references.Count);
+        Assert.Equal(9, references.Count);
         Assert.All(references, reference => Assert.Contains("s1", reference.GetProperty("referenceId").EnumerateArray().Select(id => id.GetString())));
     }
 
@@ -79,18 +80,22 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         var sender = authorized.Single(resource => resource.ResourceId == "resource-a");
         Assert.True(sender.CanSend);
         Assert.False(sender.CanReceive);
+        Assert.False(sender.CanPublish);
 
         var recipient = authorized.Single(resource => resource.ResourceId == "resource-b");
         Assert.False(recipient.CanSend);
         Assert.True(recipient.CanReceive);
+        Assert.False(recipient.CanPublish);
 
         var both = authorized.Single(resource => resource.ResourceId == "resource-c");
         Assert.True(both.CanSend);
         Assert.True(both.CanReceive);
+        Assert.True(both.CanPublish);
 
         var none = authorized.Single(resource => resource.ResourceId == "resource-d");
         Assert.False(none.CanSend);
         Assert.False(none.CanReceive);
+        Assert.False(none.CanPublish);
     }
 
     [Fact]
@@ -132,9 +137,9 @@ public class AltinnAuthorizationServiceMultiDecisionTests
         var authorized = await service.GetAuthorizedResources(CreateIdportenUser(), Party, resourceIds);
 
         Assert.Equal(201, authorized.Count);
-        Assert.All(authorized, resource => Assert.True(resource.CanSend && resource.CanReceive));
+        Assert.All(authorized, resource => Assert.True(resource.CanSend && resource.CanReceive && resource.CanPublish));
         Assert.Equal(2, pdp.Requests.Count);
-        Assert.Equal([200, 1], pdp.Requests.Select(CountResources));
+        Assert.Equal([133, 68], pdp.Requests.Select(CountResources));
     }
 
     [Fact]

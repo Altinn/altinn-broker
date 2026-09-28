@@ -73,7 +73,8 @@ public class GetAuthorizedResourcesHandler(
                 Name = metadata?.Title,
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
-                CanReceive = authorized.CanReceive
+                CanReceive = authorized.CanReceive,
+                CanPublish = authorized.CanPublish
             };
         }));
 

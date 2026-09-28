@@ -7,4 +7,5 @@ public class AuthorizedResourceOverview
     public string? ServiceOwnerName { get; set; }
     public bool CanSend { get; set; }
     public bool CanReceive { get; set; }
+    public bool CanPublish { get; set; }
 }

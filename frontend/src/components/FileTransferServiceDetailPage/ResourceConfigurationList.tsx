@@ -4,6 +4,7 @@ import type { ResourceConfiguration } from '../../api/resourceConfiguration'
 import { formatDuration } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
+import { publishAccessNotice } from '../../i18n/apiErrors'
 import {
   useResourceConfigurationEditor,
   type ConfigurationDraft,
@@ -18,14 +19,18 @@ type ResourceConfigurationListProps = {
   resourceId: string
   configuration: ResourceConfiguration
   onBehalfOf: string
+  /** When false, the edit toggle is disabled and an access notice is shown. */
+  canPublish: boolean
 }
 
 export function ResourceConfigurationList({
   resourceId,
   configuration,
   onBehalfOf,
+  canPublish,
 }: ResourceConfigurationListProps) {
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
+  const publishNotice = canPublish ? null : publishAccessNotice(resourceId)
 
   return (
     <div className="resource-configuration">
@@ -40,8 +45,21 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={editor.saving}
+          disabled={!canPublish || editor.saving}
         />
+        {publishNotice && (
+          <Field.Description>
+            {publishNotice.message}{' '}
+            <a
+              href={publishNotice.linkHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="resource-configuration__error-link"
+            >
+              {publishNotice.linkLabel}
+            </a>
+          </Field.Description>
+        )}
       </Field>
 
       {editor.saveError && (

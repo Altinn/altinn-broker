@@ -36,4 +36,10 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("canReceive")]
     public bool CanReceive { get; set; }
+
+    /// <summary>
+    /// The user has the <c>publish</c> action on the resource for the party, and may configure it
+    /// </summary>
+    [JsonPropertyName("canPublish")]
+    public bool CanPublish { get; set; }
 }

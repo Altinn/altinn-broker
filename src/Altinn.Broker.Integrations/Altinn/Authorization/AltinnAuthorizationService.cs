@@ -109,10 +109,14 @@ public class AltinnAuthorizationService : IAuthorizationService
 
         var sendAction = GetActionId(ResourceAccessLevel.Write);
         var receiveAction = GetActionId(ResourceAccessLevel.Read);
-        string[] actions = [sendAction, receiveAction];
+        var publishAction = GetActionId(ResourceAccessLevel.Publish);
+        string[] actions = [sendAction, receiveAction, publishAction];
         var resourcesPerRequest = MaxDecisionsPerRequest / actions.Length;
         var distinctResourceIds = resourceIds.Distinct(StringComparer.Ordinal).ToList();
-        var access = distinctResourceIds.ToDictionary(resourceId => resourceId, _ => (CanSend: false, CanReceive: false), StringComparer.Ordinal);
+        var access = distinctResourceIds.ToDictionary(
+            resourceId => resourceId,
+            _ => (CanSend: false, CanReceive: false, CanPublish: false),
+            StringComparer.Ordinal);
 
         async Task ApplyDecisions(IReadOnlyList<string> resourcesToCheck)
         {
@@ -155,9 +159,13 @@ public class AltinnAuthorizationService : IAuthorizationService
                     continue;
                 }
 
-                access[resourceId] = action == sendAction
-                    ? (true, resourceAccess.CanReceive)
-                    : (resourceAccess.CanSend, true);
+                access[resourceId] = action switch
+                {
+                    _ when action == sendAction => (true, resourceAccess.CanReceive, resourceAccess.CanPublish),
+                    _ when action == receiveAction => (resourceAccess.CanSend, true, resourceAccess.CanPublish),
+                    _ when action == publishAction => (resourceAccess.CanSend, resourceAccess.CanReceive, true),
+                    _ => resourceAccess
+                };
             }
         }
 
@@ -199,7 +207,8 @@ public class AltinnAuthorizationService : IAuthorizationService
             {
                 ResourceId = entry.Key,
                 CanSend = entry.Value.CanSend,
-                CanReceive = entry.Value.CanReceive
+                CanReceive = entry.Value.CanReceive,
+                CanPublish = entry.Value.CanPublish
             })
             .ToList();
     }

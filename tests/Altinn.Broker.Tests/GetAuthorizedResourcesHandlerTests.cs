@@ -64,6 +64,7 @@ public class GetAuthorizedResourcesHandlerTests
         var sender = resources.Single(resource => resource.ResourceId == "resource-a");
         Assert.True(sender.CanSend);
         Assert.False(sender.CanReceive);
+        Assert.False(sender.CanPublish);
         Assert.Equal("Røntgenbilder mellom sykehus", sender.Name);
         Assert.Equal("Helsedirektoratet", sender.ServiceOwnerName);
     }

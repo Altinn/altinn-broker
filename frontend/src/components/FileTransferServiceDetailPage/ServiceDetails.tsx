@@ -73,6 +73,7 @@ export function ServiceDetails({
           resourceId={resource.resourceId}
           configuration={configuration}
           onBehalfOf={onBehalfOf}
+          canPublish={resource.canPublish}
         />
       </section>
     </div>
