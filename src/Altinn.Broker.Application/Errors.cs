@@ -41,6 +41,18 @@ public static class Errors
     public static Error AuthorizationUnavailable = new Error(33, "Could not determine which resources you have access to. Please try again later.", HttpStatusCode.ServiceUnavailable);
     public static Error MissingOnBehalfOf = new Error(34, "Missing on behalf of parameter for IdPorten token", HttpStatusCode.BadRequest);
     public static Error AuthorizedPartiesUnavailable = new Error(35, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
+
+    /// <summary>
+    /// Returned when an ID-porten caller lacks the <c>publish</c> action on the resource policy.
+    /// </summary>
+    public static Error NoPublishAccessToResource(string resourceId)
+    {
+        var overviewUrl = $"https://tjenesteoversikten.no/resource/{Uri.EscapeDataString(resourceId)}";
+        return new Error(
+            36,
+            $"You must have a role or access package that grants the \"publish\" access right (tilgangsrettighet) for this resource. See access rights at: {overviewUrl}",
+            HttpStatusCode.Forbidden);
+    }
 }
 
 public static class StatisticsErrors

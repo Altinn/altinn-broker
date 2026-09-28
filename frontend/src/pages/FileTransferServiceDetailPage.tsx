@@ -15,7 +15,9 @@ export function FileTransferServiceDetailPage() {
 
   switch (state?.status) {
     case 'loaded':
-      return <ServiceDetails {...state.service} />
+      return (
+        <ServiceDetails {...state.service} onBehalfOf={selectedParty!.organizationNumber} />
+      )
     case 'missing':
       return (
         <div className="page">

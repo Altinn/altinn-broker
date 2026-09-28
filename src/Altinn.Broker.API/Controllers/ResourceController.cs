@@ -20,8 +20,9 @@ public class ResourceController : Controller
     /// Configures a resource with settings to be used within the broker service.
     /// </summary>
     /// <remarks>
-    /// One of the scopes: <br/> 
-    /// - altinn:serviceowner <br/>
+    /// Authorized as: <br/>
+    /// - Service owner (<c>altinn:serviceowner</c>) that owns the resource <br/>
+    /// - End user (ID-porten) with the <c>publish</c> action on the resource for the given party (<paramref name="onBehalfOf"/>) <br/>
     /// </remarks>
     /// <response code="200">Resource configured successfully</response>
     /// <response code="400"><ul>
@@ -33,11 +34,12 @@ public class ResourceController : Controller
     /// <li>Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it</li>
     /// <li>Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days</li>
     /// <li>Time to live cannot exceed 365 days</li>
+    /// <li>Missing onBehalfOf when using an ID-porten end-user session</li>
     /// </ul></response>
-    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource, or an end-user session with publish rights</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpPut]
-    [Authorize(Policy = AuthorizationConstants.ServiceOwner)]
+    [Authorize(Policy = AuthorizationConstants.ConfigureResource)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -45,11 +47,17 @@ public class ResourceController : Controller
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [Route("{resourceId}")]
-    public async Task<ActionResult> ConfigureResource(string resourceId, [FromBody] ResourceExt resourceExt, [FromServices] ConfigureResourceHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult> ConfigureResource(
+        string resourceId,
+        [FromBody] ResourceExt resourceExt,
+        [FromQuery] string? onBehalfOf,
+        [FromServices] ConfigureResourceHandler handler,
+        CancellationToken cancellationToken)
     {
         var result = await handler.Process(new ConfigureResourceRequest()
         {
             ResourceId = resourceId,
+            OnBehalfOf = onBehalfOf,
             MaxFileTransferSize = resourceExt.MaxFileTransferSize,
             FileTransferTimeToLive = resourceExt.FileTransferTimeToLive,
             PurgeFileTransferAfterAllRecipientsConfirmed = resourceExt.PurgeFileTransferAfterAllRecipientsConfirmed,

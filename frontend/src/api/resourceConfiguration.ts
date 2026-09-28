@@ -40,6 +40,18 @@ function enforcedMaxFileTransferSize(configured: number | null, approvedForDisab
 }
 
 /**
+ * Fields the ConfigureResource endpoint accepts for a resource (legacy Altinn 2 settings omitted).
+ * Durations must be ISO-8601 (e.g. `P30D`, `PT2H`).
+ */
+export type ConfigureResourceInput = {
+  maxFileTransferSize?: number | null
+  fileTransferTimeToLive?: string
+  purgeFileTransferAfterAllRecipientsConfirmed?: boolean
+  purgeFileTransferGracePeriod?: string
+  requiredParty?: string | null
+}
+
+/**
  * Reads the broker configuration for a resource.
  */
 export async function getResourceConfiguration(resourceId: string): Promise<ResourceConfiguration> {
@@ -65,4 +77,27 @@ export async function getResourceConfiguration(resourceId: string): Promise<Reso
     requiredParty: body.requiredParty || DEFAULTS.requiredParty,
     approvedForDisabledVirusScan,
   }
+}
+
+/**
+ * Updates the broker configuration for a resource via ConfigureResource.
+ */
+export async function configureResource(
+  resourceId: string,
+  input: ConfigureResourceInput,
+  onBehalfOf?: string,
+): Promise<void> {
+  const params = new URLSearchParams()
+  if (onBehalfOf) {
+    params.set('onBehalfOf', onBehalfOf)
+  }
+  const query = params.toString()
+  const path = `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}${query ? `?${query}` : ''}`
+
+  await apiFetch<void>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+    redirectOnUnauthorized: false,
+  })
 }

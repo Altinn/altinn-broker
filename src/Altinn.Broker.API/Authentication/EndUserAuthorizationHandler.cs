@@ -55,3 +55,43 @@ public sealed class EndUserScopeAccessHandler : AuthorizationHandler<ScopeAccess
         return Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// Coarse gate for ConfigureResource: service-owner scope <em>or</em> an authenticated
+/// Broker end-user session. The handler still enforces org ownership or PDP <c>publish</c>.
+/// </summary>
+public sealed class ConfigureResourceAccessRequirement : IAuthorizationRequirement { }
+
+public sealed class ConfigureResourceAccessHandler : AuthorizationHandler<ConfigureResourceAccessRequirement>
+{
+    protected override Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        ConfigureResourceAccessRequirement requirement)
+    {
+        if (HasServiceOwnerScope(context.User) || IsBrokerEndUser(context.User))
+        {
+            context.Succeed(requirement);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static bool HasServiceOwnerScope(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.Claims.Any(claim =>
+            (claim.Type is "scope" or "scp" or "urn:altinn:scope")
+            && claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Contains(AuthorizationConstants.ServiceOwnerScope));
+    }
+
+    private static bool IsBrokerEndUser(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var isCookieAuthenticated = user.Identities.Any(identity =>
+            identity.IsAuthenticated
+            && identity.AuthenticationType is AuthorizationConstants.EndUserCookie
+                or AuthorizationConstants.AltinnPlatformJwtCookie);
+        var hasAltinnEndUserIdentity = user.HasClaim(claim =>
+            claim.Type is "urn:altinn:userid" or "urn:altinn:partyid");
+        return isCookieAuthenticated && hasAltinnEndUserIdentity;
+    }
+}

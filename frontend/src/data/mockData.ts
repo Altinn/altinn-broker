@@ -63,6 +63,22 @@ export const fileTransferServices: FileTransferService[] = [
     ],
   },
   {
+    id: 'ttd-brokerbox-utvikling',
+    name: 'Brokerbox utvikling',
+    owner: 'Digitaliseringsdirektoratet',
+    canCreate: true,
+    lockedVariables: [
+      {
+        name: 'maxFileTransferSize = 50 GB',
+        description: 'Grense for hvor stort et vedlegg kan være',
+      },
+      {
+        name: 'virusScanRequired = true',
+        description: 'Filen skal virusskannes før mottaker kan laste ned',
+      },
+    ],
+  },
+  {
     id: 'avvik',
     name: 'Avviksrapport til Arbeidstilsynet',
     owner: 'Arbeidstilsynet',

@@ -2,6 +2,8 @@
 public class ConfigureResourceRequest
 {
     public required string ResourceId { get; set; }
+    /// <summary>Organization the ID-porten end user acts on behalf of when configuring the resource.</summary>
+    public string? OnBehalfOf { get; set; }
     public long? MaxFileTransferSize { get; set; }
     public string? FileTransferTimeToLive { get; set; }
     public bool? PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;

@@ -14,7 +14,13 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(
+    IResourceRepository resourceRepository,
+    IAltinnResourceRepository altinnResourceRepository,
+    IServiceOwnerRepository serviceOwnerRepository,
+    IAuthorizationService authorizationService,
+    IHostEnvironment hostEnvironment,
+    ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -23,6 +29,16 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         ResourceEntity? existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         ResourceEntity? altinnResourceToCreate = null;
 
+        var isIdportenToken = await authorizationService.IsIdPortenToken(user);
+        if (isIdportenToken)
+        {
+            var accessError = await AuthorizeIdPortenPublisher(request, user, cancellationToken);
+            if (accessError is not null)
+            {
+                return accessError;
+            }
+        }
+
         if (existingResource is null)
         {
             var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
@@ -30,7 +46,8 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             {
                 return Errors.InvalidResourceDefinition;
             }
-            if (altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            if (!isIdportenToken
+                && altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
             {
                 return Errors.NoAccessToResource;
             }
@@ -40,12 +57,10 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             }
             altinnResourceToCreate = altinnResource;
         }
-        else
+        else if (!isIdportenToken
+            && existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
         {
-            if (existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
-            {
-                return Errors.NoAccessToResource;
-            }
+            return Errors.NoAccessToResource;
         }
 
         var resourceForValidation = existingResource ?? altinnResourceToCreate;
@@ -111,6 +126,29 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty, cancellationToken);
         }
         return Task.CompletedTask;
+    }
+
+    private async Task<Error?> AuthorizeIdPortenPublisher(
+        ConfigureResourceRequest request,
+        ClaimsPrincipal? user,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.OnBehalfOf))
+        {
+            return Errors.MissingOnBehalfOf;
+        }
+
+        var hasAccess = await authorizationService.CheckAccessAsPublisher(
+            user,
+            request.ResourceId,
+            request.OnBehalfOf,
+            cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoPublishAccessToResource(request.ResourceId);
+        }
+
+        return null;
     }
 
     private Error? ValidateMaxFileTransferSize(ResourceEntity? resource, long maxFileTransferSize)
