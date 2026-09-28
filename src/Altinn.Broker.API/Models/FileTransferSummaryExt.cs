@@ -18,6 +18,11 @@ public class FileTransferSummaryExt
     public string Sender { get; set; } = string.Empty;
 
     /// <summary>
+    /// True if the calling actor is the sender of this file transfer, false if they are a recipient
+    /// </summary>
+    public bool IsSender { get; set; }
+
+    /// <summary>
     /// Recipients of the file transfer
     /// </summary>
     public List<string> Recipients { get; set; } = new List<string>();

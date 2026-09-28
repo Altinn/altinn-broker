@@ -12,6 +12,8 @@ public class FileTransferSummaryEntity
 
     public required string Sender { get; set; }
 
+    public required bool IsSender { get; set; }
+
     public required List<string> Recipients { get; set; }
 
     public required string SendersFileTransferReference { get; set; }

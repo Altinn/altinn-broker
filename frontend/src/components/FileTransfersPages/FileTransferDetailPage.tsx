@@ -1,11 +1,12 @@
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { List, ListItem } from '@altinn/altinn-components'
+import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
+import { Button, List, ListItem } from '@altinn/altinn-components'
 import { useEffect, useRef, useState } from 'react'
 import { FileTransferDetailList } from './FileTransferDetailList'
 import { FileTransferActions } from './FileTransferActions'
 import { getFileTransferDetails, type FileTransferDetails } from '../../api/fileTransferDetail'
 import { useParties } from '../../parties/PartiesContext'
 import '../../pages/pages.css'
+import { ArrowUndoIcon } from '@navikt/aksel-icons'
 
 type FileTransferDetailPageProps = {
   backPath: string
@@ -29,16 +30,16 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
       return
     }
     const requestedTransferId = transferId
-    const requestedPartyUuid = selectedParty.partyUuid
+    const requestedPartyUuidRef = selectedParty?.partyUuid
     try {
       const transferDetails = await getFileTransferDetails(requestedTransferId, selectedParty)
-      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuid) {
+      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuidRef) {
         setTransferDetails(transferDetails)
         setLoadError(false)
       }
     } catch (error) {
       console.error('Error fetching transfer details:', error)
-      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuid) {
+      if (transferIdRef.current === requestedTransferId && selectedPartyUuidRef.current === requestedPartyUuidRef) {
         setLoadError(true)
       }
     }
@@ -77,9 +78,10 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
   return (
     <div className="page">
       <div className="page-actions">
-        <Link to={backPath} className="button button--secondary">
-          ← Tilbake
-        </Link>
+        <Button as={(props: LinkProps) => <Link {...props} to={backPath} />} variant="secondary" size="sm">
+          <ArrowUndoIcon aria-hidden />
+          Tilbake
+        </Button>
       </div>
 
       <section className="page-section">
