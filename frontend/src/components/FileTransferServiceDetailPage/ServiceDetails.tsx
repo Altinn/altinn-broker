@@ -1,6 +1,7 @@
 import { Button, ButtonIcon, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
 import { ArrowUndoIcon, PlusIcon } from '@navikt/aksel-icons'
 import { Link, type LinkProps } from 'react-router-dom'
+import type { AllowedRecipient } from '../../api/allowedRecipients'
 import { newFileTransferPath, PageRoutes } from '../../pages/routes'
 import type { FileTransferService } from './useFileTransferService'
 import { NoRecipientsNotice } from './NoRecipientsNotice'
@@ -18,7 +19,11 @@ export function ServiceDetails({
   configuration,
   allowedRecipients,
   onBehalfOf,
-}: FileTransferService & { onBehalfOf: string }) {
+  sender,
+}: FileTransferService & {
+  onBehalfOf: string
+  sender: AllowedRecipient
+}) {
   // Without anyone to send to there is nothing to create, so the action is withheld rather
   // than leading the user into a form they cannot complete.
   const hasRecipients = allowedRecipients.length > 0
@@ -74,6 +79,8 @@ export function ServiceDetails({
           configuration={configuration}
           onBehalfOf={onBehalfOf}
           canPublish={resource.canPublish}
+          sender={sender}
+          recipients={allowedRecipients}
         />
       </section>
     </div>

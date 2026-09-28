@@ -1,9 +1,15 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
-import { Alert, Button, Field, Switch, Textfield } from '@digdir/designsystemet-react'
+import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
+import { useMemo } from 'react'
+import type { AllowedRecipient } from '../../api/allowedRecipients'
 import type { ResourceConfiguration } from '../../api/resourceConfiguration'
 import { formatDuration } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
-import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
+import {
+  formatOrganizationDisplay,
+  formatOrgNumber,
+  toOrgNumber,
+} from '../../helpers/orgIdentifierHelper'
 import { publishAccessNotice } from '../../i18n/apiErrors'
 import {
   useResourceConfigurationEditor,
@@ -14,6 +20,7 @@ import './fileTransferServiceDetailPage.css'
 
 const NOT_SET = '–'
 const NO_LIMIT = 'Ingen grense satt'
+const NO_REQUIRED_PARTY = ''
 
 type ResourceConfigurationListProps = {
   resourceId: string
@@ -21,6 +28,8 @@ type ResourceConfigurationListProps = {
   onBehalfOf: string
   /** When false, the edit toggle is disabled and an access notice is shown. */
   canPublish: boolean
+  sender: AllowedRecipient
+  recipients: AllowedRecipient[]
 }
 
 export function ResourceConfigurationList({
@@ -28,9 +37,15 @@ export function ResourceConfigurationList({
   configuration,
   onBehalfOf,
   canPublish,
+  sender,
+  recipients,
 }: ResourceConfigurationListProps) {
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
   const publishNotice = canPublish ? null : publishAccessNotice(resourceId)
+  const partyOptions = useMemo(
+    () => buildRequiredPartyOptions(sender, recipients, configuration.requiredParty),
+    [sender, recipients, configuration.requiredParty],
+  )
 
   return (
     <div className="resource-configuration">
@@ -86,6 +101,7 @@ export function ResourceConfigurationList({
           draft={editor.draft}
           errors={editor.errors}
           virusScanRequired={!editor.configuration.approvedForDisabledVirusScan}
+          partyOptions={partyOptions}
           saving={editor.saving}
           onChange={editor.updateDraft}
           onSave={editor.save}
@@ -94,7 +110,7 @@ export function ResourceConfigurationList({
       ) : (
         <SettingsSection>
           <List size="sm">
-            {configurationFields(editor.configuration).map((field) => (
+            {configurationFields(editor.configuration, partyOptions).map((field) => (
               <SettingsItem key={field.label} id={field.label} title={field.label} value={field.value} />
             ))}
           </List>
@@ -108,6 +124,7 @@ type ConfigurationFormProps = {
   draft: ConfigurationDraft
   errors: ConfigurationDraftErrors
   virusScanRequired: boolean
+  partyOptions: AllowedRecipient[]
   saving: boolean
   onChange: <K extends keyof ConfigurationDraft>(key: K, value: ConfigurationDraft[K]) => void
   onSave: () => void
@@ -118,6 +135,7 @@ function ConfigurationForm({
   draft,
   errors,
   virusScanRequired,
+  partyOptions,
   saving,
   onChange,
   onSave,
@@ -164,14 +182,27 @@ function ConfigurationForm({
         inputMode="numeric"
         disabled={saving}
       />
-      <Textfield
-        label="Påkrevd part"
-        description="Organisasjonsnummer. La stå tomt for ingen påkrevd part."
-        value={draft.requiredParty}
-        onChange={(event) => onChange('requiredParty', event.target.value)}
-        error={errors.requiredParty}
-        disabled={saving}
-      />
+      <Field>
+        <Label htmlFor="required-party">Påkrevd part</Label>
+        <Field.Description>
+          Velg avsender eller en mottaker. La stå uten valg for ingen påkrevd part.
+        </Field.Description>
+        <Select
+          id="required-party"
+          value={draft.requiredParty}
+          onChange={(event) => onChange('requiredParty', event.target.value)}
+          disabled={saving}
+          aria-invalid={errors.requiredParty ? true : undefined}
+        >
+          <Select.Option value={NO_REQUIRED_PARTY}>Ingen påkrevd part</Select.Option>
+          {partyOptions.map((party) => (
+            <Select.Option key={party.organizationNumber} value={party.organizationNumber}>
+              {formatOrganizationDisplay(party.name, party.organizationNumber)}
+            </Select.Option>
+          ))}
+        </Select>
+        {errors.requiredParty && <ValidationMessage>{errors.requiredParty}</ValidationMessage>}
+      </Field>
       <Textfield
         label="Virusskanning påkrevd"
         value={yesNo(virusScanRequired)}
@@ -190,7 +221,34 @@ function ConfigurationForm({
   )
 }
 
-function configurationFields(configuration: ResourceConfiguration) {
+/** Sender first, then recipients; keeps a configured party that is not in either list. */
+function buildRequiredPartyOptions(
+  sender: AllowedRecipient,
+  recipients: AllowedRecipient[],
+  requiredParty: string | null,
+): AllowedRecipient[] {
+  const options: AllowedRecipient[] = [
+    { name: sender.name, organizationNumber: sender.organizationNumber },
+  ]
+  const seen = new Set([sender.organizationNumber])
+
+  for (const recipient of recipients) {
+    if (seen.has(recipient.organizationNumber)) {
+      continue
+    }
+    seen.add(recipient.organizationNumber)
+    options.push(recipient)
+  }
+
+  const configured = requiredParty ? toOrgNumber(requiredParty) : null
+  if (configured && !seen.has(configured)) {
+    options.push({ name: formatOrgNumber(configured), organizationNumber: configured })
+  }
+
+  return options
+}
+
+function configurationFields(configuration: ResourceConfiguration, partyOptions: AllowedRecipient[]) {
   return [
     {
       label: 'Maks filstørrelse',
@@ -213,7 +271,7 @@ function configurationFields(configuration: ResourceConfiguration) {
     },
     {
       label: 'Påkrevd part',
-      value: requiredParty(configuration.requiredParty),
+      value: requiredPartyDisplay(configuration.requiredParty, partyOptions),
     },
     {
       label: 'Virusskanning påkrevd',
@@ -226,6 +284,16 @@ function yesNo(value: boolean): string {
   return value ? 'Ja' : 'Nei'
 }
 
-function requiredParty(identifier: string | null): string {
-  return identifier ? formatOrgNumber(identifier) : NOT_SET
+function requiredPartyDisplay(identifier: string | null, partyOptions: AllowedRecipient[]): string {
+  if (!identifier) {
+    return NOT_SET
+  }
+
+  const digits = toOrgNumber(identifier)
+  const match = digits
+    ? partyOptions.find((party) => party.organizationNumber === digits)
+    : undefined
+  return match
+    ? formatOrganizationDisplay(match.name, match.organizationNumber)
+    : formatOrgNumber(identifier)
 }

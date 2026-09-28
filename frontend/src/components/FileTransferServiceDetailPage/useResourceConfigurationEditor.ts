@@ -9,7 +9,7 @@ import {
 } from '../../api/resourceConfiguration'
 import { daysToIso8601, hoursToIso8601, timeSpanToDays, timeSpanToHours } from '../../helpers/durationHelper'
 import { bytesToGb, gbToBytes } from '../../helpers/fileSizeHelper'
-import { formatOrgNumber, toOrgIdentifier, toOrgNumber } from '../../helpers/orgIdentifierHelper'
+import { toOrgIdentifier, toOrgNumber } from '../../helpers/orgIdentifierHelper'
 import { localizeApiError, type LocalizedApiError } from '../../i18n/apiErrors'
 
 const MAX_TTL_DAYS = 365
@@ -125,7 +125,9 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
     fileTransferTimeToLiveDays: ttlDays === null ? '' : String(ttlDays),
     purgeFileTransferAfterAllRecipientsConfirmed: configuration.purgeFileTransferAfterAllRecipientsConfirmed,
     purgeFileTransferGracePeriodHours: graceHours === null ? '' : String(graceHours),
-    requiredParty: configuration.requiredParty ? formatOrgNumber(configuration.requiredParty) : '',
+    requiredParty: configuration.requiredParty
+      ? (toOrgNumber(configuration.requiredParty) ?? '')
+      : '',
   }
 }
 
@@ -156,7 +158,7 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
 
   const party = draft.requiredParty.trim()
   if (party !== '' && !toOrgNumber(party)) {
-    errors.requiredParty = 'Oppgi et gyldig organisasjonsnummer (9 siffer).'
+    errors.requiredParty = 'Velg en gyldig part fra listen.'
   }
 
   return errors

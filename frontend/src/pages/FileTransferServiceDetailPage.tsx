@@ -16,7 +16,14 @@ export function FileTransferServiceDetailPage() {
   switch (state?.status) {
     case 'loaded':
       return (
-        <ServiceDetails {...state.service} onBehalfOf={selectedParty!.organizationNumber} />
+        <ServiceDetails
+          {...state.service}
+          onBehalfOf={selectedParty!.organizationNumber}
+          sender={{
+            name: selectedParty!.name,
+            organizationNumber: selectedParty!.organizationNumber,
+          }}
+        />
       )
     case 'missing':
       return (
