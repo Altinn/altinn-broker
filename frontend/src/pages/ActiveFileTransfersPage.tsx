@@ -2,12 +2,13 @@ import { getActiveFileTransfers } from '../api/activeFileTransfers'
 import { FileTransferList } from '../components/FileTransfersPages/FileTransferList'
 import { activeTransferPath } from './routes'
 import { useParties } from '../parties/PartiesContext'
+import { SelectedPartyMessage } from '../parties/SelectedPartyMessage'
 
 export function ActiveFileTransfersPage() {
   const { selectedParty } = useParties()
 
   if (!selectedParty) {
-    return <p>Ingen aktør valgt.</p>
+    return <SelectedPartyMessage loadingText="Laster aktive formidlinger …" />
   }
 
   return (
