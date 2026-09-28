@@ -10,7 +10,11 @@ param apiOriginHostName string = ''
 @description('AFD endpoint name. Must be globally unique across Azure. Hostname becomes {endpointName}-{hash}.azurefd.net.')
 param endpointName string = 'default'
 
+@description('Existing AFD custom domain resource name (not the FQDN). When set, routes use this domain only and the default *.azurefd.net hostname is disabled.')
+param customDomainName string = ''
+
 var hasApiOrigin = !empty(apiOriginHostName)
+var hasCustomDomain = !empty(customDomainName)
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2023-05-01' = {
   name: frontDoorProfileName
@@ -28,6 +32,11 @@ resource afdEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2023-05-01' = {
   properties: {
     enabledState: 'Enabled'
   }
+}
+
+resource customDomain 'Microsoft.Cdn/profiles/customDomains@2023-05-01' existing = if (hasCustomDomain) {
+  parent: frontDoorProfile
+  name: customDomainName
 }
 
 resource frontendOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
@@ -150,6 +159,13 @@ resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (
     originGroup: {
       id: apiOriginGroup!.id
     }
+    customDomains: hasCustomDomain
+      ? [
+          {
+            id: customDomain!.id
+          }
+        ]
+      : []
     supportedProtocols: [
       'Http'
       'Https'
@@ -158,7 +174,7 @@ resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (
       '/broker/*'
     ]
     forwardingProtocol: 'HttpsOnly'
-    linkToDefaultDomain: 'Enabled'
+    linkToDefaultDomain: hasCustomDomain ? 'Disabled' : 'Enabled'
     httpsRedirect: 'Enabled'
     enabledState: 'Enabled'
   }
@@ -174,6 +190,13 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
     originGroup: {
       id: frontendOriginGroup.id
     }
+    customDomains: hasCustomDomain
+      ? [
+          {
+            id: customDomain!.id
+          }
+        ]
+      : []
     ruleSets: hasApiOrigin
       ? [
           {
@@ -189,7 +212,7 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
       '/*'
     ]
     forwardingProtocol: 'HttpsOnly'
-    linkToDefaultDomain: 'Enabled'
+    linkToDefaultDomain: hasCustomDomain ? 'Disabled' : 'Enabled'
     httpsRedirect: 'Enabled'
     enabledState: 'Enabled'
   }
