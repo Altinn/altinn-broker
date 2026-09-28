@@ -1,7 +1,13 @@
 import { createContext, useContext } from 'react'
 import type { UploadPlan, UploadProgress } from '../api/tus/tusUpload'
 
-export type UploadStatus = 'initializing' | 'uploading' | 'finishing' | 'paused' | 'failed'
+export type UploadStatus =
+  | 'initializing'
+  | 'uploading'
+  | 'finishing'
+  | 'pausing'
+  | 'paused'
+  | 'failed'
 
 export type ActiveUpload = {
   resourceId: string

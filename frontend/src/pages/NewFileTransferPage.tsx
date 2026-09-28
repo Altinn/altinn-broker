@@ -249,6 +249,7 @@ export function NewFileTransferPage() {
             <UploadProgress
               progress={form.progress}
               initializing={form.initializing}
+              pausing={form.pausing}
               paused={form.paused}
               finishing={form.finishing}
               stopped={form.failed}

@@ -7,6 +7,7 @@ import { formatFileSize } from '../../helpers/fileSizeHelper'
 type UploadState = {
   progress: Progress | null
   initializing: boolean
+  pausing: boolean
   paused: boolean
   finishing: boolean
   stopped: boolean
@@ -18,15 +19,15 @@ type UploadProgressProps = UploadState & {
 }
 
 export function UploadProgress({ onPause, onResume, ...state }: UploadProgressProps) {
-  const { progress, paused, finishing, stopped } = state
-  const running = progress !== null && !paused && !finishing && !stopped
+  const { progress, pausing, paused, finishing, stopped } = state
+  const running = progress !== null && !pausing && !paused && !finishing && !stopped
 
   return (
     <div className="new-transfer__progress">
       <progress value={progress?.percent ?? 0} max={100} aria-label="Opplasting" />
       <div className="new-transfer__progress-status">
         <p>{statusText(state)}</p>
-        {paused && (
+        {(paused || pausing) && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onResume}>
             <PlayIcon aria-hidden />
             Fortsett
@@ -51,6 +52,7 @@ export function UploadProgress({ onPause, onResume, ...state }: UploadProgressPr
 function statusText({
   progress,
   initializing,
+  pausing,
   paused,
   finishing,
   stopped,
@@ -69,6 +71,9 @@ function statusText({
   if (paused) {
     return `Pauset på ${sent}`
   }
+  if (pausing) {
+    return `Pauser på ${sent} — fullfører delene som er i gang`
+  }
   if (finishing) {
     return 'Setter sammen filen…'
   }
@@ -82,6 +87,7 @@ function statusText({
 function screenReaderStatusText({
   progress,
   initializing,
+  pausing,
   paused,
   finishing,
   stopped,
@@ -97,6 +103,9 @@ function screenReaderStatusText({
   }
   if (paused) {
     return `Opplastingen er pauset på ${tenths}`
+  }
+  if (pausing) {
+    return 'Pauser opplastingen'
   }
   if (finishing) {
     return 'Setter sammen filen'

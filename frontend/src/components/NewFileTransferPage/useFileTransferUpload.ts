@@ -126,6 +126,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     blockedBy,
     sending: active !== null,
     initializing: active?.status === 'initializing',
+    pausing: active?.status === 'pausing',
     paused: active?.status === 'paused',
     failed: active?.status === 'failed',
     finishing: active?.status === 'finishing',

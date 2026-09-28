@@ -47,7 +47,7 @@ export type RunUploadOptions = {
   onProgress?: (progress: UploadProgress) => void
   onPhase?: (phase: UploadPhase) => void
   signal?: AbortSignal
-  pauseSignal?: AbortSignal
+  isPaused?: () => boolean
   alreadySent?: number
 }
 
@@ -87,7 +87,7 @@ export function runUpload(
   file: File,
   options: RunUploadOptions = {},
 ): Promise<void> {
-  const { onProgress, onPhase, signal, pauseSignal, alreadySent = 0 } = options
+  const { onProgress, onPhase, signal, isPaused, alreadySent = 0 } = options
 
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
@@ -123,7 +123,7 @@ export function runUpload(
       endpoint: apiUrl(tusUploadPath(plan.fileTransferId)),
       chunkSize: chunkSizeFor(plan),
       retryDelays: RETRY_DELAYS,
-      httpStack: pausableHttpStack(pauseSignal),
+      httpStack: pausableHttpStack(isPaused),
       storeFingerprintForResuming: false,
       onAfterResponse: (_request, response) => {
         if (response.getStatus() < 400) {
@@ -249,7 +249,7 @@ function targetOptions(plan: UploadPlan): Partial<UploadOptions> {
 
 // tus-js-client has no graceful pause, but it lets the transport be supplied. Refusing to start new
 // requests stops the upload without aborting any, which would leave the server holding locks.
-function pausableHttpStack(pauseSignal?: AbortSignal): HttpStack {
+function pausableHttpStack(isPaused?: () => boolean): HttpStack {
   const stack = new DefaultHttpStack({})
 
   return {
@@ -258,7 +258,7 @@ function pausableHttpStack(pauseSignal?: AbortSignal): HttpStack {
       const request = stack.createRequest(method, url)
       const send = request.send.bind(request)
       request.send = (body: unknown) =>
-        pauseSignal?.aborted ? Promise.reject(new UploadPausedError()) : send(body)
+        isPaused?.() ? Promise.reject(new UploadPausedError()) : send(body)
       return request
     },
   }

@@ -25,7 +25,6 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
 
   const uploadRef = useRef<{ plan: UploadPlan; file: File } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const pauseRef = useRef<AbortController | null>(null)
   const runningRef = useRef<Promise<void> | null>(null)
   const pauseRequestedRef = useRef(false)
   const listenersRef = useRef(new Set<UploadSuccessListener>())
@@ -42,18 +41,15 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (plan: UploadPlan, file: File, resourceId: string, alreadySent: number) => {
-      abortRef.current?.abort()
+      const previous = abortRef.current
+      abortRef.current = null
+      previous?.abort()
       const winding = runningRef.current
       runningRef.current = null
       await winding
 
       const controller = new AbortController()
       abortRef.current = controller
-      const pauseController = new AbortController()
-      pauseRef.current = pauseController
-      if (pauseRequestedRef.current) {
-        pauseController.abort()
-      }
       setActive((current) =>
         current === null
           ? current
@@ -86,7 +82,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
             }
           },
           signal: controller.signal,
-          pauseSignal: pauseController.signal,
+          isPaused: () => pauseRequestedRef.current,
           alreadySent,
         })
         if (!current()) {
@@ -211,18 +207,30 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   // against the run that follows.
   const pause = useCallback(() => {
     pauseRequestedRef.current = true
-    pauseRef.current?.abort()
+    // The requests already sent are left to finish, so the pause takes a moment to take effect.
+    setActive((current) =>
+      current && (current.status === 'uploading' || current.status === 'finishing')
+        ? { ...current, status: 'pausing' }
+        : current,
+    )
   }, [])
 
   const resume = useCallback(() => {
+    pauseRequestedRef.current = false
+
+    // A run that has not stopped yet never has to be replaced; it simply keeps sending.
+    if (active?.status === 'pausing') {
+      update({ status: 'uploading' })
+      return
+    }
+
     const upload = uploadRef.current
     const resourceId = active?.resourceId
     if (!upload || !resourceId) {
       return
     }
-    pauseRequestedRef.current = false
     void startRun(upload.plan, upload.file, resourceId, active?.progress?.loaded ?? 0)
-  }, [active?.progress?.loaded, active?.resourceId, startRun])
+  }, [active?.progress?.loaded, active?.resourceId, active?.status, startRun, update])
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
