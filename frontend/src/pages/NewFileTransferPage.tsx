@@ -8,9 +8,11 @@ import {
   Spinner,
   Textfield,
 } from '@digdir/designsystemet-react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'react-toastify'
+import { clearDraft, draftKey } from '../components/NewFileTransferPage/draftStore'
+import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
+import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
 import { PartyField } from '../components/NewFileTransferPage/PartyField'
 import { RecipientsField } from '../components/NewFileTransferPage/RecipientsField'
@@ -28,7 +30,9 @@ import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
-import { activeTransferPath, servicePath } from './routes'
+import { useUploads } from '../upload/uploadsContext'
+import { formatFileSize } from '../helpers/fileSizeHelper'
+import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
@@ -38,15 +42,20 @@ export function NewFileTransferPage() {
   const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
 
-  const onSent = useCallback(
-    (fileTransferId: string) => {
-      toast.success('Formidlingen er sendt, og filen er lastet opp.')
-      navigate(activeTransferPath(fileTransferId), { replace: true })
-    },
-    [navigate],
-  )
+  const { addUploadSuccessListener } = useUploads()
+  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
 
-  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, onSent })
+  useEffect(
+    () =>
+      addUploadSuccessListener(({ fileTransferId, resourceId }) => {
+        if (resourceId !== serviceId) {
+          return
+        }
+        clearDraft(draftKey(serviceId, senderOrgNumber))
+        navigate(activeTransferPath(fileTransferId), { replace: true })
+      }),
+    [navigate, senderOrgNumber, serviceId, addUploadSuccessListener],
+  )
   const { errors, setValue, submitAttempts, values } = form
 
   useEffect(() => {
@@ -87,13 +96,26 @@ export function NewFileTransferPage() {
   }
 
   const cancel = () => {
-    form.abort()
+    form.cancel()
     navigate(servicePath(service.resourceId))
   }
 
   const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
     (field) => errors[field],
   )
+
+  // An upload that can be carried on takes the primary action over, so there is only one to press.
+  const continueUpload =
+    form.paused || form.failed
+      ? form.resume
+      : form.resumeReady
+        ? form.resumeInterrupted
+        : null
+
+  // An interrupted upload settled these when it was created, so they are shown but not editable.
+  const settled = form.interrupted !== null
+
+  const blockedBy = form.blockedBy
 
   // The metadata summary entry points at the row input that failed instead of the entire metadata field.
   const metadataErrorTargetId = (field: NewFileTransferField) =>
@@ -127,52 +149,73 @@ export function NewFileTransferPage() {
         >
           {form.loadError && <Alert data-color="warning">{form.loadError}</Alert>}
 
+          {blockedBy && (
+            <BlockingUploadNotice
+              upload={blockedBy}
+              onContinue={() => navigate(newFileTransferPath(blockedBy.resourceId))}
+              onCancel={blockedBy.cancel}
+            />
+          )}
+
           <fieldset className="new-transfer__fields" disabled={form.sending}>
-            <PartyField
-              label="Avsender"
-              description="Du formidler på vegne av denne organisasjonen."
-              name={selectedParty?.name ?? ''}
-              organizationNumber={senderOrgNumber}
-            />
+            <fieldset className="new-transfer__fields" disabled={settled}>
+              <PartyField
+                label="Avsender"
+                description="Du formidler på vegne av denne organisasjonen."
+                name={selectedParty?.name ?? ''}
+                organizationNumber={senderOrgNumber}
+              />
 
-            <RecipientsField
-              id={fieldId('recipients')}
-              rules={form.rules}
-              selected={values.recipients}
-              error={errors.recipients}
-              onChange={(recipients) => setValue('recipients', recipients)}
-            />
+              <RecipientsField
+                id={fieldId('recipients')}
+                rules={form.rules}
+                selected={values.recipients}
+                error={errors.recipients}
+                onChange={(recipients) => setValue('recipients', recipients)}
+              />
 
-            <Textfield
-              id={fieldId('reference')}
-              label="Referanse"
-              description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
-              value={values.reference}
-              error={errors.reference}
-              maxLength={MAX_REFERENCE_LENGTH}
-              onChange={(event) => setValue('reference', event.target.value)}
-            />
+              <Textfield
+                id={fieldId('reference')}
+                label="Referanse"
+                description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
+                value={values.reference}
+                error={errors.reference}
+                maxLength={MAX_REFERENCE_LENGTH}
+                onChange={(event) => setValue('reference', event.target.value)}
+              />
 
-            <MetadataFields
-              id={fieldId('metadata')}
-              entries={values.metadata}
-              rowErrors={form.metadataRowErrors}
-              onChange={(metadata) => setValue('metadata', metadata)}
-            />
+              <MetadataFields
+                id={fieldId('metadata')}
+                entries={values.metadata}
+                rowErrors={form.metadataRowErrors}
+                onChange={(metadata) => setValue('metadata', metadata)}
+              />
+            </fieldset>
+
+            {form.interrupted && (
+              <InterruptedUploadNotice
+                file={form.interrupted.file}
+                uploaded={form.interruptedUploaded}
+                ready={form.resumeReady}
+                onDiscard={form.discardInterrupted}
+              />
+            )}
 
             <UploadFile
               id={fieldId('file')}
               file={values.file}
               maxFileSize={form.maxFileSize}
-              error={errors.file}
+              error={form.wrongFile ?? errors.file}
               onChange={(file) => setValue('file', file)}
             />
 
-            <VirusScanField
-              checked={values.virusScan}
-              locked={form.virusScanLocked}
-              onChange={(virusScan) => setValue('virusScan', virusScan)}
-            />
+            <fieldset className="new-transfer__fields" disabled={settled}>
+              <VirusScanField
+                checked={values.virusScan}
+                locked={form.virusScanLocked}
+                onChange={(virusScan) => setValue('virusScan', virusScan)}
+              />
+            </fieldset>
           </fieldset>
 
           {failedFields.length > 0 && (
@@ -193,13 +236,45 @@ export function NewFileTransferPage() {
           )}
 
           {form.submitError && <Alert data-color="danger">{form.submitError}</Alert>}
+          {form.activeFile && !values.file && (
+            <div className="new-transfer__file">
+              <span className="new-transfer__file-name">{form.activeFile.name}</span>
+              <span className="new-transfer__file-size">
+                {formatFileSize(form.activeFile.size)}
+              </span>
+            </div>
+          )}
 
-          {form.sending && <UploadProgress progress={form.progress} />}
+          {form.sending && (
+            <UploadProgress
+              progress={form.progress}
+              initializing={form.initializing}
+              paused={form.paused}
+              finishing={form.finishing}
+              stopped={form.failed}
+              onPause={form.pause}
+              onResume={form.resume}
+            />
+          )}
 
           <div className="new-transfer__actions">
-            <Button type="submit" loading={form.sending}>
-              {form.sending ? 'Laster opp…' : 'Send formidling'}
-            </Button>
+            {continueUpload || settled ? (
+              <Button
+                type="button"
+                onClick={continueUpload ?? undefined}
+                disabled={continueUpload === null}
+              >
+                Fortsett opplastingen
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                loading={form.sending}
+                disabled={form.sending || blockedBy !== null}
+              >
+                {form.sending ? 'Laster opp…' : 'Send formidling'}
+              </Button>
+            )}
             <Button type="button" variant="secondary" onClick={cancel}>
               Avbryt
             </Button>
