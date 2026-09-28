@@ -15,7 +15,8 @@ public class IdPortenDirectAuthSettings
     /// Must include at least one <c>altinn:*</c> scope. Platform Authentication
     /// rejects ID-Porten exchange when the access token has only openid/profile.
     /// </summary>
-    public string[] Scopes { get; set; } = ["openid", "profile", "altinn:portal/enduser"];
+    public string[] Scopes { get; set; } =
+        ["openid", "profile", IdPortenDirectAuthDefaults.OfflineAccessScope, "altinn:portal/enduser"];
 
     /// <summary>
     /// Public origin of the SPA (e.g. https://localhost:5173 in local Vite).

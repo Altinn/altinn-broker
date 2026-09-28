@@ -109,11 +109,27 @@ Used for direct ID-Porten login. Section name is unchanged for existing deployme
 | `Authority` | Yes | ID-Porten issuer (e.g. `https://test.idporten.no`) |
 | `ClientId` | Yes | ID-Porten client id (Key Vault secret in deploy) |
 | `ClientSecret` | Yes | ID-Porten client secret (Key Vault secret in deploy) |
-| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) |
+| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) and `offline_access` (see below) |
 | `SpaBaseUrl` | Dev / split-origin | Public SPA origin (e.g. `https://localhost:5173`). OIDC callback and post-login redirect use this host. Leave empty when SPA and API share the same origin (Front Door + APIM). |
 | `CookieName` | No | Broker session cookie name (default `AltinnBrokerSession`) |
 
 Fixed in code (not configurable): callback `/broker/api/v1/authentication/callback`, front-channel logout `/broker/api/v1/authentication/frontchannel-logout`, back-channel logout `/broker/api/v1/authentication/backchannel-logout`, post-logout redirect `/`, required ACR `idporten-loa-substantial`, session lifetime 60 minutes.
+
+#### `offline_access` and session renewal
+
+The Altinn token stored in the session cookie is short-lived — shorter than the cookie itself. When
+it expires, Broker redeems the stored ID-Porten refresh token, gets a new access token and exchanges
+it for a new Altinn token, all inside the request. Without a refresh token there is nothing to renew,
+and the user is redirected to ID-Porten every time the Altinn token expires — a login round-trip they
+never asked for, invisible whenever the ID-Porten SSO session is still alive.
+
+The ID-Porten client must therefore be registered in Samarbeidsportalen with:
+
+- the `offline_access` scope, and
+- `refresh_token_lifetime` greater than 0 (ideally at least the 60-minute cookie lifetime).
+
+If either is missing, login still works but the warning *"ID-Porten returned no refresh token"* is
+logged on every sign-in and sessions keep bouncing through login.
 
 **Deploy environment variables** (Container App):
 
@@ -129,7 +145,7 @@ Fixed in code (not configurable): callback `/broker/api/v1/authentication/callba
   "Authority": "https://test.idporten.no",
   "ClientId": "<from Samarbeidsportalen>",
   "ClientSecret": "<from Samarbeidsportalen>",
-  "Scopes": ["openid", "profile", "altinn:portal/enduser"],
+  "Scopes": ["openid", "profile", "offline_access", "altinn:portal/enduser"],
   "SpaBaseUrl": "https://localhost:5173"
 }
 ```
