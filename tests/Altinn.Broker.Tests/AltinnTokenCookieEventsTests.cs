@@ -73,12 +73,30 @@ public class AltinnTokenCookieEventsTests
         Assert.Equal(0, refreshService.Calls);
     }
 
+    /// <summary>
+    /// Altinn's exchange endpoint issues tokens that live two minutes. A leeway anywhere near that
+    /// makes every request renew, rotating the ID-Porten refresh token each time.
+    /// </summary>
+    [Fact]
+    public async Task ValidatePrincipal_WithFreshShortLivedAltinnToken_DoesNotRefresh()
+    {
+        var refreshService = new StubRefreshService(new IdPortenTokens("new-access-token", "refresh-2"));
+        var context = CreateContext(
+            altinnToken: CreateAltinnToken(TimeSpan.FromSeconds(120)),
+            refreshToken: "refresh-1");
+
+        await CreateEvents(refreshService).ValidatePrincipal(context);
+
+        Assert.NotNull(context.Principal);
+        Assert.Equal(0, refreshService.Calls);
+    }
+
     [Fact]
     public async Task ValidatePrincipal_RefreshesBeforeTheAltinnTokenExpires()
     {
         var refreshService = new StubRefreshService(new IdPortenTokens("new-access-token", "refresh-2"));
         var context = CreateContext(
-            altinnToken: CreateAltinnToken(TimeSpan.FromSeconds(30)),
+            altinnToken: CreateAltinnToken(TimeSpan.FromSeconds(10)),
             refreshToken: "refresh-1");
 
         await CreateEvents(refreshService).ValidatePrincipal(context);

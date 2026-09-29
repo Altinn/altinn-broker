@@ -20,8 +20,13 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
     /// <summary>
     /// Re-exchange this far ahead of the Altinn token's expiry, so no request travels downstream
     /// with a token that expires mid-flight.
+    ///
+    /// Keep it small. Altinn's exchange endpoint issues tokens that live only two minutes, so a
+    /// leeway anywhere near that makes every single request trigger a renewal — and every renewal
+    /// rotates the ID-Porten refresh token. This only has to outlast the downstream calls made
+    /// within one request.
     /// </summary>
-    private static readonly TimeSpan ExpiryLeeway = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ExpiryLeeway = TimeSpan.FromSeconds(20);
 
     private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
     private readonly IIdPortenTokenRefreshService _tokenRefreshService;

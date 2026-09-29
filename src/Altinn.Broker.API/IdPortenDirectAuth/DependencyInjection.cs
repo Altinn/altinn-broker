@@ -143,8 +143,8 @@ public static class DependencyInjection
                                 .LogWarning(
                                     "ID-Porten returned no refresh token. The session cannot be renewed and the user " +
                                     "will be sent through login again once the Altinn token expires. Check that the " +
-                                    "client is registered with the {Scope} scope and refresh_token_lifetime > 0.",
-                                    IdPortenDirectAuthDefaults.OfflineAccessScope);
+                                    "client is registered with refresh_token as an allowed grant type, and that " +
+                                    "refresh_token_lifetime outlives the Altinn token.");
                         }
 
                         context.Properties!.StoreTokens(

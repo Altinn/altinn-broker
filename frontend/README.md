@@ -109,13 +109,13 @@ Used for direct ID-Porten login. Section name is unchanged for existing deployme
 | `Authority` | Yes | ID-Porten issuer (e.g. `https://test.idporten.no`) |
 | `ClientId` | Yes | ID-Porten client id (Key Vault secret in deploy) |
 | `ClientSecret` | Yes | ID-Porten client secret (Key Vault secret in deploy) |
-| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) and `offline_access` (see below) |
+| `Scopes` | Yes | Must include at least one `altinn:*` scope (e.g. `altinn:portal/enduser`) |
 | `SpaBaseUrl` | Dev / split-origin | Public SPA origin (e.g. `https://localhost:5173`). OIDC callback and post-login redirect use this host. Leave empty when SPA and API share the same origin (Front Door + APIM). |
 | `CookieName` | No | Broker session cookie name (default `AltinnBrokerSession`) |
 
 Fixed in code (not configurable): callback `/broker/api/v1/authentication/callback`, front-channel logout `/broker/api/v1/authentication/frontchannel-logout`, back-channel logout `/broker/api/v1/authentication/backchannel-logout`, post-logout redirect `/`, required ACR `idporten-loa-substantial`, session lifetime 60 minutes.
 
-#### `offline_access` and session renewal
+#### Refresh tokens and session renewal
 
 The Altinn token stored in the session cookie is short-lived — shorter than the cookie itself. When
 it expires, Broker redeems the stored ID-Porten refresh token, gets a new access token and exchanges
@@ -123,13 +123,30 @@ it for a new Altinn token, all inside the request. Without a refresh token there
 and the user is redirected to ID-Porten every time the Altinn token expires — a login round-trip they
 never asked for, invisible whenever the ID-Porten SSO session is still alive.
 
-The ID-Porten client must therefore be registered in Samarbeidsportalen with:
+ID-Porten controls this through the client registration in Samarbeidsportalen, not through a scope.
+`offline_access` is **not** used: ID-Porten treats it as an ordinary scope and rejects the whole
+authorization request (`invalid_scope`) unless it is registered on the client.
 
-- the `offline_access` scope, and
-- `refresh_token_lifetime` greater than 0 (ideally at least the 60-minute cookie lifetime).
+Three lifetimes on the client govern the session. ID-Porten's defaults, and what each one does here:
 
-If either is missing, login still works but the warning *"ID-Porten returned no refresh token"* is
-logged on every sign-in and sessions keep bouncing through login.
+| Client setting | Default | Effect on Broker |
+|---|---|---|
+| `access_token_lifetime` | 120 s | The Altinn token inherits it, so renewal runs about every 100 s of active use |
+| `refresh_token_lifetime` | 600 s | The inactivity window — **must match the 60-minute cookie lifetime, so set it to 3600** |
+| `authorization_lifetime` | 7200 s | Hard cap on a session; even an active user is sent through login after it |
+
+Keep `access_token_lifetime < refresh_token_lifetime <= authorization_lifetime`.
+
+`refresh_token_lifetime` is the one that matters. At the 600-second default the refresh token dies
+after ten idle minutes while the cookie lives for sixty, and every session in that gap ends in a
+login redirect — the bug in Altinn/altinn-broker#1021. The two values express the same idea, an
+inactivity timeout, so they have to agree.
+
+`refresh_token` must also be an allowed **grant type**; without it no refresh token is issued at all,
+login still works, and the warning *"ID-Porten returned no refresh token"* is logged on every sign-in.
+
+Raising `access_token_lifetime` would cut how often the refresh token is rotated, but Altinn's
+exchange endpoint may cap the Altinn token's lifetime independently — measure before relying on it.
 
 **Deploy environment variables** (Container App):
 
@@ -145,7 +162,7 @@ logged on every sign-in and sessions keep bouncing through login.
   "Authority": "https://test.idporten.no",
   "ClientId": "<from Samarbeidsportalen>",
   "ClientSecret": "<from Samarbeidsportalen>",
-  "Scopes": ["openid", "profile", "offline_access", "altinn:portal/enduser"],
+  "Scopes": ["openid", "profile", "altinn:portal/enduser"],
   "SpaBaseUrl": "https://localhost:5173"
 }
 ```

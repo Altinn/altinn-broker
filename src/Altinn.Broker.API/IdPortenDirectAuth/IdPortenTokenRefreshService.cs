@@ -152,8 +152,9 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             {
                 _logger.LogWarning(
                     "ID-Porten refresh_token grant failed. Status={StatusCode} Error={Error}. " +
-                    "Common causes: the client is not registered with the offline_access scope or has " +
-                    "refresh_token_lifetime 0, the refresh token expired, or the session was revoked.",
+                    "Common causes: the refresh token has already been redeemed (ID-Porten rotates them), " +
+                    "refresh_token_lifetime expired before renewal was needed, the client is not registered " +
+                    "with refresh_token as a grant type, or the session was revoked.",
                     (int)response.StatusCode,
                     ReadErrorCode(body));
                 return null;
@@ -178,6 +179,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             // ID-Porten rotates on every refresh; fall back to the redeemed token only for
             // providers (or stubs) that choose not to.
             var refreshToken = ReadString(document.RootElement, "refresh_token") ?? redeemedRefreshToken;
+            _logger.LogInformation("Renewed the ID-Porten session; no login redirect needed.");
             return new IdPortenTokens(accessToken, refreshToken);
         }
         catch (JsonException ex)
@@ -192,7 +194,13 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         try
         {
             var cached = await _cache.GetStringAsync(cacheKey, cancellationToken);
-            return cached is null ? null : JsonSerializer.Deserialize<IdPortenTokens>(cached);
+            if (cached is null)
+            {
+                return null;
+            }
+
+            _logger.LogDebug("Replayed a recent ID-Porten refresh instead of redeeming a spent token.");
+            return JsonSerializer.Deserialize<IdPortenTokens>(cached);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
