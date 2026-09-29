@@ -282,7 +282,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadStarted,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }
@@ -351,7 +350,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadProcessing,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }

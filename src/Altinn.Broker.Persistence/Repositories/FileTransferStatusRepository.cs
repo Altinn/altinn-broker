@@ -8,7 +8,7 @@ using Npgsql;
 namespace Altinn.Broker.Persistence.Repositories;
 public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWithRetries commandExecutor) : IFileTransferStatusRepository
 {
-    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, string? vendor = null, CancellationToken cancellationToken = default)
+    public async Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, string? vendor = null, CancellationToken cancellationToken = default)
     {
         // This query performs two operations atomically:
         // 1. Inserts a new file transfer status record into the history table
@@ -19,6 +19,9 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         //   * No latest status exists (latest_file_status_date IS NULL), OR
         //   * Newer by timestamp (new_date > old_date), OR
         //   * Same timestamp but higher ID (handles edge case of simultaneous inserts)
+        //
+        // The timestamp is set by the database so that all replicas share one clock. clock_timestamp() is used
+        // rather than NOW(), since NOW() is frozen at the start of the transaction.
         var query = @"
             WITH inserted_status AS (
                 INSERT INTO broker.file_transfer_status (
@@ -28,7 +31,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                     file_transfer_status_detailed_description,
                     vendor
                 )
-                VALUES (@fileTransferId, @statusId, @insertedStatusTimestamp, @detailedFileTransferStatus, @vendor)
+                VALUES (@fileTransferId, @statusId, clock_timestamp() AT TIME ZONE 'UTC', @detailedFileTransferStatus, @vendor)
                 RETURNING file_transfer_status_id_pk, file_transfer_status_date, file_transfer_status_description_id_fk
             ),
             updated_file_transfer AS (
@@ -55,7 +58,6 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         await using var command = dataSource.CreateCommand(query);
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@statusId", (int)status);
-        command.Parameters.AddWithValue("@insertedStatusTimestamp", timestamp);
         command.Parameters.AddWithValue("@detailedFileTransferStatus", detailedFileTransferStatus is null ? DBNull.Value : detailedFileTransferStatus);
         command.Parameters.AddWithValue("@vendor", (object?)vendor ?? DBNull.Value);
 
@@ -107,6 +109,35 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
         command.Parameters.AddWithValue("@statusFilters", statusFilters.Select(s => (int)s).ToArray());
         command.Parameters.AddWithValue("@minStatusDate", minStatusDate);
 
+        return await ReadCurrentFileTransferStatuses(command, cancellationToken);
+    }
+
+    public async Task<List<FileTransferStatusEntity>> GetInitializedFileTransfersWithStartedUploadOlderThanDate(DateTime minStatusDate, CancellationToken cancellationToken)
+    {
+        var query = @"
+            SELECT ft.file_transfer_id_pk, ft.latest_file_status_id, ft.latest_file_status_date, ftsd.file_transfer_status_description
+            FROM broker.file_transfer ft
+            LEFT JOIN broker.file_transfer_status_description ftsd on ftsd.file_transfer_status_description_id_pk = ft.latest_file_status_id
+            WHERE ft.latest_file_status_id = @initializedStatus
+            AND ft.latest_file_status_date < @minStatusDate
+            AND EXISTS (
+                SELECT 1
+                FROM broker.file_transfer_status fs
+                WHERE fs.file_transfer_id_fk = ft.file_transfer_id_pk
+                AND fs.file_transfer_status_description_id_fk = @uploadStartedStatus
+            )
+        ";
+
+        await using var command = dataSource.CreateCommand(query);
+        command.Parameters.AddWithValue("@initializedStatus", (int)FileTransferStatus.Initialized);
+        command.Parameters.AddWithValue("@uploadStartedStatus", (int)FileTransferStatus.UploadStarted);
+        command.Parameters.AddWithValue("@minStatusDate", minStatusDate);
+
+        return await ReadCurrentFileTransferStatuses(command, cancellationToken);
+    }
+
+    private async Task<List<FileTransferStatusEntity>> ReadCurrentFileTransferStatuses(NpgsqlCommand command, CancellationToken cancellationToken)
+    {
         return await commandExecutor.ExecuteWithRetry(async (ct) =>
         {
             var fileTransferStatuses = new List<FileTransferStatusEntity>();
