@@ -1,4 +1,7 @@
+using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.CreateNotificationOrder;
+using Altinn.Broker.Application.SendNotificationOrder;
 using Altinn.Broker.Application.DownloadFile;
 using Altinn.Broker.Application.GetFileTransferSummaries;
 using Altinn.Broker.Application.PurgeFileTransfer;
@@ -61,5 +64,8 @@ public static class DependencyInjection
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
         services.AddScoped<GetActiveFileTransferDetailsHandler>();
+        services.AddScoped<CreateNotificationOrderHandler>();
+        services.AddScoped<SendNotificationOrderHandler>();
+        services.AddScoped<CheckNotificationDeliveryHandler>();
     }
 }
