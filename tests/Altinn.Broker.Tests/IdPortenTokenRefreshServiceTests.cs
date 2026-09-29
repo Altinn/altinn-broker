@@ -110,6 +110,29 @@ public class IdPortenTokenRefreshServiceTests
         Assert.Null(await CreateService(handler).RefreshAsync("refresh-1"));
     }
 
+    /// <summary>
+    /// The client has a short timeout, and HttpClient surfaces that as TaskCanceledException. This
+    /// runs on the auth path of every request, so it has to end the session, not throw a 500.
+    /// </summary>
+    [Fact]
+    public async Task RefreshAsync_WhenTheCallTimesOut_ReturnsNull()
+    {
+        var handler = new StubHttpMessageHandler(_ => throw new TaskCanceledException("timeout"));
+
+        Assert.Null(await CreateService(handler).RefreshAsync("refresh-1"));
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WhenTheCallerCancels_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var handler = new StubHttpMessageHandler(_ => throw new TaskCanceledException("cancelled"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateService(handler).RefreshAsync("refresh-1", cancellation.Token));
+    }
+
     [Fact]
     public async Task RefreshAsync_WithoutRefreshToken_ReturnsNullWithoutCallingIdPorten()
     {

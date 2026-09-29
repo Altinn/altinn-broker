@@ -131,21 +131,12 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         };
 
         string body;
-        HttpResponseMessage response;
         try
         {
             // Deliberately not retried: ID-Porten may have rotated the token before failing,
             // and a retry would then redeem a token that is already spent.
-            response = await _httpClientFactory.CreateClient(HttpClientName).SendAsync(request, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "ID-Porten refresh_token grant could not be sent.");
-            return null;
-        }
-
-        using (response)
-        {
+            using var response = await _httpClientFactory.CreateClient(HttpClientName)
+                .SendAsync(request, cancellationToken);
             body = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -159,6 +150,14 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                     ReadErrorCode(body));
                 return null;
             }
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Covers a dropped connection mid-read and the client timeout, which surfaces as
+            // TaskCanceledException. This runs on the auth path of every request, so it has to end
+            // the session cleanly rather than throw a 500. A genuine caller cancellation still propagates.
+            _logger.LogWarning(ex, "ID-Porten refresh_token grant failed to complete.");
+            return null;
         }
 
         return Parse(body, refreshToken);
