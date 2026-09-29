@@ -13,6 +13,8 @@ export type AuthorizedResource = {
   canReceive: boolean
   /** Party is a Broker service owner and the user has publish on ttd-brokerbox-utvikling for that party. */
   canPublish: boolean
+  /** The selected party is configured as a Broker service owner. */
+  isServiceOwner: boolean
 }
 
 export function fetchAuthorizedResources(party: string): Promise<AuthorizedResource[]> {

@@ -79,6 +79,7 @@ export function ServiceDetails({
           configuration={configuration}
           onBehalfOf={onBehalfOf}
           canPublish={resource.canPublish}
+          isServiceOwner={resource.isServiceOwner}
           sender={sender}
           recipients={allowedRecipients}
         />

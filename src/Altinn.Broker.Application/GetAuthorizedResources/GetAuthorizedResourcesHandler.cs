@@ -63,7 +63,9 @@ public class GetAuthorizedResourcesHandler(
             return Errors.AuthorizationUnavailable;
         }
 
-        var canConfigureForParty = await CanConfigureBrokerResources(user, party, cancellationToken);
+        var isServiceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is not null;
+        var canConfigureForParty = isServiceOwner
+            && await HasGatekeeperPublish(user, party, cancellationToken);
 
         var accessibleResources = authorizedResources
             .Where(authorized => authorized.CanSend || authorized.CanReceive)
@@ -85,7 +87,8 @@ public class GetAuthorizedResourcesHandler(
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
-                CanPublish = canConfigureForParty && ownedByParty
+                CanPublish = canConfigureForParty && ownedByParty,
+                IsServiceOwner = isServiceOwner
             };
         }));
 
@@ -94,20 +97,11 @@ public class GetAuthorizedResourcesHandler(
             .ToList();
     }
 
-    /// <summary>
-    /// BrokerBox configuration is gated by Broker service-owner status plus
-    /// <c>publish</c> on the gatekeeper resource for the party.
-    /// </summary>
-    private async Task<bool> CanConfigureBrokerResources(
+    private async Task<bool> HasGatekeeperPublish(
         ClaimsPrincipal? user,
         string party,
         CancellationToken cancellationToken)
     {
-        if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
-        {
-            return false;
-        }
-
         try
         {
             return await authorizationService.CheckAccessAsPublisher(

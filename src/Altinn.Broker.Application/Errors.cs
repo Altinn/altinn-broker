@@ -49,12 +49,12 @@ public static class Errors
     /// </summary>
     public static Error NoPublishAccessToConfigureResource = new Error(
         36,
-        $"You must have a role or access package that grants the \"publish\" access right (tilgangsrettighet) on the resource \"{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}\" for the selected organization. See access rights at: https://tjenesteoversikten.no/resource/{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}",
+        $"You must have access according to the access rules for \"{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}\" to edit a service. See: https://tjenesteoversikten.no/resource/{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}",
         HttpStatusCode.Forbidden);
 
     public static Error PartyIsNotBrokerServiceOwner = new Error(
         37,
-        "The selected party is not configured as a Broker service owner.",
+        "You must be a service owner to update a resource.",
         HttpStatusCode.Forbidden);
 
     public static Error ResourceNotOwnedByParty = new Error(

@@ -2,12 +2,12 @@
  * Localized messages for Broker API error codes shown in the SPA.
  * Keys match the numeric `errorCode` extension on ProblemDetails responses.
  */
-const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'ttd-brokerbox-utvikling'
+export const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'ttd-brokerbox-utvikling'
 
 const nbMessages: Record<number, (context: ApiErrorMessageContext) => string> = {
   36: () =>
-    `Du må ha en rolle eller tilgangspakke som gir tilgangsrettigheten «publish» på tjenesten ${BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID} for den valgte virksomheten.`,
-  37: () => 'Virksomheten er ikke satt opp som tjenesteeier i Broker.',
+    `Du må ha tilgang i henhold til tilgangsreglene for ${BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID} for å redigere en tjeneste.`,
+  37: () => 'Du må være tjeneste-eier for å oppdatere ressurs',
   38: () => 'Du kan bare endre oppsett for tjenester som eies av virksomheten du representerer.',
 }
 
@@ -18,9 +18,15 @@ export type ApiErrorMessageContext = {
 export type LocalizedApiError = {
   /** Numeric Broker error code from the API (`errorCode` extension), when present. */
   errorCode?: number
+  /**
+   * Plain message. When <c>linkHref</c> is set with <c>linkInMessage</c>, the link label
+   * is meant to appear inline where the gatekeeper resource id is mentioned.
+   */
   message: string
   linkHref?: string
   linkLabel?: string
+  /** When true, render <c>linkLabel</c> inline inside the message (replace the label text). */
+  linkInMessage?: boolean
 }
 
 /** Builds the public tjenesteoversikten page for a resource's tilgangsrettigheter. */
@@ -28,14 +34,31 @@ export function tjenesteoversiktenResourceUrl(resourceId: string): string {
   return `https://tjenesteoversikten.no/resource/${encodeURIComponent(resourceId)}`
 }
 
-/** Notice shown when the user lacks publish access to configure Broker resources. */
-export function publishAccessNotice(_resourceId?: string): LocalizedApiError {
+/**
+ * Notice when the user cannot edit Broker configuration.
+ * Non–service-owners get a short ownership message; service owners without
+ * gatekeeper publish get a message with a tjenesteoversikten link on the resource id.
+ */
+export function configureAccessNotice(isServiceOwner: boolean): LocalizedApiError {
+  if (!isServiceOwner) {
+    return {
+      errorCode: 37,
+      message: nbMessages[37]({}),
+    }
+  }
+
   return {
     errorCode: 36,
     message: nbMessages[36]({}),
     linkHref: tjenesteoversiktenResourceUrl(BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID),
-    linkLabel: 'Se tilgangsrettigheter på tjenesteoversikten.no',
+    linkLabel: BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID,
+    linkInMessage: true,
   }
+}
+
+/** @deprecated Prefer {@link configureAccessNotice}. */
+export function publishAccessNotice(_resourceId?: string): LocalizedApiError {
+  return configureAccessNotice(true)
 }
 
 /**
@@ -52,7 +75,11 @@ export function localizeApiError(
   const messages = locale === 'nb' ? nbMessages : nbMessages
 
   if (errorCode === 36) {
-    return publishAccessNotice(context.resourceId)
+    return configureAccessNotice(true)
+  }
+
+  if (errorCode === 37) {
+    return configureAccessNotice(false)
   }
 
   if (errorCode !== undefined && messages[errorCode]) {
@@ -65,6 +92,28 @@ export function localizeApiError(
   return {
     errorCode,
     message: detail ?? 'Noe gikk galt. Prøv igjen.',
+  }
+}
+
+/** Renders a localized error that may contain an inline link (gatekeeper resource id). */
+export function messageWithOptionalInlineLink(error: LocalizedApiError): {
+  before: string
+  link?: { href: string; label: string }
+  after: string
+} {
+  if (!error.linkInMessage || !error.linkHref || !error.linkLabel) {
+    return { before: error.message, after: '' }
+  }
+
+  const index = error.message.indexOf(error.linkLabel)
+  if (index < 0) {
+    return { before: error.message, link: { href: error.linkHref, label: error.linkLabel }, after: '' }
+  }
+
+  return {
+    before: error.message.slice(0, index),
+    link: { href: error.linkHref, label: error.linkLabel },
+    after: error.message.slice(index + error.linkLabel.length),
   }
 }
 

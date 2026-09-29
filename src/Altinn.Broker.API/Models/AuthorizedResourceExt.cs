@@ -44,4 +44,10 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("canPublish")]
     public bool CanPublish { get; set; }
+
+    /// <summary>
+    /// Whether the requested party is configured as a Broker service owner.
+    /// </summary>
+    [JsonPropertyName("isServiceOwner")]
+    public bool IsServiceOwner { get; set; }
 }

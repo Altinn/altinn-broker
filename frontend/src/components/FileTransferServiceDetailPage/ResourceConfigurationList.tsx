@@ -10,7 +10,11 @@ import {
   formatOrgNumber,
   toOrgNumber,
 } from '../../helpers/orgIdentifierHelper'
-import { publishAccessNotice } from '../../i18n/apiErrors'
+import {
+  configureAccessNotice,
+  messageWithOptionalInlineLink,
+  type LocalizedApiError,
+} from '../../i18n/apiErrors'
 import {
   useResourceConfigurationEditor,
   type ConfigurationDraft,
@@ -22,12 +26,36 @@ const NOT_SET = '–'
 const NO_LIMIT = 'Ingen grense satt'
 const NO_REQUIRED_PARTY = ''
 
+function LocalizedErrorText({ error }: { error: LocalizedApiError }) {
+  const parts = messageWithOptionalInlineLink(error)
+  if (!parts.link) {
+    return <span>{parts.before}</span>
+  }
+
+  return (
+    <span>
+      {parts.before}
+      <a
+        href={parts.link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="resource-configuration__error-link"
+      >
+        {parts.link.label}
+      </a>
+      {parts.after}
+    </span>
+  )
+}
+
 type ResourceConfigurationListProps = {
   resourceId: string
   configuration: ResourceConfiguration
   onBehalfOf: string
   /** When false, the edit toggle is disabled and an access notice is shown. */
   canPublish: boolean
+  /** Used to choose between service-owner vs gatekeeper access notices. */
+  isServiceOwner: boolean
   sender: AllowedRecipient
   recipients: AllowedRecipient[]
 }
@@ -37,11 +65,12 @@ export function ResourceConfigurationList({
   configuration,
   onBehalfOf,
   canPublish,
+  isServiceOwner,
   sender,
   recipients,
 }: ResourceConfigurationListProps) {
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
-  const publishNotice = canPublish ? null : publishAccessNotice(resourceId)
+  const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
   const partyOptions = useMemo(
     () => buildRequiredPartyOptions(sender, recipients, editor.configuration.requiredParty),
     [sender, recipients, editor.configuration.requiredParty],
@@ -64,35 +93,14 @@ export function ResourceConfigurationList({
         />
         {publishNotice && (
           <Field.Description>
-            {publishNotice.message}{' '}
-            <a
-              href={publishNotice.linkHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="resource-configuration__error-link"
-            >
-              {publishNotice.linkLabel}
-            </a>
+            <LocalizedErrorText error={publishNotice} />
           </Field.Description>
         )}
       </Field>
 
       {editor.saveError && (
         <Alert data-color="danger" className="resource-configuration__alert">
-          <span>{editor.saveError.message}</span>
-          {editor.saveError.linkHref && (
-            <>
-              {' '}
-              <a
-                href={editor.saveError.linkHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="resource-configuration__error-link"
-              >
-                {editor.saveError.linkLabel ?? editor.saveError.linkHref}
-              </a>
-            </>
-          )}
+          <LocalizedErrorText error={editor.saveError} />
         </Alert>
       )}
 
