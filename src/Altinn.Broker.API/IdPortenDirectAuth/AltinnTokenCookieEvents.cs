@@ -18,13 +18,9 @@ namespace Altinn.Broker.API.IdPortenDirectAuth;
 public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 {
     /// <summary>
-    /// Re-exchange this far ahead of the Altinn token's expiry, so no request travels downstream
-    /// with a token that expires mid-flight.
-    ///
-    /// Keep it small. Altinn's exchange endpoint issues tokens that live only two minutes, so a
-    /// leeway anywhere near that makes every single request trigger a renewal — and every renewal
-    /// rotates the ID-Porten refresh token. This only has to outlast the downstream calls made
-    /// within one request.
+    /// Re-exchange this far ahead of expiry, so no request travels downstream with a token that
+    /// expires mid-flight. Keep it small: Altinn issues two-minute tokens, so a larger leeway
+    /// renews on every request.
     /// </summary>
     private static readonly TimeSpan ExpiryLeeway = TimeSpan.FromSeconds(20);
 
@@ -106,8 +102,8 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             ? new ClaimsPrincipal(identity)
             : new ClaimsPrincipal([identity, idPortenIdentity]));
 
-        // ShouldRenew is left as the cookie middleware set it: forcing it to false here would both
-        // discard a token refreshed above and disable the configured sliding expiration.
+        // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
+        // token and disable sliding expiration.
     }
 
     private static async Task EndSession(CookieValidatePrincipalContext context)
@@ -130,9 +126,9 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
     }
 
     /// <summary>
-    /// Trades the stored ID-Porten refresh token for a fresh access token and exchanges that for a
-    /// new Altinn token. Without this the session dies at the Altinn token's expiry even though the
-    /// cookie and the ID-Porten session are both still alive, and the user is bounced through login.
+    /// Trades the stored refresh token for a fresh ID-Porten access token and exchanges that for a
+    /// new Altinn token. Without it the session dies at the Altinn token's expiry even though the
+    /// cookie is still valid.
     /// </summary>
     private async Task<bool> TryReExchange(CookieValidatePrincipalContext context, List<AuthenticationToken> tokens)
     {
@@ -142,8 +138,7 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             return false;
         }
 
-        // Not tied to RequestAborted: a cancelled refresh would leave ID-Porten's rotated token
-        // unrecorded, and the next request would find a refresh token that is already spent.
+        // Not tied to RequestAborted: a cancelled refresh would leave the rotated token unrecorded.
         var refreshed = await _tokenRefreshService.RefreshAsync(refreshToken, CancellationToken.None);
         if (refreshed is null)
         {

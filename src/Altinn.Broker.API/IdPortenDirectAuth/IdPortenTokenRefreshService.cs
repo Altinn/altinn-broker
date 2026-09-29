@@ -13,26 +13,17 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
-/// Redeems ID-Porten refresh tokens so an expired Altinn token can be re-exchanged without
-/// bouncing the user through a login redirect.
-///
-/// ID-Porten rotates refresh tokens: redeeming one consumes it and returns a new one. The SPA
-/// fires several API calls in parallel, so the same cookie can reach ValidatePrincipal on several
-/// requests at once. Without coordination each of those would redeem the same refresh token and
-/// all but one would fail with invalid_grant, killing the session — the very symptom this exists
-/// to remove. Two guards prevent it:
-///   1. an in-process single-flight lock, so concurrent requests on one replica make one call, and
-///   2. a short-lived distributed cache entry keyed by the redeemed token, so requests that still
-///      carry the pre-refresh cookie (or land on another replica) replay the same result.
+/// Redeems ID-Porten refresh tokens so an expired Altinn token can be re-exchanged without a
+/// login redirect. ID-Porten consumes the token it is given and returns a new one, and the SPA
+/// calls the API in parallel, so redemption is guarded by a single-flight lock and a short-lived
+/// distributed cache keyed on the redeemed token. Without both, all but one parallel request
+/// would fail with invalid_grant and end the session.
 /// </summary>
 public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
 {
     internal const string HttpClientName = "idporten-token-refresh";
 
-    /// <summary>
-    /// How long a refresh result stays replayable for requests still carrying the pre-refresh cookie.
-    /// Must comfortably outlive an in-flight request, and stay well under the refresh token lifetime.
-    /// </summary>
+    /// <summary>How long a result stays replayable for requests still carrying the old cookie.</summary>
     private static readonly TimeSpan ResultCacheLifetime = TimeSpan.FromMinutes(2);
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _singleFlightLocks = new();
@@ -133,8 +124,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         string body;
         try
         {
-            // Deliberately not retried: ID-Porten may have rotated the token before failing,
-            // and a retry would then redeem a token that is already spent.
+            // Not retried: ID-Porten may have rotated the token before failing.
             using var response = await _httpClientFactory.CreateClient(HttpClientName)
                 .SendAsync(request, cancellationToken);
             body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -153,9 +143,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
-            // Covers a dropped connection mid-read and the client timeout, which surfaces as
-            // TaskCanceledException. This runs on the auth path of every request, so it has to end
-            // the session cleanly rather than throw a 500. A genuine caller cancellation still propagates.
+            // Client timeouts surface as TaskCanceledException. This runs on every request's auth
+            // path, so it must end the session cleanly rather than throw a 500.
             _logger.LogWarning(ex, "ID-Porten refresh_token grant failed to complete.");
             return null;
         }
@@ -175,8 +164,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return null;
             }
 
-            // ID-Porten rotates on every refresh; fall back to the redeemed token only for
-            // providers (or stubs) that choose not to.
+            // ID-Porten rotates on every refresh; the fallback covers providers that do not.
             var refreshToken = ReadString(document.RootElement, "refresh_token") ?? redeemedRefreshToken;
             _logger.LogInformation("Renewed the ID-Porten session; no login redirect needed.");
             return new IdPortenTokens(accessToken, refreshToken);

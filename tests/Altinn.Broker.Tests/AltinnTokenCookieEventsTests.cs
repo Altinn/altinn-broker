@@ -14,10 +14,6 @@ using Xunit;
 
 namespace Altinn.Broker.Tests;
 
-/// <summary>
-/// Covers the session renewal that keeps users out of the ID-Porten login redirect while their
-/// cookie is still valid (Altinn/altinn-broker#1021).
-/// </summary>
 public class AltinnTokenCookieEventsTests
 {
     private const string AltinnTokenName = "altinn_token";
@@ -55,10 +51,6 @@ public class AltinnTokenCookieEventsTests
         Assert.Contains(context.Principal!.Claims, claim => claim.Type == "urn:altinn:userid");
     }
 
-    /// <summary>
-    /// The regression itself: re-exchange used to look for a token name that login never stored,
-    /// so the session was dropped the moment the Altinn token expired.
-    /// </summary>
     [Fact]
     public async Task ValidatePrincipal_UsesTheRefreshTokenNameStoredAtLogin()
     {
@@ -73,10 +65,6 @@ public class AltinnTokenCookieEventsTests
         Assert.Equal(0, refreshService.Calls);
     }
 
-    /// <summary>
-    /// Altinn's exchange endpoint issues tokens that live two minutes. A leeway anywhere near that
-    /// makes every request renew, rotating the ID-Porten refresh token each time.
-    /// </summary>
     [Fact]
     public async Task ValidatePrincipal_WithFreshShortLivedAltinnToken_DoesNotRefresh()
     {
@@ -132,10 +120,6 @@ public class AltinnTokenCookieEventsTests
         Assert.Null(context.Principal);
     }
 
-    /// <summary>
-    /// The cookie is configured with sliding expiration; clearing ShouldRenew here would cap every
-    /// session at the cookie lifetime no matter how active the user is.
-    /// </summary>
     [Fact]
     public async Task ValidatePrincipal_LeavesSlidingExpirationToTheCookieMiddleware()
     {
@@ -206,7 +190,6 @@ public class AltinnTokenCookieEventsTests
             ticket);
     }
 
-    /// <summary>Mirrors IdPortenPrincipalClaims.AuthenticationType, which is internal to the API project.</summary>
     private const string IdPortenPrincipalClaimsAuthenticationType = "IdPorten";
 
     private static string CreateAltinnToken(TimeSpan validFor)

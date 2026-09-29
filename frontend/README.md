@@ -115,39 +115,6 @@ Used for direct ID-Porten login. Section name is unchanged for existing deployme
 
 Fixed in code (not configurable): callback `/broker/api/v1/authentication/callback`, front-channel logout `/broker/api/v1/authentication/frontchannel-logout`, back-channel logout `/broker/api/v1/authentication/backchannel-logout`, post-logout redirect `/`, required ACR `idporten-loa-substantial`, session lifetime 60 minutes.
 
-#### Refresh tokens and session renewal
-
-The Altinn token stored in the session cookie is short-lived — shorter than the cookie itself. When
-it expires, Broker redeems the stored ID-Porten refresh token, gets a new access token and exchanges
-it for a new Altinn token, all inside the request. Without a refresh token there is nothing to renew,
-and the user is redirected to ID-Porten every time the Altinn token expires — a login round-trip they
-never asked for, invisible whenever the ID-Porten SSO session is still alive.
-
-ID-Porten controls this through the client registration in Samarbeidsportalen, not through a scope.
-`offline_access` is **not** used: ID-Porten treats it as an ordinary scope and rejects the whole
-authorization request (`invalid_scope`) unless it is registered on the client.
-
-Three lifetimes on the client govern the session. ID-Porten's defaults, and what each one does here:
-
-| Client setting | Default | Effect on Broker |
-|---|---|---|
-| `access_token_lifetime` | 120 s | The Altinn token inherits it, so renewal runs about every 100 s of active use |
-| `refresh_token_lifetime` | 600 s | The inactivity window — **must match the 60-minute cookie lifetime, so set it to 3600** |
-| `authorization_lifetime` | 7200 s | Hard cap on a session; even an active user is sent through login after it |
-
-Keep `access_token_lifetime < refresh_token_lifetime <= authorization_lifetime`.
-
-`refresh_token_lifetime` is the one that matters. At the 600-second default the refresh token dies
-after ten idle minutes while the cookie lives for sixty, and every session in that gap ends in a
-login redirect — the bug in Altinn/altinn-broker#1021. The two values express the same idea, an
-inactivity timeout, so they have to agree.
-
-`refresh_token` must also be an allowed **grant type**; without it no refresh token is issued at all,
-login still works, and the warning *"ID-Porten returned no refresh token"* is logged on every sign-in.
-
-Raising `access_token_lifetime` would cut how often the refresh token is rotated, but Altinn's
-exchange endpoint may cap the Altinn token's lifetime independently — measure before relying on it.
-
 **Deploy environment variables** (Container App):
 
 - `IdPortenDirectAuthSettings__Authority` ← `IDPORTEN_AUTHORITY`
@@ -166,6 +133,33 @@ exchange endpoint may cap the Altinn token's lifetime independently — measure 
   "SpaBaseUrl": "https://localhost:5173"
 }
 ```
+
+**Refresh tokens and session renewal**
+
+The Altinn token in the session cookie is shorter-lived than the cookie itself. When it expires,
+Broker redeems the stored ID-Porten refresh token and exchanges the new access token for a new
+Altinn token, inside the request. Without a refresh token there is nothing to renew, and the user
+is sent through login every time the Altinn token expires.
+
+ID-Porten controls this through the client registration, not through a scope. `offline_access` is
+not used: it is an ordinary scope there, and the authorization request is rejected with
+`invalid_scope` unless it is registered on the client. `refresh_token` must be an allowed grant
+type, or no refresh token is issued and *"ID-Porten returned no refresh token"* is logged on every
+sign-in.
+
+| Client setting | Default | Effect on Broker |
+|---|---|---|
+| `access_token_lifetime` | 120 s | Inherited by the Altinn token, so renewal runs about every 100 s of active use |
+| `refresh_token_lifetime` | 600 s | Inactivity window — **set to 3600 to match the cookie** |
+| `authorization_lifetime` | 7200 s | Hard cap on a session, regardless of activity |
+
+Keep `access_token_lifetime < refresh_token_lifetime <= authorization_lifetime`.
+
+At the 600-second default the refresh token dies after ten idle minutes while the cookie lives for
+sixty. Sessions in that gap are valid but cannot be renewed, which is the bug in
+Altinn/altinn-broker#1021 — both values express an inactivity timeout, so they have to agree.
+Raising `access_token_lifetime` may not reduce rotation; Altinn can cap the exchanged token
+independently.
 
 ### `AltinnPlatformAuth`
 

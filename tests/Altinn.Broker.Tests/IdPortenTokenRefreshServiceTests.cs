@@ -51,10 +51,6 @@ public class IdPortenTokenRefreshServiceTests
         Assert.Contains("client_secret=secret", body);
     }
 
-    /// <summary>
-    /// ID-Porten consumes the refresh token it is given. The SPA issues several API calls at once,
-    /// so without single-flight all but the first would fail with invalid_grant and kill the session.
-    /// </summary>
     [Fact]
     public async Task RefreshAsync_ConcurrentCallsWithSameToken_RedeemItOnce()
     {
@@ -77,10 +73,6 @@ public class IdPortenTokenRefreshServiceTests
         Assert.All(results, tokens => Assert.Equal("refresh-2", tokens!.RefreshToken));
     }
 
-    /// <summary>
-    /// A request that started before the refresh still carries the old cookie; replaying the cached
-    /// result keeps it alive instead of redeeming a token that is already spent.
-    /// </summary>
     [Fact]
     public async Task RefreshAsync_SameTokenTwice_ReplaysCachedResult()
     {
@@ -110,10 +102,6 @@ public class IdPortenTokenRefreshServiceTests
         Assert.Null(await CreateService(handler).RefreshAsync("refresh-1"));
     }
 
-    /// <summary>
-    /// The client has a short timeout, and HttpClient surfaces that as TaskCanceledException. This
-    /// runs on the auth path of every request, so it has to end the session, not throw a 500.
-    /// </summary>
     [Fact]
     public async Task RefreshAsync_WhenTheCallTimesOut_ReturnsNull()
     {
