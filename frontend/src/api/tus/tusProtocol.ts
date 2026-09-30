@@ -1,4 +1,4 @@
-import { ApiError, redirectToLogin } from '../client'
+import { ApiError, redirectToLoginIfSessionEnded } from '../client'
 import { BROKER_API_PREFIX, apiUrl } from '../config'
 
 const TUS_PATH = `${BROKER_API_PREFIX}/filetransfer/upload/tus`
@@ -75,7 +75,7 @@ async function tusRequest(
   })
 
   if (response.status === 401) {
-    redirectToLogin()
+    await redirectToLoginIfSessionEnded()
     throw new ApiError('Unauthorized', 401)
   }
 

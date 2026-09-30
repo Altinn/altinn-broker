@@ -6,7 +6,7 @@ import {
   type HttpStack,
   type UploadOptions,
 } from 'tus-js-client'
-import { ApiError, redirectToLogin } from '../client'
+import { ApiError, redirectToLoginIfSessionEnded } from '../client'
 import { apiUrl } from '../config'
 import { createPartialUpload, createUpload, getUploadInfo, tusUploadPath } from './tusProtocol'
 
@@ -286,7 +286,7 @@ function shouldRetry(error: DetailedError): boolean {
   const status = error.originalResponse?.getStatus() ?? 0
 
   if (status === 401) {
-    redirectToLogin()
+    void redirectToLoginIfSessionEnded()
     return false
   }
 

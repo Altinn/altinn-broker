@@ -1,5 +1,6 @@
 using Altinn.Broker.API.AltinnPlatformAuth.Options;
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.IdPortenDirectAuth;
 using Altinn.Broker.Core.Services;
 
 using Microsoft.AspNetCore.Authentication;
@@ -31,7 +32,9 @@ public sealed class EndUserTokenProvider : IEndUserTokenProvider
         }
 
         // IdPortenDirectAuth stores the exchanged Altinn token in the session cookie properties.
-        var sessionToken = await httpContext.GetTokenAsync(AuthorizationConstants.EndUserCookie, "altinn_token");
+        var sessionToken = await httpContext.GetTokenAsync(
+            AuthorizationConstants.EndUserCookie,
+            OidcSessionKeys.AltinnToken);
         if (!string.IsNullOrWhiteSpace(sessionToken))
         {
             return sessionToken;
