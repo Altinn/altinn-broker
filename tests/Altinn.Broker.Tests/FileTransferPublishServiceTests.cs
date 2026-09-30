@@ -27,7 +27,6 @@ public class FileTransferPublishServiceTests
     {
         // Arrange
         var fileTransfer = CreateFileTransfer(recipientCount: 2);
-        var timestamp = DateTimeOffset.UtcNow;
         var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
@@ -43,7 +42,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
@@ -56,7 +54,7 @@ public class FileTransferPublishServiceTests
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
-        var published = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        var published = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.True(published);
@@ -67,7 +65,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()),
@@ -131,7 +128,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
@@ -147,7 +143,7 @@ public class FileTransferPublishServiceTests
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
-        await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         // Sender + 1 recipient event, plus the notification-send job enqueued last.
@@ -177,7 +173,7 @@ public class FileTransferPublishServiceTests
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
-        var published = await service.TryPublishAsync(fileTransfer, DateTimeOffset.UtcNow, CancellationToken.None);
+        var published = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.False(published);
@@ -185,7 +181,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()),
@@ -222,7 +217,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
@@ -232,11 +226,10 @@ public class FileTransferPublishServiceTests
             .Returns("job-id");
 
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
-        var timestamp = DateTimeOffset.UtcNow;
 
         // Act
-        var first = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
-        var second = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        var first = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
+        var second = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.True(first);
@@ -245,7 +238,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()),
@@ -285,18 +277,16 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("status persistence failed"));
 
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
-        var timestamp = DateTimeOffset.UtcNow;
 
         // Act
         var firstAttempt = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+            service.TryPublishAsync(fileTransfer, CancellationToken.None));
 
         // Recover: claim is available again (transaction rolled back), status succeeds.
         claimTaken = false;
@@ -304,7 +294,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
@@ -313,7 +302,7 @@ public class FileTransferPublishServiceTests
             .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
             .Returns("job-id");
 
-        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        var recovered = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.Equal("status persistence failed", firstAttempt.Message);
@@ -324,7 +313,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()),
@@ -361,7 +349,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
@@ -380,14 +367,13 @@ public class FileTransferPublishServiceTests
             });
 
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
-        var timestamp = DateTimeOffset.UtcNow;
 
         // Act
         await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
-            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+            service.TryPublishAsync(fileTransfer, CancellationToken.None));
 
         claimTaken = false;
-        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        var recovered = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.True(recovered);
@@ -397,7 +383,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()),
@@ -434,7 +419,6 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.InsertFileTransferStatus(
                 It.IsAny<Guid>(),
                 It.IsAny<FileTransferStatus>(),
-                It.IsAny<DateTimeOffset>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
@@ -453,14 +437,13 @@ public class FileTransferPublishServiceTests
             });
 
         var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
-        var timestamp = DateTimeOffset.UtcNow;
 
         // Act
         await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
-            service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None));
+            service.TryPublishAsync(fileTransfer, CancellationToken.None));
 
         claimTaken = false;
-        var recovered = await service.TryPublishAsync(fileTransfer, timestamp, CancellationToken.None);
+        var recovered = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
 
         // Assert
         Assert.True(recovered);
@@ -470,7 +453,6 @@ public class FileTransferPublishServiceTests
             r => r.InsertFileTransferStatus(
                 fileTransfer.FileTransferId,
                 FileTransferStatus.Published,
-                timestamp,
                 null,
                 null,
                 It.IsAny<CancellationToken>()),

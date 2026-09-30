@@ -36,7 +36,6 @@ public class FileTransferPublishService(
     /// </summary>
     public async Task<bool> TryPublishAsync(
         FileTransferEntity fileTransfer,
-        DateTimeOffset timestamp,
         CancellationToken cancellationToken)
     {
         using var transaction = new TransactionScope(
@@ -60,7 +59,6 @@ public class FileTransferPublishService(
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransfer.FileTransferId,
             FileTransferStatus.Published,
-            timestamp: timestamp,
             cancellationToken: cancellationToken);
 
         EnqueuePublishedEvents(fileTransfer);

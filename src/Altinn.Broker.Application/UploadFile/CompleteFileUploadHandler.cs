@@ -44,6 +44,14 @@ public class CompleteFileUploadHandler(
             return Errors.FileTransferNotFound;
         }
 
+        if (fileTransfer.FileTransferStatusEntity.Status == FileTransferStatus.Initialized)
+        {
+            logger.LogError(
+                "CompleteFileUpload failed for file transfer {FileTransferId}: file was uploaded but status is still Initialized",
+                request.FileTransferId);
+            return Errors.UploadFailed;
+        }
+
         if (fileTransfer.FileTransferStatusEntity.Status is not (
             FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing))
         {
@@ -89,7 +97,6 @@ public class CompleteFileUploadHandler(
             await fileTransferStatusRepository.InsertFileTransferStatus(
                 request.FileTransferId,
                 FileTransferStatus.Failed,
-                timestamp: request.UploadFinishedTimestamp,
                 detailedFileTransferStatus: "Checksum mismatch",
                 cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue<IBrokerStorageService>(service =>
@@ -119,7 +126,6 @@ public class CompleteFileUploadHandler(
                             await fileTransferStatusRepository.InsertFileTransferStatus(
                                 request.FileTransferId,
                                 FileTransferStatus.UploadProcessing,
-                                timestamp: request.UploadFinishedTimestamp,
                                 cancellationToken: ct);
                             backgroundJobClient.Enqueue(() => eventBus.Publish(
                                 AltinnEventType.UploadProcessing,
@@ -137,7 +143,6 @@ public class CompleteFileUploadHandler(
                             request.FileTransferId);
                         await fileTransferPublishService.TryPublishAsync(
                             fileTransfer,
-                            DateTimeOffset.UtcNow,
                             ct);
                     }
 
@@ -169,7 +174,6 @@ public class CompleteFileUploadHandler(
                             await fileTransferStatusRepository.InsertFileTransferStatus(
                                 request.FileTransferId,
                                 FileTransferStatus.UploadProcessing,
-                                timestamp: request.UploadFinishedTimestamp,
                                 cancellationToken: ct);
                             backgroundJobClient.Enqueue(() => eventBus.Publish(
                                 AltinnEventType.UploadProcessing,
@@ -184,7 +188,6 @@ public class CompleteFileUploadHandler(
                     {
                         await fileTransferPublishService.TryPublishAsync(
                             fileTransfer,
-                            DateTimeOffset.UtcNow,
                             ct);
                     }
 
@@ -210,7 +213,6 @@ public class CompleteFileUploadHandler(
                 await fileTransferStatusRepository.InsertFileTransferStatus(
                     request.FileTransferId,
                     FileTransferStatus.Failed,
-                    timestamp: DateTime.UtcNow,
                     detailedFileTransferStatus: "Error occurred while uploading fileTransfer",
                     cancellationToken: ct);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(
