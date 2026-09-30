@@ -66,7 +66,8 @@ public class ResourceController : Controller
             UseManifestFileShim = resourceExt.UseManifestFileShim,
             ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
             ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy,
-            RequiredParty = resourceExt.RequiredParty
+            RequiredParty = resourceExt.RequiredParty,
+            ApprovedForDisabledVirusScan = resourceExt.ApprovedForDisabledVirusScan
         }, HttpContext.User, cancellationToken);
 
         return result.Match(

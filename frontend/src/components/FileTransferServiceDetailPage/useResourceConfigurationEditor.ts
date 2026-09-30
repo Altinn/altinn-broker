@@ -21,6 +21,8 @@ export type ConfigurationDraft = {
   purgeFileTransferAfterAllRecipientsConfirmed: boolean
   purgeFileTransferGracePeriodHours: string
   requiredParty: string
+  /** When true, virus scan is required (approvedForDisabledVirusScan is false). */
+  virusScanRequired: boolean
 }
 
 export type ConfigurationDraftErrors = Partial<Record<keyof ConfigurationDraft, string>>
@@ -129,6 +131,7 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
     requiredParty: configuration.requiredParty
       ? (toOrgNumber(configuration.requiredParty) ?? '')
       : '',
+    virusScanRequired: !configuration.approvedForDisabledVirusScan,
   }
 }
 
@@ -182,6 +185,7 @@ function toConfigureInput(draft: ConfigurationDraft): ConfigureResourceInput | n
     purgeFileTransferGracePeriod: hoursToIso8601(grace),
     // Empty string clears; the handler skips only when the property is omitted/null.
     requiredParty: party === '' ? '' : (toOrgIdentifier(party) ?? ''),
+    approvedForDisabledVirusScan: !draft.virusScanRequired,
   }
 
   if (maxSize !== '') {

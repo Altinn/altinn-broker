@@ -76,10 +76,18 @@ public class ConfigureResourceHandler(
         }
 
         var resourceForValidation = existingResource ?? altinnResourceToCreate;
+        var approvedForDisabledVirusScan =
+            request.ApprovedForDisabledVirusScan ?? resourceForValidation?.ApprovedForDisabledVirusScan ?? false;
 
         if (request.MaxFileTransferSize is not null)
         {
-            var error = ValidateMaxFileTransferSize(resourceForValidation, request.MaxFileTransferSize.Value);
+            var error = ValidateMaxFileTransferSize(approvedForDisabledVirusScan, request.MaxFileTransferSize.Value);
+            if (error is not null) return error;
+        }
+        else if (request.ApprovedForDisabledVirusScan is false
+            && resourceForValidation?.MaxFileTransferSize is long existingMax)
+        {
+            var error = ValidateMaxFileTransferSize(approvedForDisabledVirusScan: false, existingMax);
             if (error is not null) return error;
         }
         if (request.FileTransferTimeToLive is not null)
@@ -137,6 +145,13 @@ public class ConfigureResourceHandler(
         {
             await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty, cancellationToken);
         }
+        if (request.ApprovedForDisabledVirusScan is not null)
+        {
+            await resourceRepository.UpdateApprovedForDisabledVirusScan(
+                existingResource!.Id,
+                request.ApprovedForDisabledVirusScan.Value,
+                cancellationToken);
+        }
         return Task.CompletedTask;
     }
 
@@ -174,12 +189,12 @@ public class ConfigureResourceHandler(
         return null;
     }
 
-    private Error? ValidateMaxFileTransferSize(ResourceEntity? resource, long maxFileTransferSize)
+    private Error? ValidateMaxFileTransferSize(bool approvedForDisabledVirusScan, long maxFileTransferSize)
     {
         if (maxFileTransferSize < 0) return Errors.MaxUploadSizeCannotBeNegative;
         if (maxFileTransferSize == 0) return Errors.MaxUploadSizeCannotBeZero;
         if (hostEnvironment.IsProduction()
-            && !(resource?.ApprovedForDisabledVirusScan ?? false)
+            && !approvedForDisabledVirusScan
             && maxFileTransferSize > ApplicationConstants.MaxVirusScanUploadSize)
         {
             return Errors.MaxUploadSizeForVirusScan;

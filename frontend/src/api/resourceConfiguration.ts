@@ -30,7 +30,7 @@ const DEFAULTS: ResourceConfiguration = {
   approvedForDisabledVirusScan: false,
 }
 
-/** An unapproved resource cannot turn off virus scanning, so the scan cap bounds every transfer on it. */
+/** When virus scan is required, transfers are capped at the virus-scan max even if no size is stored. */
 function enforcedMaxFileTransferSize(configured: number | null, approvedForDisabledVirusScan: boolean) {
   if (approvedForDisabledVirusScan) {
     return configured
@@ -49,6 +49,7 @@ export type ConfigureResourceInput = {
   purgeFileTransferAfterAllRecipientsConfirmed?: boolean
   purgeFileTransferGracePeriod?: string
   requiredParty?: string | null
+  approvedForDisabledVirusScan?: boolean
 }
 
 /**

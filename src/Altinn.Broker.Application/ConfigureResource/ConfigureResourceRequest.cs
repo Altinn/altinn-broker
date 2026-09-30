@@ -12,4 +12,5 @@ public class ConfigureResourceRequest
     public string? ExternalServiceCodeLegacy { get; set; }
     public int? ExternalServiceEditionCodeLegacy { get; set; }
     public string? RequiredParty { get; set; }
+    public bool? ApprovedForDisabledVirusScan { get; set; }
 }

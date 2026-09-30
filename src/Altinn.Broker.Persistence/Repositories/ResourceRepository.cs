@@ -192,4 +192,16 @@ public class ResourceRepository(NpgsqlDataSource dataSource, ExecuteDBCommandWit
         
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
+
+    public async Task UpdateApprovedForDisabledVirusScan(string resourceId, bool approvedForDisabledVirusScan, CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.altinn_resource " +
+            "SET approved_for_disabled_virus_scan = @approvedForDisabledVirusScan " +
+            "WHERE resource_id_pk = @resourceId");
+        command.Parameters.AddWithValue("@resourceId", resourceId);
+        command.Parameters.AddWithValue("@approvedForDisabledVirusScan", approvedForDisabledVirusScan);
+
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+    }
 }

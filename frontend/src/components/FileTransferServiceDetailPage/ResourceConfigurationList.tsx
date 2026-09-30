@@ -108,7 +108,6 @@ export function ResourceConfigurationList({
         <ConfigurationForm
           draft={editor.draft}
           errors={editor.errors}
-          virusScanRequired={!editor.configuration.approvedForDisabledVirusScan}
           partyOptions={partyOptions}
           saving={editor.saving}
           onChange={editor.updateDraft}
@@ -131,7 +130,6 @@ export function ResourceConfigurationList({
 type ConfigurationFormProps = {
   draft: ConfigurationDraft
   errors: ConfigurationDraftErrors
-  virusScanRequired: boolean
   partyOptions: AllowedRecipient[]
   saving: boolean
   onChange: <K extends keyof ConfigurationDraft>(key: K, value: ConfigurationDraft[K]) => void
@@ -142,7 +140,6 @@ type ConfigurationFormProps = {
 function ConfigurationForm({
   draft,
   errors,
-  virusScanRequired,
   partyOptions,
   saving,
   onChange,
@@ -211,12 +208,14 @@ function ConfigurationForm({
         </Select>
         {errors.requiredParty && <ValidationMessage>{errors.requiredParty}</ValidationMessage>}
       </Field>
-      <Textfield
-        label="Virusskanning påkrevd"
-        value={yesNo(virusScanRequired)}
-        readOnly
-        disabled
-      />
+      <Field>
+        <Switch
+          label="Virusskanning påkrevd"
+          checked={draft.virusScanRequired}
+          onChange={(event) => onChange('virusScanRequired', event.target.checked)}
+          disabled={saving}
+        />
+      </Field>
       <div className="resource-configuration__actions">
         <Button type="submit" disabled={saving}>
           {saving ? 'Lagrer…' : 'Lagre'}
