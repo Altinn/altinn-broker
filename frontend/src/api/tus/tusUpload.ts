@@ -10,7 +10,7 @@ import { ApiError, redirectToLoginIfSessionEnded } from '../client'
 import { apiUrl } from '../config'
 import { createPartialUpload, createUpload, getUploadInfo, tusUploadPath } from './tusProtocol'
 
-const MAX_PARALLEL_PARTS = 20
+const MAX_PARALLEL_PARTS = 6
 const MIN_PART_SIZE = 64 * 1024 * 1024
 const MIN_CHUNK_SIZE = 8 * 1024 * 1024
 const CHUNKS_PER_PART_BUDGET = 40_000
