@@ -1,4 +1,5 @@
-﻿using Altinn.Broker.Models;
+﻿using Altinn.Broker.Enums;
+using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Helpers;
 
 namespace Altinn.Broker.Tests.Factories;
@@ -67,6 +68,24 @@ internal static class FileTransferInitializeExtTestFactory
         Recipients = new List<string>(),
         Sender = "0192:991825827",
         SendersFileTransferReference = "test-data"
+    };
+
+    internal static FileTransferInitalizeExt BasicFileTransfer_WithNotification() => new FileTransferInitalizeExt()
+    {
+        ResourceId = TestConstants.RESOURCE_FOR_TEST,
+        Checksum = null,
+        FileName = "input.txt",
+        PropertyList = [],
+        Recipients = new List<string> { "0192:986252932" },
+        Sender = "0192:991825827",
+        SendersFileTransferReference = "test-data",
+        Notification = new NotificationRequestExt()
+        {
+            NotificationTemplate = NotificationTemplateExt.CustomMessage,
+            NotificationChannel = NotificationChannelExt.Email,
+            EmailSubject = "You have received a file",
+            EmailBody = "Please log in to Altinn to download the file."
+        }
     };
 
     internal static FileTransferInitalizeExt BasicFileTransfer_ManifestShim() {
