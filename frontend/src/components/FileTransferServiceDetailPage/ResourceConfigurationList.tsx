@@ -17,6 +17,7 @@ import {
 } from '../../i18n/apiErrors'
 import {
   useResourceConfigurationEditor,
+  VIRUS_SCAN_SIZE_HINT,
   type ConfigurationDraft,
   type ConfigurationDraftErrors,
 } from './useResourceConfigurationEditor'
@@ -156,7 +157,7 @@ function ConfigurationForm({
     >
       <Textfield
         label="Maks filstørrelse (GB)"
-        description="La feltet stå tomt når ingen grense skal endres."
+        description={`La feltet stå tomt når ingen grense skal endres. ${VIRUS_SCAN_SIZE_HINT}`}
         value={draft.maxFileTransferSizeGb}
         onChange={(event) => onChange('maxFileTransferSizeGb', event.target.value)}
         error={errors.maxFileTransferSizeGb}
@@ -214,7 +215,10 @@ function ConfigurationForm({
           checked={draft.virusScanRequired}
           onChange={(event) => onChange('virusScanRequired', event.target.checked)}
           disabled={saving}
+          aria-invalid={errors.virusScanRequired ? true : undefined}
         />
+        <Field.Description>{VIRUS_SCAN_SIZE_HINT}</Field.Description>
+        {errors.virusScanRequired && <ValidationMessage>{errors.virusScanRequired}</ValidationMessage>}
       </Field>
       <div className="resource-configuration__actions">
         <Button type="submit" disabled={saving}>

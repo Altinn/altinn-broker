@@ -5,6 +5,8 @@
 export const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'digdir-broker-administrasjon'
 
 const nbMessages: Record<number, (context: ApiErrorMessageContext) => string> = {
+  13: () =>
+    'Maks filstørrelse kan ikke være over 50 GB når virusskanning er påkrevd. Slå av virusskanning for å tillate større filer.',
   36: () =>
     `Du må ha tilgang i henhold til tilgangsreglene for ${BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID} for å redigere en tjeneste.`,
   37: () => 'Du må være tjeneste-eier for å oppdatere ressurs',

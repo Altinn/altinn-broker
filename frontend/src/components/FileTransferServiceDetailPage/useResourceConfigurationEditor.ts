@@ -4,6 +4,7 @@ import { ApiError } from '../../api/client'
 import {
   configureResource,
   getResourceConfiguration,
+  VIRUS_SCAN_MAX_SIZE_BYTES,
   type ConfigureResourceInput,
   type ResourceConfiguration,
 } from '../../api/resourceConfiguration'
@@ -14,6 +15,9 @@ import { localizeApiError, type LocalizedApiError } from '../../i18n/apiErrors'
 
 const MAX_TTL_DAYS = 365
 const MAX_GRACE_HOURS = 24
+const VIRUS_SCAN_MAX_GB = bytesToGb(VIRUS_SCAN_MAX_SIZE_BYTES)
+const VIRUS_SCAN_SIZE_HINT =
+  `Filstørrelse over ${VIRUS_SCAN_MAX_GB} GB krever at virusskanning er slått av.`
 
 export type ConfigurationDraft = {
   maxFileTransferSizeGb: string
@@ -135,6 +139,8 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
   }
 }
 
+export { VIRUS_SCAN_SIZE_HINT }
+
 function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   const errors: ConfigurationDraftErrors = {}
 
@@ -143,6 +149,9 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
     const gb = Number(maxSize.replace(',', '.'))
     if (!Number.isFinite(gb) || gb <= 0) {
       errors.maxFileTransferSizeGb = 'Oppgi en filstørrelse større enn 0 GB.'
+    } else if (draft.virusScanRequired && gb > VIRUS_SCAN_MAX_GB) {
+      errors.maxFileTransferSizeGb = VIRUS_SCAN_SIZE_HINT
+      errors.virusScanRequired = VIRUS_SCAN_SIZE_HINT
     }
   }
 
