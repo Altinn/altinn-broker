@@ -78,10 +78,10 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                     CustomRecipient = reader.IsDBNull(reader.GetOrdinal("custom_recipient")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient")),
                     NotificationTemplate = (NotificationTemplate)reader.GetInt32(reader.GetOrdinal("notification_template")),
                     NotificationChannel = (NotificationChannel)reader.GetInt32(reader.GetOrdinal("notification_channel")),
-                    RequestedSendTime = reader.GetDateTime(reader.GetOrdinal("requested_send_time")),
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                    RequestedSendTime = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("requested_send_time")), DateTimeKind.Utc),
+                    Created = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("created")), DateTimeKind.Utc),
                     IsReminder = reader.GetBoolean(reader.GetOrdinal("is_reminder")),
-                    NotificationSent = reader.IsDBNull(reader.GetOrdinal("notification_sent")) ? null : reader.GetDateTime(reader.GetOrdinal("notification_sent")),
+                    NotificationSent = reader.IsDBNull(reader.GetOrdinal("notification_sent")) ? null : DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("notification_sent")), DateTimeKind.Utc),
                     NotificationAddress = reader.IsDBNull(reader.GetOrdinal("notification_address")) ? null : reader.GetString(reader.GetOrdinal("notification_address")),
                     NotificationOrderId = reader.IsDBNull(reader.GetOrdinal("notification_order_id")) ? null : reader.GetGuid(reader.GetOrdinal("notification_order_id")),
                     ShipmentId = reader.IsDBNull(reader.GetOrdinal("shipment_id")) ? null : reader.GetGuid(reader.GetOrdinal("shipment_id")),
@@ -89,6 +89,19 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 });
             }
             return notifications;
+        }, cancellationToken);
+    }
+
+    public async Task<bool> HasNotificationsForFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT EXISTS(SELECT 1 FROM broker.file_transfer_notification WHERE file_transfer_id_fk = @fileTransferId)");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var result = await command.ExecuteScalarAsync(ct);
+            return result is bool exists && exists;
         }, cancellationToken);
     }
 
@@ -126,10 +139,10 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 CustomRecipient = reader.IsDBNull(reader.GetOrdinal("custom_recipient")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient")),
                 NotificationTemplate = (NotificationTemplate)reader.GetInt32(reader.GetOrdinal("notification_template")),
                 NotificationChannel = (NotificationChannel)reader.GetInt32(reader.GetOrdinal("notification_channel")),
-                RequestedSendTime = reader.GetDateTime(reader.GetOrdinal("requested_send_time")),
-                Created = reader.GetDateTime(reader.GetOrdinal("created")),
+                RequestedSendTime = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("requested_send_time")), DateTimeKind.Utc),
+                Created = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("created")), DateTimeKind.Utc),
                 IsReminder = reader.GetBoolean(reader.GetOrdinal("is_reminder")),
-                NotificationSent = reader.IsDBNull(reader.GetOrdinal("notification_sent")) ? null : reader.GetDateTime(reader.GetOrdinal("notification_sent")),
+                NotificationSent = reader.IsDBNull(reader.GetOrdinal("notification_sent")) ? null : DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("notification_sent")), DateTimeKind.Utc),
                 NotificationAddress = reader.IsDBNull(reader.GetOrdinal("notification_address")) ? null : reader.GetString(reader.GetOrdinal("notification_address")),
                 NotificationOrderId = reader.IsDBNull(reader.GetOrdinal("notification_order_id")) ? null : reader.GetGuid(reader.GetOrdinal("notification_order_id")),
                 ShipmentId = reader.IsDBNull(reader.GetOrdinal("shipment_id")) ? null : reader.GetGuid(reader.GetOrdinal("shipment_id")),

@@ -8,6 +8,8 @@ public interface IFileTransferNotificationRepository
 
     Task<List<BrokerNotificationEntity>> GetNotificationsForFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
 
+    Task<bool> HasNotificationsForFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
+
     Task<BrokerNotificationEntity?> GetNotificationById(Guid notificationId, CancellationToken cancellationToken);
 
     Task UpdateOrderResponseData(Guid notificationId, Guid notificationOrderId, Guid shipmentId, CancellationToken cancellationToken);
