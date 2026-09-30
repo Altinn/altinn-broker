@@ -71,10 +71,9 @@ function heading(upload: BlockingUpload): string {
   switch (upload.status) {
     case 'failed':
       return 'En annen opplasting stoppet'
+    case 'pausing':
     case 'paused':
       return 'En annen opplasting er satt på pause'
-    case 'interrupted':
-      return 'En annen opplasting er ikke fullført'
     default:
       return 'En annen opplasting pågår'
   }

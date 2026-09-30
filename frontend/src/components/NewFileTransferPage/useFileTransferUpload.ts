@@ -6,11 +6,10 @@ import { useUploads } from '../../upload/uploadsContext'
 import {
   clearStoredUpload,
   isSameFile,
-  readAnyStoredUpload,
   readStoredUpload,
   type StoredUpload,
 } from '../../upload/uploadSession'
-import type { UploadStatus } from '../../upload/uploadsContext'
+import type { ActiveUpload, UploadStatus } from '../../upload/uploadsContext'
 import { toPropertyList, type NewFileTransferErrors, type NewFileTransferValues } from './formFields'
 import { hasErrors } from './formValidation'
 
@@ -35,7 +34,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
       ? uploads.active
       : null
 
-  const blockedBy = useBlockingUpload(resourceId, senderOrgNumber, active !== null)
+  const blockedBy = blockingUpload(active === null ? uploads.active : null, uploads.cancel)
 
   const interrupted = useInterruptedUpload(resourceId, senderOrgNumber, active !== null)
 
@@ -151,82 +150,24 @@ export type BlockingUpload = {
   fileName: string
   fileSize: number
   percent: number | null
-  status: UploadStatus | 'interrupted'
+  status: UploadStatus
   cancel: () => void
 }
 
-function useBlockingUpload(
-  resourceId: string,
-  senderOrgNumber: string,
-  mine: boolean,
-): BlockingUpload | null {
-  const uploads = useUploads()
-  const live = mine ? null : uploads.active
-
-  const [stored, setStored] = useState<StoredUpload | null>(() => readAnyStoredUpload())
-  const [uploaded, setUploaded] = useState<number | null>(null)
-
-  const elsewhere =
-    stored !== null && (stored.resourceId !== resourceId || stored.sender !== senderOrgNumber)
-      ? stored
-      : null
-  const pending = live === null ? elsewhere : null
-
-  useEffect(() => {
-    if (!pending) {
-      return
-    }
-
-    let cancelled = false
-
-    readUploadedBytes(pending.plan)
-      .then((bytes) => {
-        if (cancelled) {
-          return
-        }
-        // Nothing left to carry on to, so the record blocks nobody.
-        if (bytes === null) {
-          clearStoredUpload()
-          setStored(null)
-          return
-        }
-        setUploaded(bytes)
-      })
-      .catch((error) => {
-        console.error('Could not read how far the blocking upload got', error)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [pending])
-
-  if (live) {
-    return {
-      resourceId: live.resourceId,
-      fileName: live.fileName,
-      fileSize: live.fileSize,
-      percent: live.progress?.percent ?? null,
-      status: live.status,
-      cancel: uploads.cancel,
-    }
-  }
-
-  if (!pending) {
+// Only an active upload blocks this form: records are kept per service, so an upload left
+// unfinished elsewhere is waiting there rather than holding this one up.
+function blockingUpload(live: ActiveUpload | null, cancel: () => void): BlockingUpload | null {
+  if (live === null) {
     return null
   }
 
   return {
-    resourceId: pending.resourceId,
-    fileName: pending.file.name,
-    fileSize: pending.file.size,
-    percent: uploaded === null ? null : Math.floor((uploaded / pending.file.size) * 100),
-    status: 'interrupted',
-    cancel: () => {
-      discardUpload(pending.plan)
-      clearStoredUpload()
-      setStored(null)
-    },
+    resourceId: live.resourceId,
+    fileName: live.fileName,
+    fileSize: live.fileSize,
+    percent: live.progress?.percent ?? null,
+    status: live.status,
+    cancel,
   }
 }
 
@@ -248,7 +189,7 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
       return
     }
 
-    // Left to finish rather than aborted: aborting leaves the upload locked against the next run.
+    // Left to finish rather than aborted.
     let cancelled = false
 
     readUploadedBytes(upload.plan)
@@ -257,7 +198,7 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
           return
         }
         if (bytes === null) {
-          clearStoredUpload()
+          clearStoredUpload(resourceId, senderOrgNumber)
           setFound((current) => ({ ...current, upload: null }))
           return
         }
@@ -270,15 +211,15 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
     return () => {
       cancelled = true
     }
-  }, [upload])
+  }, [resourceId, senderOrgNumber, upload])
 
   const discard = useCallback(() => {
     if (upload) {
       discardUpload(upload.plan)
     }
-    clearStoredUpload()
+    clearStoredUpload(resourceId, senderOrgNumber)
     setFound((current) => ({ ...current, upload: null }))
-  }, [upload])
+  }, [resourceId, senderOrgNumber, upload])
 
   return { upload, uploaded, discard }
 }

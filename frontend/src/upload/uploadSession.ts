@@ -2,7 +2,7 @@ import type { UploadPlan } from '../api/tus/tusUpload'
 
 // Saves, reads and clears the session's record of an upload in progress.
 
-const STORAGE_KEY = 'brokerbox.upload-session'
+const STORAGE_PREFIX = 'brokerbox.upload-session:'
 
 export type FileFingerprint = {
   name: string
@@ -30,44 +30,32 @@ export function isSameFile(fingerprint: FileFingerprint, file: File): boolean {
   )
 }
 
-export function readAnyStoredUpload(): StoredUpload | null {
-  return read()
-}
-
 export function readStoredUpload(resourceId: string, sender: string): StoredUpload | null {
-  const stored = read()
-  if (!stored) {
-    return null
-  }
-
-  return stored.resourceId === resourceId && stored.sender === sender ? stored : null
-}
-
-export function saveStoredUpload(upload: StoredUpload): void {
-  write(upload)
-}
-
-export function clearStoredUpload(): void {
   try {
-    sessionStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // Private mode and blocked storage both throw; losing the record only costs the resume.
-  }
-}
-
-function read(): StoredUpload | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(storageKey(resourceId, sender))
     return raw ? (JSON.parse(raw) as StoredUpload) : null
   } catch {
     return null
   }
 }
 
-function write(upload: StoredUpload): void {
+export function saveStoredUpload(upload: StoredUpload): void {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(upload))
+    sessionStorage.setItem(storageKey(upload.resourceId, upload.sender), JSON.stringify(upload))
   } catch {
-    // As above: the upload still runs, it just cannot be picked up again after a reload.
+    // Private mode and blocked storage both throw; the upload still runs.
   }
+}
+
+export function clearStoredUpload(resourceId: string, sender: string): void {
+  try {
+    sessionStorage.removeItem(storageKey(resourceId, sender))
+  } catch {
+    // As above: losing the record only costs the resume.
+  }
+}
+
+// One upload record per service and sender.
+function storageKey(resourceId: string, sender: string): string {
+  return `${STORAGE_PREFIX}${sender}:${resourceId}`
 }

@@ -23,7 +23,12 @@ import {
 export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
 
-  const uploadRef = useRef<{ plan: UploadPlan; file: File } | null>(null)
+  const uploadRef = useRef<{
+    plan: UploadPlan
+    file: File
+    resourceId: string
+    sender: string
+  } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const runningRef = useRef<Promise<void> | null>(null)
   const pauseRequestedRef = useRef(false)
@@ -34,8 +39,11 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const forget = useCallback(() => {
+    const upload = uploadRef.current
+    if (upload) {
+      clearStoredUpload(upload.resourceId, upload.sender)
+    }
     uploadRef.current = null
-    clearStoredUpload()
     setActive(null)
   }, [])
 
@@ -168,7 +176,12 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      uploadRef.current = { plan, file: input.file }
+      uploadRef.current = {
+        plan,
+        file: input.file,
+        resourceId: input.resourceId,
+        sender: input.sender,
+      }
       update({ fileTransferId })
       saveStoredUpload({
         resourceId: input.resourceId,
@@ -186,7 +199,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   const resumeStored = useCallback<UploadsContextValue['resumeStored']>(
     ({ resourceId, sender, fileTransferId, plan, file }, alreadySent) => {
       pauseRequestedRef.current = false
-      uploadRef.current = { plan, file }
+      uploadRef.current = { plan, file, resourceId, sender }
       saveStoredUpload({ resourceId, sender, fileTransferId, file: fingerprintOf(file), plan })
       setActive({
         resourceId,
