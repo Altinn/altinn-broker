@@ -47,7 +47,15 @@ public class SendNotificationOrderHandler(
             return;
         }
 
-        var orderRequest = JsonSerializer.Deserialize<NotificationOrderRequestV2>(notificationOrder.OrderRequest);
+        NotificationOrderRequestV2? orderRequest;
+        try
+        {
+            orderRequest = JsonSerializer.Deserialize<NotificationOrderRequestV2>(notificationOrder.OrderRequest);
+        }
+        catch (JsonException)
+        {
+            orderRequest = null;
+        }
         if (orderRequest is null)
         {
             logger.LogError(
