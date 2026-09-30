@@ -1,4 +1,4 @@
-import { ApiError, redirectToLogin } from './client'
+import { ApiError, redirectToLoginIfSessionEnded } from './client'
 import { apiUrl } from './config'
 
 export type UploadProgress = {
@@ -87,7 +87,9 @@ function parseJsonBody(raw: string): unknown {
 
 function toFailure(status: number, body: unknown): Error | null {
   if (status === 401) {
-    redirectToLogin()
+    // Fire and forget: the upload fails now either way, and the redirect follows only if the
+    // session really is over.
+    void redirectToLoginIfSessionEnded()
     return new ApiError('Unauthorized', 401)
   }
   if (status < 200 || status >= 300) {

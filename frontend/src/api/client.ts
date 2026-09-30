@@ -46,7 +46,7 @@ export async function apiFetch<T = unknown>(
   })
 
   if (response.status === 401 && redirectOnUnauthorized) {
-    redirectToLogin()
+    await redirectToLoginIfSessionEnded()
     throw new ApiError('Unauthorized', 401)
   }
 
@@ -72,12 +72,51 @@ export async function apiFetch<T = unknown>(
   return (await response.text()) as T
 }
 
+/**
+ * A 401 from a Broker endpoint does not by itself mean the session is over: a failing downstream
+ * dependency (Altinn Authorization, token exchange) surfaces the same status. Only /me can tell the
+ * difference, so ask it before throwing the user out to ID-Porten for no reason.
+ */
+export async function redirectToLoginIfSessionEnded(returnUrl?: string): Promise<void> {
+  if (await sessionIsGone()) {
+    redirectToLogin(returnUrl)
+  }
+}
+
+async function sessionIsGone(): Promise<boolean> {
+  try {
+    const response = await fetch(apiUrl(`${AUTH_BASE_PATH}/me`), {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+
+    if (response.status === 401) {
+      return true
+    }
+
+    if (!response.ok || !(response.headers.get('Content-Type') ?? '').includes('application/json')) {
+      return false
+    }
+
+    const me = (await response.json()) as { authenticated?: boolean }
+    return me.authenticated === false
+  } catch {
+    // A network failure says nothing about the session — leave the user where they are.
+    return false
+  }
+}
+
+/** Parallel 401s must not each start their own navigation. */
+let loginRedirectStarted = false
+
 export function redirectToLogin(returnUrl: string = window.location.pathname + window.location.search) {
   const loginPath = `${AUTH_BASE_PATH}/login`
   // Avoid nested returnUrl when /broker/... is wrongly served as the SPA (Front Door → storage).
-  if (window.location.pathname === loginPath) {
+  if (window.location.pathname === loginPath || loginRedirectStarted) {
     return
   }
+
+  loginRedirectStarted = true
 
   const safeReturnUrl =
     !returnUrl || returnUrl.startsWith(AUTH_BASE_PATH) ? '/' : returnUrl

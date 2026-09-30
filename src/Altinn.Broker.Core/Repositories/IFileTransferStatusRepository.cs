@@ -5,6 +5,7 @@ namespace Altinn.Broker.Core.Repositories;
 public interface IFileTransferStatusRepository
 {
     Task<List<FileTransferStatusEntity>> GetFileTransferStatusHistory(Guid fileTransferId, CancellationToken cancellationToken);
-    Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, DateTimeOffset timestamp, string? detailedFileTransferStatus = null, string? vendor = null, CancellationToken cancellationToken = default);
+    Task InsertFileTransferStatus(Guid fileTransferId, FileTransferStatus status, string? detailedFileTransferStatus = null, string? vendor = null, CancellationToken cancellationToken = default);
     Task<List<FileTransferStatusEntity>> GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(List<FileTransferStatus> statusFilters, DateTime maxStatusAge, CancellationToken cancellationToken);
+    Task<List<FileTransferStatusEntity>> GetInitializedFileTransfersWithStartedUploadOlderThanDate(DateTime minStatusDate, CancellationToken cancellationToken);
 }
