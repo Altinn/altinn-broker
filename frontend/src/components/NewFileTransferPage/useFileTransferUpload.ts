@@ -189,12 +189,12 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
       return
     }
 
-    // Left to finish rather than aborted.
-    let cancelled = false
+    // Aborted on the way out, so leaving the page also stops the retries that wait out a lock or other error.
+    const controller = new AbortController()
 
-    readUploadedBytes(upload.plan)
+    readUploadedBytes(upload.plan, controller.signal)
       .then((bytes) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
           return
         }
         if (bytes === null) {
@@ -205,11 +205,14 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
         setUploaded(bytes)
       })
       .catch((error) => {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Could not read how far the interrupted upload got', error)
       })
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [resourceId, senderOrgNumber, upload])
 
