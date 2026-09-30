@@ -107,15 +107,16 @@ public class AltinnAuthorizationService : IAuthorizationService
             return [];
         }
 
+        // Only write/read here. Publish for configuration is checked once via CheckAccessAsPublisher
+        // on the gatekeeper resource; bundling it would drop batch size from 200 to 133 resources.
         var sendAction = GetActionId(ResourceAccessLevel.Write);
         var receiveAction = GetActionId(ResourceAccessLevel.Read);
-        var publishAction = GetActionId(ResourceAccessLevel.Publish);
-        string[] actions = [sendAction, receiveAction, publishAction];
+        string[] actions = [sendAction, receiveAction];
         var resourcesPerRequest = MaxDecisionsPerRequest / actions.Length;
         var distinctResourceIds = resourceIds.Distinct(StringComparer.Ordinal).ToList();
         var access = distinctResourceIds.ToDictionary(
             resourceId => resourceId,
-            _ => (CanSend: false, CanReceive: false, CanPublish: false),
+            _ => (CanSend: false, CanReceive: false),
             StringComparer.Ordinal);
 
         async Task ApplyDecisions(IReadOnlyList<string> resourcesToCheck)
@@ -161,9 +162,8 @@ public class AltinnAuthorizationService : IAuthorizationService
 
                 access[resourceId] = action switch
                 {
-                    _ when action == sendAction => (true, resourceAccess.CanReceive, resourceAccess.CanPublish),
-                    _ when action == receiveAction => (resourceAccess.CanSend, true, resourceAccess.CanPublish),
-                    _ when action == publishAction => (resourceAccess.CanSend, resourceAccess.CanReceive, true),
+                    _ when action == sendAction => (true, resourceAccess.CanReceive),
+                    _ when action == receiveAction => (resourceAccess.CanSend, true),
                     _ => resourceAccess
                 };
             }
@@ -207,8 +207,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             {
                 ResourceId = entry.Key,
                 CanSend = entry.Value.CanSend,
-                CanReceive = entry.Value.CanReceive,
-                CanPublish = entry.Value.CanPublish
+                CanReceive = entry.Value.CanReceive
             })
             .ToList();
     }

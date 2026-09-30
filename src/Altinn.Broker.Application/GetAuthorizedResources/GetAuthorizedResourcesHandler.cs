@@ -68,7 +68,11 @@ public class GetAuthorizedResourcesHandler(
             && await HasGatekeeperPublish(user, party, cancellationToken);
 
         var accessibleResources = authorizedResources
-            .Where(authorized => authorized.CanSend || authorized.CanReceive)
+            .Where(authorized => authorized.CanSend
+                || authorized.CanReceive
+                || (canConfigureForParty
+                    && serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
+                    && owner == party))
             .ToList();
         logger.LogInformation(
             "End user has access to {authorizedResourceCount} of {configuredResourceCount} broker resources for the requested party",

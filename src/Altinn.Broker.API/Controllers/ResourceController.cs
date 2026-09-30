@@ -174,6 +174,9 @@ public class ResourceController : Controller
     /// to organization numbers and names, with the sending party removed. When the resource requires a
     /// specific party and the sender is not that party, the required party is the only entry, and it is
     /// omitted altogether if the resource has an access list it is not on. <br/>
+    /// Pass <paramref name="ignoreRequiredParty"/> as true to skip that narrowing and return every
+    /// access-list party (minus the caller). Use that for configuration UIs that need to change the
+    /// required party. <br/>
     /// An empty list means either that the resource has no access list or that no organization can
     /// currently receive on it.
     /// </remarks>
@@ -192,13 +195,15 @@ public class ResourceController : Controller
     public async Task<ActionResult> GetAllowedRecipients(
         string resourceId,
         [FromQuery] string party,
+        [FromQuery] bool ignoreRequiredParty,
         [FromServices] GetAllowedRecipientsHandler handler,
         CancellationToken cancellationToken)
     {
         var result = await handler.Process(new GetAllowedRecipientsRequest()
         {
             ResourceId = resourceId,
-            Party = party
+            Party = party,
+            IgnoreRequiredParty = ignoreRequiredParty
         }, HttpContext.User, cancellationToken);
 
         return result.Match(

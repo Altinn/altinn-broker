@@ -25,26 +25,64 @@ export function formatDuration(timeSpan: string): string {
   return unit ? countOf(seconds, unit) : '0 sekunder'
 }
 
-/** Whole days covered by a .NET TimeSpan, or null when the value cannot be read. */
+/** Days covered by a .NET TimeSpan (may be fractional), or null when unreadable. */
 export function timeSpanToDays(timeSpan: string): number | null {
   const seconds = toSeconds(timeSpan)
   return seconds === null ? null : seconds / SECONDS_PER_DAY
 }
 
-/** Whole hours covered by a .NET TimeSpan, or null when the value cannot be read. */
+/** Hours covered by a .NET TimeSpan (may be fractional), or null when unreadable. */
 export function timeSpanToHours(timeSpan: string): number | null {
   const seconds = toSeconds(timeSpan)
   return seconds === null ? null : seconds / SECONDS_PER_HOUR
 }
 
-/** ISO-8601 duration for ConfigureResource (e.g. `P30D`). */
+/**
+ * ISO-8601 duration for ConfigureResource (e.g. `P30D`, `P1DT12H`).
+ * Fractional days are expanded to day/hour/minute/second components so values
+ * like 1.5 round-trip as the same duration the API accepts (P1DT12H).
+ */
 export function daysToIso8601(days: number): string {
-  return `P${days}D`
+  return secondsToIso8601(Math.round(days * SECONDS_PER_DAY))
 }
 
-/** ISO-8601 duration for ConfigureResource (e.g. `PT2H`). */
+/**
+ * ISO-8601 duration for ConfigureResource (e.g. `PT2H`, `PT90M`).
+ * Fractional hours are expanded to hour/minute/second components.
+ */
 export function hoursToIso8601(hours: number): string {
-  return `PT${hours}H`
+  return secondsToIso8601(Math.round(hours * SECONDS_PER_HOUR))
+}
+
+function secondsToIso8601(totalSeconds: number): string {
+  if (totalSeconds <= 0) {
+    return 'PT0S'
+  }
+
+  const days = Math.floor(totalSeconds / SECONDS_PER_DAY)
+  let remainder = totalSeconds % SECONDS_PER_DAY
+  const hours = Math.floor(remainder / SECONDS_PER_HOUR)
+  remainder %= SECONDS_PER_HOUR
+  const minutes = Math.floor(remainder / 60)
+  const seconds = remainder % 60
+
+  let result = 'P'
+  if (days > 0) {
+    result += `${days}D`
+  }
+  if (hours > 0 || minutes > 0 || seconds > 0 || days === 0) {
+    result += 'T'
+    if (hours > 0) {
+      result += `${hours}H`
+    }
+    if (minutes > 0) {
+      result += `${minutes}M`
+    }
+    if (seconds > 0 || (hours === 0 && minutes === 0)) {
+      result += `${seconds}S`
+    }
+  }
+  return result
 }
 
 function toSeconds(timeSpan: string): number | null {

@@ -18,6 +18,7 @@ export function ServiceDetails({
   resource,
   configuration,
   allowedRecipients,
+  accessListCandidates,
   onBehalfOf,
   sender,
 }: FileTransferService & {
@@ -81,7 +82,7 @@ export function ServiceDetails({
           canPublish={resource.canPublish}
           isServiceOwner={resource.isServiceOwner}
           sender={sender}
-          recipients={allowedRecipients}
+          accessListCandidates={accessListCandidates}
         />
       </section>
     </div>

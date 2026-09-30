@@ -29,8 +29,11 @@ public class ConfigureResourceHandler(
         ResourceEntity? existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         ResourceEntity? altinnResourceToCreate = null;
 
-        var isIdportenToken = await authorizationService.IsIdPortenToken(user);
-        if (isIdportenToken)
+        // End-user cookie sessions (ID-porten exchanged cookie or Altinn platform JWT cookie)
+        // must use onBehalfOf + gatekeeper publish. Service-owner bearer tokens use org ownership.
+        var isEndUserCall = (user is not null && user.IsBrokerEndUserCookieAuthenticated())
+            || await authorizationService.IsIdPortenToken(user);
+        if (isEndUserCall)
         {
             var accessError = await AuthorizeIdPortenPublisher(request, user, cancellationToken);
             if (accessError is not null)
@@ -48,12 +51,12 @@ public class ConfigureResourceHandler(
             {
                 return Errors.InvalidResourceDefinition;
             }
-            if (isIdportenToken
+            if (isEndUserCall
                 && altinnResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
             {
                 return Errors.ResourceNotOwnedByParty;
             }
-            if (!isIdportenToken
+            if (!isEndUserCall
                 && altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
             {
                 return Errors.NoAccessToResource;
@@ -64,12 +67,12 @@ public class ConfigureResourceHandler(
             }
             altinnResourceToCreate = altinnResource;
         }
-        else if (isIdportenToken
+        else if (isEndUserCall
             && existingResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
         {
             return Errors.ResourceNotOwnedByParty;
         }
-        else if (!isIdportenToken
+        else if (!isEndUserCall
             && existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
         {
             return Errors.NoAccessToResource;

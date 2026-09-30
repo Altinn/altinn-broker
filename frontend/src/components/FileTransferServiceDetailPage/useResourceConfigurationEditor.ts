@@ -129,9 +129,9 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
   return {
     maxFileTransferSizeGb:
       configuration.maxFileTransferSize === null ? '' : formatGbInput(configuration.maxFileTransferSize),
-    fileTransferTimeToLiveDays: ttlDays === null ? '' : String(ttlDays),
+    fileTransferTimeToLiveDays: ttlDays === null ? '' : formatDurationInput(ttlDays),
     purgeFileTransferAfterAllRecipientsConfirmed: configuration.purgeFileTransferAfterAllRecipientsConfirmed,
-    purgeFileTransferGracePeriodHours: graceHours === null ? '' : String(graceHours),
+    purgeFileTransferGracePeriodHours: graceHours === null ? '' : formatDurationInput(graceHours),
     requiredParty: configuration.requiredParty
       ? (toOrgNumber(configuration.requiredParty) ?? '')
       : '',
@@ -156,15 +156,15 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   }
 
   const ttl = Number(draft.fileTransferTimeToLiveDays.replace(',', '.'))
-  if (!Number.isInteger(ttl) || ttl <= 0) {
-    errors.fileTransferTimeToLiveDays = 'Oppgi levetid som et heltall antall dager.'
+  if (!Number.isFinite(ttl) || ttl <= 0) {
+    errors.fileTransferTimeToLiveDays = 'Oppgi levetid som et positivt antall dager.'
   } else if (ttl > MAX_TTL_DAYS) {
     errors.fileTransferTimeToLiveDays = `Levetiden kan ikke overstige ${MAX_TTL_DAYS} dager.`
   }
 
   const grace = Number(draft.purgeFileTransferGracePeriodHours.replace(',', '.'))
-  if (!Number.isInteger(grace) || grace < 0) {
-    errors.purgeFileTransferGracePeriodHours = 'Oppgi venteperioden som et heltall antall timer.'
+  if (!Number.isFinite(grace) || grace < 0) {
+    errors.purgeFileTransferGracePeriodHours = 'Oppgi venteperioden som et ikke-negativt antall timer.'
   } else if (grace > MAX_GRACE_HOURS) {
     errors.purgeFileTransferGracePeriodHours = `Venteperioden kan ikke overstige ${MAX_GRACE_HOURS} timer.`
   }
@@ -218,4 +218,9 @@ function describeSaveError(error: unknown, resourceId: string): LocalizedApiErro
 function formatGbInput(bytes: number): string {
   const gb = bytesToGb(bytes)
   return Number.isInteger(gb) ? String(gb) : String(Number(gb.toPrecision(6)))
+}
+
+/** Avoid long float tails when a TimeSpan maps to a fractional day/hour value. */
+function formatDurationInput(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(6)))
 }

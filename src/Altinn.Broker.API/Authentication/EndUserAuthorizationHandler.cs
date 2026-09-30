@@ -1,4 +1,5 @@
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Common;
 
 using Altinn.Common.PEP.Authorization;
 
@@ -38,10 +39,7 @@ public sealed class EndUserScopeAccessHandler : AuthorizationHandler<ScopeAccess
         AuthorizationHandlerContext context,
         ScopeAccessRequirement requirement)
     {
-        var isCookieAuthenticated = context.User.Identities.Any(identity =>
-            identity.IsAuthenticated
-            && identity.AuthenticationType is AuthorizationConstants.EndUserCookie
-                or AuthorizationConstants.AltinnPlatformJwtCookie);
+        var isCookieAuthenticated = context.User.IsBrokerEndUserCookieAuthenticated();
         var hasAltinnEndUserIdentity = context.User.HasClaim(claim =>
             claim.Type is "urn:altinn:userid" or "urn:altinn:partyid");
         var isBrokerEndUserScope = requirement.Scope.Any(scope =>
@@ -86,10 +84,7 @@ public sealed class ConfigureResourceAccessHandler : AuthorizationHandler<Config
 
     private static bool IsBrokerEndUser(System.Security.Claims.ClaimsPrincipal user)
     {
-        var isCookieAuthenticated = user.Identities.Any(identity =>
-            identity.IsAuthenticated
-            && identity.AuthenticationType is AuthorizationConstants.EndUserCookie
-                or AuthorizationConstants.AltinnPlatformJwtCookie);
+        var isCookieAuthenticated = user.IsBrokerEndUserCookieAuthenticated();
         var hasAltinnEndUserIdentity = user.HasClaim(claim =>
             claim.Type is "urn:altinn:userid" or "urn:altinn:partyid");
         return isCookieAuthenticated && hasAltinnEndUserIdentity;

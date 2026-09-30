@@ -58,7 +58,11 @@ type ResourceConfigurationListProps = {
   /** Used to choose between service-owner vs gatekeeper access notices. */
   isServiceOwner: boolean
   sender: AllowedRecipient
-  recipients: AllowedRecipient[]
+  /**
+   * Access-list parties (unfiltered by required party). Transfer-time allowed-recipients is too
+   * narrow when a required party is already set.
+   */
+  accessListCandidates: AllowedRecipient[]
 }
 
 export function ResourceConfigurationList({
@@ -68,13 +72,14 @@ export function ResourceConfigurationList({
   canPublish,
   isServiceOwner,
   sender,
-  recipients,
+  accessListCandidates,
 }: ResourceConfigurationListProps) {
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
   const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
   const partyOptions = useMemo(
-    () => buildRequiredPartyOptions(sender, recipients, editor.configuration.requiredParty),
-    [sender, recipients, editor.configuration.requiredParty],
+    () =>
+      buildRequiredPartyOptions(sender, accessListCandidates, editor.configuration.requiredParty),
+    [sender, accessListCandidates, editor.configuration.requiredParty],
   )
 
   return (
@@ -169,7 +174,7 @@ function ConfigurationForm({
         value={draft.fileTransferTimeToLiveDays}
         onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
         error={errors.fileTransferTimeToLiveDays}
-        inputMode="numeric"
+        inputMode="decimal"
         disabled={saving}
       />
       <Field>
@@ -185,13 +190,13 @@ function ConfigurationForm({
         value={draft.purgeFileTransferGracePeriodHours}
         onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
         error={errors.purgeFileTransferGracePeriodHours}
-        inputMode="numeric"
+        inputMode="decimal"
         disabled={saving}
       />
       <Field>
         <Label htmlFor="required-party">Påkrevd part</Label>
         <Field.Description>
-          Velg avsender eller en mottaker. La stå uten valg for ingen påkrevd part.
+          Velg avsender eller en part fra tilgangslisten. La stå uten valg for ingen påkrevd part.
         </Field.Description>
         <Select
           id="required-party"
@@ -232,10 +237,10 @@ function ConfigurationForm({
   )
 }
 
-/** Sender first, then recipients; keeps a configured party that is not in either list. */
+/** Sender first, then access-list candidates; keeps a configured party that is not in either list. */
 function buildRequiredPartyOptions(
   sender: AllowedRecipient,
-  recipients: AllowedRecipient[],
+  accessListCandidates: AllowedRecipient[],
   requiredParty: string | null,
 ): AllowedRecipient[] {
   const options: AllowedRecipient[] = [
@@ -243,12 +248,12 @@ function buildRequiredPartyOptions(
   ]
   const seen = new Set([sender.organizationNumber])
 
-  for (const recipient of recipients) {
-    if (seen.has(recipient.organizationNumber)) {
+  for (const candidate of accessListCandidates) {
+    if (seen.has(candidate.organizationNumber)) {
       continue
     }
-    seen.add(recipient.organizationNumber)
-    options.push(recipient)
+    seen.add(candidate.organizationNumber)
+    options.push(candidate)
   }
 
   const configured = requiredParty ? toOrgNumber(requiredParty) : null
