@@ -39,7 +39,7 @@ public class AuthorizedResourceExt
 
     /// <summary>
     /// The party is a Broker service owner and the user has <c>publish</c> on
-    /// <c>ttd-brokerbox-utvikling</c> for that party, so they may configure this resource
+    /// <c>digdir-broker-administrasjon</c> for that party, so they may configure this resource
     /// (when it is owned by the party).
     /// </summary>
     [JsonPropertyName("canPublish")]

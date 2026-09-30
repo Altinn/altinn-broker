@@ -11,5 +11,5 @@ public static class ApplicationConstants
     /// Gatekeeper resource for BrokerBox configuration: ID-porten callers must have
     /// <c>publish</c> on this resource for the selected service-owner party.
     /// </summary>
-    public const string BrokerBoxConfigureGatekeeperResourceId = "ttd-brokerbox-utvikling";
+    public const string BrokerBoxConfigureGatekeeperResourceId = "digdir-broker-administrasjon";
 }

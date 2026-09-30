@@ -2,7 +2,7 @@
  * Localized messages for Broker API error codes shown in the SPA.
  * Keys match the numeric `errorCode` extension on ProblemDetails responses.
  */
-export const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'ttd-brokerbox-utvikling'
+export const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'digdir-broker-administrasjon'
 
 const nbMessages: Record<number, (context: ApiErrorMessageContext) => string> = {
   36: () =>

@@ -23,7 +23,7 @@ public class ResourceController : Controller
     /// Authorized as: <br/>
     /// - Service owner (<c>altinn:serviceowner</c>) that owns the resource <br/>
     /// - End user (ID-porten) acting on behalf of a Broker service owner (<paramref name="onBehalfOf"/>)
-    ///   with the <c>publish</c> action on <c>ttd-brokerbox-utvikling</c> for that party <br/>
+    ///   with the <c>publish</c> action on <c>digdir-broker-administrasjon</c> for that party <br/>
     /// </remarks>
     /// <response code="200">Resource configured successfully</response>
     /// <response code="400"><ul>
