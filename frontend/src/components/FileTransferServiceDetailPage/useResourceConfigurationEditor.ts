@@ -87,7 +87,7 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
       return
     }
 
-    const body = toConfigureInput(draft)
+    const body = toConfigureInput(draft, toDraft(displayed))
     if (!body) {
       return
     }
@@ -106,7 +106,7 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     } finally {
       setSaving(false)
     }
-  }, [draft, onBehalfOf, resourceId])
+  }, [draft, displayed, onBehalfOf, resourceId])
 
   return {
     configuration: displayed,
@@ -177,7 +177,10 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   return errors
 }
 
-function toConfigureInput(draft: ConfigurationDraft): ConfigureResourceInput | null {
+function toConfigureInput(
+  draft: ConfigurationDraft,
+  initialDraft: ConfigurationDraft,
+): ConfigureResourceInput | null {
   const errors = validateDraft(draft)
   if (Object.keys(errors).length > 0) {
     return null
@@ -192,9 +195,13 @@ function toConfigureInput(draft: ConfigurationDraft): ConfigureResourceInput | n
     fileTransferTimeToLive: daysToIso8601(ttl),
     purgeFileTransferAfterAllRecipientsConfirmed: draft.purgeFileTransferAfterAllRecipientsConfirmed,
     purgeFileTransferGracePeriod: hoursToIso8601(grace),
-    // Empty string clears; the handler skips only when the property is omitted/null.
-    requiredParty: party === '' ? '' : (toOrgIdentifier(party) ?? ''),
     approvedForDisabledVirusScan: !draft.virusScanRequired,
+  }
+
+  // Omit when unchanged so an untouched unparseable stored identifier is preserved.
+  // Empty string clears; the handler skips only when the property is omitted/null.
+  if (party !== initialDraft.requiredParty.trim()) {
+    input.requiredParty = party === '' ? '' : (toOrgIdentifier(party) ?? '')
   }
 
   if (maxSize !== '') {
