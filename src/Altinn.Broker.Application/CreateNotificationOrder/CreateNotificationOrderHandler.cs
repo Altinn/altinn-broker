@@ -5,6 +5,7 @@ using System.Text.Json;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
@@ -141,7 +142,7 @@ public class CreateNotificationOrderHandler(
         var template = await notificationTemplateRepository.GetNotificationTemplate(NotificationTemplate.GenericAltinnMessage, language, cancellationToken);
         if (template is null)
         {
-            logger.LogWarning("No generic Altinn message template found for language {Language}. Falling back to the caller's own text only.", language);
+            logger.LogWarning("No generic Altinn message template found for language {Language}. Falling back to the caller's own text only.", language.SanitizeForLogs());
             return callerText;
         }
 
