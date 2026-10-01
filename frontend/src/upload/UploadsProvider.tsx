@@ -3,18 +3,20 @@ import { toast } from 'react-toastify'
 import { ApiError } from '../api/client'
 import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
-  UploadPausedError,
   createUploadPlan,
   discardUpload,
-  runUpload,
+  startUpload,
   type UploadPlan,
+  type UploadRun,
 } from '../api/tus/tusUpload'
-import { clearStoredUpload, fingerprintOf, saveStoredUpload } from './uploadSession'
+import { clearStoredUpload, saveStoredUpload } from './uploadSession'
 import {
   UploadsContext,
   type ActiveUpload,
-  type UploadSuccessListener,
+  type PlannedUpload,
   type StartUploadInput,
+  type UploadStatus,
+  type UploadSuccessListener,
   type UploadsContextValue,
 } from './uploadsContext'
 
@@ -23,19 +25,13 @@ import {
 export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
 
-  const uploadRef = useRef<{
-    plan: UploadPlan
-    file: File
-    resourceId: string
-    sender: string
-  } | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  const runningRef = useRef<Promise<void> | null>(null)
-  const pauseRequestedRef = useRef(false)
+  const uploadRef = useRef<PlannedUpload | null>(null)
+  const initializingRef = useRef<AbortController | null>(null)
+  const runRef = useRef<UploadRun | null>(null)
   const listenersRef = useRef(new Set<UploadSuccessListener>())
 
   const update = useCallback((changes: Partial<ActiveUpload>) => {
-    setActive((current) => (current ? { ...current, ...changes } : current))
+    setActive((current) => current && { ...current, ...changes })
   }, [])
 
   const forget = useCallback(() => {
@@ -48,69 +44,28 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const run = useCallback(
-    async (plan: UploadPlan, file: File, resourceId: string, alreadySent: number) => {
-      const previous = abortRef.current
-      abortRef.current = null
-      previous?.abort()
-      const winding = runningRef.current
-      runningRef.current = null
-      await winding
+    async (upload: PlannedUpload, alreadySent: number) => {
+      uploadRef.current = upload
+      saveStoredUpload(upload)
+      setActive(asUploading)
 
-      const controller = new AbortController()
-      abortRef.current = controller
-      setActive((current) =>
-        current === null
-          ? current
-          : {
-              ...current,
-              status: 'uploading',
-              error: '',
-              // The rate before the pause says nothing about the run starting now.
-              progress: current.progress && {
-                ...current.progress,
-                bytesPerSecond: null,
-                secondsRemaining: null,
-              },
-            },
-      )
-
-      // A replaced run still reports back; only the current one owns the state.
-      const current = () => abortRef.current === controller
+      const running = startUpload(upload.plan, upload.file, {
+        onProgress: (progress) => update({ progress }),
+        onPhase: (status) => update({ status }),
+        alreadySent,
+      })
+      runRef.current = running
 
       try {
-        await runUpload(plan, file, {
-          onProgress: (progress) => {
-            if (current()) {
-              update({ progress })
-            }
-          },
-          onPhase: (phase) => {
-            if (current()) {
-              update({ status: phase === 'finishing' ? 'finishing' : 'uploading' })
-            }
-          },
-          signal: controller.signal,
-          isPaused: () => pauseRequestedRef.current,
-          alreadySent,
-        })
-        if (!current()) {
-          return
-        }
+        await running.finished
         forget()
         toast.success('Formidlingen er sendt, og filen er lastet opp.')
         for (const listener of listenersRef.current) {
-          listener({ fileTransferId: plan.fileTransferId, resourceId })
+          listener({ fileTransferId: upload.plan.fileTransferId, resourceId: upload.resourceId })
         }
       } catch (error) {
-        if (!current()) {
-          return
-        }
-        if (error instanceof UploadPausedError) {
-          update({ status: 'paused' })
-          return
-        }
+        // Cancelling has already cleared the upload away.
         if (isAbortError(error)) {
-          setActive(null)
           return
         }
         console.error('File transfer upload failed', error)
@@ -118,109 +73,51 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         update({ status: 'failed', error: message })
         toast.error(message)
       } finally {
-        if (abortRef.current === controller) {
-          abortRef.current = null
+        if (runRef.current === running) {
+          runRef.current = null
         }
       }
     },
     [forget, update],
   )
 
-  const startRun = useCallback(
-    (plan: UploadPlan, file: File, resourceId: string, alreadySent = 0) => {
-      const running = run(plan, file, resourceId, alreadySent)
-      runningRef.current = running
-      return running
+  const start = useCallback(
+    async (input: StartUploadInput) => {
+      const controller = new AbortController()
+      initializingRef.current = controller
+      setActive(newActiveUpload(input, 'initializing'))
+
+      let plan: UploadPlan
+      try {
+        const fileTransferId = await initializeFileTransfer(input, controller.signal)
+        plan = await createUploadPlan(fileTransferId, input.file, controller.signal)
+      } catch (error) {
+        setActive(null)
+        if (isAbortError(error)) {
+          return
+        }
+        throw error
+      } finally {
+        initializingRef.current = null
+      }
+
+      await run({ resourceId: input.resourceId, sender: input.sender, plan, file: input.file }, 0)
     },
     [run],
   )
 
-  const start = useCallback(
-    async (input: StartUploadInput) => {
-      pauseRequestedRef.current = false
-      const controller = new AbortController()
-      abortRef.current = controller
-      setActive({
-        resourceId: input.resourceId,
-        sender: input.sender,
-        fileTransferId: '',
-        fileName: input.file.name,
-        fileSize: input.file.size,
-        status: 'initializing',
-        progress: null,
-        error: '',
-      })
-
-      let plan: UploadPlan
-      let fileTransferId: string
-      try {
-        fileTransferId = await initializeFileTransfer(
-          {
-            resourceId: input.resourceId,
-            sender: input.sender,
-            recipients: input.recipients,
-            file: input.file,
-            reference: input.reference,
-            propertyList: input.propertyList,
-            disableVirusScan: input.disableVirusScan,
-          },
-          controller.signal,
-        )
-        plan = await createUploadPlan(fileTransferId, input.file, controller.signal)
-      } catch (error) {
-        abortRef.current = null
-        setActive(null)
-        if (!isAbortError(error)) {
-          throw error
-        }
-        return
-      }
-
-      uploadRef.current = {
-        plan,
-        file: input.file,
-        resourceId: input.resourceId,
-        sender: input.sender,
-      }
-      update({ fileTransferId })
-      saveStoredUpload({
-        resourceId: input.resourceId,
-        sender: input.sender,
-        fileTransferId,
-        file: fingerprintOf(input.file),
-        plan,
-      })
-
-      await startRun(plan, input.file, input.resourceId)
+  const resumeStored = useCallback(
+    (upload: PlannedUpload, alreadySent: number) => {
+      setActive(newActiveUpload(upload, 'uploading'))
+      void run(upload, alreadySent)
     },
-    [startRun, update],
+    [run],
   )
 
-  const resumeStored = useCallback<UploadsContextValue['resumeStored']>(
-    ({ resourceId, sender, fileTransferId, plan, file }, alreadySent) => {
-      pauseRequestedRef.current = false
-      uploadRef.current = { plan, file, resourceId, sender }
-      saveStoredUpload({ resourceId, sender, fileTransferId, file: fingerprintOf(file), plan })
-      setActive({
-        resourceId,
-        sender,
-        fileTransferId,
-        fileName: file.name,
-        fileSize: file.size,
-        status: 'uploading',
-        progress: null,
-        error: '',
-      })
-      void startRun(plan, file, resourceId, alreadySent)
-    },
-    [startRun],
-  )
-
-  // Asks for a stop rather than forcing one: aborting leaves the server holding uploads locked
-  // against the run that follows.
+  // Holds the upload rather than stopping it: aborting leaves the server holding uploads locked.
+  // The requests already sent are left to finish, so the pause takes a moment to take effect.
   const pause = useCallback(() => {
-    pauseRequestedRef.current = true
-    // The requests already sent are left to finish, so the pause takes a moment to take effect.
+    runRef.current?.pause()
     setActive((current) =>
       current && (current.status === 'uploading' || current.status === 'finishing')
         ? { ...current, status: 'pausing' }
@@ -228,25 +125,20 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  // A paused upload carries on where it was; only a failed one has to start over.
   const resume = useCallback(() => {
-    pauseRequestedRef.current = false
-
-    // A run that has not stopped yet never has to be replaced; it simply keeps sending.
-    if (active?.status === 'pausing') {
-      update({ status: 'uploading' })
-      return
+    const running = runRef.current
+    if (running) {
+      running.resume()
+      setActive(asUploading)
+    } else if (uploadRef.current) {
+      void run(uploadRef.current, active?.progress?.loaded ?? 0)
     }
-
-    const upload = uploadRef.current
-    const resourceId = active?.resourceId
-    if (!upload || !resourceId) {
-      return
-    }
-    void startRun(upload.plan, upload.file, resourceId, active?.progress?.loaded ?? 0)
-  }, [active?.progress?.loaded, active?.resourceId, active?.status, startRun, update])
+  }, [active?.progress?.loaded, run])
 
   const cancel = useCallback(() => {
-    abortRef.current?.abort()
+    initializingRef.current?.abort()
+    runRef.current?.abort()
     if (uploadRef.current) {
       discardUpload(uploadRef.current.plan)
     }
@@ -285,6 +177,36 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   )
 
   return <UploadsContext.Provider value={value}>{children}</UploadsContext.Provider>
+}
+
+function newActiveUpload(
+  { resourceId, sender, file }: { resourceId: string; sender: string; file: File },
+  status: UploadStatus,
+): ActiveUpload {
+  return {
+    resourceId,
+    sender,
+    fileName: file.name,
+    fileSize: file.size,
+    status,
+    progress: null,
+    error: '',
+  }
+}
+
+function asUploading(current: ActiveUpload | null): ActiveUpload | null {
+  return (
+    current && {
+      ...current,
+      status: 'uploading',
+      error: '',
+      progress: current.progress && {
+        ...current.progress,
+        bytesPerSecond: null,
+        secondsRemaining: null,
+      },
+    }
+  )
 }
 
 function isAbortError(error: unknown): boolean {

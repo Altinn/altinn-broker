@@ -108,13 +108,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     }
     setSubmitError('')
     uploads.resumeStored(
-      {
-        resourceId,
-        sender: senderOrgNumber,
-        fileTransferId: stored.fileTransferId,
-        plan: stored.plan,
-        file,
-      },
+      { resourceId, sender: senderOrgNumber, plan: stored.plan, file },
       // Only the bar's starting point; the library asks each upload its own offset regardless.
       interrupted.uploaded ?? 0,
     )

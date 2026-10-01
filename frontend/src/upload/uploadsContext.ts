@@ -12,7 +12,6 @@ export type UploadStatus =
 export type ActiveUpload = {
   resourceId: string
   sender: string
-  fileTransferId: string
   fileName: string
   fileSize: number
   status: UploadStatus
@@ -30,10 +29,10 @@ export type StartUploadInput = {
   disableVirusScan: boolean
 }
 
-export type ResumeStoredInput = {
+/** A file and the plan for uploading it to a transfer the sender has already initialized. */
+export type PlannedUpload = {
   resourceId: string
   sender: string
-  fileTransferId: string
   plan: UploadPlan
   file: File
 }
@@ -43,7 +42,7 @@ export type UploadSuccessListener = (upload: { fileTransferId: string; resourceI
 export type UploadsContextValue = {
   active: ActiveUpload | null
   start: (input: StartUploadInput) => Promise<void>
-  resumeStored: (upload: ResumeStoredInput, alreadySent: number) => void
+  resumeStored: (upload: PlannedUpload, alreadySent: number) => void
   pause: () => void
   resume: () => void
   cancel: () => void

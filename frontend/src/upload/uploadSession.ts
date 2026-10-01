@@ -1,4 +1,5 @@
 import type { UploadPlan } from '../api/tus/tusUpload'
+import type { PlannedUpload } from './uploadsContext'
 
 // Saves, reads and clears the session's record of an upload in progress.
 
@@ -13,13 +14,8 @@ export type FileFingerprint = {
 export type StoredUpload = {
   resourceId: string
   sender: string
-  fileTransferId: string
   file: FileFingerprint
   plan: UploadPlan
-}
-
-export function fingerprintOf(file: File): FileFingerprint {
-  return { name: file.name, size: file.size, lastModified: file.lastModified }
 }
 
 export function isSameFile(fingerprint: FileFingerprint, file: File): boolean {
@@ -39,9 +35,15 @@ export function readStoredUpload(resourceId: string, sender: string): StoredUplo
   }
 }
 
-export function saveStoredUpload(upload: StoredUpload): void {
+export function saveStoredUpload({ resourceId, sender, file, plan }: PlannedUpload): void {
+  const stored: StoredUpload = {
+    resourceId,
+    sender,
+    file: { name: file.name, size: file.size, lastModified: file.lastModified },
+    plan,
+  }
   try {
-    sessionStorage.setItem(storageKey(upload.resourceId, upload.sender), JSON.stringify(upload))
+    sessionStorage.setItem(storageKey(resourceId, sender), JSON.stringify(stored))
   } catch {
     // Private mode and blocked storage both throw; the upload still runs.
   }
