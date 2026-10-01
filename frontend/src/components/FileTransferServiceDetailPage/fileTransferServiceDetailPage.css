@@ -22,3 +22,34 @@ ul.service-detail__resource li {
   background: transparent;
   border-radius: 0;
 }
+
+.resource-configuration__edit-toggle {
+  margin-block-end: var(--ds-spacing-4);
+}
+
+.resource-configuration__alert {
+  margin-block-end: var(--ds-spacing-4);
+}
+
+.resource-configuration__error-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.resource-configuration__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-spacing-4);
+  padding: var(--ds-spacing-6);
+  background: var(--ds-color-background-default);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.resource-configuration__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-spacing-3);
+  margin-block-start: var(--ds-spacing-2);
+}

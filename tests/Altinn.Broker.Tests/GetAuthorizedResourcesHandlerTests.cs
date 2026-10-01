@@ -64,6 +64,7 @@ public class GetAuthorizedResourcesHandlerTests
         var sender = resources.Single(resource => resource.ResourceId == "resource-a");
         Assert.True(sender.CanSend);
         Assert.False(sender.CanReceive);
+        Assert.False(sender.CanPublish);
         Assert.Equal("Røntgenbilder mellom sykehus", sender.Name);
         Assert.Equal("Helsedirektoratet", sender.ServiceOwnerName);
     }
@@ -152,12 +153,16 @@ public class GetAuthorizedResourcesHandlerTests
         Mock<IResourceRepository> resourceRepository,
         Mock<IAuthorizationService> authorizationService,
         Mock<IAltinnResourceRepository> altinnResourceRepository)
-        => new(
+    {
+        var serviceOwnerRepository = new Mock<IServiceOwnerRepository>();
+        return new(
             authorizationService.Object,
             resourceRepository.Object,
+            serviceOwnerRepository.Object,
             altinnResourceRepository.Object,
             cache.Cache,
             NullLogger<GetAuthorizedResourcesHandler>.Instance);
+    }
 
     private static Mock<IResourceRepository> CreateResourceRepository(params string[] resourceIds)
     {

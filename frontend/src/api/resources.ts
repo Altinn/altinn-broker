@@ -11,6 +11,10 @@ export type AuthorizedResource = {
   serviceOwnerName: string | null
   canSend: boolean
   canReceive: boolean
+  /** Party is a Broker service owner and the user has publish on digdir-broker-administrasjon for that party. */
+  canPublish: boolean
+  /** The selected party is configured as a Broker service owner. */
+  isServiceOwner: boolean
 }
 
 export function fetchAuthorizedResources(party: string): Promise<AuthorizedResource[]> {

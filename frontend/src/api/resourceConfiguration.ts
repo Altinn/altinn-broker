@@ -2,7 +2,9 @@ import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
 
 const RESOURCE_PATH = `${BROKER_API_PREFIX}/resource`
-const VIRUS_SCAN_MAX_SIZE = 50 * 1000 * 1000 * 1000
+
+/** Max upload size when virus scanning is enabled (50 decimal GB). */
+export const VIRUS_SCAN_MAX_SIZE_BYTES = 50 * 1000 * 1000 * 1000
 
 /**
  * The broker configuration of a resource, with every field resolved to what the API applies.
@@ -30,13 +32,34 @@ const DEFAULTS: ResourceConfiguration = {
   approvedForDisabledVirusScan: false,
 }
 
-/** An unapproved resource cannot turn off virus scanning, so the scan cap bounds every transfer on it. */
-function enforcedMaxFileTransferSize(configured: number | null, approvedForDisabledVirusScan: boolean) {
-  if (approvedForDisabledVirusScan) {
+/**
+ * Effective max for a transfer when virus scan is on: configured value capped at 50 GB,
+ * or 50 GB when no limit is configured.
+ */
+export function effectiveMaxFileTransferSize(
+  configured: number | null,
+  useVirusScan: boolean,
+): number | null {
+  if (!useVirusScan) {
     return configured
   }
 
-  return configured === null ? VIRUS_SCAN_MAX_SIZE : Math.min(configured, VIRUS_SCAN_MAX_SIZE)
+  return configured === null
+    ? VIRUS_SCAN_MAX_SIZE_BYTES
+    : Math.min(configured, VIRUS_SCAN_MAX_SIZE_BYTES)
+}
+
+/**
+ * Fields the ConfigureResource endpoint accepts for a resource (legacy Altinn 2 settings omitted).
+ * Durations must be ISO-8601 (e.g. `P30D`, `PT2H`).
+ */
+export type ConfigureResourceInput = {
+  maxFileTransferSize?: number | null
+  fileTransferTimeToLive?: string
+  purgeFileTransferAfterAllRecipientsConfirmed?: boolean
+  purgeFileTransferGracePeriod?: string
+  requiredParty?: string | null
+  approvedForDisabledVirusScan?: boolean
 }
 
 /**
@@ -48,14 +71,8 @@ export async function getResourceConfiguration(resourceId: string): Promise<Reso
     { redirectOnUnauthorized: false },
   )
 
-  const approvedForDisabledVirusScan =
-    body.approvedForDisabledVirusScan ?? DEFAULTS.approvedForDisabledVirusScan
-
   return {
-    maxFileTransferSize: enforcedMaxFileTransferSize(
-      body.maxFileTransferSize ?? DEFAULTS.maxFileTransferSize,
-      approvedForDisabledVirusScan,
-    ),
+    maxFileTransferSize: body.maxFileTransferSize ?? DEFAULTS.maxFileTransferSize,
     fileTransferTimeToLive: body.fileTransferTimeToLive ?? DEFAULTS.fileTransferTimeToLive,
     purgeFileTransferAfterAllRecipientsConfirmed:
       body.purgeFileTransferAfterAllRecipientsConfirmed ??
@@ -63,6 +80,30 @@ export async function getResourceConfiguration(resourceId: string): Promise<Reso
     purgeFileTransferGracePeriod:
       body.purgeFileTransferGracePeriod ?? DEFAULTS.purgeFileTransferGracePeriod,
     requiredParty: body.requiredParty || DEFAULTS.requiredParty,
-    approvedForDisabledVirusScan,
+    approvedForDisabledVirusScan:
+      body.approvedForDisabledVirusScan ?? DEFAULTS.approvedForDisabledVirusScan,
   }
+}
+
+/**
+ * Updates the broker configuration for a resource via ConfigureResource.
+ */
+export async function configureResource(
+  resourceId: string,
+  input: ConfigureResourceInput,
+  onBehalfOf?: string,
+): Promise<void> {
+  const params = new URLSearchParams()
+  if (onBehalfOf) {
+    params.set('onBehalfOf', onBehalfOf)
+  }
+  const query = params.toString()
+  const path = `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}${query ? `?${query}` : ''}`
+
+  await apiFetch<void>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+    redirectOnUnauthorized: false,
+  })
 }

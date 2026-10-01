@@ -14,4 +14,5 @@ public interface IResourceRepository
     Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default);
     Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
     Task UpdateRequiredParty(string resourceId, string? requiredParty, CancellationToken cancellationToken = default);
+    Task UpdateApprovedForDisabledVirusScan(string resourceId, bool approvedForDisabledVirusScan, CancellationToken cancellationToken = default);
 }

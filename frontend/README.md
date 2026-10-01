@@ -198,10 +198,11 @@ Token exchange (ID-Porten) and platform refresh (SSO) call Altinn Authentication
 
 In Azure, Front Door can proxy API and SPA on one origin:
 
-1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `altinn-dev-api.azure-api.net`)
-2. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
-3. Set `FRONTEND_BASE_URL` → `IdPortenDirectAuthSettings__SpaBaseUrl` (Front Door URL from the deploy log)
-4. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
+1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `platform.tt02.altinn.no`)
+2. Set GitHub secret `FRONTEND_CUSTOM_DOMAIN` to the public hostname already created by the platform team (e.g. `ab.tt02.altinn.no`). The deploy looks up that domain on the Front Door profile and associates it with the routes; it never creates the domain.
+3. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
+4. Set `FRONTEND_BASE_URL` → `IdPortenDirectAuthSettings__SpaBaseUrl` (custom domain or Front Door URL from the deploy log)
+5. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
 
 Front Door endpoint names are globally unique. The name is derived from `AZURE_NAME_PREFIX`. After deploy, use the hostname printed in the workflow log for `FRONTEND_BASE_URL` and ID-Porten.
 
