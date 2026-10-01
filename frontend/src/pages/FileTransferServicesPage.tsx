@@ -59,6 +59,7 @@ export function FileTransferServicesPage() {
 
   const sendable = filtered.filter((service) => service.canSend)
   const receivable = filtered.filter((service) => service.canReceive)
+  const receivableNotSendable = receivable.filter((service) => !service.canSend)
   const configurable = filtered.filter((service) => service.isOwned)
   const isServiceOwner = services.some((service) => service.isServiceOwner)
 
@@ -150,12 +151,12 @@ export function FileTransferServicesPage() {
         </section>
       )}
 
-      {receivable.length > 0 && (
+      {receivableNotSendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan motta med
+            Andre formidlingstjenester {organizationName} er delaktig i
           </Heading>
-          <List spacing="sm">{receivable.map(serviceItem)}</List>
+          <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
         </section>
       )}
 
