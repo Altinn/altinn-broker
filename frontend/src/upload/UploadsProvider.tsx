@@ -117,19 +117,19 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   // Holds the upload rather than stopping it: aborting leaves the server holding uploads locked.
   // The requests already sent are left to finish, so the pause takes a moment to take effect.
   const pause = useCallback(() => {
-    runRef.current?.pause()
     setActive((current) =>
       current && (current.status === 'uploading' || current.status === 'finishing')
         ? { ...current, status: 'pausing' }
         : current,
     )
+    runRef.current?.pause()
   }, [])
 
   // A paused upload carries on where it was; only a failed one has to start over.
   const resume = useCallback(() => {
     const running = runRef.current
     if (running) {
-      running.resume()
+      void running.resume()
       setActive(asUploading)
     } else if (uploadRef.current) {
       void run(uploadRef.current, active?.progress?.loaded ?? 0)

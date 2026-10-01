@@ -58,7 +58,7 @@ export type StartUploadOptions = {
 export type UploadRun = {
   finished: Promise<void>
   pause: () => void
-  resume: () => void
+  resume: () => Promise<void>
   abort: () => void
 }
 
@@ -163,10 +163,22 @@ export function startUpload(
   watchdog.keepAlive()
   upload.start()
 
+  let resumeAttempt = 0
   return {
     finished,
-    pause: transport.pause,
-    resume() {
+    pause() {
+      resumeAttempt++
+      transport.pause()
+    },
+    async resume() {
+      const attempt = ++resumeAttempt
+      if (await redirectToLoginIfSessionEnded()) {
+        return
+      }
+      // Paused again while the session was checked.
+      if (attempt !== resumeAttempt) {
+        return
+      }
       progress.restartRate()
       transport.resume()
     },
@@ -275,7 +287,7 @@ function pausableHttpStack(onPaused: () => void) {
   const hold = () => {
     held ??= new Promise((resolve) => (release = resolve))
   }
-  // Paused in fact only once the requests already sent have finished.
+  // Paused only once the requests already sent have finished.
   const reportIfPaused = () => {
     if (isPaused() && inFlight.size === 0) {
       onPaused()
@@ -304,7 +316,10 @@ function pausableHttpStack(onPaused: () => void) {
       return request
     },
     isPaused,
-    pause: hold,
+    pause() {
+      hold()
+      reportIfPaused()
+    },
     resume() {
       if (!stopped) {
         release()
