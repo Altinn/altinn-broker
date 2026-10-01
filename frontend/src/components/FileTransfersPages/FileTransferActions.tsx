@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'react-toastify'
 import type { FileTransferDetails } from '../../api/fileTransferDetail'
 import type { SelectedParty } from '../../parties/PartiesContext'
 import { confirmFileTransferDownload } from '../../api/confirmFileTransferDownload'
@@ -30,6 +31,8 @@ export function FileTransferActions({ transferDetails, onBehalfOf, onDownloadCon
       onDownloadConfirmed?.()
     } catch (error) {
       console.error('Error confirming download:', error)
+      // Confirming deletes the files, so the user has to know it did not go through.
+      toast.error('Klarte ikke å bekrefte nedlastingen. Prøv igjen.')
     } finally {
       setIsConfirming(false)
     }

@@ -6,5 +6,4 @@ public class CompleteFileUploadRequest
     public string? Checksum { get; set; }
     public long UploadLength { get; set; }
     public bool DeferChecksumValidation { get; set; }
-    public DateTimeOffset UploadFinishedTimestamp { get; set; }
 }

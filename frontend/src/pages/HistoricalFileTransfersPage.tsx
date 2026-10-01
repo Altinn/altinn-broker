@@ -2,12 +2,13 @@ import { getHistoricalFileTransfers } from '../api/historicalFileTransfers'
 import { FileTransferList } from '../components/FileTransfersPages/FileTransferList'
 import { historicalTransferPath } from './routes'
 import { useParties } from '../parties/PartiesContext'
+import { SelectedPartyMessage } from '../parties/SelectedPartyMessage'
 
 export function HistoricalFileTransfersPage() {
   const { selectedParty } = useParties()
 
   if (!selectedParty) {
-    return <p>Ingen aktør valgt.</p>
+    return <SelectedPartyMessage loadingText="Laster historiske formidlinger …" />
   }
 
   return (
