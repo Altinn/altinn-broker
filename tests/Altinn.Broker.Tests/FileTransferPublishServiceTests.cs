@@ -30,7 +30,6 @@ public class FileTransferPublishServiceTests
         var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var capturedJobs = new List<Job>();
@@ -51,7 +50,7 @@ public class FileTransferPublishServiceTests
             .Callback<Job, IState>((job, _) => capturedJobs.Add(job))
             .Returns("job-id");
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         var published = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
@@ -111,12 +110,10 @@ public class FileTransferPublishServiceTests
     public async Task TryPublishAsync_WhenFileTransferHasNotifications_AlsoEnqueuesNotificationSendJob()
     {
         // Arrange
-        var fileTransfer = CreateFileTransfer(recipientCount: 1);
-        var timestamp = DateTimeOffset.UtcNow;
+        var fileTransfer = CreateFileTransfer(recipientCount: 1, hasNotification: true);
         var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
         var capturedJobs = new List<Job>();
@@ -132,15 +129,12 @@ public class FileTransferPublishServiceTests
                 null,
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        fileTransferNotificationRepository
-            .Setup(r => r.HasNotificationsForFileTransfer(fileTransfer.FileTransferId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
         backgroundJobClient
             .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
             .Callback<Job, IState>((job, _) => capturedJobs.Add(job))
             .Returns("job-id");
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         await service.TryPublishAsync(fileTransfer, CancellationToken.None);
@@ -162,7 +156,6 @@ public class FileTransferPublishServiceTests
         var claimKey = FileTransferPublishService.GetPublishedClaimKey(fileTransfer.FileTransferId);
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
 
@@ -170,7 +163,7 @@ public class FileTransferPublishServiceTests
             .Setup(r => r.TryAddIdempotencyEventAsync(claimKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         var published = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
@@ -197,7 +190,6 @@ public class FileTransferPublishServiceTests
         var claimTaken = false;
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
 
@@ -225,7 +217,7 @@ public class FileTransferPublishServiceTests
             .Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()))
             .Returns("job-id");
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         var first = await service.TryPublishAsync(fileTransfer, CancellationToken.None);
@@ -255,7 +247,6 @@ public class FileTransferPublishServiceTests
         var claimTaken = false;
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
 
@@ -282,7 +273,7 @@ public class FileTransferPublishServiceTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("status persistence failed"));
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         var firstAttempt = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -329,7 +320,6 @@ public class FileTransferPublishServiceTests
         var enqueueAttempts = 0;
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
 
@@ -366,7 +356,7 @@ public class FileTransferPublishServiceTests
                 return $"job-{enqueueAttempts}";
             });
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
@@ -399,7 +389,6 @@ public class FileTransferPublishServiceTests
         var enqueueAttempts = 0;
 
         var statusRepository = new Mock<IFileTransferStatusRepository>();
-        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
         var idempotencyRepository = new Mock<IIdempotencyEventRepository>();
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
 
@@ -436,7 +425,7 @@ public class FileTransferPublishServiceTests
                 return $"job-{enqueueAttempts}";
             });
 
-        var service = CreateService(statusRepository, fileTransferNotificationRepository, idempotencyRepository, backgroundJobClient);
+        var service = CreateService(statusRepository, idempotencyRepository, backgroundJobClient);
 
         // Act
         await Assert.ThrowsAsync<BackgroundJobClientException>(() =>
@@ -514,7 +503,6 @@ public class FileTransferPublishServiceTests
 
     private static FileTransferPublishService CreateService(
         Mock<IFileTransferStatusRepository> statusRepository,
-        Mock<IFileTransferNotificationRepository> fileTransferNotificationRepository,
         Mock<IIdempotencyEventRepository> idempotencyRepository,
         Mock<IBackgroundJobClient> backgroundJobClient)
     {
@@ -524,14 +512,13 @@ public class FileTransferPublishServiceTests
 
         return new FileTransferPublishService(
             statusRepository.Object,
-            fileTransferNotificationRepository.Object,
             idempotencyRepository.Object,
             backgroundJobClient.Object,
             eventBusMiddleware,
             logger.Object);
     }
 
-    private static FileTransferEntity CreateFileTransfer(int recipientCount)
+    private static FileTransferEntity CreateFileTransfer(int recipientCount, bool hasNotification = false)
     {
         var fileTransferId = Guid.NewGuid();
         var recipients = Enumerable.Range(0, recipientCount)
@@ -564,7 +551,8 @@ public class FileTransferPublishServiceTests
                 FileTransferId = fileTransferId,
                 Date = DateTime.UtcNow,
                 Status = FileTransferStatus.UploadProcessing
-            }
+            },
+            HasNotification = hasNotification
         };
     }
 }

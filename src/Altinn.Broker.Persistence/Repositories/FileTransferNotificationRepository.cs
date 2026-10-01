@@ -92,19 +92,6 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
         }, cancellationToken);
     }
 
-    public async Task<bool> HasNotificationsForFileTransfer(Guid fileTransferId, CancellationToken cancellationToken)
-    {
-        await using var command = dataSource.CreateCommand(
-            "SELECT EXISTS(SELECT 1 FROM broker.file_transfer_notification WHERE file_transfer_id_fk = @fileTransferId)");
-        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
-
-        return await commandExecutor.ExecuteWithRetry(async (ct) =>
-        {
-            var result = await command.ExecuteScalarAsync(ct);
-            return result is bool exists && exists;
-        }, cancellationToken);
-    }
-
     public async Task UpdateOrderResponseData(Guid notificationId, Guid notificationOrderId, Guid shipmentId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(

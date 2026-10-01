@@ -64,7 +64,7 @@ public static class DependencyInjection
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
         services.AddScoped<GetActiveFileTransferDetailsHandler>();
-        services.AddScoped<CreateNotificationOrderHandler>();
+        services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
         services.AddScoped<SendNotificationOrderHandler>();
         services.AddScoped<CheckNotificationDeliveryHandler>();
     }

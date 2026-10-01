@@ -15,7 +15,4 @@ public class NotificationRecipientExt
 
     [JsonPropertyName("organizationNumber")]
     public string? OrganizationNumber { get; set; }
-
-    [JsonPropertyName("externalIdentity")]
-    public string? ExternalIdentity { get; set; }
 }

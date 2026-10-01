@@ -17,7 +17,6 @@ namespace Altinn.Broker.Application.UploadFile;
 
 public class FileTransferPublishService(
     IFileTransferStatusRepository fileTransferStatusRepository,
-    IFileTransferNotificationRepository fileTransferNotificationRepository,
     IIdempotencyEventRepository idempotencyEventRepository,
     IBackgroundJobClient backgroundJobClient,
     EventBusMiddleware eventBus,
@@ -62,10 +61,9 @@ public class FileTransferPublishService(
             cancellationToken: cancellationToken);
 
         EnqueuePublishedEvents(fileTransfer);
-        var hasNotifications = await fileTransferNotificationRepository.HasNotificationsForFileTransfer(fileTransfer.FileTransferId, cancellationToken);
-        if (hasNotifications)
+        if (fileTransfer.HasNotification)
         {
-        backgroundJobClient.Enqueue<SendNotificationOrderHandler>(handler => handler.Process(fileTransfer.FileTransferId, CancellationToken.None));
+            backgroundJobClient.Enqueue<SendNotificationOrderHandler>(handler => handler.Process(fileTransfer.FileTransferId, CancellationToken.None));
         }
 
         transaction.Complete();

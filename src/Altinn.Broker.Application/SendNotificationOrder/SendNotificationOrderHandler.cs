@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Transactions;
 
 using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Core.Domain;
@@ -78,6 +79,11 @@ public class SendNotificationOrderHandler(
             return;
         }
 
+        using var transaction = new TransactionScope(
+            TransactionScopeOption.Required,
+            new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+            TransactionScopeAsyncFlowOption.Enabled);
+
         await fileTransferNotificationRepository.UpdateOrderResponseData(
             notificationOrder.Id,
             notificationResponse.NotificationOrderId,
@@ -94,6 +100,8 @@ public class SendNotificationOrderHandler(
                 await PersistReminderNotification(notificationOrder, orderRequest, notificationResponse.NotificationOrderId, reminderResponse, cancellationToken);
             }
         }
+
+        transaction.Complete();
     }
 
     private async Task PersistReminderNotification(

@@ -79,18 +79,6 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
     }
 
     [Fact]
-    public async Task HasNotificationsForFileTransfer_BeforeAndAfterInsert_ReflectsExistence()
-    {
-        var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
-
-        Assert.False(await _repository.HasNotificationsForFileTransfer(fileTransferId, CancellationToken.None));
-
-        await _repository.AddNotification(CreateEntity(fileTransferId, customRecipient: "{}"), CancellationToken.None);
-
-        Assert.True(await _repository.HasNotificationsForFileTransfer(fileTransferId, CancellationToken.None));
-    }
-
-    [Fact]
     public async Task GetNotificationById_ReturnsMatchingRow_AndNullForUnknownId()
     {
         var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);

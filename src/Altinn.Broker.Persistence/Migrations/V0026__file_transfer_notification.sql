@@ -1,3 +1,5 @@
+ALTER TABLE broker.file_transfer ADD COLUMN has_notification boolean NOT NULL DEFAULT false;
+
 CREATE TABLE broker.file_transfer_notification (
     file_transfer_notification_id_pk uuid PRIMARY KEY,
     file_transfer_id_fk uuid NOT NULL,

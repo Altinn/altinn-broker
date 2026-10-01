@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Transactions;
 
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
@@ -10,8 +11,6 @@ using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
-
-using Hangfire;
 
 using Microsoft.Extensions.Logging;
 
@@ -24,12 +23,11 @@ public class CreateNotificationOrderHandler(
     IIdempotencyEventRepository idempotencyEventRepository,
     IAltinnRegisterService altinnRegisterService,
     IAltinnResourceRepository altinnResourceRepository,
-    ILogger<CreateNotificationOrderHandler> logger)
+    ILogger<CreateNotificationOrderHandler> logger) : ICreateNotificationOrderHandler
 {
     private const int ReminderDelayDays = 7;
     private const string DefaultLanguage = "nb";
 
-    [AutomaticRetry(OnAttemptsExceeded = AttemptsExceededAction.Delete)]
     public async Task Process(CreateNotificationOrderRequest request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Starting notification order creation for file transfer {FileTransferId}", request.FileTransferId);
@@ -49,6 +47,11 @@ public class CreateNotificationOrderHandler(
         foreach (var (actorId, recipient) in recipients)
         {
             var recipientKey = BuildRecipientKey(recipient);
+            using var transaction = new TransactionScope(
+                TransactionScopeOption.Required,
+                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+                TransactionScopeAsyncFlowOption.Enabled);
+
             var claimed = await idempotencyEventRepository.TryAddIdempotencyEventAsync(
                 BuildNotificationClaimKey(request.FileTransferId, recipientKey),
                 cancellationToken);
@@ -58,6 +61,7 @@ public class CreateNotificationOrderHandler(
                     "Notification order already created for file transfer {FileTransferId} and recipient {RecipientKey}. Skipping.",
                     request.FileTransferId,
                     recipientKey);
+                transaction.Complete();
                 continue;
             }
 
@@ -79,6 +83,7 @@ public class CreateNotificationOrderHandler(
                 OrderRequest = JsonSerializer.Serialize(orderRequest)
             };
             await fileTransferNotificationRepository.AddNotification(notification, cancellationToken);
+            transaction.Complete();
             createdCount++;
         }
 

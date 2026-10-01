@@ -69,13 +69,28 @@ public class SendNotificationOrderHandlerTests
     [Fact]
     public async Task Process_WhenNoOrdersExist_DoesNotCallNotificationService()
     {
-        var (repository, notificationService, _, _, handler) = CreateHandler();
+        var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
         var fileTransferId = Guid.NewGuid();
         repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         await handler.Process(fileTransferId, CancellationToken.None);
 
         notificationService.Verify(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(capturedJobs);
+    }
+
+    [Fact]
+    public async Task Process_WhenOrdersExistButNoneArePending_DoesNotCallNotificationService()
+    {
+        var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
+        var fileTransferId = Guid.NewGuid();
+        var alreadySent = CreateOrder(fileTransferId: fileTransferId, notificationOrderId: Guid.NewGuid(), shipmentId: Guid.NewGuid());
+        repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([alreadySent]);
+
+        await handler.Process(fileTransferId, CancellationToken.None);
+
+        notificationService.Verify(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(capturedJobs);
     }
 
     [Fact]
