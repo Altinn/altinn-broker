@@ -28,6 +28,10 @@ inputs:
     description: "APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). Front Door forwards /broker/* here. Leave empty for SPA-only Front Door."
     required: false
     default: ""
+  FRONTEND_CUSTOM_DOMAIN:
+    description: "Public custom domain for Front Door (e.g. ab.tt02.altinn.no). Linked to routes on each deploy so it does not become Unassociated."
+    required: false
+    default: ""
   VITE_API_BASE_URL:
     description: "Broker API origin baked into the SPA at build time. Leave empty when Front Door proxies /broker/* (same-origin cookies)."
     required: false
@@ -81,6 +85,7 @@ runs:
         DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ env.DEPLOYMENT_PRINCIPAL_OBJECT_ID }}
         FRONTEND_STORAGE_ACCOUNT: ${{ inputs.FRONTEND_STORAGE_ACCOUNT }}
         API_ORIGIN_HOST_NAME: ${{ inputs.API_ORIGIN_HOST_NAME }}
+        FRONTEND_CUSTOM_DOMAIN: ${{ inputs.FRONTEND_CUSTOM_DOMAIN }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
@@ -134,7 +139,12 @@ runs:
       shell: bash
       run: |
         echo "Frontend deployed to https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}"
-        echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        if [ -n "${{ steps.deploy.outputs.customDomainHostName }}" ]; then
+          echo "Custom domain: https://${{ steps.deploy.outputs.customDomainHostName }}"
+          echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.customDomainHostName }}/broker/api/v1/authentication/me\""
+        else
+          echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        fi
         echo "Expect Content-Type: application/json (not text/html)."
 
     - name: Logout from azure
