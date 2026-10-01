@@ -4,6 +4,7 @@ import { Link, type LinkProps } from 'react-router-dom'
 import type { AllowedRecipient } from '../../api/allowedRecipients'
 import { newFileTransferPath, PageRoutes } from '../../pages/routes'
 import type { FileTransferService } from './useFileTransferService'
+import { CannotSendNotice } from './CannotSendNotice'
 import { NoRecipientsNotice } from './NoRecipientsNotice'
 import { ResourceConfigurationList } from './ResourceConfigurationList'
 import './fileTransferServiceDetailPage.css'
@@ -68,6 +69,12 @@ export function ServiceDetails({
       {resource.canSend && !hasRecipients && (
         <div className="page-section">
           <NoRecipientsNotice />
+        </div>
+      )}
+
+      {!resource.canSend && (
+        <div className="page-section">
+          <CannotSendNotice />
         </div>
       )}
 

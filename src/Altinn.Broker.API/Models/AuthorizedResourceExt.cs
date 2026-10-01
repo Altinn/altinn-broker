@@ -50,4 +50,10 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("isServiceOwner")]
     public bool IsServiceOwner { get; set; }
+
+    /// <summary>
+    /// Whether the requested party owns this broker resource.
+    /// </summary>
+    [JsonPropertyName("isOwned")]
+    public bool IsOwned { get; set; }
 }

@@ -15,6 +15,8 @@ export type AuthorizedResource = {
   canPublish: boolean
   /** The selected party is configured as a Broker service owner. */
   isServiceOwner: boolean
+  /** The selected party owns this broker resource. */
+  isOwned: boolean
 }
 
 export function fetchAuthorizedResources(party: string): Promise<AuthorizedResource[]> {
