@@ -7,16 +7,22 @@ param originHostName string
 @description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, /broker/* is forwarded to APIM.')
 param apiOriginHostName string = ''
 
-@description('Optional public custom domain (e.g. ab.tt02.altinn.no). When set, it is created/kept and linked to the routes so redeploys do not leave it Unassociated.')
-param customDomainHostName string = ''
+@description('Resource ID of an existing Front Door custom domain (managed by the platform team). When set, routes are associated with it so redeploys do not leave it Unassociated. This module never creates the domain.')
+param customDomainId string = ''
 
 @description('AFD endpoint name. Must be globally unique across Azure. Hostname becomes {endpointName}-{hash}.azurefd.net.')
 param endpointName string = 'default'
 
 var hasApiOrigin = !empty(apiOriginHostName)
-var hasCustomDomain = !empty(customDomainHostName)
-// Resource names cannot contain dots.
-var customDomainResourceName = replace(customDomainHostName, '.', '-')
+var hasCustomDomain = !empty(customDomainId)
+
+var routeCustomDomains = hasCustomDomain
+  ? [
+      {
+        id: customDomainId
+      }
+    ]
+  : []
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2023-05-01' = {
   name: frontDoorProfileName
@@ -98,26 +104,6 @@ resource apiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = if
     enabledState: 'Enabled'
   }
 }
-
-resource customDomain 'Microsoft.Cdn/profiles/customDomains@2023-05-01' = if (hasCustomDomain) {
-  parent: frontDoorProfile
-  name: customDomainResourceName
-  properties: {
-    hostName: customDomainHostName
-    tlsSettings: {
-      certificateType: 'ManagedCertificate'
-      minimumTlsVersion: 'TLS12'
-    }
-  }
-}
-
-var routeCustomDomains = hasCustomDomain
-  ? [
-      {
-        id: customDomain!.id
-      }
-    ]
-  : []
 
 // Safety net: if /* wins over /broker/*, still force APIM for broker paths.
 resource brokerApiRuleSet 'Microsoft.Cdn/profiles/ruleSets@2023-05-01' = if (hasApiOrigin) {
@@ -226,4 +212,4 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
 output profileName string = frontDoorProfile.name
 output endpointName string = afdEndpoint.name
 output endpointHostName string = afdEndpoint.properties.hostName
-output customDomainHostName string = hasCustomDomain ? customDomainHostName : ''
+output customDomainId string = customDomainId
