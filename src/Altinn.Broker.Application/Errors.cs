@@ -79,3 +79,20 @@ public static class ServiceOwnerErrors
     public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
     public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
 }
+
+public static class NotificationErrors
+{
+    public static Error MissingEmailContent = new Error(8001, "Email body and subject must be provided when sending email notifications", HttpStatusCode.BadRequest);
+    public static Error MissingSmsContent = new Error(8002, "SMS body must be provided when sending SMS notifications", HttpStatusCode.BadRequest);
+    public static Error MissingPreferredChannel = new Error(8003, "Email body, subject and SMS body must be provided when sending preferred notifications", HttpStatusCode.BadRequest);
+    public static Error MissingEmailAndSmsContent = new Error(8004, "Email body, subject and SMS body must be provided when sending email and SMS notifications", HttpStatusCode.BadRequest);
+    public static Error MissingEmailReminderContent = new Error(8005, "Reminder email body and subject must be provided when sending reminder email notifications", HttpStatusCode.BadRequest);
+    public static Error MissingSmsReminderContent = new Error(8006, "Reminder SMS body must be provided when sending reminder SMS notifications", HttpStatusCode.BadRequest);
+    public static Error MissingPreferredReminderChannel = new Error(8007, "Reminder email body, subject and SMS body must be provided when sending reminder preferred notifications", HttpStatusCode.BadRequest);
+    public static Error MissingEmailAndSmsReminderContent = new Error(8008, "Reminder email body, subject and SMS body must be provided when sending reminder email and SMS notifications", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithoutIdentifierNotAllowed = new Error(8009, "Custom recipient without identifier is not allowed", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithMultipleIdentifiersNotAllowed = new Error(8010, "Custom recipient with multiple identifiers is not allowed", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithNumberOrEmailNotAllowedWithKeyWordRecipientName = new Error(8012, "Recipient overrides with email or mobile number are not allowed when using the $recipientName$/$recipientNumber$ keywords, since there is no registered name/number to look up for that kind of recipient", HttpStatusCode.BadRequest);
+    public static Error InvalidEmailProvided = new Error(8013, "Invalid email provided for custom recipient.", HttpStatusCode.BadRequest);
+    public static Error InvalidMobileNumberProvided = new Error(8014, "Invalid mobile number provided. Mobile number can contain only '+' and numeric characters, and it must adhere to the E.164 standard.", HttpStatusCode.BadRequest);
+}

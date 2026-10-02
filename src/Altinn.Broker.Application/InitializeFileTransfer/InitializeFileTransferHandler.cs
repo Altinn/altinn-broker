@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 
+using Altinn.Broker.Application.CreateNotificationOrder;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Common;
@@ -27,6 +28,7 @@ public class InitializeFileTransferHandler(
     IFileTransferStatusRepository fileTransferStatusRepository,
     IActorFileTransferStatusRepository actorFileTransferStatusRepository,
     IBackgroundJobClient backgroundJobClient,
+    ICreateNotificationOrderHandler createNotificationOrderHandler,
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     IAltinnRegisterService altinnRegisterService,
@@ -133,9 +135,18 @@ public class InitializeFileTransferHandler(
             }
         }
 
+        if (request.Notification is not null)
+        {
+            var notificationError = NotificationValidationHelper.Validate(request.Notification);
+            if (notificationError is not null)
+            {
+                return notificationError;
+            }
+        }
+
         var fileExpirationTime = DateTime.UtcNow.Add(resource.FileTransferTimeToLive ?? TimeSpan.FromDays(30));
         var senderVendor = user?.GetCallerVendorId()?.WithPrefix();
-        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId.WithoutPrefix().WithPrefix(), request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, cancellationToken);
+        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, request.Notification != null, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId.WithoutPrefix().WithPrefix(), null, cancellationToken));
         try
@@ -153,9 +164,23 @@ public class InitializeFileTransferHandler(
             PurgeTrigger = PurgeTrigger.FileTransferExpiry
         }, null, cancellationToken), fileExpirationTime);
         await fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
+
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
             await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, vendor: senderVendor, cancellationToken: cancellationToken);
+            if (request.Notification != null)
+            {
+                await createNotificationOrderHandler.Process(new CreateNotificationOrderRequest()
+                {
+                    FileTransferId = fileTransferId,
+                    ResourceId = resource.Id,
+                    SenderExternalId = request.SenderExternalId,
+                    FileName = request.FileName,
+                    RecipientExternalIds = request.RecipientExternalIds,
+                    NotificationRequest = request.Notification,
+                    FileTransferExpirationTime = fileExpirationTime
+                }, cancellationToken);
+            }
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             return fileTransferId;
         }, logger, cancellationToken);
