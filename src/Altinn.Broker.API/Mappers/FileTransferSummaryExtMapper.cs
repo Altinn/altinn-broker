@@ -17,4 +17,14 @@ internal static class FileTransferSummaryExtMapper
             SendersFileTransferReference = summary.SendersFileTransferReference
         };
     }
+
+    internal static FileTransferSummaryListExt MapToExternalModel(FileTransferSummaryPage page, int pageSize)
+    {
+        return new FileTransferSummaryListExt()
+        {
+            Items = page.Summaries.Select(MapToExternalModel).ToList(),
+            HasMore = page.HasMore,
+            PageSize = pageSize
+        };
+    }
 }

@@ -207,6 +207,15 @@
   margin-top: 1rem;
 }
 
+/* Lines the folded-away pages up with the numbers on either side of them. */
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 100%;
+}
+
 ul.service-owner-list {
   --dsc-spacing: 0;
   background: #fff;

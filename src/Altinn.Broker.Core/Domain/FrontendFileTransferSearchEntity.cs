@@ -18,4 +18,7 @@ public class FrontendFileTransferSearchEntity
     public string? OrderAscending { get; set; }
     public SearchRole Role { get; set; } = SearchRole.Both;
 
+    /// <summary>Maximum number of file transfers to return, before their recipients are joined in.</summary>
+    public int Limit { get; set; } = 100;
+
 }

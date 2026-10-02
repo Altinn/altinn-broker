@@ -52,7 +52,7 @@ public class GetFileTransferSummariesHandlerTests
             new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
-        Assert.Empty(result.AsT0);
+        Assert.Empty(result.AsT0.Summaries);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class GetFileTransferSummariesHandlerTests
             new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
-        Assert.Empty(result.AsT0);
+        Assert.Empty(result.AsT0.Summaries);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public class GetFileTransferSummariesHandlerTests
             new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
-        var resultSummary = Assert.Single(result.AsT0);
+        var resultSummary = Assert.Single(result.AsT0.Summaries);
         Assert.Equal("Sender AS", resultSummary.Sender);
         Assert.Equal(["Recipient One AS", "0192:333333333"], resultSummary.Recipients);
     }
@@ -227,6 +227,106 @@ public class GetFileTransferSummariesHandlerTests
         Assert.Equal(expectedTerminalStatuses, queriedSenderStatuses);
         Assert.Equal(expectedTerminalStatuses, queriedRecipientStatuses);
     }
+
+    [Fact]
+    public async Task Process_MoreThanAPageAvailable_TrimsToPageSizeAndReportsHasMore()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        int? queriedLimit = null;
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) => queriedLimit = search.Limit)
+            .ReturnsAsync(CreateSummaries(GetFileTransferSummariesHandler.PageSize + 1));
+        var altinnRegisterService = new Mock<IAltinnRegisterService>();
+        altinnRegisterService
+            .Setup(service => service.LookupOrganizationName(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        // One past the page is read so a capped list can be told from a complete one.
+        Assert.Equal(GetFileTransferSummariesHandler.PageSize + 1, queriedLimit);
+        Assert.Equal(GetFileTransferSummariesHandler.PageSize, result.AsT0.Summaries.Count);
+        Assert.True(result.AsT0.HasMore);
+    }
+
+    [Fact]
+    public async Task Process_ExactlyAPageAvailable_ReportsNoMore()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSummaries(GetFileTransferSummariesHandler.PageSize));
+        var altinnRegisterService = new Mock<IAltinnRegisterService>();
+        altinnRegisterService
+            .Setup(service => service.LookupOrganizationName(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Active }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Equal(GetFileTransferSummariesHandler.PageSize, result.AsT0.Summaries.Count);
+        Assert.False(result.AsT0.HasMore);
+    }
+
+    [Fact]
+    public async Task Process_DateRangeProvided_IsPassedToRepository()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        DateTimeOffset? queriedFrom = null;
+        DateTimeOffset? queriedTo = null;
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) =>
+            {
+                queriedFrom = search.From;
+                queriedTo = search.To;
+            })
+            .ReturnsAsync([]);
+        var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+        var from = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest
+            {
+                ResourceIds = ["resource-a"],
+                OnBehalfOf = OrganizationNumber,
+                View = FileTransferListView.Historical,
+                From = from,
+                To = to
+            }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Equal(from, queriedFrom);
+        Assert.Equal(to, queriedTo);
+    }
+
+    private static List<FileTransferSummaryEntity> CreateSummaries(int count)
+        => Enumerable.Range(0, count).Select(index => new FileTransferSummaryEntity
+        {
+            FileTransferId = Guid.NewGuid(),
+            ResourceId = "resource-a",
+            Sender = $"0192:{OrganizationNumber}",
+            IsSender = true,
+            Recipients = ["0192:222222222"],
+            SendersFileTransferReference = $"ref-{index}"
+        }).ToList();
 
     private static GetFileTransferSummariesHandler CreateHandler(
         Mock<IAuthorizationService> authorizationService,
