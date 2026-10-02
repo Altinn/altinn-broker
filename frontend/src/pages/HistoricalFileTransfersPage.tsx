@@ -13,6 +13,8 @@ export function HistoricalFileTransfersPage() {
 
   return (
     <FileTransferList
+      // A fresh list per actor: no stale rows, filters or in-flight requests to unpick.
+      key={selectedParty.partyUuid}
       heading="Historiske formidlinger"
       loadingText="Laster historiske formidlinger …"
       loadErrorText="Klarte ikke å hente historiske formidlinger."

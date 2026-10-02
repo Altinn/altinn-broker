@@ -19,8 +19,11 @@ public class GetFileTransferSummariesHandler(
     IFileTransferRepository fileTransferRepository,
     IActorRepository actorRepository,
     IAltinnRegisterService altinnRegisterService,
-    ILogger<GetFileTransferSummariesHandler> logger) : IHandler<GetFileTransferSummariesRequest, List<FileTransferSummaryEntity>>
+    ILogger<GetFileTransferSummariesHandler> logger) : IHandler<GetFileTransferSummariesRequest, FileTransferSummaryPage>
 {
+    /// <summary>How many file transfers a list view returns. One more is read, to tell a full page from a capped one.</summary>
+    public const int PageSize = 100;
+
     private static readonly List<FileTransferStatus> ActiveSenderStatuses = [FileTransferStatus.UploadProcessing, FileTransferStatus.Published];
     private static readonly List<FileTransferStatus> ActiveRecipientStatuses = [FileTransferStatus.Published];
 
@@ -36,7 +39,7 @@ public class GetFileTransferSummariesHandler(
         FileTransferStatus.Failed,
     ];
 
-    public async Task<OneOf<List<FileTransferSummaryEntity>, Error>> Process(GetFileTransferSummariesRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
+    public async Task<OneOf<FileTransferSummaryPage, Error>> Process(GetFileTransferSummariesRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         logger.LogInformation("Getting {view} file transfers across {count} requested resources", request.View, request.ResourceIds.Count);
 
@@ -50,7 +53,7 @@ public class GetFileTransferSummariesHandler(
         var callingActor = await actorRepository.GetActorAsync(caller.WithPrefix(), cancellationToken);
         if (callingActor is null)
         {
-            return new List<FileTransferSummaryEntity>();
+            return FileTransferSummaryPage.Empty();
         }
 
         var authorizedResources = await authorizationService.GetAuthorizedResources(user, caller, request.ResourceIds, cancellationToken);
@@ -61,18 +64,28 @@ public class GetFileTransferSummariesHandler(
 
         if (authorizedResourceIds.Count == 0)
         {
-            return new List<FileTransferSummaryEntity>();
+            return FileTransferSummaryPage.Empty();
         }
 
         var senderStatuses = request.View == FileTransferListView.Active ? ActiveSenderStatuses : HistoricalStatuses;
         var recipientStatuses = request.View == FileTransferListView.Active ? ActiveRecipientStatuses : HistoricalStatuses;
+        // One past the page tells a capped list from a complete one, without counting the whole set.
         var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
             ResourceIds = authorizedResourceIds,
             SenderStatuses = senderStatuses,
             RecipientStatuses = recipientStatuses,
+            From = request.From,
+            To = request.To,
+            Limit = PageSize + 1,
         }, cancellationToken);
+
+        var hasMore = summaries.Count > PageSize;
+        if (hasMore)
+        {
+            summaries = summaries.Take(PageSize).ToList();
+        }
 
         var uniqueOrganizationIds = summaries
             .SelectMany(summary => new[] { summary.Sender }.Concat(summary.Recipients))
@@ -96,6 +109,6 @@ public class GetFileTransferSummariesHandler(
                 .ToList();
         }
 
-        return summaries;
+        return new FileTransferSummaryPage { Summaries = summaries, HasMore = hasMore };
     }
 }

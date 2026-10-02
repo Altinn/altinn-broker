@@ -357,6 +357,131 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.DoesNotContain(result, summary => summary.FileTransferId == fileTransferId);
 	}
 
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_MoreTransfersThanLimit_ReturnsNewestUpToLimit()
+	{
+		// Arrange
+		const int limit = 100;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		// Oldest first, so the newest `limit` of them are the ones inserted last.
+		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, limit + 1);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = limit
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.Equal(limit, result.Count);
+		Assert.DoesNotContain(ordered[0], result.Select(summary => summary.FileTransferId));
+		Assert.Contains(ordered[^1], result.Select(summary => summary.FileTransferId));
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_OnePastTheLimitRequested_ReturnsItSoCappingCanBeDetected()
+	{
+		// Arrange
+		// What the handler does: ask for one more than it shows, and treat the extra as "there is more".
+		const int pageSize = 100;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		await InsertPublishedTransfers(resourceId, senderExternalId, pageSize + 1);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		var search = new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize + 1
+		};
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(search, cancellationToken: default);
+
+		// Assert
+		Assert.Equal(pageSize + 1, result.Count);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExactlyTheLimit_ReturnsAllOfThem()
+	{
+		// Arrange
+		// The off-by-one that would make a complete list claim there is more.
+		const int pageSize = 100;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		await InsertPublishedTransfers(resourceId, senderExternalId, pageSize);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize + 1
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.Equal(pageSize, result.Count);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_DateRange_ReachesTransfersOutsideTheNewestPage()
+	{
+		// Arrange
+		// The way a user gets at anything the cap hides: narrow to a window the newest ones fall outside of.
+		const int pageSize = 100;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, pageSize + 1);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+		var oldest = ordered[0];
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize + 1,
+			// The next one sits exactly a minute later, and the range filter is inclusive at both ends.
+			From = StatusDateFor(0).AddSeconds(-30),
+			To = StatusDateFor(0).AddSeconds(30)
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(oldest, summary.FileTransferId);
+	}
+
+	/// <summary>Published transfers one minute apart, oldest first, so paging and date windows are deterministic.</summary>
+	private async Task<List<Guid>> InsertPublishedTransfers(string resourceId, string senderExternalId, int count)
+	{
+		var ids = new List<Guid>(count);
+		for (var index = 0; index < count; index++)
+		{
+			var fileTransferId = await _dataHelper.InsertFileTransfer(
+				resourceId,
+				senderExternalId: senderExternalId,
+				externalReference: $"ref-{index}");
+			await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published, StatusDateFor(index));
+			ids.Add(fileTransferId);
+		}
+		return ids;
+	}
+
+	private static readonly DateTimeOffset PagingEpoch = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+	private static DateTimeOffset StatusDateFor(int index) => PagingEpoch.AddMinutes(index);
+
 	private static string NewOrgId() => $"0192:{Random.Shared.Next(100000000, 999999999)}";
 
 	private async Task<int> CountFileTransfer(Guid fileTransferId)

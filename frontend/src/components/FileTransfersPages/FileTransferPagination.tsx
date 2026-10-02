@@ -1,4 +1,10 @@
-import { Pagination } from '@digdir/designsystemet-react'
+import { Pagination, usePagination } from '@digdir/designsystemet-react'
+
+/**
+ * How many page numbers to show before the rest are folded into an ellipsis. A full list reaches
+ * the page cap divided by the list's own page size, which is far too many buttons to lay out.
+ */
+const VISIBLE_PAGES = 7
 
 type FileTransferPaginationProps = {
   page: number
@@ -6,44 +12,57 @@ type FileTransferPaginationProps = {
   onPageChange: (page: number) => void
 }
 
-export function FileTransferPagination({ page, totalPages, onPageChange }: FileTransferPaginationProps) {
+export function FileTransferPagination({
+  page,
+  totalPages,
+  onPageChange,
+}: FileTransferPaginationProps) {
+  const { pages, prevButtonProps, nextButtonProps } = usePagination({
+    currentPage: page,
+    totalPages,
+    showPages: VISIBLE_PAGES,
+    setCurrentPage: onPageChange,
+  })
+
+  if (totalPages <= 1) {
+    return <div className="pagination-row" />
+  }
+
   return (
     <div className="pagination-row">
-      {totalPages > 1 && (
-        <Pagination aria-label="Sidenavigering" data-current={String(page)} data-total={String(totalPages)}>
-          <Pagination.List>
-            <Pagination.Item>
-              <Pagination.Button
-                aria-label="Forrige side"
-                disabled={page === 1}
-                onClick={() => onPageChange(Math.max(1, page - 1))}
-              >
-                Forrige
-              </Pagination.Button>
-            </Pagination.Item>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <Pagination.Item key={n}>
-                <Pagination.Button
-                  aria-label={`Side ${n}`}
-                  aria-current={n === page ? 'page' : undefined}
-                  onClick={() => onPageChange(n)}
-                >
-                  {n}
+      <Pagination
+        aria-label="Sidenavigering"
+        data-current={String(page)}
+        data-total={String(totalPages)}
+      >
+        <Pagination.List>
+          <Pagination.Item>
+            <Pagination.Button {...prevButtonProps} aria-label="Forrige side">
+              Forrige
+            </Pagination.Button>
+          </Pagination.Item>
+
+          {pages.map(({ page: pageNumber, itemKey, buttonProps }) =>
+            typeof pageNumber === 'number' && buttonProps ? (
+              <Pagination.Item key={itemKey}>
+                <Pagination.Button {...buttonProps} aria-label={`Side ${pageNumber}`}>
+                  {pageNumber}
                 </Pagination.Button>
               </Pagination.Item>
-            ))}
-            <Pagination.Item>
-              <Pagination.Button
-                aria-label="Neste side"
-                disabled={page === totalPages}
-                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-              >
-                Neste
-              </Pagination.Button>
-            </Pagination.Item>
-          </Pagination.List>
-        </Pagination>
-      )}
+            ) : (
+              // An empty item is how Designsystemet renders the folded-away pages: its stylesheet
+              // puts the ellipsis on `li:empty::before`, so it stays decoration rather than content.
+              <Pagination.Item key={itemKey} />
+            ),
+          )}
+
+          <Pagination.Item>
+            <Pagination.Button {...nextButtonProps} aria-label="Neste side">
+              Neste
+            </Pagination.Button>
+          </Pagination.Item>
+        </Pagination.List>
+      </Pagination>
     </div>
   )
 }

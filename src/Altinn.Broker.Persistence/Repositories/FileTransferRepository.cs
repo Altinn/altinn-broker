@@ -359,7 +359,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 AND ({actorCondition})
                 {dateCondition}
                 ORDER BY sort_date {orderDirection}
-                LIMIT 100
+                LIMIT @limit
             )
             SELECT
                 mt.file_transfer_id_pk,
@@ -375,6 +375,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
+        command.Parameters.AddWithValue("@limit", fileTransferSearch.Limit);
         if (hasSenderStatusFilter)
             command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
         if (hasRecipientStatusFilter)
