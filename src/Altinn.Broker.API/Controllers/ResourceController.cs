@@ -157,7 +157,8 @@ public class ResourceController : Controller
                 CanSend = resource.CanSend,
                 CanReceive = resource.CanReceive,
                 CanPublish = resource.CanPublish,
-                IsServiceOwner = resource.IsServiceOwner
+                IsServiceOwner = resource.IsServiceOwner,
+                IsOwned = resource.IsOwned
             }).ToList()),
             Problem
         );

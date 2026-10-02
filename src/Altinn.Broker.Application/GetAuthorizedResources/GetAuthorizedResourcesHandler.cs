@@ -15,7 +15,9 @@ using OneOf;
 namespace Altinn.Broker.Application.GetAuthorizedResources;
 
 /// <summary>
-/// Lists the broker resources an end user has access to on behalf of a party.
+/// Lists the broker resources an end user has access to on behalf of a party:
+/// access-list members with send or receive rights, plus every broker resource
+/// owned by the party when it is a Broker service owner.
 /// </summary>
 public class GetAuthorizedResourcesHandler(
     IAuthorizationService authorizationService,
@@ -67,12 +69,28 @@ public class GetAuthorizedResourcesHandler(
         var canConfigureForParty = isServiceOwner
             && await HasGatekeeperPublish(user, party, cancellationToken);
 
-        var accessibleResources = authorizedResources
-            .Where(authorized => authorized.CanSend
-                || authorized.CanReceive
-                || (canConfigureForParty
-                    && serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
-                    && owner == party))
+        // Include when the party owns the resource as a Broker service owner, or when they can
+        // send/receive and are on the resource access list.
+        var accessibility = await Task.WhenAll(authorizedResources.Select(async authorized =>
+        {
+            var ownedByParty = serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
+                && owner == party;
+            if (isServiceOwner && ownedByParty)
+            {
+                return (authorized, include: true);
+            }
+
+            if (!authorized.CanSend && !authorized.CanReceive)
+            {
+                return (authorized, include: false);
+            }
+
+            return (authorized, include: await IsOnAccessList(authorized.ResourceId, party, cancellationToken));
+        }));
+
+        var accessibleResources = accessibility
+            .Where(entry => entry.include)
+            .Select(entry => entry.authorized)
             .ToList();
         logger.LogInformation(
             "End user has access to {authorizedResourceCount} of {configuredResourceCount} broker resources for the requested party",
@@ -92,13 +110,36 @@ public class GetAuthorizedResourcesHandler(
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
                 CanPublish = canConfigureForParty && ownedByParty,
-                IsServiceOwner = isServiceOwner
+                IsServiceOwner = isServiceOwner,
+                IsOwned = ownedByParty
             };
         }));
 
         return overviews
             .OrderBy(overview => overview.Name ?? overview.ResourceId, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+    }
+
+    /// <remarks>
+    /// A missing or empty membership means the party is not on the resource access list.
+    /// Registry failures for one resource exclude that resource rather than failing the whole list.
+    /// </remarks>
+    private async Task<bool> IsOnAccessList(string resourceId, string party, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var membership = await altinnResourceRepository.GetAccessListOfResource(resourceId, party, cancellationToken);
+            return membership is { Count: > 0 };
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                e,
+                "Could not evaluate access-list membership for party {party} on resource {resourceId}",
+                party.SanitizeForLogs(),
+                resourceId.SanitizeForLogs());
+            return false;
+        }
     }
 
     private async Task<bool> HasGatekeeperPublish(
