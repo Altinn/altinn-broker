@@ -1,5 +1,5 @@
 import { CardLink } from '../components/CardLink'
-import { useParties } from '../data/useParties'
+import { useParties } from '../parties/PartiesContext'
 import { OrganizationHeader } from '../components/OrganizationHeader'
 import { PageRoutes } from './routes'
 import './pages.css'
