@@ -10,7 +10,6 @@ import {
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
-import { clearDraft, draftKey } from '../components/NewFileTransferPage/draftStore'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
@@ -30,32 +29,45 @@ import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
-import { useUploads } from '../upload/uploadsContext'
+import { useUploadActions } from '../upload/uploadsContext'
 import { formatFileSize } from '../helpers/fileSizeHelper'
 import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
+  const { selectedParty } = useParties()
+  return <NewFileTransferPageContent key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}`} />
+}
+
+function NewFileTransferPageContent() {
+  const { serviceId = '' } = useParams()
   const navigate = useNavigate()
-  const { status: partiesStatus, selectedParty } = useParties()
+  const { status: partiesStatus, parties, selectedParty, selectParty } = useParties()
   const senderOrgNumber = selectedParty?.organizationNumber ?? ''
   const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
 
-  const { addUploadSuccessListener } = useUploads()
+  const { addUploadSuccessListener } = useUploadActions()
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
 
   useEffect(
     () =>
-      addUploadSuccessListener(({ fileTransferId, resourceId }) => {
-        if (resourceId !== serviceId) {
-          return
+      addUploadSuccessListener(({ fileTransferId, resourceId, sender }) => {
+        if (resourceId === serviceId && sender === senderOrgNumber) {
+          navigate(activeTransferPath(fileTransferId), { replace: true })
         }
-        clearDraft(draftKey(serviceId, senderOrgNumber))
-        navigate(activeTransferPath(fileTransferId), { replace: true })
       }),
     [navigate, senderOrgNumber, serviceId, addUploadSuccessListener],
   )
+
+  // The upload is only shown as the form's own while acting for the organisation that sends it.
+  const goToUpload = (upload: { resourceId: string; sender: string }) => {
+    const owner = parties.find((party) => party.organizationNumber === upload.sender)
+    if (owner && upload.sender !== senderOrgNumber) {
+      selectParty(owner.partyUuid)
+    }
+    navigate(newFileTransferPath(upload.resourceId))
+  }
   const { errors, setValue, submitAttempts, values } = form
 
   useEffect(() => {
@@ -104,18 +116,20 @@ export function NewFileTransferPage() {
     (field) => errors[field],
   )
 
+  const { active, blockedBy } = form
+  const status = active?.status ?? null
+
   // An upload that can be carried on takes the primary action over, so there is only one to press.
+  // An interrupted one waits while another upload holds the place.
   const continueUpload =
-    form.paused || form.failed
+    status === 'paused' || status === 'failed'
       ? form.resume
-      : form.resumeReady
+      : form.resumeReady && !blockedBy
         ? form.resumeInterrupted
         : null
 
   // An interrupted upload settled these when it was created, so they are shown but not editable.
   const settled = form.interrupted !== null
-
-  const blockedBy = form.blockedBy
 
   // The metadata summary entry points at the row input that failed instead of the entire metadata field.
   const metadataErrorTargetId = (field: NewFileTransferField) =>
@@ -152,12 +166,12 @@ export function NewFileTransferPage() {
           {blockedBy && (
             <BlockingUploadNotice
               upload={blockedBy}
-              onContinue={() => navigate(newFileTransferPath(blockedBy.resourceId))}
-              onCancel={blockedBy.cancel}
+              onContinue={() => goToUpload(blockedBy)}
+              onCancel={form.cancelBlocking}
             />
           )}
 
-          <fieldset className="new-transfer__fields" disabled={form.sending}>
+          <fieldset className="new-transfer__fields" disabled={active !== null}>
             <fieldset className="new-transfer__fields" disabled={settled}>
               <PartyField
                 label="Avsender"
@@ -236,26 +250,15 @@ export function NewFileTransferPage() {
           )}
 
           {form.submitError && <Alert data-color="danger">{form.submitError}</Alert>}
-          {form.activeFile && !values.file && (
+          {active && !values.file && (
             <div className="new-transfer__file">
-              <span className="new-transfer__file-name">{form.activeFile.name}</span>
-              <span className="new-transfer__file-size">
-                {formatFileSize(form.activeFile.size)}
-              </span>
+              <span className="new-transfer__file-name">{active.fileName}</span>
+              <span className="new-transfer__file-size">{formatFileSize(active.fileSize)}</span>
             </div>
           )}
 
-          {form.sending && (
-            <UploadProgress
-              progress={form.progress}
-              initializing={form.initializing}
-              pausing={form.pausing}
-              paused={form.paused}
-              finishing={form.finishing}
-              stopped={form.failed}
-              onPause={form.pause}
-              onResume={form.resume}
-            />
+          {active && (
+            <UploadProgress status={active.status} onPause={form.pause} onResume={form.resume} />
           )}
 
           <div className="new-transfer__actions">
@@ -270,10 +273,10 @@ export function NewFileTransferPage() {
             ) : (
               <Button
                 type="submit"
-                loading={form.sending}
-                disabled={form.sending || blockedBy !== null}
+                loading={active !== null}
+                disabled={active !== null || blockedBy !== null}
               >
-                {form.sending ? 'Laster opp…' : 'Send formidling'}
+                {active ? 'Laster opp…' : 'Send formidling'}
               </Button>
             )}
             <Button type="button" variant="secondary" onClick={cancel}>

@@ -5,178 +5,218 @@ import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
   createUploadPlan,
   discardUpload,
+  isUploadGone,
   startUpload,
   type UploadPlan,
+  type UploadProgress,
   type UploadRun,
 } from '../api/tus/tusUpload'
+import { clearDraft, draftKey } from '../components/NewFileTransferPage/draftStore'
 import { clearStoredUpload, saveStoredUpload } from './uploadSession'
 import {
-  UploadsContext,
+  ActiveUploadContext,
+  UploadActionsContext,
+  UploadPlanError,
+  UploadProgressContext,
   type ActiveUpload,
   type PlannedUpload,
   type StartUploadInput,
+  type UploadActions,
   type UploadStatus,
   type UploadSuccessListener,
-  type UploadsContextValue,
 } from './uploadsContext'
 
 // Owns the single in-flight upload, for as long as the user stays within this app's routes.
 
+type Initializing = { phase: 'initializing'; controller: AbortController; paused: boolean }
+type Running = { phase: 'running'; upload: PlannedUpload; run: UploadRun }
+type Failed = { phase: 'failed'; upload: PlannedUpload; loaded: number }
+
 export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
-
-  const uploadRef = useRef<PlannedUpload | null>(null)
-  const initializingRef = useRef<AbortController | null>(null)
-  const runRef = useRef<UploadRun | null>(null)
+  const [progress, setProgress] = useState<UploadProgress | null>(null)
+  const sessionRef = useRef<Initializing | Running | Failed | null>(null)
   const listenersRef = useRef(new Set<UploadSuccessListener>())
+
+  const show = useCallback((upload: ActiveUpload | null) => {
+    setActive(upload)
+    setProgress(null)
+  }, [])
 
   const update = useCallback((changes: Partial<ActiveUpload>) => {
     setActive((current) => current && { ...current, ...changes })
   }, [])
 
-  const forget = useCallback(() => {
-    const upload = uploadRef.current
-    if (upload) {
-      clearStoredUpload(upload.resourceId, upload.sender)
-    }
-    uploadRef.current = null
-    setActive(null)
-  }, [])
-
   const run = useCallback(
-    async (upload: PlannedUpload, alreadySent: number) => {
-      uploadRef.current = upload
+    async (upload: PlannedUpload, alreadySent: number, paused = false) => {
       saveStoredUpload(upload)
-      setActive(asUploading)
+      update({ error: '' })
 
-      const running = startUpload(upload.plan, upload.file, {
-        onProgress: (progress) => update({ progress }),
-        onPhase: (status) => update({ status }),
-        alreadySent,
-      })
-      runRef.current = running
+      let loaded = alreadySent
+      const session: Running = {
+        phase: 'running',
+        upload,
+        run: startUpload(upload.plan, upload.file, {
+          onProgress: (progress) => {
+            loaded = progress.loaded
+            setProgress(progress)
+          },
+          onStatus: (status) => update({ status }),
+          alreadySent,
+          paused,
+        }),
+      }
+      sessionRef.current = session
 
       try {
-        await running.finished
-        forget()
-        toast.success('Formidlingen er sendt, og filen er lastet opp.')
-        for (const listener of listenersRef.current) {
-          listener({ fileTransferId: upload.plan.fileTransferId, resourceId: upload.resourceId })
-        }
+        await session.run.finished
       } catch (error) {
         // Cancelling has already cleared the upload away.
-        if (isAbortError(error)) {
+        if (isAbortError(error) || sessionRef.current !== session) {
           return
         }
         console.error('File transfer upload failed', error)
         const message = describeUploadError(error)
-        update({ status: 'failed', error: message })
         toast.error(message)
-      } finally {
-        if (runRef.current === running) {
-          runRef.current = null
+        if (isUploadGone(error)) {
+          sessionRef.current = null
+          clearStoredUpload(upload.resourceId, upload.sender)
+          show(null)
+          return
         }
+        sessionRef.current = { phase: 'failed', upload, loaded }
+        update({ status: 'failed', error: message })
+        return
+      }
+
+      if (sessionRef.current !== session) {
+        return
+      }
+      sessionRef.current = null
+      clearStoredUpload(upload.resourceId, upload.sender)
+      // Here rather than on the page, which may have been left while the last requests finished.
+      clearDraft(draftKey(upload.resourceId, upload.sender))
+      show(null)
+      toast.success('Formidlingen er sendt, og filen er lastet opp.')
+      const { resourceId, sender, plan } = upload
+      for (const listener of listenersRef.current) {
+        listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
       }
     },
-    [forget, update],
+    [show, update],
   )
 
   const start = useCallback(
     async (input: StartUploadInput) => {
-      const controller = new AbortController()
-      initializingRef.current = controller
-      setActive(newActiveUpload(input, 'initializing'))
+      // One upload at a time; another upload already holds the session.
+      if (sessionRef.current) {
+        return
+      }
+      const session: Initializing = {
+        phase: 'initializing',
+        controller: new AbortController(),
+        paused: false,
+      }
+      sessionRef.current = session
+      show(newActiveUpload(input, 'initializing'))
 
+      const { signal } = session.controller
+      let fileTransferId: string | undefined
       let plan: UploadPlan
       try {
-        const fileTransferId = await initializeFileTransfer(input, controller.signal)
-        plan = await createUploadPlan(fileTransferId, input.file, controller.signal)
+        fileTransferId = await initializeFileTransfer(input, signal)
+        plan = await createUploadPlan(fileTransferId, input.file, signal)
       } catch (error) {
-        setActive(null)
+        if (sessionRef.current === session) {
+          sessionRef.current = null
+          show(null)
+        }
         if (isAbortError(error)) {
           return
         }
-        throw error
-      } finally {
-        initializingRef.current = null
+        throw fileTransferId ? new UploadPlanError(fileTransferId, error) : error
       }
 
-      await run({ resourceId: input.resourceId, sender: input.sender, plan, file: input.file }, 0)
+      if (sessionRef.current !== session) {
+        discardUpload(plan)
+        return
+      }
+      const upload = { resourceId: input.resourceId, sender: input.sender, plan, file: input.file }
+      await run(upload, 0, session.paused)
     },
-    [run],
+    [run, show],
   )
 
   const resumeStored = useCallback(
     (upload: PlannedUpload, alreadySent: number) => {
-      setActive(newActiveUpload(upload, 'uploading'))
+      // One upload at a time; another upload already holds the session.
+      if (sessionRef.current) {
+        return
+      }
+      show(newActiveUpload(upload, 'uploading'))
       void run(upload, alreadySent)
     },
-    [run],
+    [run, show],
   )
 
   // Holds the upload rather than stopping it: aborting leaves the server holding uploads locked.
-  // The requests already sent are left to finish, so the pause takes a moment to take effect.
   const pause = useCallback(() => {
-    setActive((current) =>
-      current && (current.status === 'uploading' || current.status === 'finishing')
-        ? { ...current, status: 'pausing' }
-        : current,
-    )
-    runRef.current?.pause()
+    const session = sessionRef.current
+    if (session?.phase === 'running') {
+      session.run.pause()
+    } else if (session?.phase === 'initializing') {
+      session.paused = true
+    }
   }, [])
 
   // A paused upload carries on where it was; only a failed one has to start over.
   const resume = useCallback(() => {
-    const running = runRef.current
-    if (running) {
-      void running.resume()
-      setActive(asUploading)
-    } else if (uploadRef.current) {
-      void run(uploadRef.current, active?.progress?.loaded ?? 0)
+    const session = sessionRef.current
+    if (session?.phase === 'running') {
+      void session.run.resume()
+    } else if (session?.phase === 'failed') {
+      void run(session.upload, session.loaded)
+    } else if (session?.phase === 'initializing') {
+      session.paused = false
     }
-  }, [active?.progress?.loaded, run])
+  }, [run])
 
   const cancel = useCallback(() => {
-    initializingRef.current?.abort()
-    runRef.current?.abort()
-    if (uploadRef.current) {
-      discardUpload(uploadRef.current.plan)
+    const session = sessionRef.current
+    sessionRef.current = null
+    show(null)
+    if (session?.phase === 'initializing') {
+      session.controller.abort()
+      return
     }
-    forget()
-  }, [forget])
+    if (session?.phase === 'running') {
+      session.run.abort()
+    }
+    if (session) {
+      discardUpload(session.upload.plan)
+      clearStoredUpload(session.upload.resourceId, session.upload.sender)
+    }
+  }, [show])
 
   const addUploadSuccessListener = useCallback((listener: UploadSuccessListener) => {
     listenersRef.current.add(listener)
+    return () => {
+      listenersRef.current.delete(listener)
+    }
   }, [])
 
-  const removeUploadSuccessListener = useCallback((listener: UploadSuccessListener) => {
-    listenersRef.current.delete(listener)
-  }, [])
-
-  const value = useMemo<UploadsContextValue>(
-    () => ({
-      active,
-      start,
-      resumeStored,
-      pause,
-      resume,
-      cancel,
-      addUploadSuccessListener,
-      removeUploadSuccessListener,
-    }),
-    [
-      active,
-      start,
-      resumeStored,
-      pause,
-      resume,
-      cancel,
-      addUploadSuccessListener,
-      removeUploadSuccessListener,
-    ],
+  const actions = useMemo<UploadActions>(
+    () => ({ start, resumeStored, pause, resume, cancel, addUploadSuccessListener }),
+    [start, resumeStored, pause, resume, cancel, addUploadSuccessListener],
   )
 
-  return <UploadsContext.Provider value={value}>{children}</UploadsContext.Provider>
+  return (
+    <UploadActionsContext.Provider value={actions}>
+      <ActiveUploadContext.Provider value={active}>
+        <UploadProgressContext.Provider value={progress}>{children}</UploadProgressContext.Provider>
+      </ActiveUploadContext.Provider>
+    </UploadActionsContext.Provider>
+  )
 }
 
 function newActiveUpload(
@@ -189,24 +229,8 @@ function newActiveUpload(
     fileName: file.name,
     fileSize: file.size,
     status,
-    progress: null,
     error: '',
   }
-}
-
-function asUploading(current: ActiveUpload | null): ActiveUpload | null {
-  return (
-    current && {
-      ...current,
-      status: 'uploading',
-      error: '',
-      progress: current.progress && {
-        ...current.progress,
-        bytesPerSecond: null,
-        secondsRemaining: null,
-      },
-    }
-  )
 }
 
 function isAbortError(error: unknown): boolean {
@@ -220,7 +244,7 @@ function describeUploadError(error: unknown): string {
   if (error.status === 0) {
     return 'Mistet kontakten med serveren. Fortsett opplastingen når du er på nett igjen — det som er lastet opp beholdes.'
   }
-  if (error.status === 404 || error.status === 410) {
+  if (isUploadGone(error)) {
     return 'Opplastingen er ikke lenger tilgjengelig på serveren. Send formidlingen på nytt.'
   }
   return `Opplastingen stoppet (HTTP ${error.status}). Fortsett for å laste opp resten av filen.`

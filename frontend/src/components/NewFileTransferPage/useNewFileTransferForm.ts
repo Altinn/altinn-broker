@@ -18,8 +18,6 @@ type Options = {
 }
 
 type LoadedResource = {
-  /** The sender and resource the content belongs to. */
-  key: string
   configuration: ResourceConfiguration | null
   recipients: AllowedRecipient[]
   error: string
@@ -60,8 +58,6 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber }: Options)
 /** What the resource allows, and who may receive on it. */
 function useResourceContext(resourceId: string, senderOrgNumber: string) {
   const [loaded, setLoaded] = useState<LoadedResource | null>(null)
-  // Allowed recipients depend on the sender, so both identify what was loaded.
-  const key = `${senderOrgNumber}:${resourceId}`
 
   useEffect(() => {
     if (!senderOrgNumber) {
@@ -74,9 +70,8 @@ function useResourceContext(resourceId: string, senderOrgNumber: string) {
       getResourceConfiguration(resourceId),
       getAllowedRecipients(resourceId, senderOrgNumber),
     ])
-      .then(([configuration, recipients]) => ({ key, configuration, recipients, error: '' }))
+      .then(([configuration, recipients]) => ({ configuration, recipients, error: '' }))
       .catch(() => ({
-        key,
         configuration: null,
         recipients: [],
         error: 'Kunne ikke hente oppsettet for tjenesten. Prøv å laste siden på nytt.',
@@ -90,17 +85,15 @@ function useResourceContext(resourceId: string, senderOrgNumber: string) {
     return () => {
       cancelled = true
     }
-  }, [key, resourceId, senderOrgNumber])
+  }, [resourceId, senderOrgNumber])
 
-  // Anything loaded for another resource or party belongs to a previous route, so it counts as not loaded.
-  const resource = loaded?.key === key ? loaded : null
-  const recipients = useMemo(() => resource?.recipients ?? [], [resource])
+  const recipients = useMemo(() => loaded?.recipients ?? [], [loaded])
 
   return {
-    configuration: resource?.configuration ?? null,
+    configuration: loaded?.configuration ?? null,
     recipients,
-    loading: resource === null,
-    loadError: resource?.error ?? '',
+    loading: loaded === null,
+    loadError: loaded?.error ?? '',
   }
 }
 
@@ -111,22 +104,17 @@ function useFormValues(
   senderOrgNumber: string,
   key: string,
 ) {
-  const [stored, setStored] = useState(() => ({ key, draft: readDraft(key) ?? emptyValues() }))
-  // A route to another service is a different draft, so what was typed into this one is left alone.
-  if (stored.key !== key) {
-    setStored({ key, draft: readDraft(key) ?? emptyValues() })
-  }
-  const draft = stored.draft
+  const [draft, setDraftState] = useState(() => readDraft(key) ?? emptyValues())
 
   const setDraft = useCallback(
     (change: (current: NewFileTransferValues) => NewFileTransferValues) => {
-      setStored((current) => {
-        const next = change(current.draft)
-        writeDraft(current.key, next)
-        return { ...current, draft: next }
+      setDraftState((current) => {
+        const next = change(current)
+        writeDraft(key, next)
+        return next
       })
     },
-    [],
+    [key],
   )
 
   const rules = useMemo(

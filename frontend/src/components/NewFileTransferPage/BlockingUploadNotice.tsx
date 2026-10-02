@@ -1,17 +1,17 @@
 import { Alert, Button, Heading, Paragraph } from '@digdir/designsystemet-react'
 import { useState } from 'react'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
-import type { BlockingUpload } from './useFileTransferUpload'
+import { useUploadProgress, type ActiveUpload } from '../../upload/uploadsContext'
 
 type BlockingUploadNoticeProps = {
-  upload: BlockingUpload
+  upload: ActiveUpload
   onContinue: () => void
   onCancel: () => void
 }
 
 export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingUploadNoticeProps) {
   const [confirming, setConfirming] = useState(false)
-  const percent = upload.percent
+  const percent = useUploadProgress()?.percent ?? null
 
   return (
     <Alert data-color="info" className="new-transfer__notice">
@@ -60,14 +60,14 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
   )
 }
 
-function progressText(upload: BlockingUpload, percent: number | null): string {
+function progressText(upload: ActiveUpload, percent: number | null): string {
   if (percent !== null) {
     return ` er ${percent} % lastet opp`
   }
   return upload.status === 'initializing' ? ' er ikke kommet i gang ennå' : ' er ikke fullført'
 }
 
-function heading(upload: BlockingUpload): string {
+function heading(upload: ActiveUpload): string {
   switch (upload.status) {
     case 'failed':
       return 'En annen opplasting stoppet'

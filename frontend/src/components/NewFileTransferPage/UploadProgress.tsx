@@ -3,37 +3,29 @@ import { PauseIcon, PlayIcon } from '@navikt/aksel-icons'
 import type { UploadProgress as Progress } from '../../api/tus/tusUpload'
 import { formatRemainingTime } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { useUploadProgress, type UploadStatus } from '../../upload/uploadsContext'
 
-type UploadState = {
-  progress: Progress | null
-  initializing: boolean
-  pausing: boolean
-  paused: boolean
-  finishing: boolean
-  stopped: boolean
-}
-
-type UploadProgressProps = UploadState & {
+type UploadProgressProps = {
+  status: UploadStatus
   onPause: () => void
   onResume: () => void
 }
 
-export function UploadProgress({ onPause, onResume, ...state }: UploadProgressProps) {
-  const { progress, pausing, paused, finishing, stopped } = state
-  const running = progress !== null && !pausing && !paused && !finishing && !stopped
+export function UploadProgress({ status, onPause, onResume }: UploadProgressProps) {
+  const progress = useUploadProgress()
 
   return (
     <div className="new-transfer__progress">
       <progress value={progress?.percent ?? 0} max={100} aria-label="Opplasting" />
       <div className="new-transfer__progress-status">
-        <p>{statusText(state)}</p>
-        {(paused || pausing) && (
+        <p>{statusText(status, progress)}</p>
+        {(status === 'paused' || status === 'pausing') && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onResume}>
             <PlayIcon aria-hidden />
             Fortsett
           </Button>
         )}
-        {running && (
+        {status === 'uploading' && progress !== null && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onPause}>
             <PauseIcon aria-hidden />
             Pause
@@ -43,75 +35,57 @@ export function UploadProgress({ onPause, onResume, ...state }: UploadProgressPr
       {/* The status line changes several times a second, which is unusable read aloud, so the
           same state is announced in tenths instead. */}
       <span className="sr-only" aria-live="polite">
-        {screenReaderStatusText(state)}
+        {screenReaderStatusText(status, progress)}
       </span>
     </div>
   )
 }
 
-function statusText({
-  progress,
-  initializing,
-  pausing,
-  paused,
-  finishing,
-  stopped,
-}: UploadState): string {
+function statusText(status: UploadStatus, progress: Progress | null): string {
   if (!progress) {
     // Resuming asks each upload how far it got before it can say anything about progress.
-    return initializing ? 'Oppretter formidlingen…' : 'Finner ut hvor opplastingen slapp…'
+    return status === 'initializing' ? 'Oppretter formidlingen…' : 'Finner ut hvor opplastingen slapp…'
   }
 
   const amount = `${formatFileSize(progress.loaded)} av ${formatFileSize(progress.total)}`
   const sent = `${progress.percent} % (${amount})`
 
-  if (stopped) {
-    return `Stoppet på ${sent}`
+  switch (status) {
+    case 'failed':
+      return `Stoppet på ${sent}`
+    case 'paused':
+      return `Pauset på ${sent}`
+    case 'pausing':
+      return `Pauser på ${sent} — fullfører delene som er i gang`
+    case 'finishing':
+      return 'Setter sammen filen…'
+    default:
+      return [`Laster opp — ${sent}`, rate(progress), remaining(progress)]
+        .filter(Boolean)
+        .join(' · ')
   }
-  if (paused) {
-    return `Pauset på ${sent}`
-  }
-  if (pausing) {
-    return `Pauser på ${sent} — fullfører delene som er i gang`
-  }
-  if (finishing) {
-    return 'Setter sammen filen…'
-  }
-
-  return [`Laster opp — ${sent}`, rate(progress), remaining(progress)]
-    .filter(Boolean)
-    .join(' · ')
 }
 
 // Readable status text for screen readers
-function screenReaderStatusText({
-  progress,
-  initializing,
-  pausing,
-  paused,
-  finishing,
-  stopped,
-}: UploadState): string {
+function screenReaderStatusText(status: UploadStatus, progress: Progress | null): string {
   if (!progress) {
-    return initializing ? 'Oppretter formidlingen' : 'Finner ut hvor opplastingen slapp'
+    return status === 'initializing' ? 'Oppretter formidlingen' : 'Finner ut hvor opplastingen slapp'
   }
 
   const tenths = `${Math.floor(progress.percent / 10) * 10} prosent`
 
-  if (stopped) {
-    return `Opplastingen stoppet på ${tenths}`
+  switch (status) {
+    case 'failed':
+      return `Opplastingen stoppet på ${tenths}`
+    case 'paused':
+      return `Opplastingen er pauset på ${tenths}`
+    case 'pausing':
+      return 'Pauser opplastingen'
+    case 'finishing':
+      return 'Setter sammen filen'
+    default:
+      return `Laster opp, ${tenths}`
   }
-  if (paused) {
-    return `Opplastingen er pauset på ${tenths}`
-  }
-  if (pausing) {
-    return 'Pauser opplastingen'
-  }
-  if (finishing) {
-    return 'Setter sammen filen'
-  }
-
-  return `Laster opp, ${tenths}`
 }
 
 function rate(progress: Progress): string {

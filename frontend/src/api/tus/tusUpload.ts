@@ -8,15 +8,21 @@ import {
 } from 'tus-js-client'
 import { ApiError, redirectToLoginIfSessionEnded } from '../client'
 import { apiUrl } from '../config'
-import { createPartialUpload, createUpload, getUploadInfo, tusUploadPath } from './tusProtocol'
+import {
+  RETRY_DELAYS,
+  concatenateUploads,
+  createPartialUpload,
+  createUpload,
+  delay,
+  getUploadInfo,
+} from './tusProtocol'
 
 const MAX_PARALLEL_PARTS = 6
 const MIN_PART_SIZE = 64 * 1024 * 1024
 const MIN_CHUNK_SIZE = 8 * 1024 * 1024
+// Each chunk becomes one Azure block, and a part takes at most 50,000 of them.
 const CHUNKS_PER_PART_BUDGET = 40_000
 
-// Retry to wait out a lock or offset conflict left by a request this client abandoned.
-const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000, 15000, 15000]
 // How long an upload may go without progress or a successful response before it fails.
 const STALL_TIMEOUT_MS = 120_000
 // How often progress is reported at most.
@@ -31,11 +37,10 @@ export type UploadPart = {
   length: number
 }
 
-/** The plan for the upload; whether it is concatenated from multiple parts or a single contiguous upload. */
+/** The plan for the upload: a single contiguous upload, or several parts concatenated at the end. */
 export type UploadPlan = {
   fileTransferId: string
   parts: UploadPart[]
-  concatenated: boolean
 }
 
 export type UploadProgress = {
@@ -46,12 +51,14 @@ export type UploadProgress = {
   secondsRemaining: number | null
 }
 
-export type UploadPhase = 'finishing' | 'paused'
+export type UploadRunStatus = 'uploading' | 'pausing' | 'paused' | 'finishing'
 
 export type StartUploadOptions = {
   onProgress?: (progress: UploadProgress) => void
-  onPhase?: (phase: UploadPhase) => void
+  onStatus?: (status: UploadRunStatus) => void
   alreadySent?: number
+  /** For a pause that came while the transfer was still being created */
+  paused?: boolean
 }
 
 /** An upload under way. `finished` settles once it has succeeded, failed or been aborted. */
@@ -72,40 +79,70 @@ export async function createUploadPlan(
   // Single-part upload plan
   if (ranges.length === 1) {
     const path = await createUpload(fileTransferId, file.size, signal)
-    return { fileTransferId, parts: [{ path, ...ranges[0] }], concatenated: false }
+    return { fileTransferId, parts: [{ path, ...ranges[0] }] }
   }
 
   // Concatenated upload plan
   const parts: UploadPart[] = []
-  for (const range of ranges) {
-    const path = await createPartialUpload(fileTransferId, range.length, signal)
-    parts.push({ path, ...range })
+  try {
+    for (const range of ranges) {
+      const path = await createPartialUpload(fileTransferId, range.length, signal)
+      parts.push({ path, ...range })
+    }
+  } catch (error) {
+    // Without the whole plan, nothing will ever upload to the partials created so far.
+    discardUpload({ fileTransferId, parts })
+    throw error
   }
 
-  return { fileTransferId, parts, concatenated: true }
+  return { fileTransferId, parts }
 }
 
 export function startUpload(
   plan: UploadPlan,
   file: File,
-  { onProgress, onPhase, alreadySent = 0 }: StartUploadOptions = {},
+  { onProgress, onStatus, alreadySent = 0, paused: startPaused = false }: StartUploadOptions = {},
 ): UploadRun {
+  const concatenated = plan.parts.length > 1
+  const sentPerPart = plan.parts.map(() => 0)
+  let partsDone = 0
+  let paused = false
+  let allSent = false
+  let settled = false
+  let reported: UploadRunStatus | null = null
+
   const progress = trackProgress(file.size, alreadySent, onProgress)
-  const transport = pausableHttpStack(() => onPhase?.('paused'))
+  const transport = pausableHttpStack(report)
+  const concatenation = new AbortController()
   const watchdog = stallWatchdog(STALL_TIMEOUT_MS, () => {
-    // A paused upload is quiet on purpose.
-    if (transport.isPaused()) {
+    // A paused upload is quiet on purpose, once the requests already sent have finished.
+    if (paused && !transport.isSending()) {
       watchdog.keepAlive()
       return
     }
+    abortParts()
     finish(new ApiError('The upload stopped responding', 0))
   })
 
-  let settled = false
   let settle: (error?: Error) => void = () => {}
   const finished = new Promise<void>((resolve, reject) => {
     settle = (error) => (error ? reject(error) : resolve())
   })
+
+  function status(): UploadRunStatus {
+    if (paused) {
+      return transport.isSending() ? 'pausing' : 'paused'
+    }
+    return allSent ? 'finishing' : 'uploading'
+  }
+
+  function report() {
+    const current = status()
+    if (!settled && current !== reported) {
+      reported = current
+      onStatus?.(current)
+    }
+  }
 
   function finish(error?: Error) {
     if (settled) {
@@ -113,85 +150,126 @@ export function startUpload(
     }
     settled = true
     void transport.stop()
+    concatenation.abort()
     watchdog.clear()
     settle(error)
   }
 
-  const upload = new Upload(file, {
-    ...transportOptions(),
-    ...targetOptions(plan),
-    endpoint: apiUrl(tusUploadPath(plan.fileTransferId)),
-    chunkSize: chunkSizeFor(plan),
-    retryDelays: RETRY_DELAYS,
-    httpStack: transport,
-    storeFingerprintForResuming: false,
-    onAfterResponse: (_request, response) => {
-      if (response.getStatus() < 400) {
-        watchdog.keepAlive()
-      }
-    },
-    onProgress: (sent) => {
-      if (settled) {
-        return
-      }
-      watchdog.keepAlive()
-      progress.report(sent)
-      if (plan.concatenated && sent >= file.size) {
-        onPhase?.('finishing')
-      }
-    },
-    onSuccess: () => finish(),
-    // The other parallel parts are still sending when the first one fails. Settling before they
-    // finish would let the next run collide with them on the server's upload locks.
-    onError: (error) => {
-      void transport.stop().then(() => finish(asApiError(error)))
-    },
-  })
+  // Each part is an upload of its own. Without an endpoint, tus-js-client fails a part that is gone
+  // instead of quietly creating a new one in its place.
+  const uploads = plan.parts.map(
+    (part, index) =>
+      new Upload(file.slice(part.start, part.start + part.length), {
+        ...transportOptions(),
+        uploadUrl: apiUrl(part.path),
+        chunkSize: chunkSizeFor(plan),
+        retryDelays: RETRY_DELAYS,
+        httpStack: transport,
+        storeFingerprintForResuming: false,
+        onAfterResponse: (_request, response) => {
+          if (response.getStatus() < 400) {
+            watchdog.keepAlive()
+          }
+        },
+        onProgress: (sent) => {
+          if (settled) {
+            return
+          }
+          sentPerPart[index] = sent
+          const total = sentPerPart.reduce((sum, bytes) => sum + bytes, 0)
+          watchdog.keepAlive()
+          progress.report(total)
+          // A part that re-sends its last chunk takes this back.
+          allSent = concatenated && total >= file.size
+          report()
+        },
+        onSuccess: () => {
+          partsDone++
+          if (partsDone === plan.parts.length) {
+            complete()
+          }
+        },
+        // The other parts are still sending when one fails. Settling before they finish would let
+        // the next run collide with them on the server's upload locks.
+        onError: (error) => {
+          void transport.stop().then(() => finish(asApiError(error)))
+        },
+      }),
+  )
 
-  // tus-js-client only takes existing parallel uploads in the form of a previous upload to resume.
-  if (plan.concatenated) {
-    upload.resumeFromPreviousUpload({
-      uploadUrl: null,
-      parallelUploadUrls: plan.parts.map((part) => apiUrl(part.path)),
-      urlStorageKey: '',
-      size: file.size,
-      metadata: {},
-      creationTime: new Date().toISOString(),
-    })
+  function complete() {
+    if (!concatenated) {
+      finish()
+      return
+    }
+    watchdog.keepAlive()
+    const paths = plan.parts.map((part) => part.path)
+    concatenateUploads(plan.fileTransferId, paths, concatenation.signal).then(
+      () => finish(),
+      (error: Error) => finish(error),
+    )
   }
 
-  watchdog.keepAlive()
-  upload.start()
+  function abortParts() {
+    for (const upload of uploads) {
+      void upload.abort()
+    }
+  }
 
-  let resumeAttempt = 0
+  function pause() {
+    // Only the concatenation is left once every part is in, and holding it gains nothing.
+    if (partsDone === plan.parts.length) {
+      return
+    }
+    paused = true
+    transport.hold()
+    report()
+  }
+
+  if (startPaused) {
+    pause()
+  } else {
+    report()
+  }
+  // Shows where the run starts from before its first request, which a paused run will not send.
+  if (startPaused || alreadySent > 0) {
+    progress.restartRate()
+  }
+  watchdog.keepAlive()
+  for (const upload of uploads) {
+    upload.start()
+  }
+
   return {
     finished,
-    pause() {
-      resumeAttempt++
-      transport.pause()
-    },
+    pause,
     async resume() {
-      const attempt = ++resumeAttempt
+      if (settled || !paused) {
+        return
+      }
+      paused = false
+      watchdog.keepAlive()
+      progress.restartRate()
+      report()
+      // A pause can outlive the session.
       if (await redirectToLoginIfSessionEnded()) {
         return
       }
-      // Paused again while the session was checked.
-      if (attempt !== resumeAttempt) {
-        return
+      // In case it was paused again while the session was checked.
+      if (!paused) {
+        transport.release()
       }
-      progress.restartRate()
-      transport.resume()
     },
     abort() {
-      void upload.abort()
+      abortParts()
       finish(abortError())
     },
   }
 }
 
 /**
- * How many of the file's bytes the server already holds, or null when the plan is no longer good
- * for anything — its uploads expired, or the transfer was finished by someone else.
+ * How many of the file's bytes the server already holds, or null when the plan is no longer 
+ * usable — its uploads expired, or the transfer was finished by someone else.
  */
 export async function readUploadedBytes(
   plan: UploadPlan,
@@ -213,8 +291,14 @@ export async function readUploadedBytes(
 /** Gives up every upload in a plan, best effort. */
 export function discardUpload(plan: UploadPlan): void {
   for (const part of plan.parts) {
-    Upload.terminate(apiUrl(part.path), transportOptions()).catch(() => undefined)
+    const options = { ...transportOptions(), retryDelays: RETRY_DELAYS }
+    Upload.terminate(apiUrl(part.path), options).catch(() => undefined)
   }
+}
+
+/** The plan's uploads are gone, or the transfer no longer takes them, so resuming cannot help. */
+export function isUploadGone(error: unknown): boolean {
+  return error instanceof ApiError && [404, 409, 410].includes(error.status)
 }
 
 function splitIntoParts(size: number): { start: number; length: number }[] {
@@ -238,17 +322,28 @@ function trackProgress(
   let reportedAt = 0
   let rateWindow: { at: number; loaded: number } | null = null
   let bytesPerSecond: number | null = null
-  let sent = alreadySent
+  let loaded = alreadySent
+
+  function emit() {
+    onProgress?.({
+      loaded,
+      total,
+      percent: total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : 100,
+      bytesPerSecond,
+      secondsRemaining:
+        bytesPerSecond !== null && bytesPerSecond > 0 ? (total - loaded) / bytesPerSecond : null,
+    })
+  }
 
   return {
-    report(reported: number) {
+    report(sent: number) {
+      // Kept even when not shown, so the next report, or the one on resume, is not behind.
+      loaded = Math.max(loaded, sent)
       const now = performance.now()
       if (now - reportedAt < PROGRESS_INTERVAL_MS) {
         return
       }
       reportedAt = now
-      const loaded = Math.max(sent, reported)
-      sent = loaded
 
       rateWindow ??= { at: now, loaded }
       const elapsed = now - rateWindow.at
@@ -256,42 +351,28 @@ function trackProgress(
         bytesPerSecond = ((loaded - rateWindow.loaded) * 1000) / elapsed
         rateWindow = { at: now, loaded }
       }
-
-      onProgress?.({
-        loaded,
-        total,
-        percent: total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : 100,
-        bytesPerSecond,
-        secondsRemaining:
-          bytesPerSecond !== null && bytesPerSecond > 0 ? (total - loaded) / bytesPerSecond : null,
-      })
+      emit()
     },
     // The rate before a pause says nothing about the rate after it.
     restartRate() {
       rateWindow = null
       bytesPerSecond = null
+      emit()
     },
   }
 }
 
 // tus-js-client has no pause of its own, but it lets the transport be supplied. Holding requests
 // pauses the upload without aborting any, which would leave the server holding locks.
-function pausableHttpStack(onPaused: () => void) {
+function pausableHttpStack(onRequestDone: () => void) {
   const stack = new DefaultHttpStack({})
   const inFlight = new Set<Promise<HttpResponse>>()
   let held: Promise<void> | null = null
-  let release = () => {}
+  let letThrough = () => {}
   let stopped = false
 
-  const isPaused = () => held !== null && !stopped
   const hold = () => {
-    held ??= new Promise((resolve) => (release = resolve))
-  }
-  // Paused only once the requests already sent have finished.
-  const reportIfPaused = () => {
-    if (isPaused() && inFlight.size === 0) {
-      onPaused()
-    }
+    held ??= new Promise((resolve) => (letThrough = resolve))
   }
 
   return {
@@ -301,13 +382,12 @@ function pausableHttpStack(onPaused: () => void) {
       const send = request.send.bind(request)
       request.send = async (body: unknown) => {
         while (held) {
-          reportIfPaused()
           await held
         }
         const response = send(body)
         const forget = () => {
           inFlight.delete(response)
-          reportIfPaused()
+          onRequestDone()
         }
         inFlight.add(response)
         response.then(forget, forget)
@@ -315,14 +395,11 @@ function pausableHttpStack(onPaused: () => void) {
       }
       return request
     },
-    isPaused,
-    pause() {
-      hold()
-      reportIfPaused()
-    },
-    resume() {
+    isSending: () => inFlight.size > 0,
+    hold,
+    release() {
       if (!stopped) {
-        release()
+        letThrough()
         held = null
       }
     },
@@ -370,21 +447,13 @@ function shouldRetry(error: DetailedError): boolean {
     return false
   }
 
-  return status === 0 || status === 409 || status === 423 || status >= 500
-}
-
-function targetOptions(plan: UploadPlan): Partial<UploadOptions> {
-  if (!plan.concatenated) {
-    return { uploadUrl: apiUrl(plan.parts[0].path) }
+  // On a PATCH, a 409 is an offset mismatch, which the HEAD before the next try sorts out. Anywhere
+  // else it is Broker refusing uploads to a transfer that is done with them.
+  if (status === 409) {
+    return error.originalRequest?.getMethod() === 'PATCH'
   }
 
-  return {
-    parallelUploads: plan.parts.length,
-    parallelUploadBoundaries: plan.parts.map((part) => ({
-      start: part.start,
-      end: part.start + part.length,
-    })),
-  }
+  return status === 0 || status === 423 || status >= 500
 }
 
 function chunkSizeFor(plan: UploadPlan): number {
@@ -413,21 +482,7 @@ async function readOffsets(plan: UploadPlan, signal?: AbortSignal): Promise<numb
 }
 
 function isLocked(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 423 || error.status === 409)
-}
-
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms)
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(abortError())
-      },
-      { once: true },
-    )
-  })
+  return error instanceof ApiError && error.status === 423
 }
 
 function abortError(): DOMException {

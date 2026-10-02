@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/client'
 import { discardUpload, readUploadedBytes } from '../../api/tus/tusUpload'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
-import { useUploads } from '../../upload/uploadsContext'
+import { UploadPlanError, useActiveUpload, useUploadActions } from '../../upload/uploadsContext'
 import {
   clearStoredUpload,
   isSameFile,
   readStoredUpload,
   type StoredUpload,
 } from '../../upload/uploadSession'
-import type { ActiveUpload, UploadStatus } from '../../upload/uploadsContext'
 import { toPropertyList, type NewFileTransferErrors, type NewFileTransferValues } from './formFields'
 import { hasErrors } from './formValidation'
 
-// Adapts UploadsContext to this form: scopes the active upload to this resource and sender, and
+// Adapts the uploads context to this form: scopes the active upload to this resource and sender, and
 // exposes submit, pause, resume, cancel and the interrupted-upload actions.
 
 type Options = {
@@ -24,34 +23,27 @@ type Options = {
 }
 
 export function useFileTransferUpload({ resourceId, senderOrgNumber, values, errors }: Options) {
-  const uploads = useUploads()
+  const uploads = useUploadActions()
+  const live = useActiveUpload()
   const [submitAttempts, setSubmitAttempts] = useState(0)
   const [submitError, setSubmitError] = useState('')
 
-  // An upload that belongs to another service is none of this page's business.
-  const active =
-    uploads.active?.resourceId === resourceId && uploads.active.sender === senderOrgNumber
-      ? uploads.active
-      : null
-
-  const blockedBy = blockingUpload(active === null ? uploads.active : null, uploads.cancel)
+  const isOwn = live?.resourceId === resourceId && live.sender === senderOrgNumber
+  const active = isOwn ? live : null
+  const blockedBy = isOwn ? null : live
 
   const interrupted = useInterruptedUpload(resourceId, senderOrgNumber, active !== null)
 
   // Leaving the page pauses rather than aborts, so nothing is left locked on the server.
   const { pause } = uploads
-  const hasActiveRef = useRef(false)
-  useEffect(() => {
-    hasActiveRef.current = active !== null
-  })
-  useEffect(
-    () => () => {
-      if (hasActiveRef.current) {
-        pause()
-      }
-    },
-    [pause],
-  )
+  const hasActive = active !== null
+  useEffect(() => (hasActive ? pause : undefined), [hasActive, pause])
+
+  const cancel = useCallback(() => {
+    if (hasActive) {
+      uploads.cancel()
+    }
+  }, [hasActive, uploads])
 
   const submit = useCallback(async () => {
     setSubmitAttempts((attempts) => attempts + 1)
@@ -61,7 +53,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
       return
     }
 
-    if (uploads.active) {
+    if (blockedBy) {
       setSubmitError('En annen opplasting holder plassen. Fortsett eller avbryt den først.')
       return
     }
@@ -84,7 +76,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     } catch (error) {
       setSubmitError(describeInitializeError(error))
     }
-  }, [active, errors, resourceId, senderOrgNumber, uploads, values])
+  }, [active, blockedBy, errors, resourceId, senderOrgNumber, uploads, values])
 
   const resume = useCallback(() => {
     setSubmitError('')
@@ -116,15 +108,8 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
 
   return {
     submitAttempts,
+    active,
     blockedBy,
-    sending: active !== null,
-    initializing: active?.status === 'initializing',
-    pausing: active?.status === 'pausing',
-    paused: active?.status === 'paused',
-    failed: active?.status === 'failed',
-    finishing: active?.status === 'finishing',
-    progress: active?.progress ?? null,
-    activeFile: active && { name: active.fileName, size: active.fileSize },
     submitError: submitError || active?.error || '',
     interrupted: stored,
     interruptedUploaded: interrupted.uploaded,
@@ -133,49 +118,18 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     resumeInterrupted,
     discardInterrupted: interrupted.discard,
     submit,
-    pause: uploads.pause,
+    pause,
     resume,
-    cancel: uploads.cancel,
-  }
-}
-
-export type BlockingUpload = {
-  resourceId: string
-  fileName: string
-  fileSize: number
-  percent: number | null
-  status: UploadStatus
-  cancel: () => void
-}
-
-// Only an active upload blocks this form: records are kept per service, so an upload left
-// unfinished elsewhere is waiting there rather than holding this one up.
-function blockingUpload(live: ActiveUpload | null, cancel: () => void): BlockingUpload | null {
-  if (live === null) {
-    return null
-  }
-
-  return {
-    resourceId: live.resourceId,
-    fileName: live.fileName,
-    fileSize: live.fileSize,
-    percent: live.progress?.percent ?? null,
-    status: live.status,
     cancel,
+    cancelBlocking: uploads.cancel,
   }
 }
 
 function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasActive: boolean) {
-  const key = `${senderOrgNumber}:${resourceId}`
-  const [found, setFound] = useState<{ key: string; upload: StoredUpload | null }>(() => ({
-    key,
-    upload: readStoredUpload(resourceId, senderOrgNumber),
-  }))
-  if (found.key !== key) {
-    setFound({ key, upload: readStoredUpload(resourceId, senderOrgNumber) })
-  }
-
-  const upload = hasActive || found.key !== key ? null : found.upload
+  const [found, setFound] = useState<StoredUpload | null>(() =>
+    readStoredUpload(resourceId, senderOrgNumber),
+  )
+  const upload = hasActive ? null : found
   const [uploaded, setUploaded] = useState<number | null>(null)
 
   useEffect(() => {
@@ -193,7 +147,7 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
         }
         if (bytes === null) {
           clearStoredUpload(resourceId, senderOrgNumber)
-          setFound((current) => ({ ...current, upload: null }))
+          setFound(null)
           return
         }
         setUploaded(bytes)
@@ -215,13 +169,16 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
       discardUpload(upload.plan)
     }
     clearStoredUpload(resourceId, senderOrgNumber)
-    setFound((current) => ({ ...current, upload: null }))
+    setFound(null)
   }, [resourceId, senderOrgNumber, upload])
 
   return { upload, uploaded, discard }
 }
 
 function describeInitializeError(error: unknown): string {
+  if (error instanceof UploadPlanError) {
+    return `${describeInitializeError(error.cause)} Formidlingen ble opprettet med id ${error.fileTransferId}, men filen ble ikke lastet opp.`
+  }
   if (error instanceof InvalidOrgNumberError) {
     return error.message
   }

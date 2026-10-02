@@ -77,10 +77,12 @@ export async function apiFetch<T = unknown>(
  * dependency (Altinn Authorization, token exchange) surfaces the same status. Only /me can tell the
  * difference, so ask it before throwing the user out to ID-Porten for no reason.
  */
-export async function redirectToLoginIfSessionEnded(returnUrl?: string): Promise<void> {
-  if (await sessionIsGone()) {
-    redirectToLogin(returnUrl)
+export async function redirectToLoginIfSessionEnded(returnUrl?: string): Promise<boolean> {
+  if (!(await sessionIsGone())) {
+    return false
   }
+  redirectToLogin(returnUrl)
+  return true
 }
 
 async function sessionIsGone(): Promise<boolean> {

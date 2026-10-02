@@ -46,10 +46,11 @@ export function formatRemainingTime(seconds: number): string {
     return 'under ett minutt'
   }
 
-  const unit = UNITS.find((candidate) => seconds >= candidate.seconds && candidate.seconds >= 60)
-  if (!unit) {
-    return 'under ett minutt'
-  }
+  const roughUnit = unitFor(seconds)
+  const rounded = Math.round(seconds / roughUnit.seconds) * roughUnit.seconds
+  return countOf(rounded, unitFor(rounded))
+}
 
-  return countOf(Math.round(seconds / unit.seconds) * unit.seconds, unit)
+function unitFor(seconds: number): (typeof UNITS)[number] {
+  return UNITS.find((candidate) => seconds >= candidate.seconds && candidate.seconds >= 60) ?? UNITS[2]
 }

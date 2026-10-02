@@ -1,4 +1,5 @@
 import type { UploadPlan } from '../api/tus/tusUpload'
+import { readSessionItem, removeSessionItem, writeSessionItem } from '../helpers/sessionStorageHelper'
 import type { PlannedUpload } from './uploadsContext'
 
 // Saves, reads and clears the session's record of an upload in progress.
@@ -27,12 +28,7 @@ export function isSameFile(fingerprint: FileFingerprint, file: File): boolean {
 }
 
 export function readStoredUpload(resourceId: string, sender: string): StoredUpload | null {
-  try {
-    const raw = sessionStorage.getItem(storageKey(resourceId, sender))
-    return raw ? (JSON.parse(raw) as StoredUpload) : null
-  } catch {
-    return null
-  }
+  return readSessionItem<StoredUpload>(storageKey(resourceId, sender))
 }
 
 export function saveStoredUpload({ resourceId, sender, file, plan }: PlannedUpload): void {
@@ -42,19 +38,11 @@ export function saveStoredUpload({ resourceId, sender, file, plan }: PlannedUplo
     file: { name: file.name, size: file.size, lastModified: file.lastModified },
     plan,
   }
-  try {
-    sessionStorage.setItem(storageKey(resourceId, sender), JSON.stringify(stored))
-  } catch {
-    // Private mode and blocked storage both throw; the upload still runs.
-  }
+  writeSessionItem(storageKey(resourceId, sender), stored)
 }
 
 export function clearStoredUpload(resourceId: string, sender: string): void {
-  try {
-    sessionStorage.removeItem(storageKey(resourceId, sender))
-  } catch {
-    // As above: losing the record only costs the resume.
-  }
+  removeSessionItem(storageKey(resourceId, sender))
 }
 
 // One upload record per service and sender.
