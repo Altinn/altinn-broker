@@ -42,21 +42,19 @@ export function FileTransferPagination({
             </Pagination.Button>
           </Pagination.Item>
 
-          {pages.map(({ page: pageNumber, itemKey, buttonProps }) => (
-            <Pagination.Item key={itemKey}>
-              {typeof pageNumber === 'number' && buttonProps ? (
+          {pages.map(({ page: pageNumber, itemKey, buttonProps }) =>
+            typeof pageNumber === 'number' && buttonProps ? (
+              <Pagination.Item key={itemKey}>
                 <Pagination.Button {...buttonProps} aria-label={`Side ${pageNumber}`}>
                   {pageNumber}
                 </Pagination.Button>
-              ) : (
-                // The hook marks the folded-away pages; they are decoration, so hide them from
-                // screen readers rather than announcing a gap.
-                <span className="pagination-ellipsis" aria-hidden="true">
-                  …
-                </span>
-              )}
-            </Pagination.Item>
-          ))}
+              </Pagination.Item>
+            ) : (
+              // An empty item is how Designsystemet renders the folded-away pages: its stylesheet
+              // puts the ellipsis on `li:empty::before`, so it stays decoration rather than content.
+              <Pagination.Item key={itemKey} />
+            ),
+          )}
 
           <Pagination.Item>
             <Pagination.Button {...nextButtonProps} aria-label="Neste side">
