@@ -3,8 +3,7 @@ using Altinn.Broker.Core.Models.Enums;
 namespace Altinn.Broker.Core.Domain;
 
 /// <summary>
-/// A localized, fixed notification message for <see cref="NotificationTemplate.GenericAltinnMessage"/>. The
-/// caller's own free text (if any) is embedded into the {textToken} placeholder within the body/SMS fields.
+/// A localized, fixed notification message.
 /// </summary>
 public class NotificationTemplateEntity
 {

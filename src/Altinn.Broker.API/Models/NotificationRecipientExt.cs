@@ -15,4 +15,14 @@ public class NotificationRecipientExt
 
     [JsonPropertyName("organizationNumber")]
     public string? OrganizationNumber { get; set; }
+
+    [JsonPropertyName("nationalIdentityNumber")]
+    public string? NationalIdentityNumber { get; set; }
+
+    /// <summary>
+    /// The organization number of the file transfer recipient this custom recipient should be notified on behalf of.
+    /// Required, and must be one of the file transfer's recipients.
+    /// </summary>
+    [JsonPropertyName("relatedOrganizationNumber")]
+    public string? RelatedOrganizationNumber { get; set; }
 }

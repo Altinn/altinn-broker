@@ -87,6 +87,8 @@ namespace Altinn.Broker.Core.Models.Notifications
 
     public class RecipientPerson
     {
+        public string NationalIdentityNumber { get; set; } = null!;
+
         public string ResourceId { get; set; } = null!;
 
         public NotificationChannel ChannelSchema { get; set;}

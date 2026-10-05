@@ -20,15 +20,29 @@ public class BrokerNotificationEntity
     public required Guid FileTransferId { get; set; }
 
     /// <summary>
-    /// The real file-transfer actor this notification is for, or null when <see cref="CustomRecipient"/> is set instead.
+    /// The file-transfer actor this notification is for, or null when this row is for a custom recipient instead.
     /// </summary>
     public long? ActorId { get; set; }
 
     /// <summary>
-    /// The recipient (serialized), when this row is for an arbitrary custom recipient rather than a real file-transfer
-    /// actor. Exactly one of <see cref="ActorId"/>/<see cref="CustomRecipient"/> is set - enforced at the DB level too.
+    /// Set together with <see cref="CustomRecipientIdentifier"/> when this row is for a custom recipient rather than a
+    /// file-transfer actor. Either <see cref="ActorId"/> or both custom recipient fields are set - enforced at the DB
+    /// level too.
     /// </summary>
-    public string? CustomRecipient { get; set; }
+    public CustomRecipientType? CustomRecipientType { get; set; }
+
+    /// <summary>
+    /// The custom recipient's identifier, as given by <see cref="CustomRecipientType"/>: organization numbers as
+    /// "0192:123456789", national identity numbers as "urn:altinn:person:identifier-no:12345678901", email addresses
+    /// and mobile numbers as given.
+    /// </summary>
+    public string? CustomRecipientIdentifier { get; set; }
+
+    /// <summary>
+    /// The organization number (as "0192:123456789") of the file transfer recipient the custom recipient is notified
+    /// on behalf of. Set whenever <see cref="CustomRecipientIdentifier"/> is.
+    /// </summary>
+    public string? CustomRecipientRelatedOrganization { get; set; }
 
     public required DateTimeOffset Created { get; set; }
 

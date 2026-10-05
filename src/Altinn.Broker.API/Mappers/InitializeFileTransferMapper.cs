@@ -37,19 +37,8 @@ internal static class InitializeFileTransferMapper
 
         return new NotificationRequest()
         {
-            NotificationTemplate = MapNotificationTemplate(notification.NotificationTemplate),
-            EmailSubject = notification.EmailSubject,
-            EmailBody = notification.EmailBody,
-            EmailContentType = MapEmailContentType(notification.EmailContentType),
-            SmsBody = notification.SmsBody,
-            SendReminder = notification.SendReminder,
-            ReminderEmailSubject = notification.ReminderEmailSubject,
-            ReminderEmailBody = notification.ReminderEmailBody,
-            ReminderEmailContentType = notification.ReminderEmailContentType is null ? null : MapEmailContentType(notification.ReminderEmailContentType.Value),
-            ReminderSmsBody = notification.ReminderSmsBody,
             NotificationChannel = MapNotificationChannel(notification.NotificationChannel),
-            ReminderNotificationChannel = notification.ReminderNotificationChannel is null ? null : MapNotificationChannel(notification.ReminderNotificationChannel.Value),
-            Language = notification.Language,
+            SendReminder = notification.SendReminder,
             CustomRecipients = notification.CustomRecipients?.Select(MapCustomRecipient).ToList(),
         };
     }
@@ -59,13 +48,8 @@ internal static class InitializeFileTransferMapper
         EmailAddress = recipient.EmailAddress,
         MobileNumber = recipient.MobileNumber,
         OrganizationNumber = recipient.OrganizationNumber,
-    };
-
-    private static NotificationTemplate MapNotificationTemplate(NotificationTemplateExt template) => template switch
-    {
-        NotificationTemplateExt.CustomMessage => NotificationTemplate.CustomMessage,
-        NotificationTemplateExt.GenericAltinnMessage => NotificationTemplate.GenericAltinnMessage,
-        _ => throw new InvalidEnumArgumentException(nameof(template), (int)template, typeof(NotificationTemplateExt))
+        NationalIdentityNumber = recipient.NationalIdentityNumber,
+        RelatedOrganizationNumber = recipient.RelatedOrganizationNumber,
     };
 
     private static NotificationChannel MapNotificationChannel(NotificationChannelExt channel) => channel switch
@@ -76,12 +60,5 @@ internal static class InitializeFileTransferMapper
         NotificationChannelExt.SmsPreferred => NotificationChannel.SmsPreferred,
         NotificationChannelExt.EmailAndSms => NotificationChannel.EmailAndSms,
         _ => throw new InvalidEnumArgumentException(nameof(channel), (int)channel, typeof(NotificationChannelExt))
-    };
-
-    private static EmailContentType MapEmailContentType(EmailContentTypeExt contentType) => contentType switch
-    {
-        EmailContentTypeExt.Plain => EmailContentType.Plain,
-        EmailContentTypeExt.Html => EmailContentType.Html,
-        _ => throw new InvalidEnumArgumentException(nameof(contentType), (int)contentType, typeof(EmailContentTypeExt))
     };
 }
