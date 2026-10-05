@@ -26,7 +26,7 @@ public class CheckNotificationDeliveryHandlerTests
     {
         Id = id ?? Guid.NewGuid(),
         FileTransferId = Guid.NewGuid(),
-        NotificationTemplate = NotificationTemplate.CustomMessage,
+        NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
         NotificationChannel = NotificationChannel.Email,
         RequestedSendTime = DateTimeOffset.UtcNow,
         Created = DateTimeOffset.UtcNow,

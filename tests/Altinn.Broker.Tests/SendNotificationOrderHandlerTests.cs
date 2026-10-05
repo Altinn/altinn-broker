@@ -32,7 +32,7 @@ public class SendNotificationOrderHandlerTests
         Id = id ?? Guid.NewGuid(),
         FileTransferId = fileTransferId ?? Guid.NewGuid(),
         ActorId = actorId,
-        NotificationTemplate = NotificationTemplate.CustomMessage,
+        NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
         NotificationChannel = NotificationChannel.Email,
         RequestedSendTime = DateTimeOffset.UtcNow,
         Created = DateTimeOffset.UtcNow,

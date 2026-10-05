@@ -81,10 +81,7 @@ internal static class FileTransferInitializeExtTestFactory
         SendersFileTransferReference = "test-data",
         Notification = new NotificationRequestExt()
         {
-            NotificationTemplate = NotificationTemplateExt.CustomMessage,
-            NotificationChannel = NotificationChannelExt.Email,
-            EmailSubject = "You have received a file",
-            EmailBody = "Please log in to Altinn to download the file."
+            NotificationChannel = NotificationChannelExt.Email
         }
     };
 

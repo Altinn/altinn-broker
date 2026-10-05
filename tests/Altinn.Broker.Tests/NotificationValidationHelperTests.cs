@@ -16,38 +16,57 @@ public class NotificationValidationHelperTests
             PhoneNumberUtil.GetInstance().GetExampleNumberForType("NO", PhoneNumberType.MOBILE),
             PhoneNumberFormat.E164);
 
+    private const string ValidNationalIdentityNumber = "01819012012";
+    private const string InvalidNationalIdentityNumber = "01819012013";
+
+    private const string FileTransferRecipient = "123456789";
+    private static readonly List<string> FileTransferRecipients = [$"0192:{FileTransferRecipient}"];
+
     private static NotificationRequest CreateRequest(
-        NotificationTemplate template = NotificationTemplate.CustomMessage,
         NotificationChannel channel = NotificationChannel.Email,
-        string? emailSubject = "subject",
-        string? emailBody = "body",
-        string? smsBody = "sms",
         bool sendReminder = false,
-        NotificationChannel? reminderChannel = null,
-        string? reminderEmailSubject = null,
-        string? reminderEmailBody = null,
-        string? reminderSmsBody = null,
-        List<Recipient>? customRecipients = null) => new()
+        List<Recipient>? customRecipients = null,
+        bool setRelatedOrganization = true)
     {
-        NotificationTemplate = template,
-        NotificationChannel = channel,
-        EmailSubject = emailSubject,
-        EmailBody = emailBody,
-        SmsBody = smsBody,
-        SendReminder = sendReminder,
-        ReminderNotificationChannel = reminderChannel,
-        ReminderEmailSubject = reminderEmailSubject,
-        ReminderEmailBody = reminderEmailBody,
-        ReminderSmsBody = reminderSmsBody,
-        CustomRecipients = customRecipients
-    };
+        if (setRelatedOrganization)
+        {
+            customRecipients?.ForEach(recipient => recipient.RelatedOrganizationNumber ??= FileTransferRecipient);
+        }
+        return new()
+        {
+            NotificationChannel = channel,
+            SendReminder = sendReminder,
+            CustomRecipients = customRecipients
+        };
+    }
+
+    private static Error? Validate(NotificationRequest request) => NotificationValidationHelper.Validate(request, FileTransferRecipients);
 
     [Fact]
-    public void Validate_WithCompleteCustomMessageRequest_ReturnsNull()
+    public void Validate_WithCustomRecipientWithoutRelatedOrganization_ReturnsError()
     {
-        var request = CreateRequest();
+        var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com" }], setRelatedOrganization: false);
 
-        Assert.Null(NotificationValidationHelper.Validate(request));
+        Assert.Equal(NotificationErrors.CustomRecipientWithoutRelatedOrganizationNotAllowed, Validate(request));
+    }
+
+    [Fact]
+    public void Validate_WithCustomRecipientRelatedToOrganizationThatIsNotARecipient_ReturnsError()
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com", RelatedOrganizationNumber = "987654321" }]);
+
+        Assert.Equal(NotificationErrors.CustomRecipientRelatedOrganizationNotARecipient, Validate(request));
+    }
+
+    [Theory]
+    [InlineData(FileTransferRecipient)]
+    [InlineData($"0192:{FileTransferRecipient}")]
+    [InlineData($"urn:altinn:organization:identifier-no:{FileTransferRecipient}")]
+    public void Validate_WithCustomRecipientRelatedToFileTransferRecipient_InAnyAllowedFormat_ReturnsNull(string relatedOrganizationNumber)
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com", RelatedOrganizationNumber = relatedOrganizationNumber }]);
+
+        Assert.Null(Validate(request));
     }
 
     [Theory]
@@ -56,100 +75,11 @@ public class NotificationValidationHelperTests
     [InlineData(NotificationChannel.EmailAndSms)]
     [InlineData(NotificationChannel.EmailPreferred)]
     [InlineData(NotificationChannel.SmsPreferred)]
-    public void Validate_WithGenericAltinnMessageTemplate_SkipsContentValidationEvenWhenTextIsMissing(NotificationChannel channel)
+    public void Validate_WithAnyChannel_ReturnsNull(NotificationChannel channel)
     {
-        var request = CreateRequest(
-            template: NotificationTemplate.GenericAltinnMessage,
-            channel: channel,
-            emailSubject: null,
-            emailBody: null,
-            smsBody: null);
+        var request = CreateRequest(channel: channel, sendReminder: true);
 
-        Assert.Null(NotificationValidationHelper.Validate(request));
-    }
-
-    [Fact]
-    public void Validate_EmailChannel_WithoutEmailContent_ReturnsMissingEmailContent()
-    {
-        var request = CreateRequest(channel: NotificationChannel.Email, emailSubject: null, emailBody: null);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingEmailContent, error);
-    }
-
-    [Fact]
-    public void Validate_EmailChannel_WithSubjectButNoBody_ReturnsMissingEmailContent()
-    {
-        var request = CreateRequest(channel: NotificationChannel.Email, emailSubject: "subject", emailBody: null);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingEmailContent, error);
-    }
-
-    [Fact]
-    public void Validate_SmsChannel_WithoutSmsContent_ReturnsMissingSmsContent()
-    {
-        var request = CreateRequest(channel: NotificationChannel.Sms, smsBody: null);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingSmsContent, error);
-    }
-
-    [Fact]
-    public void Validate_EmailAndSmsChannel_WithOnlyEmailContent_ReturnsMissingEmailAndSmsContent()
-    {
-        var request = CreateRequest(channel: NotificationChannel.EmailAndSms, smsBody: null);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingEmailAndSmsContent, error);
-    }
-
-    [Theory]
-    [InlineData(NotificationChannel.EmailPreferred)]
-    [InlineData(NotificationChannel.SmsPreferred)]
-    public void Validate_PreferredChannel_WithMissingEitherContent_ReturnsMissingPreferredChannel(NotificationChannel channel)
-    {
-        var request = CreateRequest(channel: channel, smsBody: null);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingPreferredChannel, error);
-    }
-
-    [Fact]
-    public void Validate_WithReminderMissingContent_ReturnsMissingEmailReminderContent()
-    {
-        var request = CreateRequest(sendReminder: true, reminderChannel: NotificationChannel.Email);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingEmailReminderContent, error);
-    }
-
-    [Fact]
-    public void Validate_WithReminderContentProvided_ReturnsNull()
-    {
-        var request = CreateRequest(
-            sendReminder: true,
-            reminderChannel: NotificationChannel.Email,
-            reminderEmailSubject: "reminder subject",
-            reminderEmailBody: "reminder body");
-
-        Assert.Null(NotificationValidationHelper.Validate(request));
-    }
-
-    [Fact]
-    public void Validate_WithReminderFallingBackToMainChannel_ValidatesUsingMainChannel()
-    {
-        var request = CreateRequest(sendReminder: true);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.MissingEmailReminderContent, error);
+        Assert.Null(Validate(request));
     }
 
     [Fact]
@@ -157,7 +87,7 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient()]);
 
-        var error = NotificationValidationHelper.Validate(request);
+        var error = Validate(request);
 
         Assert.Equal(NotificationErrors.CustomRecipientWithoutIdentifierNotAllowed, error);
     }
@@ -167,17 +97,49 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com", MobileNumber = ValidMobileNumber }]);
 
-        var error = NotificationValidationHelper.Validate(request);
+        var error = Validate(request);
 
         Assert.Equal(NotificationErrors.CustomRecipientWithMultipleIdentifiersNotAllowed, error);
     }
 
-    [Fact]
-    public void Validate_WithCustomRecipientWithValidOrganizationNumber_ReturnsNull()
+    [Theory]
+    [InlineData("123456789")]
+    [InlineData("0192:123456789")]
+    [InlineData("urn:altinn:organization:identifier-no:123456789")]
+    public void Validate_WithCustomRecipientWithValidOrganizationNumber_InAnyAllowedFormat_ReturnsNull(string organizationNumber)
     {
-        var request = CreateRequest(customRecipients: [new Recipient { OrganizationNumber = "123456789" }]);
+        var request = CreateRequest(customRecipients: [new Recipient { OrganizationNumber = organizationNumber }]);
 
-        Assert.Null(NotificationValidationHelper.Validate(request));
+        Assert.Null(Validate(request));
+    }
+
+    [Theory]
+    [InlineData("12345678")]
+    [InlineData("1234567890")]
+    [InlineData("12345678a")]
+    [InlineData("not-a-number")]
+    [InlineData(" ")]
+    [InlineData(" 123456789")]
+    [InlineData("0192:")]
+    [InlineData("0193:123456789")]
+    [InlineData("urn:altinn:person:identifier-no:123456789")]
+    [InlineData("foo:123456789")]
+    public void Validate_WithCustomRecipientWithInvalidOrganizationNumber_ReturnsInvalidOrganizationNumberProvided(string invalidOrganizationNumber)
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { OrganizationNumber = invalidOrganizationNumber }]);
+
+        Assert.Equal(NotificationErrors.InvalidOrganizationNumberProvided, Validate(request));
+    }
+
+    [Theory]
+    [InlineData("12345678a")]
+    [InlineData("foo:123456789")]
+    [InlineData("urn:altinn:person:identifier-no:123456789")]
+    public void Validate_WithCustomRecipientWithInvalidRelatedOrganizationNumber_ReturnsInvalidOrganizationNumberProvided(string invalidRelatedOrganizationNumber)
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com", RelatedOrganizationNumber = invalidRelatedOrganizationNumber }]);
+
+        Assert.Equal(NotificationErrors.InvalidOrganizationNumberProvided, Validate(request));
     }
 
     [Theory]
@@ -188,7 +150,7 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = invalidEmail }]);
 
-        var error = NotificationValidationHelper.Validate(request);
+        var error = Validate(request);
 
         Assert.Equal(NotificationErrors.InvalidEmailProvided, error);
     }
@@ -198,7 +160,7 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com" }]);
 
-        Assert.Null(NotificationValidationHelper.Validate(request));
+        Assert.Null(Validate(request));
     }
 
     [Theory]
@@ -209,9 +171,49 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient { MobileNumber = invalidMobile }]);
 
-        var error = NotificationValidationHelper.Validate(request);
+        var error = Validate(request);
 
         Assert.Equal(NotificationErrors.InvalidMobileNumberProvided, error);
+    }
+
+    [Theory]
+    [InlineData(ValidNationalIdentityNumber)]
+    [InlineData($"urn:altinn:person:identifier-no:{ValidNationalIdentityNumber}")]
+    public void Validate_WithCustomRecipientWithValidNationalIdentityNumber_WithOrWithoutPersonUrn_ReturnsNull(string nationalIdentityNumber)
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { NationalIdentityNumber = nationalIdentityNumber }]);
+
+        Assert.Null(Validate(request));
+    }
+
+    [Theory]
+    [InlineData(InvalidNationalIdentityNumber)]
+    [InlineData($"urn:altinn:person:identifier-no:{InvalidNationalIdentityNumber}")]
+    [InlineData($"{ValidNationalIdentityNumber}0")]
+    [InlineData($" {ValidNationalIdentityNumber}")]
+    [InlineData($"urn:altinn:organization:identifier-no:{ValidNationalIdentityNumber}")]
+    [InlineData($"0192:{ValidNationalIdentityNumber}")]
+    [InlineData($"foo:{ValidNationalIdentityNumber}")]
+    [InlineData("urn:altinn:person:identifier-no:")]
+    [InlineData("notanumber1")]
+    [InlineData(" ")]
+    public void Validate_WithCustomRecipientWithInvalidNationalIdentityNumber_ReturnsInvalidNationalIdentityNumberProvided(string invalidNationalIdentityNumber)
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { NationalIdentityNumber = invalidNationalIdentityNumber }]);
+
+        var error = Validate(request);
+
+        Assert.Equal(NotificationErrors.InvalidNationalIdentityNumberProvided, error);
+    }
+
+    [Fact]
+    public void Validate_WithCustomRecipientWithNationalIdentityNumberAndEmail_ReturnsMultipleIdentifiersError()
+    {
+        var request = CreateRequest(customRecipients: [new Recipient { NationalIdentityNumber = ValidNationalIdentityNumber, EmailAddress = "test@example.com" }]);
+
+        var error = Validate(request);
+
+        Assert.Equal(NotificationErrors.CustomRecipientWithMultipleIdentifiersNotAllowed, error);
     }
 
     [Fact]
@@ -219,55 +221,6 @@ public class NotificationValidationHelperTests
     {
         var request = CreateRequest(customRecipients: [new Recipient { MobileNumber = ValidMobileNumber }]);
 
-        Assert.Null(NotificationValidationHelper.Validate(request));
-    }
-
-    [Fact]
-    public void Validate_WithEmailRecipientAndRecipientNameKeyword_ReturnsError()
-    {
-        var request = CreateRequest(
-            emailBody: "Hello $recipientName$",
-            customRecipients: [new Recipient { EmailAddress = "test@example.com" }]);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.CustomRecipientWithNumberOrEmailNotAllowedWithKeyWordRecipientName, error);
-    }
-
-    [Fact]
-    public void Validate_WithMobileRecipientAndRecipientNumberKeyword_ReturnsError()
-    {
-        var request = CreateRequest(
-            emailBody: "Your number is $recipientNumber$",
-            customRecipients: [new Recipient { MobileNumber = ValidMobileNumber }]);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.CustomRecipientWithNumberOrEmailNotAllowedWithKeyWordRecipientName, error);
-    }
-
-    [Fact]
-    public void Validate_WithOrganizationRecipientAndRecipientNameKeyword_ReturnsNull()
-    {
-        var request = CreateRequest(
-            emailBody: "Hello $recipientName$",
-            customRecipients: [new Recipient { OrganizationNumber = "991825827" }]);
-
-        Assert.Null(NotificationValidationHelper.Validate(request));
-    }
-
-    [Fact]
-    public void Validate_WithEmailRecipientAndKeywordOnlyInReminderText_ReturnsError()
-    {
-        var request = CreateRequest(
-            sendReminder: true,
-            reminderChannel: NotificationChannel.Email,
-            reminderEmailSubject: "subject",
-            reminderEmailBody: "Hello $recipientName$",
-            customRecipients: [new Recipient { EmailAddress = "test@example.com" }]);
-
-        var error = NotificationValidationHelper.Validate(request);
-
-        Assert.Equal(NotificationErrors.CustomRecipientWithNumberOrEmailNotAllowedWithKeyWordRecipientName, error);
+        Assert.Null(Validate(request));
     }
 }

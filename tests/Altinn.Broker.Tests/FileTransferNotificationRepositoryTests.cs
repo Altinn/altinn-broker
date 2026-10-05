@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -26,13 +24,26 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
         _dataHelper = new TestDataHelper(_dataSource);
     }
 
-    private static BrokerNotificationEntity CreateEntity(Guid fileTransferId, long? actorId = null, string? customRecipient = null, bool isReminder = false) => new()
+    private const string RelatedOrganization = "0192:987654321";
+
+    /// <summary>
+    /// <paramref name="customRecipientRelatedOrganization"/> is only set when <paramref name="customRecipientType"/> is.
+    /// </summary>
+    private static BrokerNotificationEntity CreateEntity(
+        Guid fileTransferId,
+        long? actorId = null,
+        CustomRecipientType? customRecipientType = null,
+        string? customRecipientIdentifier = null,
+        string? customRecipientRelatedOrganization = RelatedOrganization,
+        bool isReminder = false) => new()
     {
         Id = Guid.NewGuid(),
         FileTransferId = fileTransferId,
         ActorId = actorId,
-        CustomRecipient = customRecipient,
-        NotificationTemplate = NotificationTemplate.CustomMessage,
+        CustomRecipientType = customRecipientType,
+        CustomRecipientIdentifier = customRecipientIdentifier,
+        CustomRecipientRelatedOrganization = customRecipientType is null ? null : customRecipientRelatedOrganization,
+        NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
         NotificationChannel = NotificationChannel.Email,
         RequestedSendTime = DateTimeOffset.UtcNow,
         Created = DateTimeOffset.UtcNow,
@@ -54,8 +65,10 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
         Assert.Equal(entity.Id, stored.Id);
         Assert.Equal(fileTransferId, stored.FileTransferId);
         Assert.Equal(actor.ActorId, stored.ActorId);
-        Assert.Null(stored.CustomRecipient);
-        Assert.Equal(NotificationTemplate.CustomMessage, stored.NotificationTemplate);
+        Assert.Null(stored.CustomRecipientType);
+        Assert.Null(stored.CustomRecipientIdentifier);
+        Assert.Null(stored.CustomRecipientRelatedOrganization);
+        Assert.Equal(NotificationTemplate.GenericAltinnMessage, stored.NotificationTemplate);
         Assert.Equal(NotificationChannel.Email, stored.NotificationChannel);
         Assert.False(stored.IsReminder);
         Assert.Null(stored.NotificationSent);
@@ -63,26 +76,62 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
         Assert.Null(stored.ShipmentId);
     }
 
-    [Fact]
-    public async Task AddNotification_WithCustomRecipient_RoundTripsWithoutActorId()
+    [Theory]
+    [InlineData(CustomRecipientType.Organization, "0192:123456789")]
+    [InlineData(CustomRecipientType.Person, "urn:altinn:person:identifier-no:01819012012")]
+    [InlineData(CustomRecipientType.Email, "test@example.com")]
+    [InlineData(CustomRecipientType.MobileNumber, "+4799999999")]
+    public async Task AddNotification_WithCustomRecipient_RoundTripsTypeAndIdentifierWithoutActorId(CustomRecipientType type, string identifier)
     {
         var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
-        var customRecipientJson = JsonSerializer.Serialize(new { EmailAddress = "test@example.com" });
-        var entity = CreateEntity(fileTransferId, customRecipient: customRecipientJson);
+        var entity = CreateEntity(fileTransferId, customRecipientType: type, customRecipientIdentifier: identifier);
 
         await _repository.AddNotification(entity, CancellationToken.None);
 
         var notifications = await _repository.GetNotificationsForFileTransfer(fileTransferId, CancellationToken.None);
         var stored = Assert.Single(notifications);
         Assert.Null(stored.ActorId);
-        Assert.Equal(customRecipientJson, stored.CustomRecipient);
+        Assert.Equal(type, stored.CustomRecipientType);
+        Assert.Equal(identifier, stored.CustomRecipientIdentifier);
+        Assert.Equal(RelatedOrganization, stored.CustomRecipientRelatedOrganization);
+    }
+
+    [Fact]
+    public async Task AddNotification_WithCustomRecipientWithoutRelatedOrganization_IsRejectedByDatabase()
+    {
+        var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
+        var entity = CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com", customRecipientRelatedOrganization: null);
+
+        await Assert.ThrowsAsync<PostgresException>(() => _repository.AddNotification(entity, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AddNotification_WithSameCustomRecipientForTwoRelatedOrganizations_StoresBoth()
+    {
+        var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
+
+        await _repository.AddNotification(CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com", customRecipientRelatedOrganization: "0192:111111111"), CancellationToken.None);
+        await _repository.AddNotification(CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com", customRecipientRelatedOrganization: "0192:222222222"), CancellationToken.None);
+
+        var notifications = await _repository.GetNotificationsForFileTransfer(fileTransferId, CancellationToken.None);
+        Assert.Equal(2, notifications.Count);
+    }
+
+    [Fact]
+    public async Task AddNotification_WithBothActorAndCustomRecipient_IsRejectedByDatabase()
+    {
+        var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
+        var actor = await _dataHelper.GetOrCreateActor("0192:123456789");
+        var entity = CreateEntity(fileTransferId, actorId: actor.ActorId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com");
+
+        await Assert.ThrowsAsync<PostgresException>(() => _repository.AddNotification(entity, CancellationToken.None));
     }
 
     [Fact]
     public async Task GetNotificationById_ReturnsMatchingRow_AndNullForUnknownId()
     {
         var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
-        var entity = CreateEntity(fileTransferId, customRecipient: "{}");
+        var entity = CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com");
         await _repository.AddNotification(entity, CancellationToken.None);
 
         var found = await _repository.GetNotificationById(entity.Id, CancellationToken.None);
@@ -97,7 +146,7 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
     public async Task UpdateOrderResponseData_SetsOrderAndShipmentId_ButNotNotificationSent()
     {
         var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
-        var entity = CreateEntity(fileTransferId, customRecipient: "{}");
+        var entity = CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com");
         await _repository.AddNotification(entity, CancellationToken.None);
         var notificationOrderId = Guid.NewGuid();
         var shipmentId = Guid.NewGuid();
@@ -115,7 +164,7 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
     public async Task UpdateNotificationSent_SetsSentTimeAndAddress()
     {
         var fileTransferId = await _dataHelper.InsertFileTransfer(TestConstants.RESOURCE_FOR_TEST);
-        var entity = CreateEntity(fileTransferId, customRecipient: "{}");
+        var entity = CreateEntity(fileTransferId, customRecipientType: CustomRecipientType.Email, customRecipientIdentifier: "test@example.com");
         await _repository.AddNotification(entity, CancellationToken.None);
         var sentTime = DateTimeOffset.UtcNow.AddMinutes(-3);
 
