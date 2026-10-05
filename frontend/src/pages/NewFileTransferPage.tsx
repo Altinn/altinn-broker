@@ -30,7 +30,6 @@ import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
 import { useUploadActions } from '../upload/uploadsContext'
-import { formatFileSize } from '../helpers/fileSizeHelper'
 import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
@@ -129,7 +128,7 @@ function NewFileTransferPageContent() {
         : null
 
   // An interrupted upload settled these when it was created, so they are shown but not editable.
-  const settled = form.interrupted !== null
+  const detailsLocked = form.interrupted !== null
 
   // The metadata summary entry points at the row input that failed instead of the entire metadata field.
   const metadataErrorTargetId = (field: NewFileTransferField) =>
@@ -172,7 +171,7 @@ function NewFileTransferPageContent() {
           )}
 
           <fieldset className="new-transfer__fields" disabled={active !== null}>
-            <fieldset className="new-transfer__fields" disabled={settled}>
+            <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <PartyField
                 label="Avsender"
                 description="Du formidler på vegne av denne organisasjonen."
@@ -223,7 +222,7 @@ function NewFileTransferPageContent() {
               onChange={(file) => setValue('file', file)}
             />
 
-            <fieldset className="new-transfer__fields" disabled={settled}>
+            <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}
@@ -250,19 +249,13 @@ function NewFileTransferPageContent() {
           )}
 
           {form.submitError && <Alert data-color="danger">{form.submitError}</Alert>}
-          {active && !values.file && (
-            <div className="new-transfer__file">
-              <span className="new-transfer__file-name">{active.fileName}</span>
-              <span className="new-transfer__file-size">{formatFileSize(active.fileSize)}</span>
-            </div>
-          )}
 
           {active && (
             <UploadProgress status={active.status} onPause={form.pause} onResume={form.resume} />
           )}
 
           <div className="new-transfer__actions">
-            {continueUpload || settled ? (
+            {continueUpload || detailsLocked ? (
               <Button
                 type="button"
                 onClick={continueUpload ?? undefined}

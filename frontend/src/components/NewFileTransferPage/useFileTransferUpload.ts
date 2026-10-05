@@ -53,11 +53,6 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
       return
     }
 
-    if (blockedBy) {
-      setSubmitError('En annen opplasting holder plassen. Fortsett eller avbryt den først.')
-      return
-    }
-
     const file = values.file
     if (!file || hasErrors(errors)) {
       return
@@ -76,7 +71,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     } catch (error) {
       setSubmitError(describeInitializeError(error))
     }
-  }, [active, blockedBy, errors, resourceId, senderOrgNumber, uploads, values])
+  }, [active, errors, resourceId, senderOrgNumber, uploads, values])
 
   const resume = useCallback(() => {
     setSubmitError('')
