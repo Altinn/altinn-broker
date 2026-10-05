@@ -66,7 +66,7 @@ export async function getUploadInfo(
   const response = await tusRequest('HEAD', path, {}, signal)
 
   // A HEAD meets a lock as 423, so a 409 is Broker refusing uploads to a transfer done with them.
-  if (response.status === 404 || response.status === 409 || response.status === 410) {
+  if (isGone(response.status)) {
     return null
   }
   if (response.status !== 200) {
@@ -96,6 +96,16 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
+/** The upload is gone, or its transfer no longer takes uploads. */
+export function isGone(status: number): boolean {
+  return status === 404 || status === 409 || status === 410
+}
+
+/** A lock, or a server error that passes, either of which is worth another try. */
+export function isTemporary(status: number): boolean {
+  return status === 423 || status >= 500
+}
+
 async function post(
   path: string,
   headers: Record<string, string>,
@@ -103,8 +113,7 @@ async function post(
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const response = await tusRequest('POST', path, headers, signal)
-    const passing = response.status === 423 || response.status >= 500
-    if (!passing || attempt >= RETRY_DELAYS.length) {
+    if (!isTemporary(response.status) || attempt >= RETRY_DELAYS.length) {
       return response
     }
     await delay(RETRY_DELAYS[attempt], signal)

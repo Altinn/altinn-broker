@@ -15,6 +15,8 @@ import {
   createUpload,
   delay,
   getUploadInfo,
+  isGone,
+  isTemporary,
 } from './tusProtocol'
 
 const MAX_PARALLEL_PARTS = 6
@@ -69,6 +71,14 @@ export type UploadRun = {
   abort: () => void
 }
 
+/** Resuming cannot help: the plan's uploads are gone, or the transfer no longer takes them. */
+export class UploadGoneError extends ApiError {
+  constructor(message: string, status: number, body?: unknown) {
+    super(message, status, body)
+    this.name = 'UploadGoneError'
+  }
+}
+
 export async function createUploadPlan(
   fileTransferId: string,
   file: File,
@@ -109,6 +119,7 @@ export function startUpload(
   let paused = false
   let allSent = false
   let settled = false
+  let failure: Error | undefined
   let reported: UploadRunStatus | null = null
 
   const progress = trackProgress(file.size, alreadySent, onProgress)
@@ -121,7 +132,7 @@ export function startUpload(
       return
     }
     abortParts()
-    finish(new ApiError('The upload stopped responding', 0))
+    finish(failure ?? new ApiError('The upload stopped responding', 0))
   })
 
   let settle: (error?: Error) => void = () => {}
@@ -140,6 +151,7 @@ export function startUpload(
     const current = status()
     if (!settled && current !== reported) {
       reported = current
+      progress.show()
       onStatus?.(current)
     }
   }
@@ -192,7 +204,8 @@ export function startUpload(
         // The other parts are still sending when one fails. Settling before they finish would let
         // the next run collide with them on the server's upload locks.
         onError: (error) => {
-          void transport.stop().then(() => finish(asApiError(error)))
+          failure ??= asApiError(error)
+          void transport.stop().then(() => finish(failure))
         },
       }),
   )
@@ -206,7 +219,12 @@ export function startUpload(
     const paths = plan.parts.map((part) => part.path)
     concatenateUploads(plan.fileTransferId, paths, concatenation.signal).then(
       () => finish(),
-      (error: Error) => finish(error),
+      (error: Error) =>
+        finish(
+          error instanceof ApiError && isGone(error.status)
+            ? new UploadGoneError(error.message, error.status, error.body)
+            : error,
+        ),
     )
   }
 
@@ -279,8 +297,9 @@ export async function readUploadedBytes(
     try {
       return await readOffsets(plan, signal)
     } catch (error) {
-      // A lock left behind by an abandoned request should eventually expire on its own
-      if (attempt >= RETRY_DELAYS.length || !isLocked(error)) {
+      // A lock left behind by an abandoned request expires on its own, and a server error may pass.
+      const temporary = error instanceof ApiError && isTemporary(error.status)
+      if (attempt >= RETRY_DELAYS.length || !temporary) {
         throw error
       }
       await delay(RETRY_DELAYS[attempt], signal)
@@ -296,9 +315,8 @@ export function discardUpload(plan: UploadPlan): void {
   }
 }
 
-/** The plan's uploads are gone, or the transfer no longer takes them, so resuming cannot help. */
 export function isUploadGone(error: unknown): boolean {
-  return error instanceof ApiError && [404, 409, 410].includes(error.status)
+  return error instanceof UploadGoneError
 }
 
 function splitIntoParts(size: number): { start: number; length: number }[] {
@@ -323,8 +341,10 @@ function trackProgress(
   let rateWindow: { at: number; loaded: number } | null = null
   let bytesPerSecond: number | null = null
   let loaded = alreadySent
+  let shown = false
 
   function emit() {
+    shown = true
     onProgress?.({
       loaded,
       total,
@@ -358,6 +378,12 @@ function trackProgress(
       rateWindow = null
       bytesPerSecond = null
       emit()
+    },
+    /** Shows the latest figure now, unless nothing has been shown yet. */
+    show() {
+      if (shown) {
+        emit()
+      }
     },
   }
 }
@@ -453,7 +479,7 @@ function shouldRetry(error: DetailedError): boolean {
     return error.originalRequest?.getMethod() === 'PATCH'
   }
 
-  return status === 0 || status === 423 || status >= 500
+  return status === 0 || isTemporary(status)
 }
 
 function chunkSizeFor(plan: UploadPlan): number {
@@ -467,7 +493,11 @@ function asApiError(error: Error): Error {
   }
 
   const response = error.originalResponse
-  return new ApiError(error.message, response?.getStatus() ?? 0, response?.getBody())
+  const status = response?.getStatus() ?? 0
+  const body = response?.getBody()
+  return isGone(status) && !shouldRetry(error)
+    ? new UploadGoneError(error.message, status, body)
+    : new ApiError(error.message, status, body)
 }
 
 async function readOffsets(plan: UploadPlan, signal?: AbortSignal): Promise<number | null> {
@@ -479,10 +509,6 @@ async function readOffsets(plan: UploadPlan, signal?: AbortSignal): Promise<numb
     }
     return total + Math.min(upload.offset, plan.parts[index].length)
   }, 0)
-}
-
-function isLocked(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 423
 }
 
 function abortError(): DOMException {
