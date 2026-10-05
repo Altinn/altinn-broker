@@ -114,7 +114,7 @@ export function startUpload(
   { onProgress, onStatus, alreadySent = 0, paused: startPaused = false }: StartUploadOptions = {},
 ): UploadRun {
   const concatenated = plan.parts.length > 1
-  const sentPerPart = plan.parts.map(() => 0)
+  const sentPerPart: (number | null)[] = plan.parts.map(() => null)
   let partsDone = 0
   let paused = false
   let allSent = false
@@ -151,7 +151,6 @@ export function startUpload(
     const current = status()
     if (!settled && current !== reported) {
       reported = current
-      // With every status comes the figure to go with it, so the first one shows where the run starts.
       progress.show()
       onStatus?.(current)
     }
@@ -188,8 +187,12 @@ export function startUpload(
           if (settled) {
             return
           }
+          // A part's first report jumps to wherever it had got to, which can be an absurd value and says nothing about upload speed.
+          if (sentPerPart[index] === null) {
+            progress.restartRate()
+          }
           sentPerPart[index] = sent
-          const total = sentPerPart.reduce((sum, bytes) => sum + bytes, 0)
+          const total = sentPerPart.reduce<number>((sum, bytes) => sum + (bytes ?? 0), 0)
           watchdog.keepAlive()
           progress.report(total)
           // A part that re-sends its last chunk takes this back.
