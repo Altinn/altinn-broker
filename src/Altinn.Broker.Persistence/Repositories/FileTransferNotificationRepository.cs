@@ -16,7 +16,9 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 file_transfer_notification_id_pk,
                 file_transfer_id_fk,
                 actor_id_fk,
-                custom_recipient,
+                custom_recipient_type,
+                custom_recipient_identifier,
+                custom_recipient_related_organization,
                 notification_template,
                 notification_channel,
                 requested_send_time,
@@ -30,7 +32,9 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 @id,
                 @fileTransferId,
                 @actorId,
-                @customRecipient,
+                @customRecipientType,
+                @customRecipientIdentifier,
+                @customRecipientRelatedOrganization,
                 @notificationTemplate,
                 @notificationChannel,
                 @requestedSendTime,
@@ -45,7 +49,9 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
         command.Parameters.AddWithValue("@id", notification.Id);
         command.Parameters.AddWithValue("@fileTransferId", notification.FileTransferId);
         command.Parameters.AddWithValue("@actorId", (object?)notification.ActorId ?? DBNull.Value);
-        command.Parameters.AddWithValue("@customRecipient", (object?)notification.CustomRecipient ?? DBNull.Value);
+        command.Parameters.AddWithValue("@customRecipientType", notification.CustomRecipientType is null ? DBNull.Value : (short)notification.CustomRecipientType.Value);
+        command.Parameters.AddWithValue("@customRecipientIdentifier", (object?)notification.CustomRecipientIdentifier ?? DBNull.Value);
+        command.Parameters.AddWithValue("@customRecipientRelatedOrganization", (object?)notification.CustomRecipientRelatedOrganization ?? DBNull.Value);
         command.Parameters.AddWithValue("@notificationTemplate", (int)notification.NotificationTemplate);
         command.Parameters.AddWithValue("@notificationChannel", (int)notification.NotificationChannel);
         command.Parameters.AddWithValue("@requestedSendTime", notification.RequestedSendTime);
@@ -75,7 +81,9 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                     Id = reader.GetGuid(reader.GetOrdinal("file_transfer_notification_id_pk")),
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
                     ActorId = reader.IsDBNull(reader.GetOrdinal("actor_id_fk")) ? null : reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                    CustomRecipient = reader.IsDBNull(reader.GetOrdinal("custom_recipient")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient")),
+                    CustomRecipientType = reader.IsDBNull(reader.GetOrdinal("custom_recipient_type")) ? null : (CustomRecipientType)reader.GetInt16(reader.GetOrdinal("custom_recipient_type")),
+                    CustomRecipientIdentifier = reader.IsDBNull(reader.GetOrdinal("custom_recipient_identifier")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient_identifier")),
+                    CustomRecipientRelatedOrganization = reader.IsDBNull(reader.GetOrdinal("custom_recipient_related_organization")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient_related_organization")),
                     NotificationTemplate = (NotificationTemplate)reader.GetInt32(reader.GetOrdinal("notification_template")),
                     NotificationChannel = (NotificationChannel)reader.GetInt32(reader.GetOrdinal("notification_channel")),
                     RequestedSendTime = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("requested_send_time")), DateTimeKind.Utc),
@@ -123,7 +131,9 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 Id = reader.GetGuid(reader.GetOrdinal("file_transfer_notification_id_pk")),
                 FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
                 ActorId = reader.IsDBNull(reader.GetOrdinal("actor_id_fk")) ? null : reader.GetInt64(reader.GetOrdinal("actor_id_fk")),
-                CustomRecipient = reader.IsDBNull(reader.GetOrdinal("custom_recipient")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient")),
+                CustomRecipientType = reader.IsDBNull(reader.GetOrdinal("custom_recipient_type")) ? null : (CustomRecipientType)reader.GetInt16(reader.GetOrdinal("custom_recipient_type")),
+                CustomRecipientIdentifier = reader.IsDBNull(reader.GetOrdinal("custom_recipient_identifier")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient_identifier")),
+                CustomRecipientRelatedOrganization = reader.IsDBNull(reader.GetOrdinal("custom_recipient_related_organization")) ? null : reader.GetString(reader.GetOrdinal("custom_recipient_related_organization")),
                 NotificationTemplate = (NotificationTemplate)reader.GetInt32(reader.GetOrdinal("notification_template")),
                 NotificationChannel = (NotificationChannel)reader.GetInt32(reader.GetOrdinal("notification_channel")),
                 RequestedSendTime = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("requested_send_time")), DateTimeKind.Utc),

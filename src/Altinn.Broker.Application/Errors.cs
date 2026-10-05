@@ -62,17 +62,12 @@ public static class ServiceOwnerErrors
 
 public static class NotificationErrors
 {
-    public static Error MissingEmailContent = new Error(8001, "Email body and subject must be provided when sending email notifications", HttpStatusCode.BadRequest);
-    public static Error MissingSmsContent = new Error(8002, "SMS body must be provided when sending SMS notifications", HttpStatusCode.BadRequest);
-    public static Error MissingPreferredChannel = new Error(8003, "Email body, subject and SMS body must be provided when sending preferred notifications", HttpStatusCode.BadRequest);
-    public static Error MissingEmailAndSmsContent = new Error(8004, "Email body, subject and SMS body must be provided when sending email and SMS notifications", HttpStatusCode.BadRequest);
-    public static Error MissingEmailReminderContent = new Error(8005, "Reminder email body and subject must be provided when sending reminder email notifications", HttpStatusCode.BadRequest);
-    public static Error MissingSmsReminderContent = new Error(8006, "Reminder SMS body must be provided when sending reminder SMS notifications", HttpStatusCode.BadRequest);
-    public static Error MissingPreferredReminderChannel = new Error(8007, "Reminder email body, subject and SMS body must be provided when sending reminder preferred notifications", HttpStatusCode.BadRequest);
-    public static Error MissingEmailAndSmsReminderContent = new Error(8008, "Reminder email body, subject and SMS body must be provided when sending reminder email and SMS notifications", HttpStatusCode.BadRequest);
-    public static Error CustomRecipientWithoutIdentifierNotAllowed = new Error(8009, "Custom recipient without identifier is not allowed", HttpStatusCode.BadRequest);
-    public static Error CustomRecipientWithMultipleIdentifiersNotAllowed = new Error(8010, "Custom recipient with multiple identifiers is not allowed", HttpStatusCode.BadRequest);
-    public static Error CustomRecipientWithNumberOrEmailNotAllowedWithKeyWordRecipientName = new Error(8012, "Recipient overrides with email or mobile number are not allowed when using the $recipientName$/$recipientNumber$ keywords, since there is no registered name/number to look up for that kind of recipient", HttpStatusCode.BadRequest);
-    public static Error InvalidEmailProvided = new Error(8013, "Invalid email provided for custom recipient.", HttpStatusCode.BadRequest);
-    public static Error InvalidMobileNumberProvided = new Error(8014, "Invalid mobile number provided. Mobile number can contain only '+' and numeric characters, and it must adhere to the E.164 standard.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithoutIdentifierNotAllowed = new Error(8001, "Custom recipient without identifier is not allowed", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithMultipleIdentifiersNotAllowed = new Error(8002, "Custom recipient with multiple identifiers is not allowed", HttpStatusCode.BadRequest);
+    public static Error InvalidEmailProvided = new Error(8003, "Invalid email provided for custom recipient.", HttpStatusCode.BadRequest);
+    public static Error InvalidMobileNumberProvided = new Error(8004, "Invalid mobile number provided. Mobile number can contain only '+' and numeric characters, and it must adhere to the E.164 standard.", HttpStatusCode.BadRequest);
+    public static Error InvalidNationalIdentityNumberProvided = new Error(8005, "Invalid national identity number provided for custom recipient. It must be an 11-digit Norwegian national identity number, optionally prefixed with 'urn:altinn:person:identifier-no:'.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithoutRelatedOrganizationNotAllowed = new Error(8006, "Custom recipient must specify the related organization number of the file transfer recipient it is notified on behalf of.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientRelatedOrganizationNotARecipient = new Error(8007, "The related organization number of a custom recipient must be one of the file transfer's recipients.", HttpStatusCode.BadRequest);
+    public static Error InvalidOrganizationNumberProvided = new Error(8008, "Invalid organization number provided for custom recipient. It must be a 9-digit organization number, optionally prefixed with '0192:' or 'urn:altinn:organization:identifier-no:'.", HttpStatusCode.BadRequest);
 }

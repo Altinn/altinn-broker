@@ -137,7 +137,7 @@ public class InitializeFileTransferHandler(
 
         if (request.Notification is not null)
         {
-            var notificationError = NotificationValidationHelper.Validate(request.Notification);
+            var notificationError = NotificationValidationHelper.Validate(request.Notification, request.RecipientExternalIds);
             if (notificationError is not null)
             {
                 return notificationError;
