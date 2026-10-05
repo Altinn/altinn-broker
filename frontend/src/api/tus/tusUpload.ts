@@ -151,6 +151,7 @@ export function startUpload(
     const current = status()
     if (!settled && current !== reported) {
       reported = current
+      // With every status comes the figure to go with it, so the first one shows where the run starts.
       progress.show()
       onStatus?.(current)
     }
@@ -248,10 +249,6 @@ export function startUpload(
   } else {
     report()
   }
-  // Shows where the run starts from before its first request, which a paused run will not send.
-  if (startPaused || alreadySent > 0) {
-    progress.restartRate()
-  }
   watchdog.keepAlive()
   for (const upload of uploads) {
     upload.start()
@@ -340,10 +337,8 @@ function trackProgress(
   let rateWindow: { at: number; loaded: number } | null = null
   let bytesPerSecond: number | null = null
   let loaded = alreadySent
-  let shown = false
 
   function emit() {
-    shown = true
     onProgress?.({
       loaded,
       total,
@@ -378,12 +373,8 @@ function trackProgress(
       bytesPerSecond = null
       emit()
     },
-    /** Shows the latest figure now, unless nothing has been shown yet. */
-    show() {
-      if (shown) {
-        emit()
-      }
-    },
+    /** Shows the latest figure now, whether or not the interval has passed. */
+    show: emit,
   }
 }
 

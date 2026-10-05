@@ -25,7 +25,7 @@ export function UploadProgress({ status, onPause, onResume }: UploadProgressProp
             Fortsett
           </Button>
         )}
-        {status === 'uploading' && progress !== null && (
+        {status === 'uploading' && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onPause}>
             <PauseIcon aria-hidden />
             Pause
@@ -42,9 +42,8 @@ export function UploadProgress({ status, onPause, onResume }: UploadProgressProp
 }
 
 function statusText(status: UploadStatus, progress: Progress | null): string {
-  if (!progress) {
-    // Resuming asks each upload how far it got before it can say anything about progress.
-    return status === 'initializing' ? 'Oppretter formidlingen…' : 'Finner ut hvor opplastingen slapp…'
+  if (status === 'initializing' || !progress) {
+    return 'Oppretter formidlingen…'
   }
 
   const amount = `${formatFileSize(progress.loaded)} av ${formatFileSize(progress.total)}`
@@ -68,8 +67,8 @@ function statusText(status: UploadStatus, progress: Progress | null): string {
 
 // Readable status text for screen readers
 function screenReaderStatusText(status: UploadStatus, progress: Progress | null): string {
-  if (!progress) {
-    return status === 'initializing' ? 'Oppretter formidlingen' : 'Finner ut hvor opplastingen slapp'
+  if (status === 'initializing' || !progress) {
+    return 'Oppretter formidlingen'
   }
 
   const tenths = `${Math.floor(progress.percent / 10) * 10} prosent`
