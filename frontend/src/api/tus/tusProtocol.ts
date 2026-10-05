@@ -60,11 +60,11 @@ export async function concatenateUploads(
   await assertCreated(response)
 }
 
-/** Null when the upload is gone: expired, already assembled, never created, or no longer taken. */
-export async function getUploadInfo(
-  path: string,
-  signal?: AbortSignal,
-): Promise<{ offset: number; length: number } | null> {
+/**
+ * How many bytes the server holds of the upload, or null when it is gone: expired, already
+ * assembled, never created, or no longer taken.
+ */
+export async function getUploadOffset(path: string, signal?: AbortSignal): Promise<number | null> {
   const response = await apiRequest(path, { method: 'HEAD', headers: TUS_HEADERS, signal })
 
   // A HEAD meets a lock as 423, so a 409 is Broker refusing uploads to a transfer done with them.
@@ -76,12 +76,11 @@ export async function getUploadInfo(
   }
 
   const offset = Number(response.headers.get('Upload-Offset') ?? Number.NaN)
-  const length = Number(response.headers.get('Upload-Length') ?? Number.NaN)
-  if (!Number.isFinite(offset) || !Number.isFinite(length)) {
+  if (!Number.isFinite(offset)) {
     throw new ApiError('The upload did not report an offset', response.status)
   }
 
-  return { offset, length }
+  return offset
 }
 
 export function delay(ms: number, signal?: AbortSignal): Promise<void> {

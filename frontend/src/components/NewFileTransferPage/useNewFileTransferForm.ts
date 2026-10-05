@@ -104,18 +104,11 @@ function useFormValues(
   senderOrgNumber: string,
   key: string,
 ) {
-  const [draft, setDraftState] = useState(() => readDraft(key) ?? emptyValues())
+  const [draft, setDraft] = useState(() => readDraft(key) ?? emptyValues())
 
-  const setDraft = useCallback(
-    (change: (current: NewFileTransferValues) => NewFileTransferValues) => {
-      setDraftState((current) => {
-        const next = change(current)
-        writeDraft(key, next)
-        return next
-      })
-    },
-    [key],
-  )
+  useEffect(() => {
+    writeDraft(key, draft)
+  }, [key, draft])
 
   const rules = useMemo(
     () => resolveRecipientRules(recipients, configuration?.requiredParty ?? null, senderOrgNumber),
@@ -137,7 +130,7 @@ function useFormValues(
     <K extends keyof NewFileTransferValues>(key: K, value: NewFileTransferValues[K]) => {
       setDraft((current) => ({ ...current, [key]: value }))
     },
-    [setDraft],
+    [],
   )
 
   const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])

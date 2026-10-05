@@ -14,7 +14,7 @@ import {
   createPartialUpload,
   createUpload,
   delay,
-  getUploadInfo,
+  getUploadOffset,
   isGone,
   isTemporary,
 } from './tusProtocol'
@@ -494,13 +494,13 @@ function asApiError(error: Error): Error {
 }
 
 async function readOffsets(plan: UploadPlan, signal?: AbortSignal): Promise<number | null> {
-  const uploads = await Promise.all(plan.parts.map((part) => getUploadInfo(part.path, signal)))
+  const offsets = await Promise.all(plan.parts.map((part) => getUploadOffset(part.path, signal)))
 
-  return uploads.reduce<number | null>((total, upload, index) => {
-    if (total === null || upload === null) {
+  return offsets.reduce<number | null>((total, offset, index) => {
+    if (total === null || offset === null) {
       return null
     }
-    return total + Math.min(upload.offset, plan.parts[index].length)
+    return total + Math.min(offset, plan.parts[index].length)
   }, 0)
 }
 
