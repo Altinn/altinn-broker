@@ -4,7 +4,9 @@ CREATE TABLE broker.file_transfer_notification (
     file_transfer_notification_id_pk uuid PRIMARY KEY,
     file_transfer_id_fk uuid NOT NULL,
     actor_id_fk bigint NULL,
-    custom_recipient text NULL,
+    custom_recipient_type smallint NULL,
+    custom_recipient_identifier character varying(254) NULL,
+    custom_recipient_related_organization character varying(14) NULL,
     notification_template integer NOT NULL,
     notification_channel integer NOT NULL,
     requested_send_time timestamp without time zone NOT NULL,
@@ -19,9 +21,20 @@ CREATE TABLE broker.file_transfer_notification (
         FOREIGN KEY (file_transfer_id_fk) REFERENCES broker.file_transfer (file_transfer_id_pk) ON DELETE CASCADE,
     CONSTRAINT file_transfer_notification_actor_fk
         FOREIGN KEY (actor_id_fk) REFERENCES broker.actor (actor_id_pk) ON DELETE CASCADE,
-    -- A row is either for a real file-transfer actor or an arbitrary custom recipient, never both or neither.
+    -- A row is either for a file-transfer actor or a custom recipient (type + identifier + the file transfer
+    -- recipient it is related to), never both or neither. Custom recipients never reference the actor table, not even
+    -- when identified by organization number.
     CONSTRAINT file_transfer_notification_recipient_xor
-        CHECK ((actor_id_fk IS NOT NULL) <> (custom_recipient IS NOT NULL))
+        CHECK (
+            (actor_id_fk IS NOT NULL
+                AND custom_recipient_type IS NULL
+                AND custom_recipient_identifier IS NULL
+                AND custom_recipient_related_organization IS NULL)
+            OR (actor_id_fk IS NULL
+                AND custom_recipient_type IS NOT NULL
+                AND custom_recipient_identifier IS NOT NULL
+                AND custom_recipient_related_organization IS NOT NULL)
+        )
 );
 
 CREATE INDEX file_transfer_notification_file_transfer_id_idx
@@ -32,8 +45,8 @@ CREATE UNIQUE INDEX file_transfer_notification_actor_recipient_idx
     WHERE actor_id_fk IS NOT NULL;
 
 CREATE UNIQUE INDEX file_transfer_notification_custom_recipient_idx
-    ON broker.file_transfer_notification (file_transfer_id_fk, custom_recipient, is_reminder)
-    WHERE custom_recipient IS NOT NULL;
+    ON broker.file_transfer_notification (file_transfer_id_fk, custom_recipient_type, custom_recipient_identifier, custom_recipient_related_organization, is_reminder)
+    WHERE custom_recipient_identifier IS NOT NULL;
 
 CREATE TABLE broker.notification_template (
     notification_template_id_pk integer PRIMARY KEY,
@@ -54,29 +67,11 @@ INSERT INTO broker.notification_template (
     reminder_email_subject, reminder_email_body, reminder_sms_body
 ) VALUES
     (
-        0, 1, 'nb',
-        'En ny filoverføring er tilgjengelig i Altinn for $recipientName$',
-        'Hei. $recipientName$ $recipientNumber$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). {textToken}Logg inn i Altinn for å se filoverføringen.',
-        'Hei. $recipientName$ $recipientNumber$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). {textToken}Logg inn i Altinn for å se filoverføringen.',
-        'Påminnelse - en ny filoverføring er tilgjengelig i Altinn for $recipientName$',
-        'Hei. Dette er en påminnelse om at $recipientName$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). {textToken}Logg inn i Altinn for å se filoverføringen.',
-        'Hei. Dette er en påminnelse om at $recipientName$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). {textToken}Logg inn i Altinn for å se filoverføringen.'
-    ),
-    (
-        1, 1, 'nn',
-        'Ei ny filoverføring er tilgjengeleg i Altinn for $recipientName$',
-        'Hei. $recipientName$ $recipientNumber$ har motteke fila $fileName$ frå $sendersName$ gjennom Altinn Formidling. (For å sjå denne filoverføringa krevst tilgang til $resourceName$). {textToken}Logg inn i Altinn for å sjå filoverføringa.',
-        'Hei. $recipientName$ $recipientNumber$ har motteke fila $fileName$ frå $sendersName$ gjennom Altinn Formidling. (For å sjå denne filoverføringa krevst tilgang til $resourceName$). {textToken}Logg inn i Altinn for å sjå filoverføringa.',
-        'Påminning - ei ny filoverføring er tilgjengeleg i Altinn for $recipientName$',
-        'Hei. Dette er ei påminning om at $recipientName$ har motteke fila $fileName$ frå $sendersName$ gjennom Altinn Formidling. (For å sjå denne filoverføringa krevst tilgang til $resourceName$). {textToken}Logg inn i Altinn for å sjå filoverføringa.',
-        'Hei. Dette er ei påminning om at $recipientName$ har motteke fila $fileName$ frå $sendersName$ gjennom Altinn Formidling. (For å sjå denne filoverføringa krevst tilgang til $resourceName$). {textToken}Logg inn i Altinn for å sjå filoverføringa.'
-    ),
-    (
-        2, 1, 'en',
-        'A new file transfer is available in Altinn for $recipientName$',
-        'Hi. $recipientName$ $recipientNumber$ has received the file $fileName$ from $sendersName$ through Altinn Broker. (Access to $resourceName$ is required to view this file transfer). {textToken}Log in to Altinn to view the file transfer.',
-        'Hi. $recipientName$ $recipientNumber$ has received the file $fileName$ from $sendersName$ through Altinn Broker. (Access to $resourceName$ is required to view this file transfer). {textToken}Log in to Altinn to view the file transfer.',
-        'Reminder - a new file transfer is available in Altinn for $recipientName$',
-        'Hi. This is a reminder that $recipientName$ has received the file $fileName$ from $sendersName$ through Altinn Broker. (Access to $resourceName$ is required to view this file transfer). {textToken}Log in to Altinn to view the file transfer.',
-        'Hi. This is a reminder that $recipientName$ has received the file $fileName$ from $sendersName$ through Altinn Broker. (Access to $resourceName$ is required to view this file transfer). {textToken}Log in to Altinn to view the file transfer.'
+        0, 0, 'nb',
+        'En ny filoverføring er tilgjengelig i Altinn for $fileTransferRecipient$',
+        'Hei. $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.',
+        'Hei. $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.',
+        'Påminnelse - en ny filoverføring er tilgjengelig i Altinn for $fileTransferRecipient$',
+        'Hei. Dette er en påminnelse om at $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.',
+        'Hei. Dette er en påminnelse om at $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.'
     );

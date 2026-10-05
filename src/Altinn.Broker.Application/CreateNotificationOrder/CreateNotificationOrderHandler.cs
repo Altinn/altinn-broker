@@ -1,12 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Transactions;
 
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
+using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Domain;
-using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
@@ -27,6 +25,9 @@ public class CreateNotificationOrderHandler(
 {
     private const int ReminderDelayDays = 7;
     private const string DefaultLanguage = "nb";
+    private const EmailContentType DefaultEmailContentType = EmailContentType.Plain;
+    private const string FileTransferRecipientToken = "$fileTransferRecipient$";
+    private static readonly string[] NotificationsResolvedTokens = ["$recipientName$", "$recipientNumber$"];
 
     public async Task Process(CreateNotificationOrderRequest request, CancellationToken cancellationToken)
     {
@@ -40,42 +41,49 @@ public class CreateNotificationOrderHandler(
             return;
         }
 
-        var resolvedText = await ResolveNotificationText(notificationRequest, cancellationToken);
+        var resolvedText = await ResolveNotificationText(cancellationToken);
         var orderTokens = await ResolveOrderTokenValues(request, cancellationToken);
+        var fileTransferRecipients = await ResolveFileTransferRecipients(recipients, cancellationToken);
         var requestedSendTime = DateTimeOffset.UtcNow;
         var createdCount = 0;
-        foreach (var (actorId, recipient) in recipients)
+        for (var recipientIndex = 0; recipientIndex < recipients.Count; recipientIndex++)
         {
-            var recipientKey = BuildRecipientKey(recipient);
+            var (actorId, recipient) = recipients[recipientIndex];
+            var notificationId = Guid.NewGuid();
             using var transaction = new TransactionScope(
                 TransactionScopeOption.Required,
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
             var claimed = await idempotencyEventRepository.TryAddIdempotencyEventAsync(
-                BuildNotificationClaimKey(request.FileTransferId, recipientKey),
+                BuildNotificationClaimKey(request.FileTransferId, recipientIndex),
                 cancellationToken);
             if (!claimed)
             {
                 logger.LogInformation(
-                    "Notification order already created for file transfer {FileTransferId} and recipient {RecipientKey}. Skipping.",
-                    request.FileTransferId,
-                    recipientKey);
+                    "Notification order for recipient {RecipientIndex} already created for file transfer {FileTransferId}. Skipping.",
+                    recipientIndex,
+                    request.FileTransferId);
                 transaction.Complete();
                 continue;
             }
 
-            var recipientName = await ResolveRecipientName(recipient, cancellationToken);
-            var recipientNumber = ResolveRecipientNumber(recipient);
-            var tokens = orderTokens with { RecipientName = recipientName, RecipientNumber = recipientNumber };
-            var orderRequest = CreateNotificationOrderRequestV2(request.FileTransferId, request.ResourceId, recipient, recipientKey, notificationRequest, resolvedText, requestedSendTime, tokens);
+            var tokens = orderTokens with
+            {
+                FileTransferRecipient = fileTransferRecipients[GetFileTransferRecipientNumber(actorId, recipient)]
+            };
+            var relatedOrganizationNumber = recipient.RelatedOrganizationNumber?.WithoutPrefix();
+            var orderRequest = CreateNotificationOrderRequestV2(request.FileTransferId, request.ResourceId, recipient, notificationId, notificationRequest, resolvedText, requestedSendTime, tokens);
+            var (customRecipientType, customRecipientIdentifier) = actorId is null ? DescribeCustomRecipient(recipient) : (null, null);
             var notification = new BrokerNotificationEntity
             {
-                Id = Guid.NewGuid(),
+                Id = notificationId,
                 FileTransferId = request.FileTransferId,
                 ActorId = actorId,
-                CustomRecipient = actorId is null ? JsonSerializer.Serialize(recipient) : null,
-                NotificationTemplate = notificationRequest.NotificationTemplate,
+                CustomRecipientType = customRecipientType,
+                CustomRecipientIdentifier = customRecipientIdentifier,
+                CustomRecipientRelatedOrganization = actorId is null ? relatedOrganizationNumber?.WithPrefix() : null,
+                NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
                 NotificationChannel = notificationRequest.NotificationChannel,
                 RequestedSendTime = requestedSendTime,
                 Created = DateTimeOffset.UtcNow,
@@ -103,16 +111,19 @@ public class CreateNotificationOrderHandler(
             var actorId = await ResolveActorId(recipient, cancellationToken);
             resolved.Add((actorId, recipient));
         }
-        
 
         if (notificationRequest.CustomRecipients is { Count: > 0 })
         {
-            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, recipient)));
+            var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
+            resolved.AddRange(notificationRequest.CustomRecipients
+                .Where(recipient => string.IsNullOrEmpty(recipient.OrganizationNumber) || !fileTransferRecipients.Contains(recipient.OrganizationNumber.WithoutPrefix()))
+                .Select(recipient => ((long?)null, recipient)));
         }
 
         return resolved
             .GroupBy(entry => BuildRecipientKey(entry.Recipient))
             .Select(group => group.First())
+            .OrderBy(entry => BuildRecipientKey(entry.Recipient), StringComparer.Ordinal)
             .ToList();
     }
 
@@ -127,100 +138,84 @@ public class CreateNotificationOrderHandler(
         return await actorRepository.AddActorAsync(new ActorEntity { ActorExternalId = externalId }, cancellationToken);
     }
 
-
-    private async Task<ResolvedNotificationText> ResolveNotificationText(NotificationRequest notificationRequest, CancellationToken cancellationToken)
+    private async Task<ResolvedNotificationText> ResolveNotificationText(CancellationToken cancellationToken)
     {
-        var callerText = new ResolvedNotificationText(
-            notificationRequest.EmailSubject,
-            notificationRequest.EmailBody,
-            notificationRequest.SmsBody,
-            notificationRequest.ReminderEmailSubject,
-            notificationRequest.ReminderEmailBody,
-            notificationRequest.ReminderSmsBody);
+        var template = await notificationTemplateRepository.GetNotificationTemplate(NotificationTemplate.GenericAltinnMessage, DefaultLanguage, cancellationToken)
+            ?? throw new InvalidOperationException($"No {NotificationTemplate.GenericAltinnMessage} notification template found for language '{DefaultLanguage}'");
 
-        if (notificationRequest.NotificationTemplate != NotificationTemplate.GenericAltinnMessage)
+        var resolvedText = new ResolvedNotificationText(
+            template.EmailSubject,
+            template.EmailBody,
+            template.SmsBody,
+            template.ReminderEmailSubject,
+            template.ReminderEmailBody,
+            template.ReminderSmsBody);
+
+        if (resolvedText.ContainsAny(NotificationsResolvedTokens))
         {
-            return callerText;
+            throw new InvalidOperationException($"The {NotificationTemplate.GenericAltinnMessage} notification template must not contain {string.Join("/", NotificationsResolvedTokens)}");
         }
 
-        var language = notificationRequest.Language ?? DefaultLanguage;
-        var template = await notificationTemplateRepository.GetNotificationTemplate(NotificationTemplate.GenericAltinnMessage, language, cancellationToken);
-        if (template is null)
-        {
-            logger.LogWarning("No generic Altinn message template found for language {Language}. Falling back to the caller's own text only.", language.SanitizeForLogs());
-            return callerText;
-        }
-
-        return new ResolvedNotificationText(
-            MergeTemplateWithCustomText(template.EmailSubject, notificationRequest.EmailSubject),
-            MergeTemplateWithCustomText(template.EmailBody, notificationRequest.EmailBody),
-            MergeTemplateWithCustomText(template.SmsBody, notificationRequest.SmsBody),
-            MergeTemplateWithCustomText(template.ReminderEmailSubject, notificationRequest.ReminderEmailSubject),
-            MergeTemplateWithCustomText(template.ReminderEmailBody, notificationRequest.ReminderEmailBody),
-            MergeTemplateWithCustomText(template.ReminderSmsBody, notificationRequest.ReminderSmsBody));
+        return resolvedText;
     }
 
-    private static string? MergeTemplateWithCustomText(string? templateText, string? customText)
-    {
-        if (string.IsNullOrEmpty(templateText))
-        {
-            return customText;
-        }
-        return templateText.Replace("{textToken}", string.IsNullOrEmpty(customText) ? string.Empty : customText + " ").Trim();
-    }
-
-    /// <summary>
-    /// Resolves the token values shared by every recipient's order for this file transfer - the sender's and
-    /// resource's display names, and the file's own name/expiration (fetched once per <see cref="Process"/> call,
-    /// not once per recipient, since none of them vary by recipient). Falls back to the raw identifier when a
-    /// lookup fails, so a lookup outage degrades the notification text rather than blocking it from being created.
-    /// </summary>
     private async Task<OrderTokenValues> ResolveOrderTokenValues(CreateNotificationOrderRequest request, CancellationToken cancellationToken)
     {
         var sendersName = await altinnRegisterService.LookupOrganizationName(request.SenderExternalId, cancellationToken)
             ?? request.SenderExternalId;
         var resourceMetadata = await altinnResourceRepository.GetResourceMetadata(request.ResourceId, cancellationToken);
         var resourceName = resourceMetadata?.Title ?? request.ResourceId;
-        return new OrderTokenValues(sendersName, resourceName, request.FileName, request.FileTransferExpirationTime, RecipientName: string.Empty, RecipientNumber: string.Empty);
+        return new OrderTokenValues(sendersName, resourceName, request.FileName, request.FileTransferExpirationTime, FileTransferRecipient: string.Empty);
     }
 
-    private async Task<string> ResolveRecipientName(Recipient recipient, CancellationToken cancellationToken)
+    private static string GetFileTransferRecipientNumber(long? actorId, Recipient recipient) =>
+        actorId is null ? recipient.RelatedOrganizationNumber!.WithoutPrefix() : recipient.OrganizationNumber!.WithoutPrefix();
+
+    private async Task<Dictionary<string, string>> ResolveFileTransferRecipients(List<(long? ActorId, Recipient Recipient)> recipients, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(recipient.OrganizationNumber))
+        var descriptions = new Dictionary<string, string>();
+        var organizationNumbers = recipients
+            .Select(entry => GetFileTransferRecipientNumber(entry.ActorId, entry.Recipient))
+            .Distinct();
+        foreach (var organizationNumber in organizationNumbers)
         {
-            var organizationExternalId = recipient.OrganizationNumber.WithPrefix();
-            return await altinnRegisterService.LookupOrganizationName(organizationExternalId, cancellationToken) ?? recipient.OrganizationNumber;
+            var name = await altinnRegisterService.LookupOrganizationName(organizationNumber.WithPrefix(), cancellationToken);
+            descriptions[organizationNumber] = string.IsNullOrWhiteSpace(name) ? organizationNumber : $"{name} ({organizationNumber})";
         }
-        return BuildActorExternalId(recipient);
+        return descriptions;
     }
 
-    private static string ResolveRecipientNumber(Recipient recipient) =>
-        !string.IsNullOrEmpty(recipient.OrganizationNumber) ? recipient.OrganizationNumber : BuildActorExternalId(recipient);
+    private static (CustomRecipientType? Type, string? Identifier) DescribeCustomRecipient(Recipient recipient)
+    {
+        if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return (CustomRecipientType.Organization, BuildActorExternalId(recipient));
+        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return (CustomRecipientType.Person, BuildActorExternalId(recipient));
+        if (!string.IsNullOrEmpty(recipient.EmailAddress)) return (CustomRecipientType.Email, recipient.EmailAddress);
+        if (!string.IsNullOrEmpty(recipient.MobileNumber)) return (CustomRecipientType.MobileNumber, recipient.MobileNumber);
+        throw new InvalidOperationException("Recipient must have exactly one identifier");
+    }
 
     private static string BuildActorExternalId(Recipient recipient)
     {
-        if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return recipient.OrganizationNumber.WithPrefix();
+        if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return recipient.OrganizationNumber.WithoutPrefix().WithPrefix();
+        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return $"{UrnConstants.PersonIdAttribute}:{recipient.NationalIdentityNumber.WithoutPrefix()}";
         if (!string.IsNullOrEmpty(recipient.EmailAddress)) return recipient.EmailAddress;
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return recipient.MobileNumber;
         throw new InvalidOperationException("Recipient must have exactly one identifier");
     }
 
-    private static string BuildRecipientKey(Recipient recipient) => BuildActorExternalId(recipient);
+    private static string BuildRecipientKey(Recipient recipient) =>
+        string.IsNullOrEmpty(recipient.RelatedOrganizationNumber)
+            ? BuildActorExternalId(recipient)
+            : $"{BuildActorExternalId(recipient)}_{recipient.RelatedOrganizationNumber.WithoutPrefix().WithPrefix()}";
 
-    private static string BuildNotificationClaimKey(Guid fileTransferId, string recipientKey) => $"{fileTransferId}_notification_{recipientKey}";
-
-    private static Guid CreateStableIdempotencyId(Guid fileTransferId, string recipientKey)
-    {
-        var name = $"notification:{fileTransferId}:{recipientKey}";
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(name));
-        return new Guid(hash.AsSpan(0, 16));
-    }
+    private static string BuildNotificationClaimKey(Guid fileTransferId, int recipientIndex) =>
+        $"{fileTransferId}_notification_{recipientIndex}";
 
     private static NotificationOrderRequestV2 CreateNotificationOrderRequestV2(
         Guid fileTransferId,
         string resourceId,
         Recipient recipient,
-        string recipientKey,
+        Guid notificationId,
         NotificationRequest notificationRequest,
         ResolvedNotificationText resolvedText,
         DateTimeOffset requestedSendTime,
@@ -230,7 +225,7 @@ public class CreateNotificationOrderHandler(
         {
             SendersReference = $"bro-{fileTransferId}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
-            IdempotencyId = CreateStableIdempotencyId(fileTransferId, recipientKey),
+            IdempotencyId = notificationId,
             Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: false)
         };
 
@@ -253,8 +248,7 @@ public class CreateNotificationOrderHandler(
     private static string? ApplyTokens(string? text, OrderTokenValues tokens) =>
         text?
             .Replace("$sendersName$", tokens.SendersName)
-            .Replace("$recipientName$", tokens.RecipientName)
-            .Replace("$recipientNumber$", tokens.RecipientNumber)
+            .Replace(FileTransferRecipientToken, tokens.FileTransferRecipient)
             .Replace("$resourceName$", tokens.ResourceName)
             .Replace("$fileName$", tokens.FileName)
             .Replace("$expirationTime$", tokens.ExpirationTime.ToString("dd.MM.yyyy HH:mm"));
@@ -268,18 +262,13 @@ public class CreateNotificationOrderHandler(
         bool isReminder)
     {
         var resourceIdWithPrefix = $"urn:altinn:resource:{resourceId}";
-        var channel = isReminder
-            ? notificationRequest.ReminderNotificationChannel ?? notificationRequest.NotificationChannel
-            : notificationRequest.NotificationChannel;
+        var channel = notificationRequest.NotificationChannel;
         var emailSubject = ApplyTokens(isReminder ? resolvedText.ReminderEmailSubject : resolvedText.EmailSubject, tokens);
         var emailBody = ApplyTokens(isReminder ? resolvedText.ReminderEmailBody : resolvedText.EmailBody, tokens);
         var smsBody = ApplyTokens(isReminder ? resolvedText.ReminderSmsBody : resolvedText.SmsBody, tokens);
-        var emailContentType = isReminder
-            ? notificationRequest.ReminderEmailContentType ?? notificationRequest.EmailContentType
-            : notificationRequest.EmailContentType;
 
         var emailSettings = !string.IsNullOrWhiteSpace(emailSubject) && !string.IsNullOrWhiteSpace(emailBody)
-            ? new EmailSettings { Subject = emailSubject, Body = emailBody, ContentType = emailContentType }
+            ? new EmailSettings { Subject = emailSubject, Body = emailBody, ContentType = DefaultEmailContentType }
             : null;
         var smsSettings = !string.IsNullOrWhiteSpace(smsBody)
             ? new SmsSettings { Body = smsBody }
@@ -292,6 +281,20 @@ public class CreateNotificationOrderHandler(
                 RecipientOrganization = new RecipientOrganization
                 {
                     OrgNumber = recipient.OrganizationNumber,
+                    ResourceId = resourceIdWithPrefix,
+                    ChannelSchema = channel,
+                    EmailSettings = emailSettings,
+                    SmsSettings = smsSettings
+                }
+            };
+        }
+        else if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber))
+        {
+            return new RecipientV2
+            {
+                RecipientPerson = new RecipientPerson
+                {
+                    NationalIdentityNumber = recipient.NationalIdentityNumber.WithoutPrefix(),
                     ResourceId = resourceIdWithPrefix,
                     ChannelSchema = channel,
                     EmailSettings = emailSettings,
@@ -326,16 +329,15 @@ public class CreateNotificationOrderHandler(
     }
 
     /// <summary>
-    /// The token values substitutable into the final notification text via $sendersName$/$recipientName$/
-    /// $recipientNumber$/$resourceName$/$fileName$/$expirationTime$. <see cref="RecipientName"/> and
-    /// <see cref="RecipientNumber"/> are the only ones that vary per recipient.
+    /// The token values substitutable into the final notification text via $sendersName$/$fileTransferRecipient$/
+    /// $resourceName$/$fileName$/$expirationTime$. <see cref="FileTransferRecipient"/> is the only one that varies per
+    /// recipient.
     /// </summary>
-    private sealed record OrderTokenValues(string SendersName, string ResourceName, string FileName, DateTime ExpirationTime, string RecipientName, string RecipientNumber);
+    private sealed record OrderTokenValues(string SendersName, string ResourceName, string FileName, DateTime ExpirationTime, string FileTransferRecipient);
 
     /// <summary>
-    /// The final text to send, after resolving <see cref="NotificationTemplate.CustomMessage"/> vs.
-    /// <see cref="NotificationTemplate.GenericAltinnMessage"/> - but before $token$ substitution, which is applied
-    /// per recipient in <see cref="CreateRecipientV2"/>.
+    /// The template text to send, before $token$ substitution, which is applied per recipient in
+    /// <see cref="CreateRecipientV2"/>.
     /// </summary>
     private sealed record ResolvedNotificationText(
         string? EmailSubject,
@@ -343,5 +345,10 @@ public class CreateNotificationOrderHandler(
         string? SmsBody,
         string? ReminderEmailSubject,
         string? ReminderEmailBody,
-        string? ReminderSmsBody);
+        string? ReminderSmsBody)
+    {
+        public bool ContainsAny(IEnumerable<string> tokens) =>
+            new[] { EmailSubject, EmailBody, SmsBody, ReminderEmailSubject, ReminderEmailBody, ReminderSmsBody }
+                .Any(text => text is not null && tokens.Any(token => text.Contains(token, StringComparison.Ordinal)));
+    }
 }
