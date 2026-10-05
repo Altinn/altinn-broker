@@ -146,6 +146,7 @@ public class BrokerTusStore(
             acceptedOffset = acceptResult.NewAcceptedOffset;
             isFinalChunk = acceptedOffset >= state.UploadLength;
             state.PendingUploads++;
+            state.InflightBlockOperations++;
         }
 
         timing.Step("assignBlock", blockId);
@@ -908,6 +909,7 @@ public class BrokerTusStore(
         byte[] chunk)
     {
         await state.ConcurrentUploader.WaitAsync();
+        var releasedSemaphore = false;
         try
         {
             await using var chunkStream = new MemoryStream(chunk, writable: false);
@@ -933,6 +935,7 @@ public class BrokerTusStore(
             }
 
             await uploadProgressCache.IncrementCommittedOffsetAsync(fileId, chunk.Length, CancellationToken.None);
+            await RecordUploadActivityAsync(fileId, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -951,8 +954,14 @@ public class BrokerTusStore(
                 fileId,
                 blockId);
 
+            // Free this slot so queued sibling uploads can finish staging + cache updates
+            // before we snapshot the durable resume point.
+            state.ConcurrentUploader.Release();
+            releasedSemaphore = true;
+
             try
             {
+                await WaitForSiblingBlockOperationsAsync(state);
                 await ReconcileAcceptedOffsetToDurableAsync(fileId, state, CancellationToken.None);
             }
             catch (Exception reconcileEx)
@@ -965,12 +974,52 @@ public class BrokerTusStore(
         }
         finally
         {
-            state.ConcurrentUploader.Release();
+            if (!releasedSemaphore)
+            {
+                state.ConcurrentUploader.Release();
+            }
+
+            SignalInflightBlockOperationCompleted(state);
         }
     }
 
     private static TaskCompletionSource<long> NewProgressSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private static void SignalInflightBlockOperationCompleted(TusUploadState state)
+    {
+        lock (state.SyncRoot)
+        {
+            state.InflightBlockOperations = Math.Max(state.InflightBlockOperations - 1, 0);
+            var previousSignal = state.InflightChangedSignal;
+            state.InflightChangedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            previousSignal.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Waits until this is the only remaining inflight block operation. Uses
+    /// <see cref="TusUploadState.InflightBlockOperations"/> (not PendingUploads) so sibling
+    /// <c>IncrementCommittedOffsetAsync</c> calls finish before reconcile snapshots durable state.
+    /// </summary>
+    private static async Task WaitForSiblingBlockOperationsAsync(TusUploadState state)
+    {
+        while (true)
+        {
+            Task waitTask;
+            lock (state.SyncRoot)
+            {
+                if (state.InflightBlockOperations <= 1)
+                {
+                    return;
+                }
+
+                waitTask = state.InflightChangedSignal.Task;
+            }
+
+            await waitTask;
+        }
+    }
 
     private async Task<long> GetDurableStagingOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
@@ -1034,7 +1083,9 @@ public class BrokerTusStore(
         {
             lock (state.SyncRoot)
             {
-                hasLocalPending = state.PendingUploads > 0;
+                // InflightBlockOperations covers staging + IncrementCommittedOffsetAsync; PendingUploads
+                // can already be zero while a committed-offset cache write is still in flight.
+                hasLocalPending = state.InflightBlockOperations > 0;
                 hasFault = state.Fault is not null;
             }
         }
@@ -1833,17 +1884,10 @@ public class BrokerTusStore(
 
     private async Task RenewExpirationAsync(string fileId, CancellationToken cancellationToken)
     {
+        // Expiration renewal must stay separate from upload-activity tracking. HEAD/offset reads
+        // renew expiration via RenewExpirationIfTrackedAsync and must not refresh the reconcile
+        // grace period — activity is recorded only when data is accepted or staged.
         await SetExpirationAsync(fileId, DateTimeOffset.UtcNow.Add(_uploadExpiration), cancellationToken);
-
-        var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
-        if (await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedFileId, cancellationToken) is Guid fileTransferId)
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-        }
-        else if (Guid.TryParse(normalizedFileId, out fileTransferId))
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-        }
     }
 
     private async Task RenewExpirationIfTrackedAsync(string fileId, CancellationToken cancellationToken)
