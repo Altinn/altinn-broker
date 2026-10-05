@@ -47,12 +47,14 @@ export async function concatenateUploads(
   fileTransferId: string,
   partPaths: string[],
   signal?: AbortSignal,
+  onAttempt?: () => void,
 ): Promise<void> {
   const parts = partPaths.map((path) => apiUrl(path)).join(' ')
   const response = await post(
     tusUploadPath(fileTransferId),
     { 'Upload-Concat': `final;${parts}` },
     signal,
+    onAttempt,
   )
 
   await assertCreated(response)
@@ -110,8 +112,10 @@ async function post(
   path: string,
   headers: Record<string, string>,
   signal?: AbortSignal,
+  onAttempt?: () => void,
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
+    onAttempt?.()
     const response = await tusRequest('POST', path, headers, signal)
     if (!isTemporary(response.status) || attempt >= RETRY_DELAYS.length) {
       return response

@@ -215,9 +215,8 @@ export function startUpload(
       finish()
       return
     }
-    watchdog.keepAlive()
     const paths = plan.parts.map((part) => part.path)
-    concatenateUploads(plan.fileTransferId, paths, concatenation.signal).then(
+    concatenateUploads(plan.fileTransferId, paths, concatenation.signal, watchdog.keepAlive).then(
       () => finish(),
       (error: Error) =>
         finish(
