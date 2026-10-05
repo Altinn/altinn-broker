@@ -17,7 +17,11 @@ export function FileTransfersMainPage() {
         <CardLink
           to={PageRoutes.services}
           title="Se dine formidlingstjenester"
-          description={`Formidlingstjenestene ${organizationName} er delaktig i`}
+          description={
+            organizationName
+              ? `Formidlingstjenestene ${organizationName} er delaktig i`
+              : 'Formidlingstjenester du er delaktig i'
+          }
         />
       </section>
 
