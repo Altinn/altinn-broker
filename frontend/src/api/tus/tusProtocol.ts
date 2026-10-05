@@ -1,8 +1,8 @@
-import { ApiError, redirectToLoginIfSessionEnded } from '../client'
+import { ApiError, apiRequest, readBody } from '../client'
 import { BROKER_API_PREFIX, apiUrl } from '../config'
 
 const TUS_PATH = `${BROKER_API_PREFIX}/filetransfer/upload/tus`
-const TUS_VERSION = '1.0.0'
+const TUS_HEADERS = { 'Tus-Resumable': '1.0.0' }
 
 // Retry to wait out a lock, or a server error that passes.
 export const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000, 15000, 15000]
@@ -65,7 +65,7 @@ export async function getUploadInfo(
   path: string,
   signal?: AbortSignal,
 ): Promise<{ offset: number; length: number } | null> {
-  const response = await tusRequest('HEAD', path, {}, signal)
+  const response = await apiRequest(path, { method: 'HEAD', headers: TUS_HEADERS, signal })
 
   // A HEAD meets a lock as 423, so a 409 is Broker refusing uploads to a transfer done with them.
   if (isGone(response.status)) {
@@ -116,33 +116,16 @@ async function post(
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     onAttempt?.()
-    const response = await tusRequest('POST', path, headers, signal)
+    const response = await apiRequest(path, {
+      method: 'POST',
+      headers: { ...TUS_HEADERS, ...headers },
+      signal,
+    })
     if (!isTemporary(response.status) || attempt >= RETRY_DELAYS.length) {
       return response
     }
     await delay(RETRY_DELAYS[attempt], signal)
   }
-}
-
-async function tusRequest(
-  method: 'POST' | 'HEAD',
-  path: string,
-  headers: Record<string, string>,
-  signal?: AbortSignal,
-): Promise<Response> {
-  const response = await fetch(apiUrl(path), {
-    method,
-    headers: { 'Tus-Resumable': TUS_VERSION, 'X-Requested-With': 'XMLHttpRequest', ...headers },
-    credentials: 'include',
-    signal,
-  })
-
-  if (response.status === 401) {
-    await redirectToLoginIfSessionEnded()
-    throw new ApiError('Unauthorized', 401)
-  }
-
-  return response
 }
 
 async function assertCreated(response: Response): Promise<void> {
@@ -151,16 +134,6 @@ async function assertCreated(response: Response): Promise<void> {
   }
 
   throw new ApiError(`${response.status} on ${response.url}`, response.status, await readBody(response))
-}
-
-// Problem details come as JSON, so their detail can be shown.
-async function readBody(response: Response): Promise<unknown> {
-  const text = await response.text().catch(() => '')
-  try {
-    return JSON.parse(text)
-  } catch {
-    return text
-  }
 }
 
 function locationPath(response: Response, fallback?: string): string {
