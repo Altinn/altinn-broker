@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, List } from '@altinn/altinn-components'
+import { useEffect, useState } from 'react'
+import {
+  Alert,
+  Button,
+  List,
+  Toolbar,
+  ToolbarFilter,
+  ToolbarSearch,
+  type FilterState,
+} from '@altinn/altinn-components'
 import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
 import { MIN_SEARCH_LENGTH } from '../../api/fileTransferSummary'
+import { readFilterSelection, useFileTransferFilters } from './useFileTransferFilters'
 import { FileTransferCard } from './FileTransferCard'
-import { FileTransferFilters } from './FileTransferFilters'
 import '../../pages/pages.css'
 import type { SelectedParty } from '../../parties/PartiesContext'
 
@@ -30,9 +38,11 @@ export function FileTransferList({
   toPath,
 }: FileTransferListProps) {
   const [search, setSearch] = useState('')
-  const [resourceFilter, setResourceFilter] = useState('')
+  const [filterState, setFilterState] = useState<FilterState>({})
   // The search goes to the API, so wait for a pause in typing rather than firing per keystroke.
   const debouncedSearch = useDebounced(search, 300)
+
+  const { resourceFilter, role } = readFilterSelection(filterState)
 
   const {
     resources,
@@ -43,32 +53,42 @@ export function FileTransferList({
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useFileTransferList(queryKey, fetchTransfers, currentOrg, debouncedSearch)
+  } = useFileTransferList(queryKey, fetchTransfers, currentOrg, debouncedSearch, role, resourceFilter)
 
-  // The reference search is the API's job now; only the service filter is narrowed here.
-  const filtered = useMemo(
-    () => items.filter((overview) => !resourceFilter || overview.resourceId === resourceFilter),
-    [items, resourceFilter],
-  )
+  // Needs the resources to name the services it offers.
+  const { filters, getFilterLabel } = useFileTransferFilters(resources)
 
   const resourceName = (resourceId: string) =>
     resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
 
-  const isFiltered = Boolean(appliedSearch || resourceFilter)
-  // Typed something, but not enough for the API to act on it.
-  const searchTooShort = search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH
+  const isFiltered = Boolean(appliedSearch || resourceFilter || role !== 'Both')
 
   return (
     <div className="page">
       <h2 className="page-heading">{heading}</h2>
 
-      <FileTransferFilters
-        search={search}
-        onSearchChange={setSearch}
-        resourceFilter={resourceFilter}
-        onResourceFilterChange={setResourceFilter}
-        resources={resources}
-      />
+      <Toolbar>
+        <ToolbarSearch
+          name="file-transfer-search"
+          label="Søk på referanse"
+          placeholder="Søk på referanse"
+          value={search}
+          minLength={MIN_SEARCH_LENGTH}
+          onChange={(event) => setSearch((event.target as HTMLInputElement).value)}
+          onClear={() => setSearch('')}
+        />
+        <ToolbarFilter
+          filters={filters}
+          filterState={filterState}
+          onFilterStateChange={setFilterState}
+          getFilterLabel={getFilterLabel}
+          addLabel="Legg til filter"
+          addNextLabel="Legg til"
+          removeLabel="Fjern filter"
+          resetLabel="Nullstill filtre"
+          submitLabel="Vis treff"
+        />
+      </Toolbar>
 
       {isError && (
         <Alert variant="danger" heading="Kunne ikke hente formidlinger" message={loadErrorText} />
@@ -76,18 +96,14 @@ export function FileTransferList({
 
       {isLoading && <p className="empty-state">{loadingText}</p>}
 
-      {searchTooShort && (
-        <p className="empty-state">Skriv minst {MIN_SEARCH_LENGTH} tegn for å søke.</p>
-      )}
-
-      {!isLoading && !isError && !searchTooShort && filtered.length === 0 && (
+      {!isLoading && !isError && items.length === 0 && (
         <p className="empty-state">
           {isFiltered ? 'Ingen formidlinger passer søket.' : emptyStateText}
         </p>
       )}
 
       <List className="card-list">
-        {filtered.map((overview) => (
+        {items.map((overview) => (
           <li key={overview.fileTransferId}>
             <FileTransferCard
               resourceName={resourceName(overview.resourceId)}

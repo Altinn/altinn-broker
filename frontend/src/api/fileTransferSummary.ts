@@ -21,6 +21,9 @@ export type FileTransferSummaryPage = {
   continuationToken: string | null
 }
 
+/** Which side of the file transfer the party was on. */
+export type FileTransferRole = 'Both' | 'Sender' | 'Recipient'
+
 /** Shorter terms match too much to be worth a round trip; the API ignores them anyway. */
 export const MIN_SEARCH_LENGTH = 3
 
@@ -31,12 +34,14 @@ export function fetchSummaryPage(
   onBehalfOf: SelectedParty | undefined,
   continuationToken: string | undefined,
   search: string | undefined,
+  role: FileTransferRole,
 ): Promise<FileTransferSummaryPage> {
   const params = new URLSearchParams()
   resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
   if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
   if (continuationToken) params.set('continuationToken', continuationToken)
   if (search) params.set('search', search)
+  if (role !== 'Both') params.set('role', role)
 
   return apiFetch<FileTransferSummaryPage>(`${path}?${params}`, {
     redirectOnUnauthorized: false,

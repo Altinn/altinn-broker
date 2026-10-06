@@ -1,6 +1,6 @@
 import type { SelectedParty } from '../parties/PartiesContext'
 import { BROKER_API_PREFIX } from './config'
-import { fetchSummaryPage, type FileTransferSummaryPage } from './fileTransferSummary'
+import { fetchSummaryPage, type FileTransferRole, type FileTransferSummaryPage } from './fileTransferSummary'
 
 const HISTORICAL_FILETRANSFERS_PATH = `${BROKER_API_PREFIX}/frontend/historical-file-transfers`
 
@@ -13,6 +13,7 @@ export function getHistoricalFileTransfers(
   onBehalfOf: SelectedParty | undefined,
   continuationToken: string | undefined,
   search: string | undefined,
+  role: FileTransferRole,
 ): Promise<FileTransferSummaryPage> {
-  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken, search)
+  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken, search, role)
 }

@@ -3,6 +3,7 @@ using Altinn.Broker.API.Helpers;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GetActiveFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferSummaries;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Mappers;
 using Altinn.Broker.Models;
 
@@ -25,7 +26,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
     /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
     /// <c>continuationToken</c> is passed back to read the next page. <c>search</c> matches the
-    /// sender's reference and is ignored below three characters.
+    /// sender's reference and is ignored below three characters. <c>role</c> limits the list to
+    /// what the party sent or received.
     /// </remarks>
     /// <response code="200">Returns the list of active file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
@@ -40,7 +42,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         [FromServices] GetFileTransferSummariesHandler handler,
         CancellationToken cancellationToken,
         [FromQuery] string? continuationToken = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] SearchRole role = SearchRole.Both)
     {
         logger.LogInformation("Getting active file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
@@ -49,7 +52,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
             OnBehalfOf = onBehalfOf ?? string.Empty,
             View = FileTransferListView.Active,
             ContinuationToken = continuationToken,
-            Search = search
+            Search = search,
+            Role = role
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),
@@ -68,7 +72,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
     /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
     /// <c>continuationToken</c> is passed back to read the next page. <c>search</c> matches the
-    /// sender's reference and is ignored below three characters.
+    /// sender's reference and is ignored below three characters. <c>role</c> limits the list to
+    /// what the party sent or received.
     /// </remarks>
     /// <response code="200">Returns the list of historical file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
@@ -83,7 +88,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         [FromServices] GetFileTransferSummariesHandler handler,
         CancellationToken cancellationToken,
         [FromQuery] string? continuationToken = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] SearchRole role = SearchRole.Both)
     {
         logger.LogInformation("Getting historical file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
@@ -92,7 +98,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
             OnBehalfOf = onBehalfOf ?? string.Empty,
             View = FileTransferListView.Historical,
             ContinuationToken = continuationToken,
-            Search = search
+            Search = search,
+            Role = role
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),

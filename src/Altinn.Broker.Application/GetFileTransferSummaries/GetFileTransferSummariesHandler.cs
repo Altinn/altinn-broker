@@ -85,6 +85,7 @@ public class GetFileTransferSummariesHandler(
             Limit = PageSize + 1,
             Cursor = FileTransferListCursor.FromToken(request.ContinuationToken),
             SearchTerm = SearchTermOf(request.Search),
+            Role = request.Role,
         }, cancellationToken);
 
         var hasNextPage = summaries.Count > PageSize;
