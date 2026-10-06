@@ -9,7 +9,10 @@ import {
 } from 'react'
 import { apiFetch, redirectToLogin, redirectToLogout } from '../api/client'
 import { AUTH_BASE_PATH } from '../api/config'
-import type { AuthState, AuthUser, MeResponse } from './types'
+import { clearSessionItems, readSessionItem, writeSessionItem } from '../helpers/sessionStorageHelper'
+import { claimValue, type AuthState, type AuthUser, type MeResponse } from './types'
+
+const USER_STORAGE_KEY = 'brokerbox.user'
 
 type AuthContextValue = {
   status: AuthState['status']
@@ -42,6 +45,16 @@ async function fetchCurrentUser(): Promise<AuthUser | null | 'unavailable'> {
   }
 }
 
+// Drafts and interrupted uploads belong to the user who made them, and another user may log in on
+// the same tab. Runs before any page has read them.
+function forgetPreviousUser(user: AuthUser) {
+  const userId = claimValue(user, 'urn:altinn:userid') ?? claimValue(user, 'urn:altinn:partyid') ?? ''
+  if (readSessionItem<string>(USER_STORAGE_KEY) !== userId) {
+    clearSessionItems()
+    writeSessionItem(USER_STORAGE_KEY, userId)
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' })
 
@@ -50,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user === 'unavailable') {
       setState({ status: 'api_unreachable' })
       return
+    }
+    if (user) {
+      forgetPreviousUser(user)
     }
     setState(user ? { status: 'authenticated', user } : { status: 'unauthenticated' })
   }, [])
@@ -69,7 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         redirectToLogin(returnUrl)
       },
-      logout: (returnUrl) => redirectToLogout(returnUrl),
+      logout: (returnUrl) => {
+        clearSessionItems()
+        redirectToLogout(returnUrl)
+      },
       refresh,
     }),
     [state, refresh],

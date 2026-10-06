@@ -25,3 +25,11 @@ export function removeSessionItem(key: string): void {
     // Left behind, which only costs the convenience.
   }
 }
+
+export function clearSessionItems(): void {
+  try {
+    sessionStorage.clear()
+  } catch {
+    // Left behind, which only costs the convenience.
+  }
+}
