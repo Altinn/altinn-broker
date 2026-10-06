@@ -142,8 +142,7 @@ export function startUpload(
   const transport = pausableHttpStack(report)
   const concatenation = new AbortController()
   const watchdog = stallWatchdog(STALL_TIMEOUT_MS, () => {
-    const storing = allSent && partsDone < plan.parts.length
-    if ((paused && !transport.isSending()) || storing) {
+    if (paused && !transport.isSending()) {
       watchdog.keepAlive()
       return
     }
