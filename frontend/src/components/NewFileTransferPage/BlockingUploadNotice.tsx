@@ -14,6 +14,12 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
   const [confirming, setConfirming] = useState(false)
   const percent = useUploadProgress()?.percent ?? null
 
+  // While finishing, the server may already have accepted the join, which a cancel can't undo.
+  const cancellable = upload.status !== 'finishing'
+  if (confirming && !cancellable) {
+    setConfirming(false)
+  }
+
   return (
     <Alert data-color="info" className="new-transfer__notice">
       <Heading level={3} data-size="2xs">
@@ -30,14 +36,16 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
           <Button type="button" variant="secondary" data-size="sm" onClick={onContinue}>
             Gå til opplastingen
           </Button>
-          <Button
-            type="button"
-            variant="tertiary"
-            data-size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            Avbryt den opplastingen
-          </Button>
+          {cancellable && (
+            <Button
+              type="button"
+              variant="tertiary"
+              data-size="sm"
+              onClick={() => setConfirming(true)}
+            >
+              Avbryt den opplastingen
+            </Button>
+          )}
         </div>
       )}
     </Alert>

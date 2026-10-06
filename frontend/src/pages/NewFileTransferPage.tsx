@@ -128,7 +128,7 @@ function NewFileTransferPageContent() {
   // An interrupted upload settled these when it was created, so they are shown but not editable.
   const detailsLocked = form.interrupted !== null
 
-  const cancellable = active !== null || form.interrupted !== null
+  const cancellable = (active !== null && active.status !== 'finishing') || form.interrupted !== null
   if (confirmingCancel && !cancellable) {
     setConfirmingCancel(false)
   }
