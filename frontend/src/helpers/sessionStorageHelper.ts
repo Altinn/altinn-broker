@@ -26,9 +26,13 @@ export function removeSessionItem(key: string): void {
   }
 }
 
-export function clearSessionItems(): void {
+export function clearSessionItems(prefix: string): void {
   try {
-    sessionStorage.clear()
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(prefix)) {
+        sessionStorage.removeItem(key)
+      }
+    }
   } catch {
     // Left behind, which only costs the convenience.
   }

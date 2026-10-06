@@ -12,7 +12,8 @@ import { AUTH_BASE_PATH } from '../api/config'
 import { clearSessionItems, readSessionItem, writeSessionItem } from '../helpers/sessionStorageHelper'
 import { claimValue, type AuthState, type AuthUser, type MeResponse } from './types'
 
-const USER_STORAGE_KEY = 'brokerbox.user'
+const STORAGE_PREFIX = 'brokerbox.'
+const USER_STORAGE_KEY = `${STORAGE_PREFIX}user`
 
 type AuthContextValue = {
   status: AuthState['status']
@@ -50,7 +51,7 @@ async function fetchCurrentUser(): Promise<AuthUser | null | 'unavailable'> {
 function forgetPreviousUser(user: AuthUser) {
   const userId = claimValue(user, 'urn:altinn:userid') ?? claimValue(user, 'urn:altinn:partyid') ?? ''
   if (readSessionItem<string>(USER_STORAGE_KEY) !== userId) {
-    clearSessionItems()
+    clearSessionItems(STORAGE_PREFIX)
     writeSessionItem(USER_STORAGE_KEY, userId)
   }
 }
@@ -86,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectToLogin(returnUrl)
       },
       logout: (returnUrl) => {
-        clearSessionItems()
+        clearSessionItems(STORAGE_PREFIX)
         redirectToLogout(returnUrl)
       },
       refresh,
