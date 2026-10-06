@@ -259,7 +259,6 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
-
         var selects = new List<string>();
         if (includeRecipient) selects.Add(recipientSelect);
         if (includeSender) selects.Add(senderSelect);
@@ -340,6 +339,14 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        bool ascending = orderDirection.Equals("ASC", StringComparison.OrdinalIgnoreCase);
+
+        // Keyset paging: continue strictly past the last row of the previous page. The id is part
+        // of the comparison because the timestamp is not unique - without it a page boundary that
+        // lands between two file transfers sharing a timestamp skips or repeats one.
+        string cursorCondition = fileTransferSearch.Cursor is null
+            ? ""
+            : $"AND ({timestampColumn}, f.file_transfer_id_pk) {(ascending ? ">" : "<")} (@cursorDate, @cursorId)";
 
         // Cap and sort the matching file transfers first (matching_transfers), then fan out to one
         // row per recipient - doing the LIMIT before the recipient join keeps it "100 file transfers
@@ -358,7 +365,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 WHERE f.resource_id = ANY(@resourceIds)
                 AND ({actorCondition})
                 {dateCondition}
-                ORDER BY sort_date {orderDirection}
+                {cursorCondition}
+                ORDER BY sort_date {orderDirection}, f.file_transfer_id_pk {orderDirection}
                 LIMIT @limit
             )
             SELECT
@@ -366,16 +374,22 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 mt.resource_id,
                 mt.external_file_transfer_reference,
                 mt.sender_actor_external_id,
+                mt.sort_date,
                 recipient.actor_external_id AS recipient_actor_external_id
             FROM matching_transfers mt
             LEFT JOIN broker.actor_file_transfer_latest_status afls ON afls.file_transfer_id_fk = mt.file_transfer_id_pk
             LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afls.actor_id_fk
-            ORDER BY mt.sort_date {orderDirection}, mt.file_transfer_id_pk;";
+            ORDER BY mt.sort_date {orderDirection}, mt.file_transfer_id_pk {orderDirection};";
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
         command.Parameters.AddWithValue("@limit", fileTransferSearch.Limit);
+        if (fileTransferSearch.Cursor is { } cursor)
+        {
+            command.Parameters.AddWithValue("@cursorDate", cursor.SortDate.UtcDateTime);
+            command.Parameters.AddWithValue("@cursorId", cursor.FileTransferId);
+        }
         if (hasSenderStatusFilter)
             command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
         if (hasRecipientStatusFilter)
@@ -403,6 +417,11 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         Sender = senderActorExternalId,
                         IsSender = senderActorExternalId == fileTransferSearch.Actor.ActorExternalId,
                         SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        // The column is `timestamp` holding UTC, so Npgsql hands back Kind=Unspecified.
+                        // Left as is, the conversion to DateTimeOffset would read it as local time and
+                        // shift the cursor by the machine's offset.
+                        SortDate = new DateTimeOffset(
+                            DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("sort_date")), DateTimeKind.Utc)),
                         Recipients = new List<string>()
                     };
                     summaries[fileTransferId] = summary;

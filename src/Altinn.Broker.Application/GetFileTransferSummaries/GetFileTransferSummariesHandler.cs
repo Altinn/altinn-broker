@@ -69,7 +69,7 @@ public class GetFileTransferSummariesHandler(
 
         var senderStatuses = request.View == FileTransferListView.Active ? ActiveSenderStatuses : HistoricalStatuses;
         var recipientStatuses = request.View == FileTransferListView.Active ? ActiveRecipientStatuses : HistoricalStatuses;
-        // One past the page tells a capped list from a complete one, without counting the whole set.
+        // One past the page tells a full page from the last one, without counting the whole set.
         var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
@@ -77,10 +77,11 @@ public class GetFileTransferSummariesHandler(
             SenderStatuses = senderStatuses,
             RecipientStatuses = recipientStatuses,
             Limit = PageSize + 1,
+            Cursor = FileTransferListCursor.FromToken(request.ContinuationToken),
         }, cancellationToken);
 
-        var hasMore = summaries.Count > PageSize;
-        if (hasMore)
+        var hasNextPage = summaries.Count > PageSize;
+        if (hasNextPage)
         {
             summaries = summaries.Take(PageSize).ToList();
         }
@@ -107,6 +108,14 @@ public class GetFileTransferSummariesHandler(
                 .ToList();
         }
 
-        return new FileTransferSummaryPage { Summaries = summaries, HasMore = hasMore };
+        return new FileTransferSummaryPage
+        {
+            Summaries = summaries,
+            HasNextPage = hasNextPage,
+            ContinuationToken = hasNextPage ? ContinuationTokenFor(summaries[^1]) : null
+        };
     }
+
+    private static string ContinuationTokenFor(FileTransferSummaryEntity last)
+        => new FileTransferListCursor(last.SortDate, last.FileTransferId).ToToken();
 }

@@ -6,11 +6,12 @@ const ACTIVE_FILETRANSFERS_PATH = `${BROKER_API_PREFIX}/frontend/active-file-tra
 
 /**
  * Active (published) file transfers across the given resources, newest first and capped at a page.
- *
+ * Continue past it with the token from the previous page.
  */
 export function getActiveFileTransfers(
   resourceIds: string[],
-  onBehalfOf?: SelectedParty,
+  onBehalfOf: SelectedParty | undefined,
+  continuationToken: string | undefined,
 ): Promise<FileTransferSummaryPage> {
-  return fetchSummaryPage(ACTIVE_FILETRANSFERS_PATH, resourceIds, onBehalfOf)
+  return fetchSummaryPage(ACTIVE_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken)
 }

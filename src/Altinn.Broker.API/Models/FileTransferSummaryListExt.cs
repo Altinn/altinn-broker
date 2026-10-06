@@ -1,23 +1,22 @@
 namespace Altinn.Broker.Models;
 
 /// <summary>
-/// A capped list of file transfer summaries, and whether the party has more than fit in it.
+/// One page of file transfer summaries, newest first, and how to continue past it.
 /// </summary>
 public class FileTransferSummaryListExt
 {
     /// <summary>
-    /// The file transfers, newest first. At most <see cref="PageSize"/> of them.
+    /// The file transfers on this page.
     /// </summary>
     public List<FileTransferSummaryExt> Items { get; set; } = new List<FileTransferSummaryExt>();
 
     /// <summary>
-    /// True when the party has file transfers beyond the ones in <see cref="Items"/>. Narrow the
-    /// search with <c>from</c>/<c>to</c> to reach them.
+    /// True when the party has file transfers beyond the ones in <see cref="Items"/>.
     /// </summary>
-    public bool HasMore { get; set; }
+    public bool HasNextPage { get; set; }
 
     /// <summary>
-    /// The cap applied to <see cref="Items"/>.
+    /// Pass back as <c>continuationToken</c> to read the next page. Null when there is none.
     /// </summary>
-    public int PageSize { get; set; }
+    public string? ContinuationToken { get; set; }
 }

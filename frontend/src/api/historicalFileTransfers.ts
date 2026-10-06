@@ -10,7 +10,8 @@ const HISTORICAL_FILETRANSFERS_PATH = `${BROKER_API_PREFIX}/frontend/historical-
  */
 export function getHistoricalFileTransfers(
   resourceIds: string[],
-  onBehalfOf?: SelectedParty,
+  onBehalfOf: SelectedParty | undefined,
+  continuationToken: string | undefined,
 ): Promise<FileTransferSummaryPage> {
-  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf)
+  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken)
 }

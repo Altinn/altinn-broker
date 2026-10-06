@@ -17,4 +17,10 @@ public class FileTransferSummaryEntity
     public required List<string> Recipients { get; set; }
 
     public required string SendersFileTransferReference { get; set; }
+
+    /// <summary>
+    /// What the list sorts by: when the file transfer reached its current status, or when it was
+    /// created if no status filter applies. Doubles as the cursor position for the next page.
+    /// </summary>
+    public required DateTimeOffset SortDate { get; set; }
 }

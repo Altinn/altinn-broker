@@ -9,27 +9,29 @@ export type FileTransferSummary = {
   sender: string
   isSender: boolean
   recipients: string[]
+  /** When the file transfer reached its current status — what the list is sorted by. */
+  sortDate: string
 }
 
-/**
- * One page of summaries. The list endpoints cap how much they return, so `hasMore` is what lets the
- * page say "there are older ones" instead of letting a capped list pass for a complete one.
- */
+/** One page of summaries, and how to continue past it. */
 export type FileTransferSummaryPage = {
   items: FileTransferSummary[]
-  hasMore: boolean
-  pageSize: number
+  hasNextPage: boolean
+  /** Pass back to read the next page. Null on the last one. */
+  continuationToken: string | null
 }
 
-/** Reads one page of summaries from a list endpoint. */
+/** Reads one page of summaries, continuing from `continuationToken` when given. */
 export function fetchSummaryPage(
   path: string,
   resourceIds: string[],
   onBehalfOf?: SelectedParty,
+  continuationToken?: string,
 ): Promise<FileTransferSummaryPage> {
   const params = new URLSearchParams()
   resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
   if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
+  if (continuationToken) params.set('continuationToken', continuationToken)
 
   return apiFetch<FileTransferSummaryPage>(`${path}?${params}`, {
     redirectOnUnauthorized: false,

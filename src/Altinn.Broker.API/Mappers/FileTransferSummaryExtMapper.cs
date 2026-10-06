@@ -14,17 +14,18 @@ internal static class FileTransferSummaryExtMapper
             Sender = summary.Sender,
             IsSender = summary.IsSender,
             Recipients = summary.Recipients,
-            SendersFileTransferReference = summary.SendersFileTransferReference
+            SendersFileTransferReference = summary.SendersFileTransferReference,
+            SortDate = summary.SortDate
         };
     }
 
-    internal static FileTransferSummaryListExt MapToExternalModel(FileTransferSummaryPage page, int pageSize)
+    internal static FileTransferSummaryListExt MapToExternalModel(FileTransferSummaryPage page)
     {
         return new FileTransferSummaryListExt()
         {
             Items = page.Summaries.Select(MapToExternalModel).ToList(),
-            HasMore = page.HasMore,
-            PageSize = pageSize
+            HasNextPage = page.HasNextPage,
+            ContinuationToken = page.ContinuationToken
         };
     }
 }

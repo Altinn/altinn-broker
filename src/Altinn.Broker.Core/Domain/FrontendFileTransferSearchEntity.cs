@@ -21,4 +21,7 @@ public class FrontendFileTransferSearchEntity
     /// <summary>Maximum number of file transfers to return, before their recipients are joined in.</summary>
     public int Limit { get; set; } = 100;
 
+    /// <summary>Where to continue from. Null starts at the newest.</summary>
+    public FileTransferListCursor? Cursor { get; set; }
+
 }

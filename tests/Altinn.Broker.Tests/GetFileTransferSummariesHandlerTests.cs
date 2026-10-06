@@ -117,7 +117,8 @@ public class GetFileTransferSummariesHandlerTests
             Sender = "0192:111111111",
             IsSender = false,
             Recipients = ["0192:222222222", "0192:333333333"],
-            SendersFileTransferReference = "ref-1"
+            SendersFileTransferReference = "ref-1",
+            SortDate = DateTimeOffset.UtcNow
         };
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         fileTransferRepository
@@ -229,7 +230,7 @@ public class GetFileTransferSummariesHandlerTests
     }
 
     [Fact]
-    public async Task Process_MoreThanAPageAvailable_TrimsToPageSizeAndReportsHasMore()
+    public async Task Process_MoreThanAPageAvailable_TrimsToPageSizeAndReportsNextPage()
     {
         var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
         var actorRepository = CreateActorRepository(actor);
@@ -253,11 +254,13 @@ public class GetFileTransferSummariesHandlerTests
         // One past the page is read so a capped list can be told from a complete one.
         Assert.Equal(GetFileTransferSummariesHandler.PageSize + 1, queriedLimit);
         Assert.Equal(GetFileTransferSummariesHandler.PageSize, result.AsT0.Summaries.Count);
-        Assert.True(result.AsT0.HasMore);
+        Assert.True(result.AsT0.HasNextPage);
+        // The token has to be there, or "there is more" is a dead end.
+        Assert.False(string.IsNullOrEmpty(result.AsT0.ContinuationToken));
     }
 
     [Fact]
-    public async Task Process_ExactlyAPageAvailable_ReportsNoMore()
+    public async Task Process_ExactlyAPageAvailable_ReportsNoNextPage()
     {
         var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
         var actorRepository = CreateActorRepository(actor);
@@ -277,7 +280,8 @@ public class GetFileTransferSummariesHandlerTests
 
         Assert.True(result.IsT0);
         Assert.Equal(GetFileTransferSummariesHandler.PageSize, result.AsT0.Summaries.Count);
-        Assert.False(result.AsT0.HasMore);
+        Assert.False(result.AsT0.HasNextPage);
+        Assert.Null(result.AsT0.ContinuationToken);
     }
 
     private static List<FileTransferSummaryEntity> CreateSummaries(int count)
@@ -288,7 +292,8 @@ public class GetFileTransferSummariesHandlerTests
             Sender = $"0192:{OrganizationNumber}",
             IsSender = true,
             Recipients = ["0192:222222222"],
-            SendersFileTransferReference = $"ref-{index}"
+            SendersFileTransferReference = $"ref-{index}",
+            SortDate = DateTimeOffset.UtcNow.AddMinutes(-index)
         }).ToList();
 
     private static GetFileTransferSummariesHandler CreateHandler(

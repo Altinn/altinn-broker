@@ -383,6 +383,82 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Contains(ordered[^1], result.Select(summary => summary.FileTransferId));
 	}
 
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_Cursor_ContinuesWhereThePreviousPageStopped()
+	{
+		// Arrange
+		const int pageSize = 10;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, pageSize * 3);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		FrontendFileTransferSearchEntity Search(FileTransferListCursor? cursor) => new()
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize,
+			Cursor = cursor
+		};
+
+		// Act - walk every page the way the frontend does
+		var seen = new List<Guid>();
+		FileTransferListCursor? cursor = null;
+		for (var page = 0; page < 3; page++)
+		{
+			var result = await _repository.GetFileTransferSummariesAssociatedWithActor(Search(cursor), cancellationToken: default);
+			Assert.Equal(pageSize, result.Count);
+			seen.AddRange(result.Select(summary => summary.FileTransferId));
+			var last = result[^1];
+			cursor = new FileTransferListCursor(last.SortDate, last.FileTransferId);
+		}
+
+		// Assert - every file transfer exactly once, newest first
+		Assert.Equal(ordered.Count, seen.Count);
+		Assert.Equal(seen.Count, seen.Distinct().Count());
+		Assert.Equal(Enumerable.Reverse(ordered), seen);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_TiedSortDates_StillPagesWithoutSkippingOrRepeating()
+	{
+		// Arrange
+		// The reason the cursor carries the id: a page boundary between transfers sharing a timestamp.
+		const int pageSize = 5;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var sameInstant = StatusDateFor(0);
+		var ids = new List<Guid>();
+		for (var index = 0; index < pageSize * 2; index++)
+		{
+			var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId);
+			await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published, sameInstant);
+			ids.Add(fileTransferId);
+		}
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		FrontendFileTransferSearchEntity Search(FileTransferListCursor? cursor) => new()
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize,
+			Cursor = cursor
+		};
+
+		// Act
+		var first = await _repository.GetFileTransferSummariesAssociatedWithActor(Search(null), cancellationToken: default);
+		var lastOfFirst = first[^1];
+		var second = await _repository.GetFileTransferSummariesAssociatedWithActor(
+			Search(new FileTransferListCursor(lastOfFirst.SortDate, lastOfFirst.FileTransferId)), cancellationToken: default);
+
+		// Assert
+		var seen = first.Concat(second).Select(summary => summary.FileTransferId).ToList();
+		Assert.Equal(ids.Count, seen.Count);
+		Assert.Equal(seen.Count, seen.Distinct().Count());
+	}
+
 	/// <summary>Published transfers one minute apart, oldest first, so paging and date windows are deterministic.</summary>
 	private async Task<List<Guid>> InsertPublishedTransfers(string resourceId, string senderExternalId, int count)
 	{

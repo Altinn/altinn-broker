@@ -13,8 +13,8 @@ export function ActiveFileTransfersPage() {
 
   return (
     <FileTransferList
-      // A fresh list per actor: no stale rows, filters or in-flight requests to unpick.
       key={selectedParty.partyUuid}
+      queryKey="active-file-transfers"
       heading="Aktive formidlinger"
       loadingText="Laster aktive formidlinger …"
       loadErrorText="Klarte ikke å hente aktive formidlinger."
