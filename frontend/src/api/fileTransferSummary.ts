@@ -1,3 +1,6 @@
+import type { SelectedParty } from '../parties/PartiesContext'
+import { apiFetch } from './client'
+
 /** Lean summary of a file transfer, shared by the active and historical list endpoints. */
 export type FileTransferSummary = {
   fileTransferId: string
@@ -25,19 +28,29 @@ export type DateRange = {
 }
 
 /**
- * Turns the picked dates into the instants the API filters on.
+ * Reads one page of summaries from a list endpoint.
  *
- * The boundaries are the user's own day: picking 5 October means everything that happened on
+ * The date boundaries are the user's own day: picking 5 October means everything that happened on
  * 5 October where they are, not where the server is.
  */
-export function dateRangeParams(range: DateRange): Record<string, string> {
-  const params: Record<string, string> = {}
+export function fetchSummaryPage(
+  path: string,
+  resourceIds: string[],
+  onBehalfOf?: SelectedParty,
+  range: DateRange = {},
+): Promise<FileTransferSummaryPage> {
+  const params = new URLSearchParams()
+  resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
+  if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
+
   const from = instant(range.from, '00:00:00.000')
   const to = instant(range.to, '23:59:59.999')
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
 
-  if (from) params.from = from
-  if (to) params.to = to
-  return params
+  return apiFetch<FileTransferSummaryPage>(`${path}?${params}`, {
+    redirectOnUnauthorized: false,
+  })
 }
 
 function instant(date: string | undefined, time: string): string | undefined {

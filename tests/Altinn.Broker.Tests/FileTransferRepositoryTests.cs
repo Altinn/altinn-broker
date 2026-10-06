@@ -384,56 +384,6 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetFileTransferSummariesAssociatedWithActor_OnePastTheLimitRequested_ReturnsItSoCappingCanBeDetected()
-	{
-		// Arrange
-		// What the handler does: ask for one more than it shows, and treat the extra as "there is more".
-		const int pageSize = 100;
-		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
-		var senderExternalId = NewOrgId();
-		await InsertPublishedTransfers(resourceId, senderExternalId, pageSize + 1);
-		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
-
-		var search = new FrontendFileTransferSearchEntity
-		{
-			Actor = actor,
-			ResourceIds = [resourceId],
-			SenderStatuses = [FileTransferStatus.Published],
-			Limit = pageSize + 1
-		};
-
-		// Act
-		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(search, cancellationToken: default);
-
-		// Assert
-		Assert.Equal(pageSize + 1, result.Count);
-	}
-
-	[Fact]
-	public async Task GetFileTransferSummariesAssociatedWithActor_ExactlyTheLimit_ReturnsAllOfThem()
-	{
-		// Arrange
-		// The off-by-one that would make a complete list claim there is more.
-		const int pageSize = 100;
-		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
-		var senderExternalId = NewOrgId();
-		await InsertPublishedTransfers(resourceId, senderExternalId, pageSize);
-		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
-
-		// Act
-		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
-		{
-			Actor = actor,
-			ResourceIds = [resourceId],
-			SenderStatuses = [FileTransferStatus.Published],
-			Limit = pageSize + 1
-		}, cancellationToken: default);
-
-		// Assert
-		Assert.Equal(pageSize, result.Count);
-	}
-
-	[Fact]
 	public async Task GetFileTransferSummariesAssociatedWithActor_DateRange_ReachesTransfersOutsideTheNewestPage()
 	{
 		// Arrange

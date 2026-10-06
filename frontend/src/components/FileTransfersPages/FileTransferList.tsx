@@ -46,14 +46,12 @@ export function FileTransferList({
   const [loadError, setLoadError] = useState(false)
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
-  const [from, setFrom] = useState<string | undefined>(undefined)
-  const [to, setTo] = useState<string | undefined>(undefined)
+  const [range, setRange] = useState<DateRange>({})
   const [page, setPage] = useState(1)
   /** Keyed by the dates it was fetched for, so a page from a previous range counts as not loaded. */
   const [loaded, setLoaded] = useState<{ key: string; page: FileTransferSummaryPage } | null>(null)
 
-  const range = useMemo<DateRange>(() => ({ from, to }), [from, to])
-  const rangeKey = `${from ?? ''}|${to ?? ''}`
+  const rangeKey = `${range.from ?? ''}|${range.to ?? ''}`
 
   useEffect(() => {
     let active = true
@@ -104,7 +102,7 @@ export function FileTransferList({
     return () => {
       active = false
     }
-  }, [resources, rangeKey, range, currentOrg, fetchTransfers])
+  }, [resources, range, rangeKey, currentOrg, fetchTransfers])
 
   const current = loaded?.key === rangeKey ? loaded.page : null
   const isLoading = !loadError && current === null
@@ -142,8 +140,7 @@ export function FileTransferList({
   }
 
   function handleRange(next: DateRange) {
-    setFrom(next.from)
-    setTo(next.to)
+    setRange(next)
     setPage(1)
   }
 
