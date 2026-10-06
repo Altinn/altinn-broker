@@ -4,7 +4,7 @@ import { BROKER_API_PREFIX, apiUrl } from '../config'
 const TUS_PATH = `${BROKER_API_PREFIX}/filetransfer/upload/tus`
 const TUS_HEADERS = { 'Tus-Resumable': '1.0.0' }
 
-// Retry to wait out a lock, or a server error that passes.
+// How long to wait before each new try when a request fails in a way that may pass.
 export const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000, 15000, 15000]
 
 // The TUS requests made outside tus-js-client: creating the uploads, joining the parts, and asking
@@ -20,7 +20,7 @@ export async function createUpload(
   signal?: AbortSignal,
 ): Promise<string> {
   const path = tusUploadPath(fileTransferId)
-  const response = await post(path, { 'Upload-Length': String(length) }, signal)
+  const response = await send('POST', path, { 'Upload-Length': String(length) }, signal)
 
   await assertCreated(response)
   return locationPath(response, path)
@@ -32,7 +32,8 @@ export async function createPartialUpload(
   length: number,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await post(
+  const response = await send(
+    'POST',
     tusUploadPath(fileTransferId),
     { 'Upload-Length': String(length), 'Upload-Concat': 'partial' },
     signal,
@@ -50,7 +51,8 @@ export async function concatenateUploads(
   onAttempt?: () => void,
 ): Promise<void> {
   const parts = partPaths.map((path) => apiUrl(path)).join(' ')
-  const response = await post(
+  const response = await send(
+    'POST',
     tusUploadPath(fileTransferId),
     { 'Upload-Concat': `final;${parts}` },
     signal,
@@ -65,7 +67,7 @@ export async function concatenateUploads(
  * assembled, never created, or no longer taken.
  */
 export async function getUploadOffset(path: string, signal?: AbortSignal): Promise<number | null> {
-  const response = await apiRequest(path, { method: 'HEAD', headers: TUS_HEADERS, signal })
+  const response = await send('HEAD', path, {}, signal)
 
   // A HEAD meets a lock as 423, so a 409 is Broker refusing uploads to a transfer done with them.
   if (isGone(response.status)) {
@@ -83,7 +85,52 @@ export async function getUploadOffset(path: string, signal?: AbortSignal): Promi
   return offset
 }
 
-export function delay(ms: number, signal?: AbortSignal): Promise<void> {
+/** The upload is gone, or its transfer no longer takes uploads. */
+export function isGone(status: number): boolean {
+  return status === 404 || status === 409 || status === 410
+}
+
+/** A lock, or a server error that passes, either of which is worth another try. */
+export function isTemporary(status: number): boolean {
+  return status === 423 || status >= 500
+}
+
+/**
+ * Sends the request, and sends it again after a pause while it fails in a way that may pass: a
+ * dropped connection, a lock or a server error. Sending a POST twice is safe here. A repeated create
+ * leaves at most an empty upload that the server ignores, and a repeated join gets a 409, which is
+ * checked against the transfer's status.
+ */
+async function send(
+  method: 'HEAD' | 'POST',
+  path: string,
+  headers: Record<string, string>,
+  signal?: AbortSignal,
+  onAttempt?: () => void,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const lastTry = attempt >= RETRY_DELAYS.length
+    onAttempt?.()
+    try {
+      const response = await apiRequest(path, {
+        method,
+        headers: { ...TUS_HEADERS, ...headers },
+        signal,
+      })
+      if (lastTry || !isTemporary(response.status)) {
+        return response
+      }
+    } catch (error) {
+      // fetch fails with a TypeError when the connection drops.
+      if (lastTry || !(error instanceof TypeError)) {
+        throw error
+      }
+    }
+    await delay(RETRY_DELAYS[attempt], signal)
+  }
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms)
     signal?.addEventListener(
@@ -95,36 +142,6 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
       { once: true },
     )
   })
-}
-
-/** The upload is gone, or its transfer no longer takes uploads. */
-export function isGone(status: number): boolean {
-  return status === 404 || status === 409 || status === 410
-}
-
-/** A lock, or a server error that passes, either of which is worth another try. */
-export function isTemporary(status: number): boolean {
-  return status === 423 || status >= 500
-}
-
-async function post(
-  path: string,
-  headers: Record<string, string>,
-  signal?: AbortSignal,
-  onAttempt?: () => void,
-): Promise<Response> {
-  for (let attempt = 0; ; attempt++) {
-    onAttempt?.()
-    const response = await apiRequest(path, {
-      method: 'POST',
-      headers: { ...TUS_HEADERS, ...headers },
-      signal,
-    })
-    if (!isTemporary(response.status) || attempt >= RETRY_DELAYS.length) {
-      return response
-    }
-    await delay(RETRY_DELAYS[attempt], signal)
-  }
 }
 
 async function assertCreated(response: Response): Promise<void> {

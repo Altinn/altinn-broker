@@ -13,7 +13,6 @@ import {
   concatenateUploads,
   createPartialUpload,
   createUpload,
-  delay,
   getUploadOffset,
   isGone,
   isTemporary,
@@ -292,18 +291,14 @@ export async function readUploadedBytes(
   plan: UploadPlan,
   signal?: AbortSignal,
 ): Promise<number | null> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await readOffsets(plan, signal)
-    } catch (error) {
-      // A lock left behind by an abandoned request expires on its own, and a server error may pass.
-      const temporary = error instanceof ApiError && isTemporary(error.status)
-      if (attempt >= RETRY_DELAYS.length || !temporary) {
-        throw error
-      }
-      await delay(RETRY_DELAYS[attempt], signal)
+  const offsets = await Promise.all(plan.parts.map((part) => getUploadOffset(part.path, signal)))
+
+  return offsets.reduce<number | null>((total, offset, index) => {
+    if (total === null || offset === null) {
+      return null
     }
-  }
+    return total + Math.min(offset, plan.parts[index].length)
+  }, 0)
 }
 
 /** Gives up every upload in a plan, best effort. */
@@ -491,17 +486,6 @@ function asApiError(error: Error): Error {
   return isGone(status) && !shouldRetry(error)
     ? new UploadGoneError(error.message, status, body)
     : new ApiError(error.message, status, body)
-}
-
-async function readOffsets(plan: UploadPlan, signal?: AbortSignal): Promise<number | null> {
-  const offsets = await Promise.all(plan.parts.map((part) => getUploadOffset(part.path, signal)))
-
-  return offsets.reduce<number | null>((total, offset, index) => {
-    if (total === null || offset === null) {
-      return null
-    }
-    return total + Math.min(offset, plan.parts[index].length)
-  }, 0)
 }
 
 function abortError(): DOMException {
