@@ -383,35 +383,6 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Contains(ordered[^1], result.Select(summary => summary.FileTransferId));
 	}
 
-	[Fact]
-	public async Task GetFileTransferSummariesAssociatedWithActor_DateRange_ReachesTransfersOutsideTheNewestPage()
-	{
-		// Arrange
-		// The way a user gets at anything the cap hides: narrow to a window the newest ones fall outside of.
-		const int pageSize = 100;
-		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
-		var senderExternalId = NewOrgId();
-		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, pageSize + 1);
-		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
-		var oldest = ordered[0];
-
-		// Act
-		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
-		{
-			Actor = actor,
-			ResourceIds = [resourceId],
-			SenderStatuses = [FileTransferStatus.Published],
-			Limit = pageSize + 1,
-			// The next one sits exactly a minute later, and the range filter is inclusive at both ends.
-			From = StatusDateFor(0).AddSeconds(-30),
-			To = StatusDateFor(0).AddSeconds(30)
-		}, cancellationToken: default);
-
-		// Assert
-		var summary = Assert.Single(result);
-		Assert.Equal(oldest, summary.FileTransferId);
-	}
-
 	/// <summary>Published transfers one minute apart, oldest first, so paging and date windows are deterministic.</summary>
 	private async Task<List<Guid>> InsertPublishedTransfers(string resourceId, string senderExternalId, int count)
 	{

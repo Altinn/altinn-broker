@@ -76,8 +76,6 @@ public class GetFileTransferSummariesHandler(
             ResourceIds = authorizedResourceIds,
             SenderStatuses = senderStatuses,
             RecipientStatuses = recipientStatuses,
-            From = request.From,
-            To = request.To,
             Limit = PageSize + 1,
         }, cancellationToken);
 

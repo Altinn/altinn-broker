@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type {
-  DateRange,
-  FileTransferSummaryPage,
-} from '../../api/fileTransferSummary'
+import type { FileTransferSummaryPage } from '../../api/fileTransferSummary'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../../api/resources'
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
@@ -24,7 +21,6 @@ type FileTransferListProps = {
   fetchTransfers: (
     resourceIds: string[],
     onBehalfOf: SelectedParty,
-    range: DateRange,
   ) => Promise<FileTransferSummaryPage>
   toPath: (transferId: string) => string
 }
@@ -46,12 +42,8 @@ export function FileTransferList({
   const [loadError, setLoadError] = useState(false)
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
-  const [range, setRange] = useState<DateRange>({})
   const [page, setPage] = useState(1)
-  /** Keyed by the dates it was fetched for, so a page from a previous range counts as not loaded. */
-  const [loaded, setLoaded] = useState<{ key: string; page: FileTransferSummaryPage } | null>(null)
-
-  const rangeKey = `${range.from ?? ''}|${range.to ?? ''}`
+  const [loaded, setLoaded] = useState<FileTransferSummaryPage | null>(null)
 
   useEffect(() => {
     let active = true
@@ -79,18 +71,17 @@ export function FileTransferList({
     }
 
     let active = true
-    const key = rangeKey
     const resourceIds = resources.map((resource) => resource.resourceId)
     // Nothing to ask about without a resource, and the API would reject an empty list anyway.
     const request =
       resourceIds.length === 0
         ? Promise.resolve(EMPTY_PAGE)
-        : fetchTransfers(resourceIds, currentOrg, range)
+        : fetchTransfers(resourceIds, currentOrg)
 
     request
       .then((transfers) => {
         if (active) {
-          setLoaded({ key, page: transfers })
+          setLoaded(transfers)
         }
       })
       .catch(() => {
@@ -102,9 +93,9 @@ export function FileTransferList({
     return () => {
       active = false
     }
-  }, [resources, range, rangeKey, currentOrg, fetchTransfers])
+  }, [resources, currentOrg, fetchTransfers])
 
-  const current = loaded?.key === rangeKey ? loaded.page : null
+  const current = loaded
   const isLoading = !loadError && current === null
 
   const filtered = useMemo(() => {
@@ -139,11 +130,6 @@ export function FileTransferList({
     setPage(1)
   }
 
-  function handleRange(next: DateRange) {
-    setRange(next)
-    setPage(1)
-  }
-
   const isFiltered = Boolean(search.trim() || resourceFilter)
 
   return (
@@ -156,8 +142,6 @@ export function FileTransferList({
         resourceFilter={resourceFilter}
         onResourceFilterChange={handleServiceFilter}
         resources={resources ?? []}
-        range={range}
-        onRangeChange={handleRange}
       />
 
       {loadError && <p className="empty-state">{loadErrorText}</p>}
@@ -170,14 +154,14 @@ export function FileTransferList({
         <Alert
           variant="info"
           heading={`Viser de ${current.pageSize} nyeste`}
-          message="Det finnes flere formidlinger enn dette. Velg en fra- og til-dato for å se eldre."
+          message="Du har flere formidlinger enn dette. Eldre formidlinger kan foreløpig ikke vises her."
         />
       )}
 
       {current && cards.length === 0 && (
         <p className="empty-state">
           {current.hasMore && isFiltered
-            ? `Ingen treff blant de ${current.pageSize} nyeste. Avgrens med dato for å søke lenger tilbake.`
+            ? `Ingen treff blant de ${current.pageSize} nyeste. Søket dekker ikke eldre formidlinger.`
             : emptyStateText}
         </p>
       )}

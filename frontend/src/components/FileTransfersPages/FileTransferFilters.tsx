@@ -1,6 +1,5 @@
-import { Search, Select, Textfield } from '@digdir/designsystemet-react'
+import { Search, Select } from '@digdir/designsystemet-react'
 import type { AuthorizedResource } from '../../api/resources'
-import type { DateRange } from '../../api/fileTransferSummary'
 
 type FileTransferFiltersProps = {
   search: string
@@ -8,8 +7,6 @@ type FileTransferFiltersProps = {
   resourceFilter: string
   onResourceFilterChange: (value: string) => void
   resources: AuthorizedResource[]
-  range: DateRange
-  onRangeChange: (range: DateRange) => void
 }
 
 export function FileTransferFilters({
@@ -18,8 +15,6 @@ export function FileTransferFilters({
   resourceFilter,
   onResourceFilterChange,
   resources,
-  range,
-  onRangeChange,
 }: FileTransferFiltersProps) {
   return (
     <div className="filter-row">
@@ -56,32 +51,6 @@ export function FileTransferFilters({
             </Select.Option>
           ))}
         </Select>
-      </div>
-
-      {/* Unlike the two above, the dates are sent to the API: they are how the user reaches
-          formidlinger that fall outside the page the list endpoint returns. */}
-      <div className="field">
-        <Textfield
-          id="range-from"
-          type="date"
-          label="Fra dato"
-          data-size="sm"
-          value={range.from ?? ''}
-          max={range.to}
-          onChange={(e) => onRangeChange({ ...range, from: e.target.value || undefined })}
-        />
-      </div>
-
-      <div className="field">
-        <Textfield
-          id="range-to"
-          type="date"
-          label="Til dato"
-          data-size="sm"
-          value={range.to ?? ''}
-          min={range.from}
-          onChange={(e) => onRangeChange({ ...range, to: e.target.value || undefined })}
-        />
       </div>
     </div>
   )

@@ -280,43 +280,6 @@ public class GetFileTransferSummariesHandlerTests
         Assert.False(result.AsT0.HasMore);
     }
 
-    [Fact]
-    public async Task Process_DateRangeProvided_IsPassedToRepository()
-    {
-        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
-        var actorRepository = CreateActorRepository(actor);
-        var authorizationService = CreateAuthorizationService("resource-a");
-        DateTimeOffset? queriedFrom = null;
-        DateTimeOffset? queriedTo = null;
-        var fileTransferRepository = new Mock<IFileTransferRepository>();
-        fileTransferRepository
-            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
-            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((search, _) =>
-            {
-                queriedFrom = search.From;
-                queriedTo = search.To;
-            })
-            .ReturnsAsync([]);
-        var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
-        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
-        var from = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var to = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
-
-        var result = await handler.Process(
-            new GetFileTransferSummariesRequest
-            {
-                ResourceIds = ["resource-a"],
-                OnBehalfOf = OrganizationNumber,
-                View = FileTransferListView.Historical,
-                From = from,
-                To = to
-            }, null, CancellationToken.None);
-
-        Assert.True(result.IsT0);
-        Assert.Equal(from, queriedFrom);
-        Assert.Equal(to, queriedTo);
-    }
-
     private static List<FileTransferSummaryEntity> CreateSummaries(int count)
         => Enumerable.Range(0, count).Select(index => new FileTransferSummaryEntity
         {
