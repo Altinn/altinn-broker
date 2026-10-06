@@ -201,10 +201,10 @@
   font-size: 0.9375rem;
 }
 
-.pagination-row {
+.load-more-row {
   display: flex;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 ul.service-owner-list {

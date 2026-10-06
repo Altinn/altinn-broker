@@ -13,6 +13,9 @@ export function HistoricalFileTransfersPage() {
 
   return (
     <FileTransferList
+      // A fresh list per actor, instead of unpicking which request belonged to whom.
+      key={selectedParty.partyUuid}
+      queryKey="historical-file-transfers"
       heading="Historiske formidlinger"
       loadingText="Laster historiske formidlinger …"
       loadErrorText="Klarte ikke å hente historiske formidlinger."
