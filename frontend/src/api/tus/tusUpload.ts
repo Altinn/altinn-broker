@@ -125,8 +125,10 @@ export function startUpload(
   const transport = pausableHttpStack(report)
   const concatenation = new AbortController()
   const watchdog = stallWatchdog(STALL_TIMEOUT_MS, () => {
-    // A paused upload is quiet on purpose, once the requests already sent have finished.
-    if (paused && !transport.isSending()) {
+    // Quiet is expected while paused, and while the server stores parts it has every byte of: it
+    // answers a part's last chunk only once the whole part is stored.
+    const storing = allSent && partsDone < plan.parts.length
+    if ((paused && !transport.isSending()) || storing) {
       watchdog.keepAlive()
       return
     }
