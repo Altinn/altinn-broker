@@ -38,6 +38,12 @@ public sealed class TusUploadState : IDisposable
 
     public Exception? Fault { get; set; }
 
+    /// <summary>
+    /// True while one failed <c>UploadBlockAsync</c> owns draining siblings and reconciling
+    /// AcceptedOffset. Prevents concurrent failures from all waiting on the inflight count.
+    /// </summary>
+    public bool OffsetReconcileElected { get; set; }
+
     public TaskCompletionSource<long> ProgressSignal { get; set; }
 
     public TaskCompletionSource InflightChangedSignal { get; set; }

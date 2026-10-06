@@ -939,6 +939,7 @@ public class BrokerTusStore(
         }
         catch (Exception ex)
         {
+            var electedReconciler = false;
             lock (state.SyncRoot)
             {
                 state.Fault = ex;
@@ -946,6 +947,14 @@ public class BrokerTusStore(
                 var previousProgress = state.ProgressSignal;
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetException(ex);
+
+                // Only one failed operation may drain siblings and reconcile; others must finish
+                // through finally so InflightBlockOperations can drop.
+                if (!state.OffsetReconcileElected)
+                {
+                    state.OffsetReconcileElected = true;
+                    electedReconciler = true;
+                }
             }
 
             logger.LogError(
@@ -959,6 +968,11 @@ public class BrokerTusStore(
             state.ConcurrentUploader.Release();
             releasedSemaphore = true;
 
+            if (!electedReconciler)
+            {
+                return;
+            }
+
             try
             {
                 await WaitForSiblingBlockOperationsAsync(state);
@@ -970,6 +984,13 @@ public class BrokerTusStore(
                     reconcileEx,
                     "Failed to reconcile TUS accepted offset after staging failure for file id {FileId}.",
                     fileId);
+            }
+            finally
+            {
+                lock (state.SyncRoot)
+                {
+                    state.OffsetReconcileElected = false;
+                }
             }
         }
         finally
@@ -1145,6 +1166,7 @@ public class BrokerTusStore(
                 lock (state.SyncRoot)
                 {
                     state.Fault = null;
+                    state.OffsetReconcileElected = false;
                 }
             }
 
@@ -1177,6 +1199,7 @@ public class BrokerTusStore(
                 state.NextBlockIndex = resumePoint.NextBlockIndex;
                 state.PendingUploads = 0;
                 state.Fault = null;
+                state.OffsetReconcileElected = false;
                 state.BlockIds.Clear();
                 if (resumePoint.BlockIds is { Count: > 0 })
                 {
