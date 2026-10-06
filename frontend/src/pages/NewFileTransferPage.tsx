@@ -29,6 +29,7 @@ import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
+import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
 import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
@@ -61,7 +62,7 @@ function NewFileTransferPageContent() {
 
   // The upload is only shown as the form's own while acting for the organisation that sends it.
   const goToUpload = (upload: { resourceId: string; sender: string }) => {
-    const owner = parties.find((party) => party.organizationNumber === upload.sender)
+    const owner = flattenParties(parties).find((party) => party.organizationNumber === upload.sender)
     if (owner && upload.sender !== senderOrgNumber) {
       selectParty(owner.partyUuid)
     }
