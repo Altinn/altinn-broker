@@ -123,21 +123,23 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
 
 function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasActive: boolean) {
   const { markReceived } = useUploadActions()
-  const [found, setFound] = useState<StoredUpload | null>(() =>
+  const [interruptedUpload, setInterruptedUpload] = useState<StoredUpload | null>(() =>
     readStoredUpload(resourceId, senderOrgNumber),
   )
-  const upload = hasActive ? null : found
+  if (hasActive && interruptedUpload) {
+    setInterruptedUpload(null)
+  }
   const [uploaded, setUploaded] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!upload) {
+    if (!interruptedUpload) {
       return
     }
 
     // Aborted on the way out, so leaving the page also stops the retries that wait out a lock or other error.
     const controller = new AbortController()
 
-    readUploadedBytes(upload.plan, controller.signal)
+    readUploadedBytes(interruptedUpload.plan, controller.signal)
       .then(async (bytes) => {
         if (controller.signal.aborted) {
           return
@@ -146,16 +148,16 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
           setUploaded(bytes)
           return
         }
-        const received = await hasReceivedFile(upload.plan.fileTransferId)
+        const received = await hasReceivedFile(interruptedUpload.plan.fileTransferId)
         if (controller.signal.aborted) {
           return
         }
         if (received) {
-          markReceived({ resourceId, sender: senderOrgNumber, plan: upload.plan })
+          markReceived({ resourceId, sender: senderOrgNumber, plan: interruptedUpload.plan })
         } else {
           clearStoredUpload(resourceId, senderOrgNumber)
         }
-        setFound(null)
+        setInterruptedUpload(null)
       })
       .catch((error) => {
         if (controller.signal.aborted) {
@@ -167,17 +169,17 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
     return () => {
       controller.abort()
     }
-  }, [markReceived, resourceId, senderOrgNumber, upload])
+  }, [interruptedUpload, markReceived, resourceId, senderOrgNumber])
 
   const discard = useCallback(() => {
-    if (upload) {
-      discardUpload(upload.plan)
+    if (interruptedUpload) {
+      discardUpload(interruptedUpload.plan)
     }
     clearStoredUpload(resourceId, senderOrgNumber)
-    setFound(null)
-  }, [resourceId, senderOrgNumber, upload])
+    setInterruptedUpload(null)
+  }, [interruptedUpload, resourceId, senderOrgNumber])
 
-  return { upload, uploaded, discard }
+  return { upload: interruptedUpload, uploaded, discard }
 }
 
 function describeInitializeError(error: unknown): string {
