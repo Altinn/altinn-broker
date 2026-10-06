@@ -12,6 +12,7 @@ export function getHistoricalFileTransfers(
   resourceIds: string[],
   onBehalfOf: SelectedParty | undefined,
   continuationToken: string | undefined,
+  search: string | undefined,
 ): Promise<FileTransferSummaryPage> {
-  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken)
+  return fetchSummaryPage(HISTORICAL_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken, search)
 }

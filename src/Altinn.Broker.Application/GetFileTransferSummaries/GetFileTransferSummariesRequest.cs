@@ -10,4 +10,7 @@ public class GetFileTransferSummariesRequest
 
     /// <summary>Opaque token from the previous page. Null starts at the newest.</summary>
     public string? ContinuationToken { get; set; }
+
+    /// <summary>Free text matched against the sender's reference.</summary>
+    public string? Search { get; set; }
 }

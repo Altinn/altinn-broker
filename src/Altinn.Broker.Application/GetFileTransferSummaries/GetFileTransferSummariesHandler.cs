@@ -24,6 +24,12 @@ public class GetFileTransferSummariesHandler(
     /// <summary>How many file transfers a list view returns. One more is read, to tell a full page from a capped one.</summary>
     public const int PageSize = 100;
 
+    /// <summary>
+    /// Shorter terms match too much to be worth a query, and the trigram index needs three
+    /// characters to be useful. Mirrors the minimum Arbeidsflate applies to its dialog search.
+    /// </summary>
+    public const int MinimumSearchLength = 3;
+
     private static readonly List<FileTransferStatus> ActiveSenderStatuses = [FileTransferStatus.UploadProcessing, FileTransferStatus.Published];
     private static readonly List<FileTransferStatus> ActiveRecipientStatuses = [FileTransferStatus.Published];
 
@@ -78,6 +84,7 @@ public class GetFileTransferSummariesHandler(
             RecipientStatuses = recipientStatuses,
             Limit = PageSize + 1,
             Cursor = FileTransferListCursor.FromToken(request.ContinuationToken),
+            SearchTerm = SearchTermOf(request.Search),
         }, cancellationToken);
 
         var hasNextPage = summaries.Count > PageSize;
@@ -118,4 +125,11 @@ public class GetFileTransferSummariesHandler(
 
     private static string ContinuationTokenFor(FileTransferSummaryEntity last)
         => new FileTransferListCursor(last.SortDate, last.FileTransferId).ToToken();
+
+    /// <summary>Anything shorter than the minimum is treated as no search at all.</summary>
+    private static string? SearchTermOf(string? search)
+    {
+        var trimmed = search?.Trim();
+        return trimmed is not null && trimmed.Length >= MinimumSearchLength ? trimmed : null;
+    }
 }

@@ -21,17 +21,22 @@ export type FileTransferSummaryPage = {
   continuationToken: string | null
 }
 
+/** Shorter terms match too much to be worth a round trip; the API ignores them anyway. */
+export const MIN_SEARCH_LENGTH = 3
+
 /** Reads one page of summaries, continuing from `continuationToken` when given. */
 export function fetchSummaryPage(
   path: string,
   resourceIds: string[],
-  onBehalfOf?: SelectedParty,
-  continuationToken?: string,
+  onBehalfOf: SelectedParty | undefined,
+  continuationToken: string | undefined,
+  search: string | undefined,
 ): Promise<FileTransferSummaryPage> {
   const params = new URLSearchParams()
   resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
   if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
   if (continuationToken) params.set('continuationToken', continuationToken)
+  if (search) params.set('search', search)
 
   return apiFetch<FileTransferSummaryPage>(`${path}?${params}`, {
     redirectOnUnauthorized: false,

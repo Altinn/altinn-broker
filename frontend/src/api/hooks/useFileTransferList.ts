@@ -1,12 +1,17 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
-import type { FileTransferSummary, FileTransferSummaryPage } from '../fileTransferSummary'
-import { fetchAuthorizedResources, type AuthorizedResource } from '../resources'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import {
+  MIN_SEARCH_LENGTH,
+  type FileTransferSummary,
+  type FileTransferSummaryPage,
+} from '../fileTransferSummary'
+import { fetchAuthorizedResources } from '../resources'
 import type { SelectedParty } from '../../parties/PartiesContext'
 
 export type FetchFileTransferPage = (
   resourceIds: string[],
   onBehalfOf: SelectedParty | undefined,
   continuationToken: string | undefined,
+  search: string | undefined,
 ) => Promise<FileTransferSummaryPage>
 
 /**
@@ -19,11 +24,19 @@ export function useFileTransferList(
   queryKey: string,
   fetchPage: FetchFileTransferPage,
   party: SelectedParty,
+  search: string,
 ) {
-  const resources = useQuery_AuthorizedResources(party)
+  const resources = useQuery({
+    queryKey: ['authorized-resources', party.organizationNumber],
+    queryFn: () => fetchAuthorizedResources(party.organizationNumber),
+  })
+
+  // Below the minimum the API ignores the term, so keep it out of the key and query unfiltered
+  // rather than refetching for every keystroke on the way to three characters.
+  const appliedSearch = search.trim().length >= MIN_SEARCH_LENGTH ? search.trim() : ''
 
   const transfers = useInfiniteQuery({
-    queryKey: [queryKey, party.organizationNumber],
+    queryKey: [queryKey, party.organizationNumber, appliedSearch],
     enabled: resources.data !== undefined,
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
@@ -31,31 +44,21 @@ export function useFileTransferList(
         (resources.data ?? []).map((resource) => resource.resourceId),
         party,
         pageParam,
+        appliedSearch || undefined,
       ),
     getNextPageParam: (lastPage) => lastPage.continuationToken ?? undefined,
   })
 
-  const items: FileTransferSummary[] =
-    transfers.data?.pages.flatMap((page) => page.items) ?? []
+  const items: FileTransferSummary[] = transfers.data?.pages.flatMap((page) => page.items) ?? []
 
   return {
     resources: resources.data ?? [],
     items,
+    appliedSearch,
     isLoading: resources.isLoading || transfers.isPending,
     isError: resources.isError || transfers.isError,
     hasNextPage: transfers.hasNextPage,
     isFetchingNextPage: transfers.isFetchingNextPage,
     fetchNextPage: transfers.fetchNextPage,
   }
-}
-
-/** The resources the party may act on. Its own query so the authorization call is not repeated. */
-function useQuery_AuthorizedResources(party: SelectedParty) {
-  return useInfiniteQuery({
-    queryKey: ['authorized-resources', party.organizationNumber],
-    initialPageParam: undefined,
-    queryFn: () => fetchAuthorizedResources(party.organizationNumber),
-    getNextPageParam: () => undefined,
-    select: (data): AuthorizedResource[] => data.pages[0] ?? [],
-  })
 }

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, List } from '@altinn/altinn-components'
 import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
+import { MIN_SEARCH_LENGTH } from '../../api/fileTransferSummary'
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
 import '../../pages/pages.css'
@@ -30,25 +31,32 @@ export function FileTransferList({
 }: FileTransferListProps) {
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
+  // The search goes to the API, so wait for a pause in typing rather than firing per keystroke.
+  const debouncedSearch = useDebounced(search, 300)
 
-  const { resources, items, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useFileTransferList(queryKey, fetchTransfers, currentOrg)
+  const {
+    resources,
+    items,
+    appliedSearch,
+    isLoading,
+    isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useFileTransferList(queryKey, fetchTransfers, currentOrg, debouncedSearch)
 
-  // Narrows what has been loaded so far. Reaching further back is what "Hent flere" is for.
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return items.filter((overview) => {
-      const reference = overview.sendersFileTransferReference || overview.fileTransferId
-      const matchesSearch = !query || reference.toLowerCase().includes(query)
-      const matchesResource = !resourceFilter || overview.resourceId === resourceFilter
-      return matchesSearch && matchesResource
-    })
-  }, [items, search, resourceFilter])
+  // The reference search is the API's job now; only the service filter is narrowed here.
+  const filtered = useMemo(
+    () => items.filter((overview) => !resourceFilter || overview.resourceId === resourceFilter),
+    [items, resourceFilter],
+  )
 
   const resourceName = (resourceId: string) =>
     resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
 
-  const isFiltered = Boolean(search.trim() || resourceFilter)
+  const isFiltered = Boolean(appliedSearch || resourceFilter)
+  // Typed something, but not enough for the API to act on it.
+  const searchTooShort = search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH
 
   return (
     <div className="page">
@@ -68,11 +76,13 @@ export function FileTransferList({
 
       {isLoading && <p className="empty-state">{loadingText}</p>}
 
-      {!isLoading && !isError && filtered.length === 0 && (
+      {searchTooShort && (
+        <p className="empty-state">Skriv minst {MIN_SEARCH_LENGTH} tegn for å søke.</p>
+      )}
+
+      {!isLoading && !isError && !searchTooShort && filtered.length === 0 && (
         <p className="empty-state">
-          {isFiltered && hasNextPage
-            ? 'Ingen treff blant formidlingene som er lastet. Hent flere for å søke lenger tilbake.'
-            : emptyStateText}
+          {isFiltered ? 'Ingen formidlinger passer søket.' : emptyStateText}
         </p>
       )}
 
@@ -106,4 +116,16 @@ export function FileTransferList({
       )}
     </div>
   )
+}
+
+/** Holds back a value until the user stops changing it. */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(timer)
+  }, [value, delayMs])
+
+  return debounced
 }

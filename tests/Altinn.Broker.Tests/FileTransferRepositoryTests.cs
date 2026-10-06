@@ -459,6 +459,75 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Equal(seen.Count, seen.Distinct().Count());
 	}
 
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_SearchTerm_MatchesReferenceSubstringCaseInsensitively()
+	{
+		// Arrange
+		var resourceId = $"search-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var wanted = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "Saksnr-2026/4711");
+		var other = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "Saksnr-2026/9999");
+		await _dataHelper.SetLatestFileTransferStatus(wanted, FileTransferStatus.Published);
+		await _dataHelper.SetLatestFileTransferStatus(other, FileTransferStatus.Published);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act - a substring from the middle, in the wrong case
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			SearchTerm = "nr-2026/47"
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(wanted, summary.FileTransferId);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_SearchTermWithCursor_PagesWithinTheMatches()
+	{
+		// Arrange
+		// Search narrows the set the cursor walks; the two have to compose.
+		const int pageSize = 5;
+		var resourceId = $"search-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var matching = new List<Guid>();
+		for (var index = 0; index < pageSize * 2; index++)
+		{
+			var hit = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: $"TREFF-{index:D2}");
+			await _dataHelper.SetLatestFileTransferStatus(hit, FileTransferStatus.Published, StatusDateFor(index));
+			matching.Add(hit);
+
+			var miss = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: $"BOM-{index:D2}");
+			await _dataHelper.SetLatestFileTransferStatus(miss, FileTransferStatus.Published, StatusDateFor(index));
+		}
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		FrontendFileTransferSearchEntity Search(FileTransferListCursor? cursor) => new()
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize,
+			SearchTerm = "TREFF-",
+			Cursor = cursor
+		};
+
+		// Act
+		var first = await _repository.GetFileTransferSummariesAssociatedWithActor(Search(null), cancellationToken: default);
+		var last = first[^1];
+		var second = await _repository.GetFileTransferSummariesAssociatedWithActor(
+			Search(new FileTransferListCursor(last.SortDate, last.FileTransferId)), cancellationToken: default);
+
+		// Assert - only matches, every one exactly once
+		var seen = first.Concat(second).Select(summary => summary.FileTransferId).ToList();
+		Assert.Equal(matching.Count, seen.Count);
+		Assert.Equal(seen.Count, seen.Distinct().Count());
+		Assert.All(seen, id => Assert.Contains(id, matching));
+	}
+
 	/// <summary>Published transfers one minute apart, oldest first, so paging and date windows are deterministic.</summary>
 	private async Task<List<Guid>> InsertPublishedTransfers(string resourceId, string senderExternalId, int count)
 	{

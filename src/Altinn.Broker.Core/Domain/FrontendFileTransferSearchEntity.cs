@@ -24,4 +24,7 @@ public class FrontendFileTransferSearchEntity
     /// <summary>Where to continue from. Null starts at the newest.</summary>
     public FileTransferListCursor? Cursor { get; set; }
 
+    /// <summary>Substring match against the sender's reference. Null or empty means no filter.</summary>
+    public string? SearchTerm { get; set; }
+
 }

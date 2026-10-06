@@ -24,7 +24,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// - altinn:broker.write <br/>
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
     /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
-    /// <c>continuationToken</c> is passed back to read the next page.
+    /// <c>continuationToken</c> is passed back to read the next page. <c>search</c> matches the
+    /// sender's reference and is ignored below three characters.
     /// </remarks>
     /// <response code="200">Returns the list of active file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
@@ -38,7 +39,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         [FromQuery] string? onBehalfOf,
         [FromServices] GetFileTransferSummariesHandler handler,
         CancellationToken cancellationToken,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] string? search = null)
     {
         logger.LogInformation("Getting active file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
@@ -46,7 +48,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
             ResourceIds = resourceIds,
             OnBehalfOf = onBehalfOf ?? string.Empty,
             View = FileTransferListView.Active,
-            ContinuationToken = continuationToken
+            ContinuationToken = continuationToken,
+            Search = search
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),
@@ -64,7 +67,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// - altinn:broker.write <br/>
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
     /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
-    /// <c>continuationToken</c> is passed back to read the next page.
+    /// <c>continuationToken</c> is passed back to read the next page. <c>search</c> matches the
+    /// sender's reference and is ignored below three characters.
     /// </remarks>
     /// <response code="200">Returns the list of historical file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
@@ -78,7 +82,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
         [FromQuery] string? onBehalfOf,
         [FromServices] GetFileTransferSummariesHandler handler,
         CancellationToken cancellationToken,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] string? search = null)
     {
         logger.LogInformation("Getting historical file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
@@ -86,7 +91,8 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
             ResourceIds = resourceIds,
             OnBehalfOf = onBehalfOf ?? string.Empty,
             View = FileTransferListView.Historical,
-            ContinuationToken = continuationToken
+            ContinuationToken = continuationToken,
+            Search = search
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),

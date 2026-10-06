@@ -12,6 +12,7 @@ export function getActiveFileTransfers(
   resourceIds: string[],
   onBehalfOf: SelectedParty | undefined,
   continuationToken: string | undefined,
+  search: string | undefined,
 ): Promise<FileTransferSummaryPage> {
-  return fetchSummaryPage(ACTIVE_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken)
+  return fetchSummaryPage(ACTIVE_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken, search)
 }

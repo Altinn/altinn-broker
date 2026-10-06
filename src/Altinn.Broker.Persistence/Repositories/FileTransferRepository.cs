@@ -348,6 +348,11 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             ? ""
             : $"AND ({timestampColumn}, f.file_transfer_id_pk) {(ascending ? ">" : "<")} (@cursorDate, @cursorId)";
 
+        // Substring match, so the trigram index in V0027 is what keeps this off a seq scan.
+        string searchCondition = string.IsNullOrWhiteSpace(fileTransferSearch.SearchTerm)
+            ? ""
+            : "AND f.external_file_transfer_reference ILIKE @search";
+
         // Cap and sort the matching file transfers first (matching_transfers), then fan out to one
         // row per recipient - doing the LIMIT before the recipient join keeps it "100 file transfers
         // with all their recipients" rather than "100 rows total" (which would cut a transfer's
@@ -366,6 +371,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 AND ({actorCondition})
                 {dateCondition}
                 {cursorCondition}
+                {searchCondition}
                 ORDER BY sort_date {orderDirection}, f.file_transfer_id_pk {orderDirection}
                 LIMIT @limit
             )
@@ -389,6 +395,10 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         {
             command.Parameters.AddWithValue("@cursorDate", cursor.SortDate.UtcDateTime);
             command.Parameters.AddWithValue("@cursorId", cursor.FileTransferId);
+        }
+        if (!string.IsNullOrWhiteSpace(fileTransferSearch.SearchTerm))
+        {
+            command.Parameters.AddWithValue("@search", $"%{fileTransferSearch.SearchTerm.Trim()}%");
         }
         if (hasSenderStatusFilter)
             command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
