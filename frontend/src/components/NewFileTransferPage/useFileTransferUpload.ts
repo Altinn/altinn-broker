@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/client'
 import { hasReceivedFile } from '../../api/fileTransferStatus'
-import { discardUpload, readUploadedBytes } from '../../api/tus/tusUpload'
+import { FileChangedError, discardUpload, readUploadedBytes } from '../../api/tus/tusUpload'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import { UploadPlanError, useActiveUpload, useUploadActions } from '../../upload/uploadsContext'
 import {
@@ -187,6 +187,9 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
 function describeInitializeError(error: unknown): string {
   if (error instanceof UploadPlanError) {
     return `${describeInitializeError(error.cause)} Formidlingen ble opprettet med id ${error.fileTransferId}, men filen ble ikke lastet opp.`
+  }
+  if (error instanceof FileChangedError) {
+    return 'Filen er endret eller flyttet etter at du valgte den. Velg filen på nytt.'
   }
   if (error instanceof InvalidOrgNumberError) {
     return error.message

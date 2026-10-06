@@ -4,6 +4,8 @@ import { ApiError } from '../api/client'
 import { hasReceivedFile } from '../api/fileTransferStatus'
 import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
+  FileChangedError,
+  assertFileUnchanged,
   createUploadPlan,
   discardUpload,
   isUploadGone,
@@ -128,6 +130,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       let fileTransferId: string | undefined
       let plan: UploadPlan
       try {
+        await assertFileUnchanged(input.file)
         fileTransferId = await initializeFileTransfer(input, signal)
         plan = await createUploadPlan(fileTransferId, input.file, signal)
       } catch (error) {
@@ -257,6 +260,9 @@ function isAbortError(error: unknown): boolean {
 }
 
 function describeUploadError(error: unknown): string {
+  if (error instanceof FileChangedError) {
+    return 'Filen er endret eller flyttet etter at opplastingen startet, så den kan ikke fortsette. Avbryt opplastingen, velg filen på nytt og send igjen.'
+  }
   if (!(error instanceof ApiError)) {
     return 'Opplastingen stoppet. Fortsett for å laste opp resten av filen.'
   }

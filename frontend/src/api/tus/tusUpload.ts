@@ -78,6 +78,23 @@ export class UploadGoneError extends ApiError {
   }
 }
 
+/** The file was changed or moved after it was picked, so the browser no longer reads it. */
+export class FileChangedError extends Error {
+  constructor() {
+    super('The file was changed after it was picked')
+    this.name = 'FileChangedError'
+  }
+}
+
+/** The browser refuses to read a file that has changed on disk since it was picked. */
+export async function assertFileUnchanged(file: Blob): Promise<void> {
+  try {
+    await file.slice(0, 1).arrayBuffer()
+  } catch {
+    throw new FileChangedError()
+  }
+}
+
 export async function createUploadPlan(
   fileTransferId: string,
   file: File,
@@ -182,6 +199,13 @@ export function startUpload(
             watchdog.keepAlive()
           }
         },
+        // A changed file fails like a dropped connection, but no number of tries will read it.
+        onShouldRetry: (error) => {
+          if (!error.originalResponse) {
+            void assertFileUnchanged(file).catch(fail)
+          }
+          return shouldRetry(error)
+        },
         onProgress: (sent) => {
           if (settled) {
             return
@@ -204,14 +228,16 @@ export function startUpload(
             complete()
           }
         },
-        // The other parts are still sending when one fails. Settling before they finish would let
-        // the next run collide with them on the server's upload locks.
-        onError: (error) => {
-          failure ??= asApiError(error)
-          void transport.stop().then(() => finish(failure))
-        },
+        onError: (error) => fail(asApiError(error)),
       }),
   )
+
+  // The other parts are still sending when one fails. Settling before they finish would let the
+  // next run collide with them on the server's upload locks.
+  function fail(error: Error) {
+    failure ??= error
+    void transport.stop().then(() => finish(failure))
+  }
 
   function complete() {
     if (!concatenated) {
