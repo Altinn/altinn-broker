@@ -90,6 +90,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         toast.error(message)
         if (isUploadGone(error)) {
           sessionRef.current = null
+          discardUpload(upload.plan)
           clearStoredUpload(upload.resourceId, upload.sender)
           show(null)
           return
@@ -224,7 +225,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
 
 /**
  * Waits for the upload to finish. If the server rejects it but already has the file, the upload
- * succeeded and only the response was lost, so that counts as finished too.
+ * succeeded and only the response was lost, so that counts as finished too. If the status can't be
+ * read, that error is thrown instead, so the upload fails without being given up as gone.
  */
 async function fileReceived(plan: UploadPlan, run: UploadRun): Promise<void> {
   try {

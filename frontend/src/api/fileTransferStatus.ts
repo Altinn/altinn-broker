@@ -8,15 +8,12 @@ const RECEIVED_STATUSES = ['UploadProcessing', 'Published', 'AllConfirmedDownloa
 
 /**
  * Whether the server already has the transfer's file. Broker rejects uploads once it does, so a
- * rejected upload may have succeeded with only the response lost.
+ * rejected upload may have succeeded with only the response lost. Throws when the status can't be
+ * read, since neither answer is safe then.
  */
 export async function hasReceivedFile(fileTransferId: string): Promise<boolean> {
-  try {
-    const overview = await apiFetch<{ fileTransferStatus?: string }>(
-      `${BROKER_API_PREFIX}/filetransfer/${fileTransferId}`,
-    )
-    return RECEIVED_STATUSES.includes(overview.fileTransferStatus ?? '')
-  } catch {
-    return false
-  }
+  const overview = await apiFetch<{ fileTransferStatus?: string }>(
+    `${BROKER_API_PREFIX}/filetransfer/${fileTransferId}`,
+  )
+  return RECEIVED_STATUSES.includes(overview.fileTransferStatus ?? '')
 }

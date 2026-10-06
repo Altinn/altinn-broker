@@ -133,6 +133,14 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
   }
   const [uploaded, setUploaded] = useState<number | null>(null)
 
+  const discard = useCallback(() => {
+    if (interruptedUpload) {
+      discardUpload(interruptedUpload.plan)
+    }
+    clearStoredUpload(resourceId, senderOrgNumber)
+    setInterruptedUpload(null)
+  }, [interruptedUpload, resourceId, senderOrgNumber])
+
   useEffect(() => {
     if (!interruptedUpload) {
       return
@@ -156,10 +164,10 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
         }
         if (received) {
           markReceived({ resourceId, sender: senderOrgNumber, plan: interruptedUpload.plan })
+          setInterruptedUpload(null)
         } else {
-          clearStoredUpload(resourceId, senderOrgNumber)
+          discard()
         }
-        setInterruptedUpload(null)
       })
       .catch((error) => {
         if (controller.signal.aborted) {
@@ -171,15 +179,7 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
     return () => {
       controller.abort()
     }
-  }, [interruptedUpload, markReceived, resourceId, senderOrgNumber])
-
-  const discard = useCallback(() => {
-    if (interruptedUpload) {
-      discardUpload(interruptedUpload.plan)
-    }
-    clearStoredUpload(resourceId, senderOrgNumber)
-    setInterruptedUpload(null)
-  }, [interruptedUpload, resourceId, senderOrgNumber])
+  }, [discard, interruptedUpload, markReceived, resourceId, senderOrgNumber])
 
   return { upload: interruptedUpload, uploaded, discard }
 }
