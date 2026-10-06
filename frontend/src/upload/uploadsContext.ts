@@ -38,6 +38,8 @@ export type UploadActions = {
   pause: () => void
   resume: () => void
   cancel: () => void
+  /** Call when the server has the file: this clears the saved upload and draft, and shows that the file was sent. */
+  markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>) => void
   /** Returns the function that removes the listener again. */
   addUploadSuccessListener: (listener: UploadSuccessListener) => () => void
 }

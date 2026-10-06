@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../api/client'
+import { hasReceivedFile } from '../api/fileTransferStatus'
 import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
   createUploadPlan,
@@ -47,6 +48,15 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     setActive((current) => current && { ...current, ...changes })
   }, [])
 
+  const markReceived = useCallback<UploadActions['markReceived']>(({ resourceId, sender, plan }) => {
+    clearStoredUpload(resourceId, sender)
+    clearDraft(draftKey(resourceId, sender))
+    toast.success('Formidlingen er sendt, og filen er lastet opp.')
+    for (const listener of listenersRef.current) {
+      listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
+    }
+  }, [])
+
   const run = useCallback(
     async (upload: PlannedUpload, alreadySent: number, paused = false) => {
       saveStoredUpload(upload)
@@ -69,7 +79,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       sessionRef.current = session
 
       try {
-        await session.run.finished
+        await fileReceived(upload.plan, session.run)
       } catch (error) {
         // Cancelling has already cleared the upload away.
         if (isAbortError(error) || sessionRef.current !== session) {
@@ -93,17 +103,10 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         return
       }
       sessionRef.current = null
-      clearStoredUpload(upload.resourceId, upload.sender)
-      // Here rather than on the page, which may have been left while the last requests finished.
-      clearDraft(draftKey(upload.resourceId, upload.sender))
       show(null)
-      toast.success('Formidlingen er sendt, og filen er lastet opp.')
-      const { resourceId, sender, plan } = upload
-      for (const listener of listenersRef.current) {
-        listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
-      }
+      markReceived(upload)
     },
-    [show, update],
+    [markReceived, show, update],
   )
 
   const start = useCallback(
@@ -206,8 +209,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const actions = useMemo<UploadActions>(
-    () => ({ start, resumeStored, pause, resume, cancel, addUploadSuccessListener }),
-    [start, resumeStored, pause, resume, cancel, addUploadSuccessListener],
+    () => ({ start, resumeStored, pause, resume, cancel, markReceived, addUploadSuccessListener }),
+    [start, resumeStored, pause, resume, cancel, markReceived, addUploadSuccessListener],
   )
 
   return (
@@ -217,6 +220,20 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       </ActiveUploadContext.Provider>
     </UploadActionsContext.Provider>
   )
+}
+
+/**
+ * Waits for the upload to finish. If the server rejects it but already has the file, the upload
+ * succeeded and only the response was lost, so that counts as finished too.
+ */
+async function fileReceived(plan: UploadPlan, run: UploadRun): Promise<void> {
+  try {
+    await run.finished
+  } catch (error) {
+    if (!isUploadGone(error) || !(await hasReceivedFile(plan.fileTransferId))) {
+      throw error
+    }
+  }
 }
 
 function newActiveUpload(

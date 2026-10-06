@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/client'
+import { hasReceivedFile } from '../../api/fileTransferStatus'
 import { discardUpload, readUploadedBytes } from '../../api/tus/tusUpload'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import { UploadPlanError, useActiveUpload, useUploadActions } from '../../upload/uploadsContext'
@@ -121,6 +122,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
 }
 
 function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasActive: boolean) {
+  const { markReceived } = useUploadActions()
   const [found, setFound] = useState<StoredUpload | null>(() =>
     readStoredUpload(resourceId, senderOrgNumber),
   )
@@ -136,16 +138,24 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
     const controller = new AbortController()
 
     readUploadedBytes(upload.plan, controller.signal)
-      .then((bytes) => {
+      .then(async (bytes) => {
         if (controller.signal.aborted) {
           return
         }
-        if (bytes === null) {
-          clearStoredUpload(resourceId, senderOrgNumber)
-          setFound(null)
+        if (bytes !== null) {
+          setUploaded(bytes)
           return
         }
-        setUploaded(bytes)
+        const received = await hasReceivedFile(upload.plan.fileTransferId)
+        if (controller.signal.aborted) {
+          return
+        }
+        if (received) {
+          markReceived({ resourceId, sender: senderOrgNumber, plan: upload.plan })
+        } else {
+          clearStoredUpload(resourceId, senderOrgNumber)
+        }
+        setFound(null)
       })
       .catch((error) => {
         if (controller.signal.aborted) {
@@ -157,7 +167,7 @@ function useInterruptedUpload(resourceId: string, senderOrgNumber: string, hasAc
     return () => {
       controller.abort()
     }
-  }, [resourceId, senderOrgNumber, upload])
+  }, [markReceived, resourceId, senderOrgNumber, upload])
 
   const discard = useCallback(() => {
     if (upload) {
