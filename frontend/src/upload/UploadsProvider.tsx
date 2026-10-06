@@ -134,13 +134,11 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         fileTransferId = await initializeFileTransfer(input, signal)
         plan = await createUploadPlan(fileTransferId, input.file, signal)
       } catch (error) {
-        if (sessionRef.current === session) {
-          sessionRef.current = null
-          show(null)
-        }
-        if (isAbortError(error)) {
+        if (sessionRef.current !== session) {
           return
         }
+        sessionRef.current = null
+        show(null)
         throw fileTransferId ? new UploadPlanError(fileTransferId, error) : error
       }
 
