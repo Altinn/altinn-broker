@@ -77,7 +77,7 @@ export async function getUploadOffset(path: string, signal?: AbortSignal): Promi
     throw new ApiError(`${response.status} on ${response.url}`, response.status)
   }
 
-  const offset = Number(response.headers.get('Upload-Offset') ?? Number.NaN)
+  const offset = Number(response.headers.get('Upload-Offset') || Number.NaN)
   if (!Number.isFinite(offset)) {
     throw new ApiError('The upload did not report an offset', response.status)
   }
