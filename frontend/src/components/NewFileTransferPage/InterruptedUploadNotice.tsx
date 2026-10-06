@@ -1,4 +1,4 @@
-import { Alert, Button, Heading, Paragraph } from '@digdir/designsystemet-react'
+import { Alert, Heading, Paragraph } from '@digdir/designsystemet-react'
 import type { FileFingerprint } from '../../upload/uploadSession'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 
@@ -7,15 +7,9 @@ type InterruptedUploadNoticeProps = {
   /** Bytes the server already holds, or null while that is still being read back. */
   uploaded: number | null
   ready: boolean
-  onDiscard: () => void
 }
 
-export function InterruptedUploadNotice({
-  file,
-  uploaded,
-  ready,
-  onDiscard,
-}: InterruptedUploadNoticeProps) {
+export function InterruptedUploadNotice({ file, uploaded, ready }: InterruptedUploadNoticeProps) {
   const percent = uploaded === null ? null : Math.floor((uploaded / file.size) * 100)
 
   return (
@@ -37,11 +31,6 @@ export function InterruptedUploadNotice({
           </Paragraph>
         </>
       )}
-      <div className="new-transfer__resume-actions">
-        <Button type="button" variant="tertiary" data-size="sm" onClick={onDiscard}>
-          Forkast
-        </Button>
-      </div>
     </Alert>
   )
 }

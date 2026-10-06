@@ -2,6 +2,7 @@ import { Alert, Button, Heading, Paragraph } from '@digdir/designsystemet-react'
 import { useState } from 'react'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { useUploadProgress, type ActiveUpload } from '../../upload/uploadsContext'
+import { CancelUploadConfirmation } from './CancelUploadConfirmation'
 
 type BlockingUploadNoticeProps = {
   upload: ActiveUpload
@@ -23,24 +24,7 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
         kan laste opp én fil om gangen, så denne må fullføres eller avbrytes før du sender en ny.
       </Paragraph>
       {confirming ? (
-        <>
-          <Paragraph data-size="sm">
-            Avbryter du, går det som er lastet opp tapt og filen må sendes på nytt.
-          </Paragraph>
-          <div className="new-transfer__resume-actions">
-            <Button type="button" variant="primary" data-color="danger" data-size="sm" onClick={onCancel}>
-              Ja, avbryt opplastingen
-            </Button>
-            <Button
-              type="button"
-              variant="tertiary"
-              data-size="sm"
-              onClick={() => setConfirming(false)}
-            >
-              Nei, behold den
-            </Button>
-          </div>
-        </>
+        <CancelUploadConfirmation onConfirm={onCancel} onDismiss={() => setConfirming(false)} />
       ) : (
         <div className="new-transfer__resume-actions">
           <Button type="button" variant="secondary" data-size="sm" onClick={onContinue}>

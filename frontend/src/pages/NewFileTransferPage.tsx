@@ -8,9 +8,10 @@ import {
   Spinner,
   Textfield,
 } from '@digdir/designsystemet-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
+import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
 import { PartyField } from '../components/NewFileTransferPage/PartyField'
@@ -46,6 +47,7 @@ function NewFileTransferPageContent() {
   const senderOrgNumber = selectedParty?.organizationNumber ?? ''
   const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
 
   const { addUploadSuccessListener } = useUploadActions()
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
@@ -107,11 +109,6 @@ function NewFileTransferPageContent() {
     )
   }
 
-  const cancel = () => {
-    form.cancel()
-    navigate(servicePath(service.resourceId))
-  }
-
   const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
     (field) => errors[field],
   )
@@ -130,6 +127,11 @@ function NewFileTransferPageContent() {
 
   // An interrupted upload settled these when it was created, so they are shown but not editable.
   const detailsLocked = form.interrupted !== null
+
+  const cancellable = active !== null || form.interrupted !== null
+  if (confirmingCancel && !cancellable) {
+    setConfirmingCancel(false)
+  }
 
   // The metadata summary entry points at the row input that failed instead of the entire metadata field.
   const metadataErrorTargetId = (field: NewFileTransferField) =>
@@ -211,7 +213,6 @@ function NewFileTransferPageContent() {
                 file={form.interrupted.file}
                 uploaded={form.interruptedUploaded}
                 ready={form.resumeReady}
-                onDiscard={form.discardInterrupted}
               />
             )}
 
@@ -255,28 +256,40 @@ function NewFileTransferPageContent() {
             <UploadProgress status={active.status} onPause={form.pause} onResume={form.resume} />
           )}
 
-          <div className="new-transfer__actions">
-            {continueUpload || detailsLocked ? (
-              <Button
-                type="button"
-                onClick={continueUpload ?? undefined}
-                disabled={continueUpload === null}
-              >
-                Fortsett opplastingen
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                loading={active !== null}
-                disabled={active !== null || blockedBy !== null}
-              >
-                {active ? 'Laster opp…' : 'Send formidling'}
-              </Button>
-            )}
-            <Button type="button" variant="secondary" onClick={cancel}>
-              Avbryt
-            </Button>
-          </div>
+          {confirmingCancel ? (
+            <CancelUploadConfirmation
+              onConfirm={() => {
+                setConfirmingCancel(false)
+                form.cancel()
+              }}
+              onDismiss={() => setConfirmingCancel(false)}
+            />
+          ) : (
+            <div className="new-transfer__actions">
+              {continueUpload || detailsLocked ? (
+                <Button
+                  type="button"
+                  onClick={continueUpload ?? undefined}
+                  disabled={continueUpload === null}
+                >
+                  Fortsett opplastingen
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  loading={active !== null}
+                  disabled={active !== null || blockedBy !== null}
+                >
+                  {active ? 'Laster opp…' : 'Send formidling'}
+                </Button>
+              )}
+              {cancellable && (
+                <Button type="button" variant="secondary" onClick={() => setConfirmingCancel(true)}>
+                  Avbryt opplastingen
+                </Button>
+              )}
+            </div>
+          )}
         </form>
       )}
     </DialogLayout>

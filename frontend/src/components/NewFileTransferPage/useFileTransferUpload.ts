@@ -40,11 +40,14 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
   const hasActive = active !== null
   useEffect(() => (hasActive ? pause : undefined), [hasActive, pause])
 
+  const discardInterrupted = interrupted.discard
   const cancel = useCallback(() => {
     if (hasActive) {
       uploads.cancel()
+    } else {
+      discardInterrupted()
     }
-  }, [hasActive, uploads])
+  }, [discardInterrupted, hasActive, uploads])
 
   const submit = useCallback(async () => {
     setSubmitAttempts((attempts) => attempts + 1)
@@ -112,7 +115,6 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     wrongFile,
     resumeReady,
     resumeInterrupted,
-    discardInterrupted: interrupted.discard,
     submit,
     pause,
     resume,
