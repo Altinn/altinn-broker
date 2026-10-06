@@ -57,17 +57,20 @@ export function FileTransferServicesPage() {
     return services.filter((service) => serviceName(service).toLowerCase().includes(query))
   }, [services, search])
 
-  const creatable = filtered.filter((service) => service.canSend)
-  const other = filtered.filter((service) => !service.canSend)
+  const sendable = filtered.filter((service) => service.canSend)
+  const receivable = filtered.filter((service) => service.canReceive)
+  const receivableNotSendable = receivable.filter((service) => !service.canSend)
+  const configurable = filtered.filter((service) => service.isOwned)
+  const isServiceOwner = services.some((service) => service.isServiceOwner)
 
-  const serviceItem = (service: AuthorizedResource, variant: 'default' | 'subtle') => (
+  const serviceItem = (service: AuthorizedResource) => (
     <ResourceListItem
       key={service.resourceId}
       id={service.resourceId}
       resourceName={serviceName(service)}
       ownerName={service.serviceOwnerName ?? 'Ukjent eier'}
       description={service.serviceOwnerName ? `Eid av ${service.serviceOwnerName}` : undefined}
-      variant={variant}
+      variant="default"
       interactive
       as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
     />
@@ -139,21 +142,30 @@ export function FileTransferServicesPage() {
         />
       )}
 
-      {creatable.length > 0 && (
+      {sendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan opprette
+            Formidlingstjenester {organizationName} kan sende med
           </Heading>
-          <List spacing="sm">{creatable.map((service) => serviceItem(service, 'default'))}</List>
+          <List spacing="sm">{sendable.map(serviceItem)}</List>
         </section>
       )}
 
-      {other.length > 0 && (
+      {receivableNotSendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
             Andre formidlingstjenester {organizationName} er delaktig i
           </Heading>
-          <List spacing="sm">{other.map((service) => serviceItem(service, 'subtle'))}</List>
+          <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
+        </section>
+      )}
+
+      {isServiceOwner && configurable.length > 0 && (
+        <section className="page-section">
+          <Heading size="sm" as="h2">
+            Formidlingstjenester {organizationName} kan konfigurere
+          </Heading>
+          <List spacing="sm">{configurable.map(serviceItem)}</List>
         </section>
       )}
     </div>

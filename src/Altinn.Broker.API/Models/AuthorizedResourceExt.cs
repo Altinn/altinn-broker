@@ -36,4 +36,24 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("canReceive")]
     public bool CanReceive { get; set; }
+
+    /// <summary>
+    /// The party is a Broker service owner and the user has <c>publish</c> on
+    /// <c>digdir-broker-administrasjon</c> for that party, so they may configure this resource
+    /// (when it is owned by the party).
+    /// </summary>
+    [JsonPropertyName("canPublish")]
+    public bool CanPublish { get; set; }
+
+    /// <summary>
+    /// Whether the requested party is configured as a Broker service owner.
+    /// </summary>
+    [JsonPropertyName("isServiceOwner")]
+    public bool IsServiceOwner { get; set; }
+
+    /// <summary>
+    /// Whether the requested party owns this broker resource.
+    /// </summary>
+    [JsonPropertyName("isOwned")]
+    public bool IsOwned { get; set; }
 }

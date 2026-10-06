@@ -15,14 +15,26 @@ type AllowedRecipientBody = {
   name: string | null
 }
 
+export type GetAllowedRecipientsOptions = {
+  /**
+   * When true, returns every access-list party (minus the caller) without narrowing to the
+   * currently configured required party. Use for configuration UIs that need to change required party.
+   */
+  ignoreRequiredParty?: boolean
+}
+
 /**
  * Reads the organizations the party may send to on a resource.
  */
 export async function getAllowedRecipients(
   resourceId: string,
   party: string,
+  options: GetAllowedRecipientsOptions = {},
 ): Promise<AllowedRecipient[]> {
   const query = new URLSearchParams({ party })
+  if (options.ignoreRequiredParty) {
+    query.set('ignoreRequiredParty', 'true')
+  }
   const path = `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}/allowed-recipients?${query}`
 
   const body = await apiFetch<AllowedRecipientBody[]>(path)

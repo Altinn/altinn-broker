@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
-import { getResourceConfiguration, type ResourceConfiguration } from '../../api/resourceConfiguration'
+import {
+  effectiveMaxFileTransferSize,
+  getResourceConfiguration,
+  type ResourceConfiguration,
+} from '../../api/resourceConfiguration'
 import {
   emptyValues,
   metadataInputId,
@@ -114,7 +118,6 @@ function useFormValues(
     () => resolveRecipientRules(recipients, configuration?.requiredParty ?? null, senderOrgNumber),
     [recipients, configuration, senderOrgNumber],
   )
-  const maxFileSize = configuration?.maxFileTransferSize ?? null
   const requiredParty = rules.requiredParty
   const virusScanLocked = !configuration?.approvedForDisabledVirusScan
   const values = useMemo<NewFileTransferValues>(
@@ -124,6 +127,10 @@ function useFormValues(
       virusScan: virusScanLocked || draft.virusScan,
     }),
     [draft, requiredParty, virusScanLocked],
+  )
+  const maxFileSize = effectiveMaxFileTransferSize(
+    configuration?.maxFileTransferSize ?? null,
+    values.virusScan,
   )
 
   const setValue = useCallback(
