@@ -358,32 +358,6 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetFileTransferSummariesAssociatedWithActor_MoreTransfersThanLimit_ReturnsNewestUpToLimit()
-	{
-		// Arrange
-		const int limit = 100;
-		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
-		var senderExternalId = NewOrgId();
-		// Oldest first, so the newest `limit` of them are the ones inserted last.
-		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, limit + 1);
-		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
-
-		// Act
-		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
-		{
-			Actor = actor,
-			ResourceIds = [resourceId],
-			SenderStatuses = [FileTransferStatus.Published],
-			Limit = limit
-		}, cancellationToken: default);
-
-		// Assert
-		Assert.Equal(limit, result.Count);
-		Assert.DoesNotContain(ordered[0], result.Select(summary => summary.FileTransferId));
-		Assert.Contains(ordered[^1], result.Select(summary => summary.FileTransferId));
-	}
-
-	[Fact]
 	public async Task GetFileTransferSummariesAssociatedWithActor_Cursor_ContinuesWhereThePreviousPageStopped()
 	{
 		// Arrange

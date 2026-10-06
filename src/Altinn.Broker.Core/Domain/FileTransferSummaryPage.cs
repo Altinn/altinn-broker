@@ -7,11 +7,14 @@ public class FileTransferSummaryPage
 {
     public required List<FileTransferSummaryEntity> Summaries { get; set; }
 
-    /// <summary>True when the party has file transfers beyond the ones in <see cref="Summaries"/>.</summary>
-    public required bool HasNextPage { get; set; }
-
-    /// <summary>Pass back as the cursor to read the next page. Null when there is none.</summary>
+    /// <summary>Pass back as the cursor to read the next page. Null when this is the last one.</summary>
     public string? ContinuationToken { get; set; }
 
-    public static FileTransferSummaryPage Empty() => new() { Summaries = [], HasNextPage = false };
+    /// <summary>
+    /// Whether the party has file transfers beyond this page. Derived rather than stored, so it
+    /// cannot disagree with the token.
+    /// </summary>
+    public bool HasNextPage => ContinuationToken is not null;
+
+    public static FileTransferSummaryPage Empty() => new() { Summaries = [] };
 }

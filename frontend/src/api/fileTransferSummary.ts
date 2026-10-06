@@ -14,8 +14,10 @@ export type FileTransferSummary = {
 /** One page of summaries, and how to continue past it. */
 export type FileTransferSummaryPage = {
   items: FileTransferSummary[]
-  hasNextPage: boolean
-  /** Pass back to read the next page. Null on the last one. */
+  /**
+   * Pass back to read the next page. Null on the last one — which is also how the list knows
+   * there is nothing more, so the API's `hasNextPage` is not needed here.
+   */
   continuationToken: string | null
 }
 

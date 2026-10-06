@@ -43,12 +43,15 @@ export function useFileTransferList(
   })
 
   const items: FileTransferSummary[] = transfers.data?.pages.flatMap((page) => page.items) ?? []
+  const isError = resources.isError || transfers.isError
 
   return {
     resources: resources.data ?? [],
     items,
-    isLoading: resources.isLoading || transfers.isPending,
-    isError: resources.isError || transfers.isError,
+    isError,
+    // The transfer query stays pending while the resources it depends on load, so it covers both
+    // phases. A failed resource lookup leaves it pending for good, hence the error taking priority.
+    isLoading: !isError && transfers.isPending,
     hasNextPage: transfers.hasNextPage,
     isFetchingNextPage: transfers.isFetchingNextPage,
     fetchNextPage: transfers.fetchNextPage,

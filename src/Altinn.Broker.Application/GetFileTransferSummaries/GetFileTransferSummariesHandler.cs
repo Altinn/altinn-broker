@@ -111,7 +111,6 @@ public class GetFileTransferSummariesHandler(
         return new FileTransferSummaryPage
         {
             Summaries = summaries,
-            HasNextPage = hasNextPage,
             ContinuationToken = hasNextPage ? ContinuationTokenFor(summaries[^1]) : null
         };
     }
