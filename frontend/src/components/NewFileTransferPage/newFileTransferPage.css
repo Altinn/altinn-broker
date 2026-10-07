@@ -101,10 +101,32 @@
   height: var(--ds-size-2);
 }
 
-.new-transfer__progress > p {
+/* The status text and the pause control share a row, with the text taking whatever is left. */
+.new-transfer__progress-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-size-3);
+}
+
+.new-transfer__progress-status > p {
   margin: 0;
+  min-width: 0;
   color: var(--ds-color-neutral-text-subtle);
   font-size: var(--ds-body-sm-font-size);
+}
+
+.new-transfer__resume,
+.new-transfer__notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-size-2);
+}
+
+.new-transfer__resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-size-2);
 }
 
 .new-transfer__error-summary:focus {

@@ -19,7 +19,7 @@ export function toAuthorizedParty(party: AuthorizedPartyDto): AuthorizedParty {
 }
 
 /** Every party in the hierarchy, parents before their subunits. */
-export function flattenParties(parties: AuthorizedPartyDto[]): AuthorizedPartyDto[] {
+export function flattenParties<T extends { subunits?: T[] }>(parties: T[]): T[] {
   return parties.flatMap((party) => [party, ...flattenParties(party.subunits ?? [])])
 }
 

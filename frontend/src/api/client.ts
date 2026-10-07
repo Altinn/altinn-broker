@@ -18,24 +18,17 @@ export type ApiFetchOptions = RequestInit & {
 }
 
 /**
- * Authenticated fetch against the Broker API.
- * Always sends cookies (`credentials: "include"`).
- * State-changing requests get `X-Requested-With` for CSRF protection.
+ * Authenticated request to the Broker API, answered with the response as is.
+ * Always sends cookies (`credentials: "include"`). State-changing requests get
+ * `X-Requested-With` for CSRF protection.
  */
-export async function apiFetch<T = unknown>(
-  path: string,
-  options: ApiFetchOptions = {},
-): Promise<T> {
+export async function apiRequest(path: string, options: ApiFetchOptions = {}): Promise<Response> {
   const { redirectOnUnauthorized = true, headers: initHeaders, ...rest } = options
   const method = (rest.method ?? 'GET').toUpperCase()
   const headers = new Headers(initHeaders)
 
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !headers.has('X-Requested-With')) {
     headers.set('X-Requested-With', 'XMLHttpRequest')
-  }
-
-  if (!headers.has('Accept')) {
-    headers.set('Accept', 'application/json')
   }
 
   const response = await fetch(apiUrl(path), {
@@ -50,14 +43,23 @@ export async function apiFetch<T = unknown>(
     throw new ApiError('Unauthorized', 401)
   }
 
+  return response
+}
+
+/** An authenticated request whose body is the answer. Anything but a success throws an ApiError. */
+export async function apiFetch<T = unknown>(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<T> {
+  const headers = new Headers(options.headers)
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json')
+  }
+
+  const response = await apiRequest(path, { ...options, headers })
+
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = await response.text().catch(() => undefined)
-    }
-    throw new ApiError(`Request failed: ${response.status}`, response.status, body)
+    throw new ApiError(`Request failed: ${response.status}`, response.status, await readBody(response))
   }
 
   if (response.status === 204) {
@@ -72,22 +74,34 @@ export async function apiFetch<T = unknown>(
   return (await response.text()) as T
 }
 
+/** The body of an error response: problem details as JSON, so their detail can be shown, else text. */
+export async function readBody(response: Response): Promise<unknown> {
+  const text = await response.text().catch(() => '')
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
 /**
  * A 401 from a Broker endpoint does not by itself mean the session is over: a failing downstream
  * dependency (Altinn Authorization, token exchange) surfaces the same status. Only /me can tell the
  * difference, so ask it before throwing the user out to ID-Porten for no reason.
  */
-export async function redirectToLoginIfSessionEnded(returnUrl?: string): Promise<void> {
-  if (await sessionIsGone()) {
-    redirectToLogin(returnUrl)
+export async function redirectToLoginIfSessionEnded(returnUrl?: string): Promise<boolean> {
+  if (!(await sessionIsGone())) {
+    return false
   }
+  redirectToLogin(returnUrl)
+  return true
 }
 
 async function sessionIsGone(): Promise<boolean> {
   try {
-    const response = await fetch(apiUrl(`${AUTH_BASE_PATH}/me`), {
-      credentials: 'include',
+    const response = await apiRequest(`${AUTH_BASE_PATH}/me`, {
       headers: { Accept: 'application/json' },
+      redirectOnUnauthorized: false,
     })
 
     if (response.status === 401) {
