@@ -1,22 +1,17 @@
 import type { SelectedParty } from '../parties/PartiesContext'
-import { apiFetch } from './client'
 import { BROKER_API_PREFIX } from './config'
-import type { FileTransferSummary } from './fileTransferSummary'
+import { fetchSummaryPage, type FileTransferSummaryPage } from './fileTransferSummary'
 
 const ACTIVE_FILETRANSFERS_PATH = `${BROKER_API_PREFIX}/frontend/active-file-transfers`
 
 /**
- * Lean summary (fileTransferId, sender, recipients, reference) of active (published) file
- * transfers across the given resources, fetched in a single backend call.
+ * Active (published) file transfers across the given resources, newest first and capped at a page.
+ * Continue past it with the token from the previous page.
  */
 export function getActiveFileTransfers(
   resourceIds: string[],
-  onBehalfOf?: SelectedParty,
-): Promise<FileTransferSummary[]> {
-  const params = new URLSearchParams()
-  resourceIds.forEach((resourceId) => params.append('resourceIds', resourceId))
-  if (onBehalfOf) params.set('onBehalfOf', onBehalfOf.organizationNumber)
-  return apiFetch<FileTransferSummary[]>(`${ACTIVE_FILETRANSFERS_PATH}?${params}`, {
-    redirectOnUnauthorized: false,
-  })
+  onBehalfOf: SelectedParty | undefined,
+  continuationToken: string | undefined,
+): Promise<FileTransferSummaryPage> {
+  return fetchSummaryPage(ACTIVE_FILETRANSFERS_PATH, resourceIds, onBehalfOf, continuationToken)
 }
