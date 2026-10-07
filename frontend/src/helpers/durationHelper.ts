@@ -99,3 +99,21 @@ function countOf(seconds: number, unit: (typeof UNITS)[number]): string {
   const count = seconds / unit.seconds
   return `${count} ${count === 1 ? unit.singular : unit.plural}`
 }
+
+/**
+ * A countdown for something still running, rounded to the largest unit that still tells the
+ * reader how long they are waiting. Anything under a minute is not worth a number.
+ */
+export function formatRemainingTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 60) {
+    return 'under ett minutt'
+  }
+
+  const roughUnit = unitFor(seconds)
+  const rounded = Math.round(seconds / roughUnit.seconds) * roughUnit.seconds
+  return countOf(rounded, unitFor(rounded))
+}
+
+function unitFor(seconds: number): (typeof UNITS)[number] {
+  return UNITS.find((candidate) => seconds >= candidate.seconds && candidate.seconds >= 60) ?? UNITS[2]
+}
