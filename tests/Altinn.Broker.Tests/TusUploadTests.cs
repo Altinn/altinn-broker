@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Models;
-using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
@@ -85,6 +84,53 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True(downloadResponse.IsSuccessStatusCode, await downloadResponse.Content.ReadAsStringAsync());
         var downloadedBytes = await downloadResponse.Content.ReadAsByteArrayAsync();
         Assert.Equal(fileContent, downloadedBytes);
+    }
+
+    [Fact]
+    public async Task TusUpload_MultiChunk_HeadResume_Succeeds()
+    {
+        var fileContent = Encoding.UTF8.GetBytes("abcdefghijklmnopqrstuvwxyz0123"); // 30 bytes
+        const int chunkSize = 10;
+
+        var (fileTransferId, uploadUrl) = await TusUploadTestHelper.InitializeAndCreateTusUploadAsync(
+            _senderClient,
+            fileContent.Length);
+
+        var headOffset = await TusUploadTestHelper.HeadUploadOffsetAsync(_senderClient, uploadUrl);
+        Assert.Equal(0, headOffset);
+
+        long offset = 0;
+        while (offset < fileContent.Length)
+        {
+            var chunk = fileContent.AsSpan((int)offset, Math.Min(chunkSize, fileContent.Length - (int)offset)).ToArray();
+            var patchOffset = await TusUploadTestHelper.PatchChunkAsync(_senderClient, uploadUrl, offset, chunk);
+            Assert.Equal(offset + chunk.Length, patchOffset);
+
+            if (patchOffset >= fileContent.Length)
+            {
+                // Upload is complete; HEAD may race with finalize and return 409.
+                offset = patchOffset;
+                break;
+            }
+
+            // HEAD reports durable/committed offset. Wait until staging catches Accepted.
+            headOffset = await TusUploadTestHelper.WaitForHeadOffsetAsync(
+                _senderClient,
+                uploadUrl,
+                expectedOffset: offset + chunk.Length,
+                timeout: TimeSpan.FromSeconds(15));
+            Assert.Equal(offset + chunk.Length, headOffset);
+
+            // Resume from HEAD (as a client would after interrupt), then continue.
+            offset = headOffset;
+        }
+
+        Assert.Equal(fileContent.Length, offset);
+        await TusUploadTestHelper.WaitForPublishedAndAssertDownloadAsync(
+            _senderClient,
+            _recipientClient,
+            fileTransferId,
+            fileContent);
     }
 
     [Fact]

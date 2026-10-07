@@ -20,4 +20,10 @@ public class TusOptions
     /// Requests that exceed this limit are rejected before the full body is buffered.
     /// </summary>
     public long MaxChunkSizeBytes { get; set; } = DefaultMaxChunkSizeBytes;
+
+    /// <summary>
+    /// After this period without upload activity, an AcceptedOffset that is ahead of durable
+    /// storage is treated as abandoned and rolled back so HEAD/PATCH resume can agree again.
+    /// </summary>
+    public TimeSpan AcceptedOffsetReconcileGracePeriod { get; set; } = TimeSpan.FromMinutes(2);
 }
