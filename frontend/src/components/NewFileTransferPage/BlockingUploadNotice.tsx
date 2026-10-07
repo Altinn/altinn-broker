@@ -1,0 +1,72 @@
+import { Alert, Button, Heading, Paragraph } from '@digdir/designsystemet-react'
+import { useState } from 'react'
+import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { useUploadProgress, type ActiveUpload } from '../../upload/uploadsContext'
+import { CancelUploadConfirmation } from './CancelUploadConfirmation'
+
+type BlockingUploadNoticeProps = {
+  upload: ActiveUpload
+  onContinue: () => void
+  onCancel: () => void
+}
+
+export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingUploadNoticeProps) {
+  const [confirming, setConfirming] = useState(false)
+  const percent = useUploadProgress()?.percent ?? null
+
+  // While finishing, the server may already have accepted the join, which a cancel can't undo.
+  const cancellable = upload.status !== 'finishing'
+  if (confirming && !cancellable) {
+    setConfirming(false)
+  }
+
+  return (
+    <Alert data-color="info" className="new-transfer__notice">
+      <Heading level={3} data-size="2xs">
+        {heading(upload)}
+      </Heading>
+      <Paragraph data-size="sm">
+        «{upload.fileName}» ({formatFileSize(upload.fileSize)}){progressText(upload, percent)}. Du
+        kan laste opp én fil om gangen, så denne må fullføres eller avbrytes før du sender en ny.
+      </Paragraph>
+      {confirming ? (
+        <CancelUploadConfirmation onConfirm={onCancel} onDismiss={() => setConfirming(false)} />
+      ) : (
+        <div className="new-transfer__resume-actions">
+          <Button type="button" variant="secondary" data-size="sm" onClick={onContinue}>
+            Gå til opplastingen
+          </Button>
+          {cancellable && (
+            <Button
+              type="button"
+              variant="tertiary"
+              data-size="sm"
+              onClick={() => setConfirming(true)}
+            >
+              Avbryt den opplastingen
+            </Button>
+          )}
+        </div>
+      )}
+    </Alert>
+  )
+}
+
+function progressText(upload: ActiveUpload, percent: number | null): string {
+  if (percent !== null) {
+    return ` er ${percent} % lastet opp`
+  }
+  return upload.status === 'initializing' ? ' er ikke kommet i gang ennå' : ' er ikke fullført'
+}
+
+function heading(upload: ActiveUpload): string {
+  switch (upload.status) {
+    case 'failed':
+      return 'En annen opplasting stoppet'
+    case 'pausing':
+    case 'paused':
+      return 'En annen opplasting er satt på pause'
+    default:
+      return 'En annen opplasting pågår'
+  }
+}
