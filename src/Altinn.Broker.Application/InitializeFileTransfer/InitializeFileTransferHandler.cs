@@ -4,6 +4,7 @@ using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
@@ -59,15 +60,33 @@ public class InitializeFileTransferHandler(
             }
         }
 
-        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(
+            user,
+            request.ResourceId,
+            request.SenderExternalId,
+            cancellationToken,
+            requireRegisteredResource: false);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         }
+        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+        if (altinnResource is null)
+        {
+            return Errors.InvalidResourceDefinition;
+        }
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceHasNotBeenConfigured;
+            if (!string.Equals(altinnResource.ResourceType, AltinnResourceTypes.BrokerService, StringComparison.Ordinal))
+            {
+                return Errors.ResourceHasNotBeenConfigured;
+            }
+            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is null)
+            {
+                return Errors.ServiceOwnerHasNotBeenConfigured;
+            }
+            resource = await resourceRepository.CreateResource(altinnResource, cancellationToken);
         }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
@@ -84,11 +103,6 @@ public class InitializeFileTransferHandler(
         if (storageProvider is null)
         {
             return Errors.StorageProviderNotReady;
-        }
-        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
-        if (altinnResource is null)
-        {
-            return Errors.InvalidResourceDefinition;
         }
         if (altinnResource.AccessListEnabled)
         {

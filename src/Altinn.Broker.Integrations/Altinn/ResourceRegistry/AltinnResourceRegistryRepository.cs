@@ -47,6 +47,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
                 Id = altinnResourceResponse.Identifier,
                 ServiceOwnerId = TTD_ORGNUMBER.WithPrefix(),
                 OrganizationNumber = TTD_ORGNUMBER,
+                ResourceType = altinnResourceResponse.ResourceType,
                 AccessListEnabled = altinnResourceResponse.AccessListMode is "Enabled"
             };
         }
@@ -55,6 +56,7 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
             Id = altinnResourceResponse.Identifier,
             ServiceOwnerId = altinnResourceResponse.HasCompetentAuthority.Organization.WithPrefix(),
             OrganizationNumber = altinnResourceResponse.HasCompetentAuthority.Organization,
+            ResourceType = altinnResourceResponse.ResourceType,
             AccessListEnabled = altinnResourceResponse.AccessListMode is "Enabled"
         };
     }

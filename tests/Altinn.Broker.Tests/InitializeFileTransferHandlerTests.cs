@@ -68,7 +68,7 @@ public class InitializeFileTransferHandlerTests
 
         var authorizationService = new Mock<IAuthorizationService>();
         authorizationService
-            .Setup(service => service.CheckAccessAsSender(null, resourceId, "0192:991825827", It.IsAny<CancellationToken>()))
+            .Setup(service => service.CheckAccessAsSender(null, resourceId, "0192:991825827", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(true);
 
         var hostEnvironment = new Mock<IHostEnvironment>();

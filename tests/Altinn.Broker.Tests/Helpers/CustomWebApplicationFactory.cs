@@ -213,8 +213,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(altinnRegisterService.Object);
 
             var authorizationService = new Mock<IAuthorizationService>();
-            authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal>(), It.Is<string>(resource => resource == TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-            authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal?>(), It.Is<string>(resource => resource != TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal>(), It.Is<string>(resource => resource == TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>())).ReturnsAsync(false);
+            authorizationService.Setup(x => x.CheckAccessAsSender(It.IsAny<ClaimsPrincipal?>(), It.Is<string>(resource => resource != TestConstants.RESOURCE_WITH_NO_ACCESS), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>())).ReturnsAsync(true);
             authorizationService.Setup(x => x.CheckAccessAsRecipient(It.IsAny<ClaimsPrincipal?>(), It.IsAny<FileTransferEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             authorizationService.Setup(x => x.CheckAccessAsSenderOrRecipient(It.IsAny<ClaimsPrincipal?>(), It.IsAny<FileTransferEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             authorizationService.Setup(x => x.CheckAccessForSearch(It.IsAny<ClaimsPrincipal?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
