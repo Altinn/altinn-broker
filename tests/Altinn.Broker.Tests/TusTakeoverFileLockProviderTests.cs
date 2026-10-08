@@ -31,6 +31,27 @@ public class TusTakeoverFileLockProviderTests
         Assert.True(holderLifetime.Aborted);
     }
 
+    [Fact]
+    public async Task Lock_OlderRequest_GivesWayToANewerHolder()
+    {
+        var accessor = new HttpContextAccessor();
+        var provider = new TusTakeoverFileLockProvider(
+            accessor,
+            NullLogger<TusTakeoverFileLockProvider>.Instance,
+            TimeSpan.FromMilliseconds(200));
+
+        accessor.HttpContext = Request("HEAD", new AbortRecordingLifetimeFeature());
+        var olderLock = await provider.AquireLock("upload");
+
+        var newerLifetime = new AbortRecordingLifetimeFeature();
+        accessor.HttpContext = Request("HEAD", newerLifetime);
+        var newerLock = await provider.AquireLock("upload");
+        Assert.True(await newerLock.Lock());
+
+        Assert.False(await olderLock.Lock());
+        Assert.False(newerLifetime.Aborted);
+    }
+
     private static HttpContext Request(string method, IHttpRequestLifetimeFeature lifetime)
     {
         var context = new DefaultHttpContext();

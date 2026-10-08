@@ -19,9 +19,11 @@ public sealed class TusTakeoverFileLockProvider(
 {
     private readonly TimeSpan _takeoverTimeout = takeoverTimeout ?? TimeSpan.FromSeconds(10);
     private readonly Dictionary<string, FileLock> _holders = new(StringComparer.OrdinalIgnoreCase);
+    private long _lastArrival;
 
     public Task<ITusFileLock> AquireLock(string fileId)
-        => Task.FromResult<ITusFileLock>(new FileLock(this, fileId, httpContextAccessor.HttpContext));
+        => Task.FromResult<ITusFileLock>(
+            new FileLock(this, fileId, httpContextAccessor.HttpContext, Interlocked.Increment(ref _lastArrival)));
 
     private async Task<bool> TakeAsync(FileLock fileLock)
     {
@@ -29,6 +31,7 @@ public sealed class TusTakeoverFileLockProvider(
         while (true)
         {
             FileLock? holder;
+            bool holderIsNewer;
             lock (_holders)
             {
                 if (!_holders.TryGetValue(fileLock.FileId, out holder))
@@ -37,9 +40,24 @@ public sealed class TusTakeoverFileLockProvider(
                     return true;
                 }
 
-                // Aborted under the lock: a holder that is still registered hasn't finished its
-                // request, so its context isn't yet reused for another one.
-                holder.Context?.Abort();
+                // The newest request wins, so an older one gives way instead of taking the lock back.
+                holderIsNewer = holder.Arrival > fileLock.Arrival;
+                if (!holderIsNewer)
+                {
+                    // Aborted under the lock: a holder that is still registered hasn't finished its
+                    // request, so its context isn't yet reused for another one.
+                    holder.Context?.Abort();
+                }
+            }
+
+            if (holderIsNewer)
+            {
+                logger.LogInformation(
+                    "TUS upload {FileId}: a newer {HolderMethod} request holds the lock, so the older {Method} request is refused.",
+                    fileLock.FileId,
+                    holder.Method,
+                    fileLock.Method);
+                return false;
             }
 
             logger.LogInformation(
@@ -78,11 +96,17 @@ public sealed class TusTakeoverFileLockProvider(
         fileLock.Released.TrySetResult();
     }
 
-    private sealed class FileLock(TusTakeoverFileLockProvider provider, string fileId, HttpContext? context) : ITusFileLock
+    private sealed class FileLock(
+        TusTakeoverFileLockProvider provider,
+        string fileId,
+        HttpContext? context,
+        long arrival) : ITusFileLock
     {
         private bool _hasLock;
 
         public string FileId { get; } = fileId;
+
+        public long Arrival { get; } = arrival;
 
         public HttpContext? Context { get; } = context;
 
