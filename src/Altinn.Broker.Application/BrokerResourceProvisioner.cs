@@ -1,3 +1,4 @@
+using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
@@ -98,6 +99,8 @@ public class BrokerResourceProvisioner(
         ResourceEntity entity,
         CancellationToken cancellationToken)
     {
+        entity.MaxFileTransferSize ??= ApplicationConstants.MaxVirusScanUploadSize;
+
         try
         {
             var created = await resourceRepository.CreateResource(entity, cancellationToken);
