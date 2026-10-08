@@ -74,13 +74,18 @@ public sealed class TusTakeoverFileLockProvider(
                     remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero,
                     fileLock.Context?.RequestAborted ?? CancellationToken.None);
             }
-            catch (Exception e) when (e is TimeoutException or OperationCanceledException)
+            catch (TimeoutException)
             {
                 logger.LogWarning(
                     "TUS upload {FileId}: the {HolderMethod} request holding the lock did not let go, so the {Method} request is refused.",
                     fileLock.FileId,
                     holder.Method,
                     fileLock.Method);
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                // This request's own client is gone, so there's nobody to refuse.
                 return false;
             }
         }
