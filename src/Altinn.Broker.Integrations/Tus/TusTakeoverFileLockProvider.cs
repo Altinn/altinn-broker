@@ -1,3 +1,5 @@
+using Altinn.Broker.Core.Helpers;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -110,7 +112,7 @@ public sealed class TusTakeoverFileLockProvider(
 
         public HttpContext? Context { get; } = context;
 
-        public string Method { get; } = context?.Request.Method ?? "unknown";
+        public string Method { get; } = context?.Request.Method.SanitizeForLogs() ?? "unknown";
 
         public TaskCompletionSource Released { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
