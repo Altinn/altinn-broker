@@ -83,6 +83,53 @@ public class AltinnResourceRegistryRepository : IAltinnResourceRepository
         };
     }
 
+    public async Task<IReadOnlyList<AltinnResourceSearchHit>> SearchResourcesByType(string resourceType, CancellationToken cancellationToken = default)
+    {
+        var url = QueryHelpers.AddQueryString(
+            "resourceregistry/api/v1/resource/search",
+            "ResourceType",
+            resourceType);
+        var response = await _client.GetAsync(url, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NoContent)
+        {
+            return [];
+        }
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            _logger.LogError("Failed to search resources in Altinn Resource Registry. Status code: {StatusCode}", response.StatusCode);
+            _logger.LogError("Body: {Response}", await response.Content.ReadAsStringAsync(cancellationToken));
+            throw new BadHttpRequestException("Failed to search resources in Altinn Resource Registry");
+        }
+
+        var searchHits = await response.Content.ReadFromJsonAsync<List<SearchResourceResponse>>(cancellationToken: cancellationToken);
+        if (searchHits is null)
+        {
+            _logger.LogError("Failed to deserialize resource search response from Altinn Resource Registry");
+            throw new BadHttpRequestException("Failed to process resource search response from Altinn Resource Registry");
+        }
+
+        return searchHits
+            .Where(hit => !string.IsNullOrWhiteSpace(hit.Identifier) && hit.HasCompetentAuthority is not null)
+            .Select(MapSearchHit)
+            .ToList();
+    }
+
+    private AltinnResourceSearchHit MapSearchHit(SearchResourceResponse hit)
+    {
+        var authority = hit.HasCompetentAuthority!;
+        var organizationNumber = authority.Orgcode.ToLowerInvariant() == "ttd"
+            ? TTD_ORGNUMBER
+            : authority.Organization;
+        return new AltinnResourceSearchHit
+        {
+            Id = hit.Identifier!,
+            OrganizationNumber = organizationNumber,
+            Title = PickPreferredLanguage(hit.Title),
+            ServiceOwnerName = PickPreferredLanguage(authority.Name),
+            ResourceType = hit.ResourceType
+        };
+    }
+
     private async Task<GetResourceResponse?> GetResourceFromRegistry(string resourceId, CancellationToken cancellationToken)
     {
         var response = await _client.GetAsync($"resourceregistry/api/v1/resource/{resourceId}", cancellationToken);

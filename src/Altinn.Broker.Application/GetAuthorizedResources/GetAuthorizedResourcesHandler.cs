@@ -18,16 +18,24 @@ namespace Altinn.Broker.Application.GetAuthorizedResources;
 /// Lists the broker resources an end user has access to on behalf of a party:
 /// access-list members with send or receive rights, plus every broker resource
 /// owned by the party when it is a Broker service owner.
+/// Includes BrokerService resources from Resource Registry that are not yet
+/// ConfigureResource'd locally.
 /// </summary>
 public class GetAuthorizedResourcesHandler(
     IAuthorizationService authorizationService,
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAltinnResourceRepository altinnResourceRepository,
+    BrokerResourceProvisioner resourceProvisioner,
     HybridCache hybridCache,
     ILogger<GetAuthorizedResourcesHandler> logger) : IHandler<GetAuthorizedResourcesRequest, List<AuthorizedResourceOverview>>
 {
     private static readonly HybridCacheEntryOptions ResourceMetadataCacheOptions = new()
+    {
+        Expiration = TimeSpan.FromMinutes(10)
+    };
+
+    private static readonly HybridCacheEntryOptions BrokerServiceSearchCacheOptions = new()
     {
         Expiration = TimeSpan.FromMinutes(10)
     };
@@ -40,24 +48,45 @@ public class GetAuthorizedResourcesHandler(
             return Errors.InvalidParty;
         }
 
+        var brokerServices = await SearchBrokerServices(cancellationToken);
+        // Persist BrokerServices with default config so detail/config endpoints work after listing.
+        await resourceProvisioner.EnsureFromSearchHitsAsync(brokerServices, cancellationToken);
+
         var configuredResources = (await resourceRepository.GetResources(cancellationToken))
             .Where(resource => !string.IsNullOrWhiteSpace(resource.ServiceOwnerId))
             .ToList();
-        if (configuredResources.Count == 0)
+
+        var metadataFromSearch = brokerServices.ToDictionary(
+            hit => hit.Id,
+            hit => new AltinnResourceMetadata
+            {
+                Title = hit.Title,
+                ServiceOwnerName = hit.ServiceOwnerName
+            },
+            StringComparer.Ordinal);
+
+        // Local configured resources win for ownership; RR fills in BrokerServices not yet in Broker
+        // (e.g. when the service owner is not configured in this environment yet).
+        var serviceOwnerByResourceId = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var resource in configuredResources)
+        {
+            serviceOwnerByResourceId[resource.Id] = resource.ServiceOwnerId.WithoutPrefix();
+        }
+        foreach (var hit in brokerServices)
+        {
+            serviceOwnerByResourceId.TryAdd(hit.Id, hit.OrganizationNumber);
+        }
+
+        var candidateResourceIds = serviceOwnerByResourceId.Keys.ToList();
+        if (candidateResourceIds.Count == 0)
         {
             return new List<AuthorizedResourceOverview>();
         }
 
-        var configuredResourceIds = configuredResources.Select(resource => resource.Id).ToList();
-        var serviceOwnerByResourceId = configuredResources.ToDictionary(
-            resource => resource.Id,
-            resource => resource.ServiceOwnerId.WithoutPrefix(),
-            StringComparer.Ordinal);
-
         List<AuthorizedResource> authorizedResources;
         try
         {
-            authorizedResources = await authorizationService.GetAuthorizedResources(user, party, configuredResourceIds, cancellationToken);
+            authorizedResources = await authorizationService.GetAuthorizedResources(user, party, candidateResourceIds, cancellationToken);
         }
         catch (HttpRequestException e)
         {
@@ -93,13 +122,17 @@ public class GetAuthorizedResourcesHandler(
             .Select(entry => entry.authorized)
             .ToList();
         logger.LogInformation(
-            "End user has access to {authorizedResourceCount} of {configuredResourceCount} broker resources for the requested party",
+            "End user has access to {authorizedResourceCount} of {candidateResourceCount} broker resources for the requested party ({configuredCount} configured locally, {brokerServiceCount} BrokerService from registry)",
             accessibleResources.Count,
-            configuredResourceIds.Count);
+            candidateResourceIds.Count,
+            configuredResources.Count,
+            brokerServices.Count);
 
         var overviews = await Task.WhenAll(accessibleResources.Select(async authorized =>
         {
-            var metadata = await GetResourceMetadata(authorized.ResourceId, cancellationToken);
+            var metadata = metadataFromSearch.TryGetValue(authorized.ResourceId, out var fromSearch)
+                ? fromSearch
+                : await GetResourceMetadata(authorized.ResourceId, cancellationToken);
             var ownedByParty = serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
                 && owner == party;
             return new AuthorizedResourceOverview
@@ -118,6 +151,25 @@ public class GetAuthorizedResourcesHandler(
         return overviews
             .OrderBy(overview => overview.Name ?? overview.ResourceId, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<AltinnResourceSearchHit>> SearchBrokerServices(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await hybridCache.GetOrCreateAsync(
+                $"rr:search:{AltinnResourceTypes.BrokerService}",
+                AltinnResourceTypes.BrokerService,
+                (resourceType, token) => new ValueTask<IReadOnlyList<AltinnResourceSearchHit>>(
+                    altinnResourceRepository.SearchResourcesByType(resourceType, token)),
+                BrokerServiceSearchCacheOptions,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "Could not search BrokerService resources in Altinn Resource Registry; continuing with locally configured resources only");
+            return [];
+        }
     }
 
     /// <remarks>

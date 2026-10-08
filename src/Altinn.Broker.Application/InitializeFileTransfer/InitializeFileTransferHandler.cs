@@ -20,7 +20,6 @@ using OneOf;
 
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
-    IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAuthorizationService authorizationService,
@@ -31,6 +30,7 @@ public class InitializeFileTransferHandler(
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     IAltinnRegisterService altinnRegisterService,
+    BrokerResourceProvisioner resourceProvisioner,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -75,18 +75,15 @@ public class InitializeFileTransferHandler(
         {
             return Errors.InvalidResourceDefinition;
         }
-        var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        var (resource, provisionOutcome) = await resourceProvisioner.EnsureAsync(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            if (!string.Equals(altinnResource.ResourceType, AltinnResourceTypes.BrokerService, StringComparison.Ordinal))
+            return provisionOutcome switch
             {
-                return Errors.ResourceHasNotBeenConfigured;
-            }
-            if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is null)
-            {
-                return Errors.ServiceOwnerHasNotBeenConfigured;
-            }
-            resource = await resourceRepository.CreateResource(altinnResource, cancellationToken);
+                BrokerResourceProvisionOutcome.ServiceOwnerNotConfigured => Errors.ServiceOwnerHasNotBeenConfigured,
+                BrokerResourceProvisionOutcome.NotBrokerService => Errors.ResourceHasNotBeenConfigured,
+                _ => Errors.ResourceHasNotBeenConfigured
+            };
         }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)

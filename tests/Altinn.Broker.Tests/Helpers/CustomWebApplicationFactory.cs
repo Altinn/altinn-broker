@@ -197,6 +197,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     OrganizationNumber = "991825827",
                     AccessListEnabled = true
                 });
+            altinnResourceRepository.Setup(x => x.SearchResourcesByType(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<AltinnResourceSearchHit>());
             altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((List<string>?)null);
             altinnResourceRepository.Setup(x => x.GetAccessListOfResource(It.Is(TestConstants.RESOURCE_WITH_ACCESS_LIST, StringComparer.Ordinal), It.Is("986252932", StringComparer.Ordinal), It.IsAny<CancellationToken>()))
