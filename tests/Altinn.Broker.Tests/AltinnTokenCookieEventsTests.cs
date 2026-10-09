@@ -202,14 +202,70 @@ public class AltinnTokenCookieEventsTests
         var refreshService = new StubRefreshService(
             result: null,
             cached: new IdPortenTokens("cached-access", "refresh-2"));
+        var originalAltinn = CreateAltinnToken(TimeSpan.FromMinutes(25));
+        var context = CreateSigningInContext(originalAltinn, "refresh-1", exchangeResult: "exchanged-altinn-token");
+
+        await CreateEvents(refreshService).SigningIn(context);
+
+        Assert.Equal("refresh-2", context.Properties.GetTokenValue(RefreshTokenName));
+        Assert.False(string.IsNullOrEmpty(context.Properties.GetTokenValue(AltinnTokenName)));
+        Assert.NotEqual(originalAltinn, context.Properties.GetTokenValue(AltinnTokenName)!);
+    }
+
+    [Fact]
+    public async Task SigningIn_FollowsSuccessiveCachedRotationHops()
+    {
+        var refreshService = new StubRefreshService(
+            result: null,
+            cachedRotations: new Dictionary<string, IdPortenTokens>
+            {
+                ["refresh-1"] = new("access-2", "refresh-2"),
+                ["refresh-2"] = new("access-3", "refresh-3")
+            });
+        var exchange = new StubTokenExchangeService("exchanged-altinn-token");
+        var context = CreateSigningInContext(
+            CreateAltinnToken(TimeSpan.FromMinutes(25)),
+            "refresh-1",
+            tokenExchange: exchange);
+
+        await CreateEvents(refreshService).SigningIn(context);
+
+        Assert.Equal("refresh-3", context.Properties.GetTokenValue(RefreshTokenName));
+        Assert.Equal("access-3", exchange.LastAccessToken);
+    }
+
+    [Fact]
+    public async Task SigningIn_WhenTokenExchangeThrows_LeavesCookieTokensUnchanged()
+    {
+        var refreshService = new StubRefreshService(
+            result: null,
+            cached: new IdPortenTokens("cached-access", "refresh-2"));
+        var originalAltinn = CreateAltinnToken(TimeSpan.FromMinutes(25));
+        var context = CreateSigningInContext(
+            originalAltinn,
+            "refresh-1",
+            tokenExchange: new StubTokenExchangeService(exchangeException: new HttpRequestException("exchange down")));
+
+        await CreateEvents(refreshService).SigningIn(context);
+
+        Assert.Equal("refresh-1", context.Properties.GetTokenValue(RefreshTokenName));
+        Assert.Equal(originalAltinn, context.Properties.GetTokenValue(AltinnTokenName));
+    }
+
+    private static CookieSigningInContext CreateSigningInContext(
+        string altinnToken,
+        string refreshToken,
+        string? exchangeResult = "exchanged-altinn-token",
+        IAltinnTokenExchangeService? tokenExchange = null)
+    {
         var properties = new AuthenticationProperties();
         properties.StoreTokens(
         [
-            new AuthenticationToken { Name = AltinnTokenName, Value = CreateAltinnToken(TimeSpan.FromMinutes(25)) },
-            new AuthenticationToken { Name = RefreshTokenName, Value = "refresh-1" }
+            new AuthenticationToken { Name = AltinnTokenName, Value = altinnToken },
+            new AuthenticationToken { Name = RefreshTokenName, Value = refreshToken }
         ]);
-        var httpContext = CreateHttpContext(exchangeResult: "exchanged-altinn-token");
-        var context = new CookieSigningInContext(
+        var httpContext = CreateHttpContext(exchangeResult, tokenExchange: tokenExchange);
+        return new CookieSigningInContext(
             httpContext,
             new AuthenticationScheme(
                 AuthorizationConstants.EndUserCookie,
@@ -219,11 +275,6 @@ public class AltinnTokenCookieEventsTests
             new ClaimsPrincipal(new ClaimsIdentity("test")),
             properties,
             new CookieOptions());
-
-        await CreateEvents(refreshService).SigningIn(context);
-
-        Assert.Equal("refresh-2", context.Properties.GetTokenValue(RefreshTokenName));
-        Assert.False(string.IsNullOrEmpty(context.Properties.GetTokenValue(AltinnTokenName)));
     }
 
     private static AltinnTokenCookieEvents CreateEvents(
@@ -274,10 +325,12 @@ public class AltinnTokenCookieEventsTests
 
     private static DefaultHttpContext CreateHttpContext(
         string? exchangeResult = "exchanged-altinn-token",
-        IAuthenticationService? authenticationService = null)
+        IAuthenticationService? authenticationService = null,
+        IAltinnTokenExchangeService? tokenExchange = null)
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IAltinnTokenExchangeService>(new StubTokenExchangeService(exchangeResult));
+        services.AddSingleton<IAltinnTokenExchangeService>(
+            tokenExchange ?? new StubTokenExchangeService(exchangeResult));
         services.AddSingleton<IAuthenticationService>(authenticationService ?? new TrackingAuthenticationService());
         return new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
     }
@@ -298,7 +351,10 @@ public class AltinnTokenCookieEventsTests
         return handler.WriteToken(token);
     }
 
-    private sealed class StubRefreshService(IdPortenTokens? result = null, IdPortenTokens? cached = null) : IIdPortenTokenRefreshService
+    private sealed class StubRefreshService(
+        IdPortenTokens? result = null,
+        IdPortenTokens? cached = null,
+        IReadOnlyDictionary<string, IdPortenTokens>? cachedRotations = null) : IIdPortenTokenRefreshService
     {
         public int Calls { get; private set; }
 
@@ -314,7 +370,15 @@ public class AltinnTokenCookieEventsTests
         public Task<IdPortenTokens?> GetCachedRotationAsync(
             string refreshToken,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(cached);
+        {
+            if (cachedRotations is not null)
+            {
+                return Task.FromResult(
+                    cachedRotations.TryGetValue(refreshToken, out var rotated) ? rotated : null);
+            }
+
+            return Task.FromResult(cached);
+        }
     }
 
     private sealed class StubTusUploadSessionAuthenticationHelper(ClaimsPrincipal? cookieGracePrincipal = null)
@@ -339,10 +403,22 @@ public class AltinnTokenCookieEventsTests
         }
     }
 
-    private sealed class StubTokenExchangeService(string? result) : IAltinnTokenExchangeService
+    private sealed class StubTokenExchangeService(
+        string? result = "exchanged-altinn-token",
+        Exception? exchangeException = null) : IAltinnTokenExchangeService
     {
+        public string? LastAccessToken { get; private set; }
+
         public Task<string?> ExchangeIdPortenToken(string idPortenAccessToken, CancellationToken cancellationToken = default)
-            => Task.FromResult(result is null ? null : CreateAltinnToken(TimeSpan.FromMinutes(30)));
+        {
+            LastAccessToken = idPortenAccessToken;
+            if (exchangeException is not null)
+            {
+                throw exchangeException;
+            }
+
+            return Task.FromResult(result is null ? null : CreateAltinnToken(TimeSpan.FromMinutes(30)));
+        }
     }
 
     private sealed class StubLogoutSessionStore(bool revoked) : IOidcBackChannelLogoutSessionStore

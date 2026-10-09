@@ -126,6 +126,7 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
     /// <summary>
     /// Before any Set-Cookie, adopt a refresh rotation published by a parallel request. A long
     /// TUS PATCH that authenticated with a spent refresh token must not overwrite the newer cookie.
+    /// Follows successive cache hops when several rotations happened while the request was in flight.
     /// </summary>
     public override async Task SigningIn(CookieSigningInContext context)
     {
@@ -135,14 +136,24 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             return;
         }
 
-        var rotated = await _tokenRefreshService.GetCachedRotationAsync(refreshToken, CancellationToken.None);
-        if (rotated is null || rotated.RefreshToken == refreshToken)
+        var rotated = await ResolveLatestCachedRotationAsync(refreshToken);
+        if (rotated is null)
         {
             return;
         }
 
         var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
-        var newAltinnToken = await tokenExchange.ExchangeIdPortenToken(rotated.AccessToken, CancellationToken.None);
+        string? newAltinnToken;
+        try
+        {
+            newAltinnToken = await tokenExchange.ExchangeIdPortenToken(rotated.AccessToken, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // Same as a null exchange result: leave the cookie as-is rather than fail SignIn.
+            return;
+        }
+
         if (string.IsNullOrEmpty(newAltinnToken))
         {
             return;
@@ -153,6 +164,28 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
             new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
         ]);
+    }
+
+    private const int MaxCachedRotationHops = 5;
+
+    private async Task<IdPortenTokens?> ResolveLatestCachedRotationAsync(string refreshToken)
+    {
+        var current = refreshToken;
+        IdPortenTokens? latest = null;
+
+        for (var hop = 0; hop < MaxCachedRotationHops; hop++)
+        {
+            var rotated = await _tokenRefreshService.GetCachedRotationAsync(current, CancellationToken.None);
+            if (rotated is null || rotated.RefreshToken == current)
+            {
+                break;
+            }
+
+            latest = rotated;
+            current = rotated.RefreshToken;
+        }
+
+        return latest;
     }
 
     private async Task<bool> TryAcceptActiveTusUploadAsync(

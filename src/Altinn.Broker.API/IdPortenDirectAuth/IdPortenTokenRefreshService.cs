@@ -129,7 +129,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return cached;
             }
 
-            await using var distributedLock = await TryAcquireDistributedLock(cacheKey, cancellationToken);
+            var distributedLock = await TryAcquireDistributedLock(cacheKey, cancellationToken);
             if (distributedLock is null)
             {
                 // Another replica is redeeming. Never call ID-Porten with a token that may already
@@ -137,30 +137,88 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return await WaitForCachedResult(cacheKey, cancellationToken);
             }
 
-            cached = await ReadCachedResult(cacheKey, cancellationToken);
-            if (cached is not null)
+            try
             {
-                return cached;
-            }
+                cached = await ReadCachedResult(cacheKey, cancellationToken);
+                if (cached is not null)
+                {
+                    return cached;
+                }
 
-            var tokens = await Redeem(refreshToken, cancellationToken);
-            if (tokens is not null)
+                var redeemResult = await Redeem(refreshToken, cancellationToken);
+                if (redeemResult.Tokens is not null)
+                {
+                    await CacheResult(cacheKey, redeemResult.Tokens, cancellationToken);
+                    return redeemResult.Tokens;
+                }
+
+                // Metadata/config failed before the token was sent — safe to retry once after
+                // releasing the lock so another replica is not blocked on a dead holder.
+                if (redeemResult.FailureKind == RedeemFailureKind.PreRequest)
+                {
+                    await distributedLock.DisposeAsync();
+                    distributedLock = null;
+
+                    return await RetryRedeemAfterPreRequestFailureAsync(
+                        refreshToken,
+                        cacheKey,
+                        cancellationToken);
+                }
+
+                // Ambiguous: the refresh token may already have been spent. Do not redeem again.
+                return await WaitForCachedResult(cacheKey, cancellationToken);
+            }
+            finally
             {
-                await CacheResult(cacheKey, tokens, cancellationToken);
-                return tokens;
+                if (distributedLock is not null)
+                {
+                    await distributedLock.DisposeAsync();
+                }
             }
-
-            // With a real Redis lock we were the sole redeemer — no concurrent winner to wait for.
-            // Without Redis (local NoOp lock), another process may have won; poll the shared cache.
-            return distributedLock.IsDistributed
-                ? null
-                : await WaitForCachedResult(cacheKey, cancellationToken);
         }
         finally
         {
             singleFlightLock.Release();
             _singleFlightLocks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(cacheKey, singleFlightLock));
         }
+    }
+
+    private async Task<IdPortenTokens?> RetryRedeemAfterPreRequestFailureAsync(
+        string refreshToken,
+        string cacheKey,
+        CancellationToken cancellationToken)
+    {
+        var cached = await ReadCachedResult(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        await using var retryLock = await TryAcquireDistributedLock(cacheKey, cancellationToken);
+        if (retryLock is null)
+        {
+            return await WaitForCachedResult(cacheKey, cancellationToken);
+        }
+
+        cached = await ReadCachedResult(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var redeemResult = await Redeem(refreshToken, cancellationToken);
+        if (redeemResult.Tokens is not null)
+        {
+            await CacheResult(cacheKey, redeemResult.Tokens, cancellationToken);
+            return redeemResult.Tokens;
+        }
+
+        if (redeemResult.FailureKind == RedeemFailureKind.Ambiguous)
+        {
+            return await WaitForCachedResult(cacheKey, cancellationToken);
+        }
+
+        return null;
     }
 
     private async Task<RefreshLock?> TryAcquireDistributedLock(
@@ -224,7 +282,25 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         return null;
     }
 
-    private async Task<IdPortenTokens?> Redeem(string refreshToken, CancellationToken cancellationToken)
+    private enum RedeemFailureKind
+    {
+        None,
+        /// <summary>Failed before the refresh token was sent; redeeming again is safe.</summary>
+        PreRequest,
+        /// <summary>Failed after dispatch; the token may already be spent.</summary>
+        Ambiguous
+    }
+
+    private readonly record struct RedeemResult(IdPortenTokens? Tokens, RedeemFailureKind FailureKind)
+    {
+        public static RedeemResult Ok(IdPortenTokens tokens) => new(tokens, RedeemFailureKind.None);
+
+        public static RedeemResult PreRequest() => new(null, RedeemFailureKind.PreRequest);
+
+        public static RedeemResult Ambiguous() => new(null, RedeemFailureKind.Ambiguous);
+    }
+
+    private async Task<RedeemResult> Redeem(string refreshToken, CancellationToken cancellationToken)
     {
         var settings = _settings.Value;
 
@@ -236,13 +312,13 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not read ID-Porten OIDC metadata; session token cannot be refreshed.");
-            return null;
+            return RedeemResult.PreRequest();
         }
 
         if (string.IsNullOrEmpty(configuration.TokenEndpoint))
         {
             _logger.LogWarning("ID-Porten OIDC metadata has no token_endpoint; session token cannot be refreshed.");
-            return null;
+            return RedeemResult.PreRequest();
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, configuration.TokenEndpoint)
@@ -259,7 +335,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         string body;
         try
         {
-            // Not retried: ID-Porten may have rotated the token before failing.
+            // Ambiguous on failure: ID-Porten may have rotated the token before the response arrived.
             using var response = await _httpClientFactory.CreateClient(HttpClientName)
                 .SendAsync(request, cancellationToken);
             body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -273,7 +349,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                     "with refresh_token as a grant type, or the session was revoked.",
                     (int)response.StatusCode,
                     ReadErrorCode(body));
-                return null;
+                return RedeemResult.Ambiguous();
             }
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
@@ -281,13 +357,13 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             // Client timeouts surface as TaskCanceledException. This runs on every request's auth
             // path, so it must end the session cleanly rather than throw a 500.
             _logger.LogWarning(ex, "ID-Porten refresh_token grant failed to complete.");
-            return null;
+            return RedeemResult.Ambiguous();
         }
 
         return Parse(body, refreshToken);
     }
 
-    private IdPortenTokens? Parse(string body, string redeemedRefreshToken)
+    private RedeemResult Parse(string body, string redeemedRefreshToken)
     {
         try
         {
@@ -296,18 +372,18 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             if (string.IsNullOrEmpty(accessToken))
             {
                 _logger.LogWarning("ID-Porten refresh_token grant returned no access_token.");
-                return null;
+                return RedeemResult.Ambiguous();
             }
 
             // ID-Porten rotates on every refresh; the fallback covers providers that do not.
             var refreshToken = ReadString(document.RootElement, "refresh_token") ?? redeemedRefreshToken;
             _logger.LogInformation("Renewed the ID-Porten session; no login redirect needed.");
-            return new IdPortenTokens(accessToken, refreshToken);
+            return RedeemResult.Ok(new IdPortenTokens(accessToken, refreshToken));
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "Could not parse the ID-Porten refresh_token grant response.");
-            return null;
+            return RedeemResult.Ambiguous();
         }
     }
 
@@ -381,16 +457,17 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
 
     private sealed class RedisLock(IDatabase db, string key, string value) : IAsyncDisposable
     {
+        private const string ReleaseIfOwnerScript =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
         public async ValueTask DisposeAsync()
         {
             try
             {
-                // Only delete if we still own the lock (TTL may have expired and another holder taken it).
-                var current = await db.StringGetAsync(key);
-                if (current == value)
-                {
-                    await db.KeyDeleteAsync(key);
-                }
+                await db.ScriptEvaluateAsync(
+                    ReleaseIfOwnerScript,
+                    keys: [key],
+                    values: [value]);
             }
             catch
             {

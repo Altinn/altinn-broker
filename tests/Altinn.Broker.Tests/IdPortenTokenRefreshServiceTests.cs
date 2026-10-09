@@ -170,11 +170,37 @@ public class IdPortenTokenRefreshServiceTests
         Assert.Equal(0, handler.Calls);
     }
 
+    [Fact]
+    public async Task RefreshAsync_WhenOidcMetadataFailsOnce_RetriesRedeemSuccessfully()
+    {
+        var handler = new StubHttpMessageHandler(_ => Json("""{"access_token":"access-2","refresh_token":"refresh-2"}"""));
+        var configuration = new FlakyConfigurationManager(failuresBeforeSuccess: 1);
+
+        var tokens = await CreateService(handler, configurationManager: configuration).RefreshAsync("refresh-1");
+
+        Assert.NotNull(tokens);
+        Assert.Equal("refresh-2", tokens!.RefreshToken);
+        Assert.Equal(2, configuration.Calls);
+        Assert.Equal(1, handler.Calls);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WhenOidcMetadataKeepsFailing_DoesNotCallIdPorten()
+    {
+        var handler = new StubHttpMessageHandler(_ => Json("""{"access_token":"access-2","refresh_token":"refresh-2"}"""));
+        var configuration = new FlakyConfigurationManager(failuresBeforeSuccess: int.MaxValue);
+
+        Assert.Null(await CreateService(handler, configurationManager: configuration).RefreshAsync("refresh-1"));
+        Assert.Equal(2, configuration.Calls);
+        Assert.Equal(0, handler.Calls);
+    }
+
     private static IdPortenTokenRefreshService CreateService(
         StubHttpMessageHandler handler,
         IDistributedCache? cache = null,
         TimeSpan? concurrentRefreshWait = null,
-        TimeSpan? concurrentRefreshPollInterval = null)
+        TimeSpan? concurrentRefreshPollInterval = null,
+        IConfigurationManager<OpenIdConnectConfiguration>? configurationManager = null)
     {
         var settings = new IdPortenDirectAuthSettings
         {
@@ -186,7 +212,7 @@ public class IdPortenTokenRefreshServiceTests
         return new IdPortenTokenRefreshService(
             new StubHttpClientFactory(handler),
             Options.Create(settings),
-            new StaticConfigurationManager<OpenIdConnectConfiguration>(
+            configurationManager ?? new StaticConfigurationManager<OpenIdConnectConfiguration>(
                 new OpenIdConnectConfiguration { TokenEndpoint = TokenEndpoint }),
             cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
             NullLogger<IdPortenTokenRefreshService>.Instance,
@@ -229,6 +255,27 @@ public class IdPortenTokenRefreshServiceTests
         {
             Interlocked.Increment(ref _calls);
             return Task.FromResult(handler(request));
+        }
+    }
+
+    private sealed class FlakyConfigurationManager(int failuresBeforeSuccess)
+        : IConfigurationManager<OpenIdConnectConfiguration>
+    {
+        public int Calls { get; private set; }
+
+        public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel)
+        {
+            Calls++;
+            if (Calls <= failuresBeforeSuccess)
+            {
+                throw new InvalidOperationException("OIDC metadata unavailable");
+            }
+
+            return Task.FromResult(new OpenIdConnectConfiguration { TokenEndpoint = TokenEndpoint });
+        }
+
+        public void RequestRefresh()
+        {
         }
     }
 }
