@@ -23,7 +23,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
 
     public TusUploadTests(CustomWebApplicationFactory factory)
     {
-        _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN, allowAutoRedirect: false);
         _recipientClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         _responseSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -173,5 +173,66 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("0", offsetValues.First());
         Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
         Assert.Equal(partialLength.ToString(), lengthValues.First());
+    }
+
+    [Fact]
+    public async Task TusUpload_HeadWhileAPatchIsStalled_TakesOverTheLock()
+    {
+        // Under the 99,999 bytes another test may set as the test resource's maximum file size.
+        const int uploadLength = 96 * 1024;
+        var (fileTransferId, uploadUrl) = await TusUploadTestHelper.InitializeAndCreateTusUploadAsync(_senderClient, uploadLength);
+
+        // A PATCH that stops sending partway holds the upload's lock, like one whose connection dropped unnoticed.
+        using var stall = new CancellationTokenSource();
+        var stalledBody = new StalledContent(uploadLength, stall.Token);
+        var stalledPatch = _senderClient.SendAsync(TusUploadTestHelper.PatchRequest(uploadUrl, 0, stalledBody));
+        try
+        {
+            await stalledBody.ServerIsReading.WaitAsync(TimeSpan.FromSeconds(30));
+
+            var offset = await TusUploadTestHelper.HeadUploadOffsetAsync(_senderClient, uploadUrl)
+                .WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.Equal(0, offset);
+
+            var aborted = await Record.ExceptionAsync(() => stalledPatch.WaitAsync(TimeSpan.FromSeconds(30)));
+            Assert.NotNull(aborted);
+            Assert.IsNotType<TimeoutException>(aborted);
+        }
+        finally
+        {
+            stall.Cancel();
+        }
+
+        var fileContent = new byte[uploadLength];
+        Random.Shared.NextBytes(fileContent);
+        Assert.Equal(uploadLength, await TusUploadTestHelper.PatchChunkAsync(_senderClient, uploadUrl, 0, fileContent));
+        await TusUploadTestHelper.WaitForPublishedAndAssertDownloadAsync(
+            _senderClient,
+            _recipientClient,
+            fileTransferId,
+            fileContent);
+    }
+
+    // Sends 80 KB of its declared length, then stalls. The test server's request pipe holds 64 KB,
+    // so writing more than that only completes once the server is reading the body.
+    private sealed class StalledContent(long declaredLength, CancellationToken stall) : HttpContent
+    {
+        private readonly TaskCompletionSource _serverIsReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task ServerIsReading => _serverIsReading.Task;
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            await stream.WriteAsync(new byte[80 * 1024], stall);
+            await stream.FlushAsync(stall);
+            _serverIsReading.TrySetResult();
+            await Task.Delay(Timeout.Infinite, stall);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = declaredLength;
+            return true;
+        }
     }
 }
