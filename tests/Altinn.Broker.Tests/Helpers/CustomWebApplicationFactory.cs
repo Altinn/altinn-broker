@@ -225,6 +225,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var eventBus = new Mock<IEventBus>();
             services.AddSingleton(eventBus.Object);
 
+            var altinnNotificationService = new Mock<IAltinnNotificationService>();
+            services.AddSingleton(altinnNotificationService.Object);
+
             services.RemoveAll<IRecurringJobManager>();
             services.AddSingleton(new Mock<IRecurringJobManager>().Object);
         });
