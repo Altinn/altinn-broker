@@ -8,6 +8,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Altinn.AccessManagement;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
+using Altinn.Broker.Integrations.Altinn.Notifications;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
@@ -76,6 +77,11 @@ public static class DependencyInjection
             services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnResourceRepository).FullName, maskinportenSettings);
             services.AddHttpClient<IAltinnResourceRepository, AltinnResourceRegistryRepository>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnResourceRepository>()
+                    .AddStandardRetryPolicy();
+
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnNotificationService).FullName, maskinportenSettings);
+            services.AddHttpClient<IAltinnNotificationService, AltinnNotificationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnNotificationService>()
                     .AddStandardRetryPolicy();
         }
         // Calls on behalf of the logged in end user, so it carries their Altinn token instead of a Maskinporten token.

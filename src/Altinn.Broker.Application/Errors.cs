@@ -79,3 +79,15 @@ public static class ServiceOwnerErrors
     public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
     public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
 }
+
+public static class NotificationErrors
+{
+    public static Error CustomRecipientWithoutIdentifierNotAllowed = new Error(8001, "Custom recipient without identifier is not allowed", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithMultipleIdentifiersNotAllowed = new Error(8002, "Custom recipient with multiple identifiers is not allowed", HttpStatusCode.BadRequest);
+    public static Error InvalidEmailProvided = new Error(8003, "Invalid email provided for custom recipient.", HttpStatusCode.BadRequest);
+    public static Error InvalidMobileNumberProvided = new Error(8004, "Invalid mobile number provided. Mobile number can contain only '+' and numeric characters, and it must adhere to the E.164 standard.", HttpStatusCode.BadRequest);
+    public static Error InvalidNationalIdentityNumberProvided = new Error(8005, "Invalid national identity number provided for custom recipient. It must be an 11-digit Norwegian national identity number, optionally prefixed with 'urn:altinn:person:identifier-no:'.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithoutRelatedOrganizationNotAllowed = new Error(8006, "Custom recipient must specify the related organization number of the file transfer recipient it is notified on behalf of.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientRelatedOrganizationNotARecipient = new Error(8007, "The related organization number of a custom recipient must be one of the file transfer's recipients.", HttpStatusCode.BadRequest);
+    public static Error InvalidOrganizationNumberProvided = new Error(8008, "Invalid organization number provided for custom recipient. It must be a 9-digit organization number, optionally prefixed with '0192:' or 'urn:altinn:organization:identifier-no:'.", HttpStatusCode.BadRequest);
+}
