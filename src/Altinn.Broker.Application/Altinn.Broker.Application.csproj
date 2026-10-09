@@ -17,7 +17,7 @@
     <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Slack.Webhooks" Version="1.1.6" />
-    <PackageReference Include="libphonenumber-csharp" Version="9.0.39" />
+    <PackageReference Include="libphonenumber-csharp" Version="9.0.41" />
 
   </ItemGroup>
  
