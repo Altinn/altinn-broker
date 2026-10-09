@@ -235,7 +235,7 @@ public class AltinnTokenCookieEventsTests
     }
 
     [Fact]
-    public async Task SigningIn_WhenTokenExchangeThrows_LeavesCookieTokensUnchanged()
+    public async Task SigningIn_WhenTokenExchangeThrows_KeepsRotatedRefreshToken()
     {
         var refreshService = new StubRefreshService(
             result: null,
@@ -245,6 +245,37 @@ public class AltinnTokenCookieEventsTests
             originalAltinn,
             "refresh-1",
             tokenExchange: new StubTokenExchangeService(exchangeException: new HttpRequestException("exchange down")));
+
+        await CreateEvents(refreshService).SigningIn(context);
+
+        Assert.Equal("refresh-2", context.Properties.GetTokenValue(RefreshTokenName));
+        Assert.Equal(originalAltinn, context.Properties.GetTokenValue(AltinnTokenName));
+    }
+
+    [Fact]
+    public async Task SigningIn_WhenTokenExchangeReturnsNull_KeepsRotatedRefreshToken()
+    {
+        var refreshService = new StubRefreshService(
+            result: null,
+            cached: new IdPortenTokens("cached-access", "refresh-2"));
+        var originalAltinn = CreateAltinnToken(TimeSpan.FromMinutes(25));
+        var context = CreateSigningInContext(
+            originalAltinn,
+            "refresh-1",
+            tokenExchange: new StubTokenExchangeService(result: null));
+
+        await CreateEvents(refreshService).SigningIn(context);
+
+        Assert.Equal("refresh-2", context.Properties.GetTokenValue(RefreshTokenName));
+        Assert.Equal(originalAltinn, context.Properties.GetTokenValue(AltinnTokenName));
+    }
+
+    [Fact]
+    public async Task SigningIn_WhenNoCachedRotation_LeavesCookieTokensUnchanged()
+    {
+        var refreshService = new StubRefreshService(result: null, cached: null);
+        var originalAltinn = CreateAltinnToken(TimeSpan.FromMinutes(25));
+        var context = CreateSigningInContext(originalAltinn, "refresh-1");
 
         await CreateEvents(refreshService).SigningIn(context);
 

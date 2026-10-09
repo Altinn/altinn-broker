@@ -72,4 +72,10 @@ public class FileTransferInitalizeExt
     /// </summary>
     [JsonPropertyName("disableVirusScan")]
     public bool? DisableVirusScan { get; set; } = false;
+
+    /// <summary>
+    /// Optional notification to send to the recipient(s) once the file transfer is published.
+    /// </summary>
+    [JsonPropertyName("notification")]
+    public NotificationRequestExt? Notification { get; set; }
 }
