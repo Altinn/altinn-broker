@@ -167,7 +167,8 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var recipient1 = NewOrgId();
 		var recipient2 = NewOrgId();
 
-		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "my-reference");
+		var expirationTime = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "my-reference", expirationTime: expirationTime);
 		await _dataHelper.InsertRecipient(fileTransferId, recipient1);
 		await _dataHelper.InsertRecipient(fileTransferId, recipient2);
 		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
@@ -188,6 +189,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Equal(senderExternalId, summary.Sender);
 		Assert.True(summary.IsSender);
 		Assert.Equal("my-reference", summary.SendersFileTransferReference);
+		Assert.Equal(expirationTime, summary.ExpirationTime);
 		Assert.Equal(new[] { recipient1, recipient2 }.OrderBy(r => r), summary.Recipients.OrderBy(r => r));
 	}
 

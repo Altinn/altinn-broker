@@ -9,6 +9,7 @@ export type FileTransferSummary = {
   sender: string
   isSender: boolean
   recipients: string[]
+  expirationTime: string
 }
 
 /** One page of summaries, and how to continue past it. */

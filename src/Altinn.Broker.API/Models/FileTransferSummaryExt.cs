@@ -31,4 +31,9 @@ public class FileTransferSummaryExt
     /// Used by senders and receivers to identify specific file using external identification methods.
     /// </summary>
     public string SendersFileTransferReference { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When the file transfer expires. Recipients must download the file before then.
+    /// </summary>
+    public DateTimeOffset ExpirationTime { get; set; }
 }

@@ -18,6 +18,8 @@ public class FileTransferSummaryEntity
 
     public required string SendersFileTransferReference { get; set; }
 
+    public required DateTimeOffset ExpirationTime { get; set; }
+
     /// <summary>
     /// What the list sorts by. Not shown anywhere yet; it is the cursor position for the next page.
     /// </summary>

@@ -3,6 +3,7 @@ import { Button, List } from '@altinn/altinn-components'
 import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
+import { getDeadlineProps } from '../../helpers/deadlineHelper'
 import '../../pages/pages.css'
 import type { SelectedParty } from '../../parties/PartiesContext'
 
@@ -16,6 +17,8 @@ type FileTransferListProps = {
   currentOrg: SelectedParty
   fetchTransfers: FetchFileTransferPage
   toPath: (transferId: string) => string
+  /** A deadline only matters while the transfer can still be downloaded. */
+  showDeadline?: boolean
 }
 
 /**
@@ -31,6 +34,7 @@ export function FileTransferList({
   currentOrg,
   fetchTransfers,
   toPath,
+  showDeadline = false,
 }: FileTransferListProps) {
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
@@ -88,6 +92,7 @@ export function FileTransferList({
               recipients={overview.recipients}
               currentActorName={currentOrg.name}
               reference={overview.sendersFileTransferReference || overview.fileTransferId}
+              deadline={showDeadline ? getDeadlineProps(overview.expirationTime, overview.isSender) : undefined}
               to={toPath(overview.fileTransferId)}
             />
           </li>
