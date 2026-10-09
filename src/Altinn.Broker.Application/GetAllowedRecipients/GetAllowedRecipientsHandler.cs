@@ -24,6 +24,7 @@ public class GetAllowedRecipientsHandler(
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IAltinnRegisterService registerService,
+    BrokerResourceProvisioner resourceProvisioner,
     ILogger<GetAllowedRecipientsHandler> logger) : IHandler<GetAllowedRecipientsRequest, List<AllowedRecipientOverview>>
 {
     public async Task<OneOf<List<AllowedRecipientOverview>, Error>> Process(GetAllowedRecipientsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -37,7 +38,17 @@ public class GetAllowedRecipientsHandler(
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceHasNotBeenConfigured;
+            var (provisioned, outcome) = await resourceProvisioner.EnsureAsync(request.ResourceId, cancellationToken);
+            if (provisioned is null)
+            {
+                return outcome switch
+                {
+                    BrokerResourceProvisionOutcome.ServiceOwnerNotConfigured => Errors.ServiceOwnerHasNotBeenConfigured,
+                    BrokerResourceProvisionOutcome.NotFoundInRegistry => Errors.InvalidResourceDefinition,
+                    _ => Errors.ResourceHasNotBeenConfigured
+                };
+            }
+            resource = provisioned;
         }
 
         var accessList = await altinnResourceRepository.GetAccessListMembersOfResource(request.ResourceId, cancellationToken);

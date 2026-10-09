@@ -38,8 +38,8 @@ public class AltinnAuthorizationService : IAuthorizationService
         _logger = logger;
     }
 
-    public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
-        => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, cancellationToken);
+    public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default, bool requireRegisteredResource = true)
+        => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, cancellationToken, requireRegisteredResource);
 
     public Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
         => CheckUserAccess(

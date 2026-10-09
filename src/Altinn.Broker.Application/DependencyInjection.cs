@@ -30,6 +30,7 @@ public static class DependencyInjection
 {
     public static void AddApplicationHandlers(this IServiceCollection services)
     {
+        services.AddScoped<BrokerResourceProvisioner>();
         services.AddScoped<InitializeFileTransferHandler>();
         services.AddScoped<UploadFileHandler>();
         services.AddScoped<CompleteFileUploadHandler>();

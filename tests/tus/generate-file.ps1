@@ -74,10 +74,10 @@ if ($outputDirectory -and -not (Test-Path -LiteralPath $outputDirectory)) {
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 }
 
-$chunkSize = 8MB
+$chunkSize = [long]8MB
 $remaining = $byteCount
 $written = 0L
-$buffer = New-Object byte[] $chunkSize
+$buffer = New-Object byte[] ([int]$chunkSize)
 $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 
 $formattedSize = Format-ByteCount -Bytes $byteCount
@@ -92,10 +92,10 @@ $fileStream = [System.IO.File]::Open(
 
 try {
     while ($remaining -gt 0) {
-        $writeSize = [Math]::Min($chunkSize, $remaining)
+        $writeSize = [int][Math]::Min($chunkSize, $remaining)
         if ($writeSize -eq $chunkSize) {
             $rng.GetBytes($buffer)
-            $fileStream.Write($buffer, 0, $chunkSize)
+            $fileStream.Write($buffer, 0, $writeSize)
         }
         else {
             $tail = New-Object byte[] $writeSize
