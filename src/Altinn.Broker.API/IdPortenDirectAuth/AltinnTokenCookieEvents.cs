@@ -75,14 +75,16 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             var refreshed = await TryReExchange(context, tokens);
             if (!refreshed)
             {
-                await EndSession(context);
+                // Reject this request only. Do not SignOut — a parallel TUS chunk may already have
+                // rotated the refresh token and written a newer cookie; deleting ours races that.
+                context.RejectPrincipal();
                 return;
             }
 
             altinnToken = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
             if (string.IsNullOrEmpty(altinnToken) || !CanRead(altinnToken, out jwt))
             {
-                await EndSession(context);
+                context.RejectPrincipal();
                 return;
             }
         }
@@ -104,6 +106,38 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 
         // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
         // token and disable sliding expiration.
+    }
+
+    /// <summary>
+    /// Before any Set-Cookie, adopt a refresh rotation published by a parallel request. A long
+    /// TUS PATCH that authenticated with a spent refresh token must not overwrite the newer cookie.
+    /// </summary>
+    public override async Task SigningIn(CookieSigningInContext context)
+    {
+        var refreshToken = context.Properties.GetTokenValue(OidcSessionKeys.IdPortenRefreshToken);
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return;
+        }
+
+        var rotated = await _tokenRefreshService.GetCachedRotationAsync(refreshToken, CancellationToken.None);
+        if (rotated is null || rotated.RefreshToken == refreshToken)
+        {
+            return;
+        }
+
+        var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
+        var newAltinnToken = await tokenExchange.ExchangeIdPortenToken(rotated.AccessToken, CancellationToken.None);
+        if (string.IsNullOrEmpty(newAltinnToken))
+        {
+            return;
+        }
+
+        context.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
+            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+        ]);
     }
 
     private static async Task EndSession(CookieValidatePrincipalContext context)

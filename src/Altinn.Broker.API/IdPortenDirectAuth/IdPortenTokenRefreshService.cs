@@ -10,30 +10,37 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
+using StackExchange.Redis;
+
 namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
 /// Redeems ID-Porten refresh tokens so an expired Altinn token can be re-exchanged without a
 /// login redirect. ID-Porten consumes the token it is given and returns a new one, and the SPA
-/// calls the API in parallel, so redemption is guarded by a single-flight lock and a short-lived
-/// distributed cache keyed on the redeemed token. Without both, all but one parallel request
-/// would fail with invalid_grant and end the session.
+/// calls the API in parallel across Container App replicas, so redemption is gated by an
+/// in-process single-flight lock, a Redis lock (when available), and a short-lived distributed
+/// cache keyed on the redeemed token. Without that, competing redeems fail with invalid_grant
+/// and end the session.
 /// </summary>
 public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
 {
     internal const string HttpClientName = "idporten-token-refresh";
 
-    /// <summary>How long a result stays replayable for requests still carrying the old cookie.</summary>
-    private static readonly TimeSpan ResultCacheLifetime = TimeSpan.FromMinutes(2);
+    /// <summary>
+    /// How long a result stays replayable for requests still carrying the old cookie. Longer than
+    /// the Altinn token lifetime so a stale Set-Cookie that rewrites a spent refresh token can
+    /// still recover via cache.
+    /// </summary>
+    private static readonly TimeSpan ResultCacheLifetime = TimeSpan.FromMinutes(10);
 
     /// <summary>
-    /// How long a losing replica waits for the winner to write the rotated tokens. The in-process
-    /// semaphore does not span Container App replicas; when two pods redeem the same token,
-    /// ID-Porten returns invalid_grant to the loser while the winner is still caching.
+    /// Must cover a full ID-Porten round-trip on the winning replica (HTTP client timeout is 10s).
     /// </summary>
-    private static readonly TimeSpan DefaultConcurrentRefreshWait = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultConcurrentRefreshWait = TimeSpan.FromSeconds(10);
 
     private static readonly TimeSpan DefaultConcurrentRefreshPollInterval = TimeSpan.FromMilliseconds(50);
+
+    private static readonly TimeSpan DistributedLockLifetime = TimeSpan.FromSeconds(15);
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _singleFlightLocks = new();
 
@@ -41,6 +48,7 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     private readonly IOptions<IdPortenDirectAuthSettings> _settings;
     private readonly IConfigurationManager<OpenIdConnectConfiguration> _configurationManager;
     private readonly IDistributedCache _cache;
+    private readonly IConnectionMultiplexer? _redis;
     private readonly ILogger<IdPortenTokenRefreshService> _logger;
     private readonly TimeSpan _concurrentRefreshWait;
     private readonly TimeSpan _concurrentRefreshPollInterval;
@@ -50,7 +58,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         IOptions<IdPortenDirectAuthSettings> settings,
         IConfigurationManager<OpenIdConnectConfiguration> configurationManager,
         IDistributedCache cache,
-        ILogger<IdPortenTokenRefreshService> logger)
+        ILogger<IdPortenTokenRefreshService> logger,
+        IConnectionMultiplexer? redis = null)
         : this(
             httpClientFactory,
             settings,
@@ -58,7 +67,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             cache,
             logger,
             DefaultConcurrentRefreshWait,
-            DefaultConcurrentRefreshPollInterval)
+            DefaultConcurrentRefreshPollInterval,
+            redis)
     {
     }
 
@@ -69,7 +79,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         IDistributedCache cache,
         ILogger<IdPortenTokenRefreshService> logger,
         TimeSpan concurrentRefreshWait,
-        TimeSpan concurrentRefreshPollInterval)
+        TimeSpan concurrentRefreshPollInterval,
+        IConnectionMultiplexer? redis = null)
     {
         _httpClientFactory = httpClientFactory;
         _settings = settings;
@@ -78,6 +89,19 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         _logger = logger;
         _concurrentRefreshWait = concurrentRefreshWait;
         _concurrentRefreshPollInterval = concurrentRefreshPollInterval;
+        _redis = redis;
+    }
+
+    public Task<IdPortenTokens?> GetCachedRotationAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return Task.FromResult<IdPortenTokens?>(null);
+        }
+
+        return ReadCachedResult(CacheKey(refreshToken), cancellationToken);
     }
 
     public async Task<IdPortenTokens?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
@@ -105,6 +129,20 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return cached;
             }
 
+            await using var distributedLock = await TryAcquireDistributedLock(cacheKey, cancellationToken);
+            if (distributedLock is null)
+            {
+                // Another replica is redeeming. Never call ID-Porten with a token that may already
+                // be spent — wait for that replica to publish the rotated tokens.
+                return await WaitForCachedResult(cacheKey, cancellationToken);
+            }
+
+            cached = await ReadCachedResult(cacheKey, cancellationToken);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
             var tokens = await Redeem(refreshToken, cancellationToken);
             if (tokens is not null)
             {
@@ -112,14 +150,47 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return tokens;
             }
 
-            // Another replica likely won the refresh race. Do not end the session until we have
-            // given that winner time to publish the rotated tokens to the shared cache.
+            // Redeem failed (timeout after rotate, transient error, or a lockless race). Give a
+            // winning replica time to publish before ending the session.
             return await WaitForCachedResult(cacheKey, cancellationToken);
         }
         finally
         {
             singleFlightLock.Release();
             _singleFlightLocks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(cacheKey, singleFlightLock));
+        }
+    }
+
+    private async Task<IAsyncDisposable?> TryAcquireDistributedLock(
+        string cacheKey,
+        CancellationToken cancellationToken)
+    {
+        if (_redis is null)
+        {
+            return NoOpAsyncDisposable.Instance;
+        }
+
+        try
+        {
+            var db = _redis.GetDatabase();
+            var lockKey = $"lock:{cacheKey}";
+            var lockValue = Guid.NewGuid().ToString("N");
+            var acquired = await db.StringSetAsync(
+                lockKey,
+                lockValue,
+                DistributedLockLifetime,
+                When.NotExists);
+            if (!acquired)
+            {
+                return null;
+            }
+
+            return new RedisLock(db, lockKey, lockValue);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not acquire the ID-Porten refresh lock; falling back to local single-flight.");
+            return NoOpAsyncDisposable.Instance;
         }
     }
 
@@ -146,6 +217,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             }
         }
 
+        _logger.LogWarning(
+            "Timed out waiting for a concurrent ID-Porten refresh to publish rotated tokens.");
         return null;
     }
 
@@ -294,4 +367,31 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     /// <summary>Refresh tokens are credentials, so only their hash reaches the cache key.</summary>
     private static string CacheKey(string refreshToken) =>
         $"idporten-refresh:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)))}";
+
+    private sealed class RedisLock(IDatabase db, string key, string value) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                // Only delete if we still own the lock (TTL may have expired and another holder taken it).
+                var current = await db.StringGetAsync(key);
+                if (current == value)
+                {
+                    await db.KeyDeleteAsync(key);
+                }
+            }
+            catch
+            {
+                // Lock TTL is the safety net if release fails.
+            }
+        }
+    }
+
+    private sealed class NoOpAsyncDisposable : IAsyncDisposable
+    {
+        public static readonly NoOpAsyncDisposable Instance = new();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

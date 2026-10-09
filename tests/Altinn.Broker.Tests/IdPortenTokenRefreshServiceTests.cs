@@ -191,7 +191,22 @@ public class IdPortenTokenRefreshServiceTests
             cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
             NullLogger<IdPortenTokenRefreshService>.Instance,
             concurrentRefreshWait ?? TimeSpan.Zero,
-            concurrentRefreshPollInterval ?? TimeSpan.Zero);
+            concurrentRefreshPollInterval ?? TimeSpan.Zero,
+            redis: null);
+    }
+
+    [Fact]
+    public async Task GetCachedRotationAsync_AfterRefresh_ReturnsRotatedTokens()
+    {
+        var handler = new StubHttpMessageHandler(_ => Json("""{"access_token":"access-2","refresh_token":"refresh-2"}"""));
+        var service = CreateService(handler);
+
+        await service.RefreshAsync("refresh-1");
+        var cached = await service.GetCachedRotationAsync("refresh-1");
+
+        Assert.NotNull(cached);
+        Assert.Equal("refresh-2", cached!.RefreshToken);
+        Assert.Null(await service.GetCachedRotationAsync("refresh-unknown"));
     }
 
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) =>
