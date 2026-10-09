@@ -75,14 +75,16 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             var refreshed = await TryReExchange(context, tokens);
             if (!refreshed)
             {
-                await EndSession(context);
+                // Reject this request only. Do not SignOut — a parallel TUS chunk may already have
+                // rotated the refresh token and written a newer cookie; deleting ours races that.
+                context.RejectPrincipal();
                 return;
             }
 
             altinnToken = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
             if (string.IsNullOrEmpty(altinnToken) || !CanRead(altinnToken, out jwt))
             {
-                await EndSession(context);
+                context.RejectPrincipal();
                 return;
             }
         }
@@ -104,6 +106,97 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 
         // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
         // token and disable sliding expiration.
+    }
+
+    /// <summary>
+    /// Before any Set-Cookie, adopt a refresh rotation published by a parallel request. A long
+    /// TUS PATCH that authenticated with a spent refresh token must not overwrite the newer cookie.
+    /// Follows successive cache hops when several rotations happened while the request was in flight.
+    /// </summary>
+    public override async Task SigningIn(CookieSigningInContext context)
+    {
+        var refreshToken = context.Properties.GetTokenValue(OidcSessionKeys.IdPortenRefreshToken);
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return;
+        }
+
+        var rotated = await ResolveLatestCachedRotationAsync(refreshToken);
+        if (rotated is null)
+        {
+            return;
+        }
+
+        var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
+        string? newAltinnToken;
+        try
+        {
+            newAltinnToken = await tokenExchange.ExchangeIdPortenToken(rotated.AccessToken, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // Keep the rotated refresh token so the next request does not rewrite a spent one.
+            RetainRotatedRefreshToken(context, rotated);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(newAltinnToken))
+        {
+            RetainRotatedRefreshToken(context, rotated);
+            return;
+        }
+
+        context.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
+            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+        ]);
+    }
+
+    /// <summary>
+    /// When Altinn exchange fails after a cached rotation was found, still persist the new refresh
+    /// token and keep the existing Altinn JWT. Leaving the spent refresh token would let this
+    /// SignIn overwrite a newer cookie written by a parallel request.
+    /// </summary>
+    private static void RetainRotatedRefreshToken(CookieSigningInContext context, IdPortenTokens rotated)
+    {
+        var currentAltinn = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
+        if (string.IsNullOrEmpty(currentAltinn))
+        {
+            context.Properties.StoreTokens(
+            [
+                new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+            ]);
+            return;
+        }
+
+        context.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = currentAltinn },
+            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+        ]);
+    }
+
+    private const int MaxCachedRotationHops = 5;
+
+    private async Task<IdPortenTokens?> ResolveLatestCachedRotationAsync(string refreshToken)
+    {
+        var current = refreshToken;
+        IdPortenTokens? latest = null;
+
+        for (var hop = 0; hop < MaxCachedRotationHops; hop++)
+        {
+            var rotated = await _tokenRefreshService.GetCachedRotationAsync(current, CancellationToken.None);
+            if (rotated is null || rotated.RefreshToken == current)
+            {
+                break;
+            }
+
+            latest = rotated;
+            current = rotated.RefreshToken;
+        }
+
+        return latest;
     }
 
     private static async Task EndSession(CookieValidatePrincipalContext context)

@@ -6,11 +6,14 @@ using Altinn.Broker.Integrations.Altinn;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+
+using StackExchange.Redis;
 
 namespace Altinn.Broker.API.IdPortenDirectAuth;
 
@@ -40,7 +43,13 @@ public static class DependencyInjection
         });
         services.AddSingleton<IOidcLogoutTokenValidator, OidcLogoutTokenValidator>();
         services.AddSingleton<IOidcBackChannelLogoutSessionStore, OidcBackChannelLogoutSessionStore>();
-        services.AddSingleton<IIdPortenTokenRefreshService, IdPortenTokenRefreshService>();
+        services.AddSingleton<IIdPortenTokenRefreshService>(sp => new IdPortenTokenRefreshService(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>(),
+            sp.GetRequiredService<IConfigurationManager<OpenIdConnectConfiguration>>(),
+            sp.GetRequiredService<IDistributedCache>(),
+            sp.GetRequiredService<ILogger<IdPortenTokenRefreshService>>(),
+            sp.GetService<IConnectionMultiplexer>()));
         services.AddScoped<AltinnTokenCookieEvents>();
 
         builder
