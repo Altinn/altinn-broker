@@ -1,14 +1,13 @@
 /** Maps the backend's `status` field to the message shown in the transfer's status detail row. */
 export function formatFileTransferStatusMessage(
   status: string | undefined,
-  expirationTime: string | null | undefined,
   actorDownloadStatus?: string | null,
 ): string {
   switch (status) {
     case 'AwaitingDownloadByCurrentActor':
       return actorDownloadStatus === 'DownloadStarted'
         ? 'Nedlasting startet. Bekreft nedlasting for sluttstatus.'
-        : `Venter på nedlasting. Må gjøres innen ${expirationTime}.`
+        : 'Venter på nedlasting.'
     case 'AwaitingOtherRecipients':
       return 'Venter på nedlasting av resterende mottakere.'
     case 'AwaitingRecipients':
