@@ -26,6 +26,15 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     /// <summary>How long a result stays replayable for requests still carrying the old cookie.</summary>
     private static readonly TimeSpan ResultCacheLifetime = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// How long a losing replica waits for the winner to write the rotated tokens. The in-process
+    /// semaphore does not span Container App replicas; when two pods redeem the same token,
+    /// ID-Porten returns invalid_grant to the loser while the winner is still caching.
+    /// </summary>
+    private static readonly TimeSpan DefaultConcurrentRefreshWait = TimeSpan.FromSeconds(2);
+
+    private static readonly TimeSpan DefaultConcurrentRefreshPollInterval = TimeSpan.FromMilliseconds(50);
+
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _singleFlightLocks = new();
 
     private readonly IHttpClientFactory _httpClientFactory;
@@ -33,6 +42,8 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     private readonly IConfigurationManager<OpenIdConnectConfiguration> _configurationManager;
     private readonly IDistributedCache _cache;
     private readonly ILogger<IdPortenTokenRefreshService> _logger;
+    private readonly TimeSpan _concurrentRefreshWait;
+    private readonly TimeSpan _concurrentRefreshPollInterval;
 
     public IdPortenTokenRefreshService(
         IHttpClientFactory httpClientFactory,
@@ -40,12 +51,33 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         IConfigurationManager<OpenIdConnectConfiguration> configurationManager,
         IDistributedCache cache,
         ILogger<IdPortenTokenRefreshService> logger)
+        : this(
+            httpClientFactory,
+            settings,
+            configurationManager,
+            cache,
+            logger,
+            DefaultConcurrentRefreshWait,
+            DefaultConcurrentRefreshPollInterval)
+    {
+    }
+
+    internal IdPortenTokenRefreshService(
+        IHttpClientFactory httpClientFactory,
+        IOptions<IdPortenDirectAuthSettings> settings,
+        IConfigurationManager<OpenIdConnectConfiguration> configurationManager,
+        IDistributedCache cache,
+        ILogger<IdPortenTokenRefreshService> logger,
+        TimeSpan concurrentRefreshWait,
+        TimeSpan concurrentRefreshPollInterval)
     {
         _httpClientFactory = httpClientFactory;
         _settings = settings;
         _configurationManager = configurationManager;
         _cache = cache;
         _logger = logger;
+        _concurrentRefreshWait = concurrentRefreshWait;
+        _concurrentRefreshPollInterval = concurrentRefreshPollInterval;
     }
 
     public async Task<IdPortenTokens?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
@@ -74,19 +106,47 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
             }
 
             var tokens = await Redeem(refreshToken, cancellationToken);
-            if (tokens is null)
+            if (tokens is not null)
             {
-                return null;
+                await CacheResult(cacheKey, tokens, cancellationToken);
+                return tokens;
             }
 
-            await CacheResult(cacheKey, tokens, cancellationToken);
-            return tokens;
+            // Another replica likely won the refresh race. Do not end the session until we have
+            // given that winner time to publish the rotated tokens to the shared cache.
+            return await WaitForCachedResult(cacheKey, cancellationToken);
         }
         finally
         {
             singleFlightLock.Release();
             _singleFlightLocks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(cacheKey, singleFlightLock));
         }
+    }
+
+    private async Task<IdPortenTokens?> WaitForCachedResult(string cacheKey, CancellationToken cancellationToken)
+    {
+        var cached = await ReadCachedResult(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            _logger.LogInformation(
+                "Recovered ID-Porten tokens from cache after a concurrent refresh race.");
+            return cached;
+        }
+
+        var deadline = DateTimeOffset.UtcNow + _concurrentRefreshWait;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(_concurrentRefreshPollInterval, cancellationToken);
+            cached = await ReadCachedResult(cacheKey, cancellationToken);
+            if (cached is not null)
+            {
+                _logger.LogInformation(
+                    "Recovered ID-Porten tokens from cache after a concurrent refresh race.");
+                return cached;
+            }
+        }
+
+        return null;
     }
 
     private async Task<IdPortenTokens?> Redeem(string refreshToken, CancellationToken cancellationToken)

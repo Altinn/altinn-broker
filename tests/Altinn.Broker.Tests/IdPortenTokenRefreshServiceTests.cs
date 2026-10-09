@@ -95,6 +95,46 @@ public class IdPortenTokenRefreshServiceTests
     }
 
     [Fact]
+    public async Task RefreshAsync_AcrossInstances_WhenLoserGetsInvalidGrant_ReplaysWinnerCache()
+    {
+        var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+        var winnerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loserMayFail = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var call = 0;
+
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            if (Interlocked.Increment(ref call) == 1)
+            {
+                winnerStarted.SetResult();
+                loserMayFail.Task.GetAwaiter().GetResult();
+                return Json("""{"access_token":"access-2","refresh_token":"refresh-2"}""");
+            }
+
+            return Json("""{"error":"invalid_grant"}""", HttpStatusCode.BadRequest);
+        });
+
+        var winner = CreateService(handler, cache, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(20));
+        var loser = CreateService(handler, cache, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(20));
+
+        var winnerTask = Task.Run(() => winner.RefreshAsync("refresh-1"));
+        await winnerStarted.Task;
+        var loserTask = Task.Run(() => loser.RefreshAsync("refresh-1"));
+        await Task.Delay(50);
+        loserMayFail.SetResult();
+
+        var results = await Task.WhenAll(winnerTask, loserTask);
+
+        Assert.Equal(2, handler.Calls);
+        Assert.All(results, tokens =>
+        {
+            Assert.NotNull(tokens);
+            Assert.Equal("access-2", tokens!.AccessToken);
+            Assert.Equal("refresh-2", tokens.RefreshToken);
+        });
+    }
+
+    [Fact]
     public async Task RefreshAsync_WhenIdPortenIsUnreachable_ReturnsNull()
     {
         var handler = new StubHttpMessageHandler(_ => throw new HttpRequestException("boom"));
@@ -130,7 +170,11 @@ public class IdPortenTokenRefreshServiceTests
         Assert.Equal(0, handler.Calls);
     }
 
-    private static IdPortenTokenRefreshService CreateService(StubHttpMessageHandler handler)
+    private static IdPortenTokenRefreshService CreateService(
+        StubHttpMessageHandler handler,
+        IDistributedCache? cache = null,
+        TimeSpan? concurrentRefreshWait = null,
+        TimeSpan? concurrentRefreshPollInterval = null)
     {
         var settings = new IdPortenDirectAuthSettings
         {
@@ -144,8 +188,10 @@ public class IdPortenTokenRefreshServiceTests
             Options.Create(settings),
             new StaticConfigurationManager<OpenIdConnectConfiguration>(
                 new OpenIdConnectConfiguration { TokenEndpoint = TokenEndpoint }),
-            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
-            NullLogger<IdPortenTokenRefreshService>.Instance);
+            cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
+            NullLogger<IdPortenTokenRefreshService>.Instance,
+            concurrentRefreshWait ?? TimeSpan.Zero,
+            concurrentRefreshPollInterval ?? TimeSpan.Zero);
     }
 
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) =>
