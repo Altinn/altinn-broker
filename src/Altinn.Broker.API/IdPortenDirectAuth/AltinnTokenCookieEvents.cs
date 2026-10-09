@@ -135,18 +135,44 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            // Same as a null exchange result: leave the cookie as-is rather than fail SignIn.
+            // Keep the rotated refresh token so the next request does not rewrite a spent one.
+            RetainRotatedRefreshToken(context, rotated);
             return;
         }
 
         if (string.IsNullOrEmpty(newAltinnToken))
         {
+            RetainRotatedRefreshToken(context, rotated);
             return;
         }
 
         context.Properties.StoreTokens(
         [
             new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
+            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+        ]);
+    }
+
+    /// <summary>
+    /// When Altinn exchange fails after a cached rotation was found, still persist the new refresh
+    /// token and keep the existing Altinn JWT. Leaving the spent refresh token would let this
+    /// SignIn overwrite a newer cookie written by a parallel request.
+    /// </summary>
+    private static void RetainRotatedRefreshToken(CookieSigningInContext context, IdPortenTokens rotated)
+    {
+        var currentAltinn = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
+        if (string.IsNullOrEmpty(currentAltinn))
+        {
+            context.Properties.StoreTokens(
+            [
+                new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
+            ]);
+            return;
+        }
+
+        context.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = currentAltinn },
             new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
         ]);
     }
