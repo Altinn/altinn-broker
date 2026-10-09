@@ -16,4 +16,4 @@
 -- Stripe count is derived as ceil(file_transfer_size / stripe_size_bytes) and deliberately not
 -- stored, so it cannot drift out of sync with file_transfer_size.
 ALTER TABLE broker.file_transfer
-    ADD COLUMN IF NOT EXISTS stripe_size_bytes bigint NULL;
+    ADD COLUMN stripe_size_bytes bigint NULL;
