@@ -50,17 +50,21 @@ internal static class TusUploadTestHelper
         long offset,
         byte[] payload)
     {
-        var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUrl);
-        patchRequest.Headers.Add("Tus-Resumable", "1.0.0");
-        patchRequest.Headers.Add("Upload-Offset", offset.ToString());
-        patchRequest.Content = new ByteArrayContent(payload);
-        patchRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
-
-        var patchResponse = await senderClient.SendAsync(patchRequest);
+        var patchResponse = await senderClient.SendAsync(PatchRequest(uploadUrl, offset, new ByteArrayContent(payload)));
         Assert.Equal(HttpStatusCode.NoContent, patchResponse.StatusCode);
         Assert.True(patchResponse.Headers.TryGetValues("Upload-Offset", out var offsetValues));
         Assert.True(long.TryParse(offsetValues.First(), out var responseOffset));
         return responseOffset;
+    }
+
+    public static HttpRequestMessage PatchRequest(Uri uploadUrl, long offset, HttpContent body)
+    {
+        var patchRequest = new HttpRequestMessage(HttpMethod.Patch, uploadUrl);
+        patchRequest.Headers.Add("Tus-Resumable", "1.0.0");
+        patchRequest.Headers.Add("Upload-Offset", offset.ToString());
+        patchRequest.Content = body;
+        patchRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
+        return patchRequest;
     }
 
     public static async Task<(HttpStatusCode StatusCode, long? Offset, string Body)> TryHeadUploadAsync(
