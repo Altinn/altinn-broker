@@ -362,6 +362,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.file_transfer_id_pk,
                     f.resource_id,
                     f.external_file_transfer_reference,
+                    f.expiration_time,
                     sender.actor_external_id AS sender_actor_external_id,
                     {timestampColumn} AS sort_date
                 FROM broker.file_transfer f
@@ -377,6 +378,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 mt.file_transfer_id_pk,
                 mt.resource_id,
                 mt.external_file_transfer_reference,
+                mt.expiration_time,
                 mt.sender_actor_external_id,
                 mt.sort_date,
                 recipient.actor_external_id AS recipient_actor_external_id
@@ -408,6 +410,13 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             var summaries = new Dictionary<Guid, FileTransferSummaryEntity>();
 
             await using var reader = await command.ExecuteReaderAsync(ct);
+
+            // The columns are `timestamp` holding UTC, so Npgsql hands back Kind=Unspecified.
+            // Left as is, the conversion to DateTimeOffset would read them as local time and
+            // shift them by the machine's offset.
+            DateTimeOffset GetUtcTimestamp(string column)
+                => new(DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal(column)), DateTimeKind.Utc));
+
             while (await reader.ReadAsync(ct))
             {
                 var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
@@ -421,11 +430,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         Sender = senderActorExternalId,
                         IsSender = senderActorExternalId == fileTransferSearch.Actor.ActorExternalId,
                         SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
-                        // The column is `timestamp` holding UTC, so Npgsql hands back Kind=Unspecified.
-                        // Left as is, the conversion to DateTimeOffset would read it as local time and
-                        // shift the cursor by the machine's offset.
-                        SortDate = new DateTimeOffset(
-                            DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("sort_date")), DateTimeKind.Utc)),
+                        ExpirationTime = GetUtcTimestamp("expiration_time"),
+                        SortDate = GetUtcTimestamp("sort_date"),
                         Recipients = new List<string>()
                     };
                     summaries[fileTransferId] = summary;

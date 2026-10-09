@@ -27,6 +27,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       />
       <DetailField label="Opprettet" value={transferDetails.created} />
       <DetailField label="Opplastet" value={transferDetails.published} />
+      <DetailField label="Nedlastingsfrist" value={transferDetails.expirationTime} />
       <DetailField label="Filstørrelse" value={formatFileSize(transferDetails.fileTransferSize)} />
       <DetailField label="Virusskannet" value={transferDetails.useVirusScan ? "Utført" : "Ikke utført"} />
       <DetailField label="Andre metadata" value={Object.entries(transferDetails.propertyList ?? {})
@@ -34,7 +35,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
         .join(', ')} />
       <DetailField
         label="Status"
-        value={formatFileTransferStatusMessage(transferDetails.status, transferDetails.expirationTime, transferDetails.actorDownloadStatus)}
+        value={formatFileTransferStatusMessage(transferDetails.status, transferDetails.actorDownloadStatus)}
       />
     </List>
   )

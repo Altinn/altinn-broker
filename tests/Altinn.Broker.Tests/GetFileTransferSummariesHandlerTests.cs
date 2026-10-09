@@ -118,6 +118,7 @@ public class GetFileTransferSummariesHandlerTests
             IsSender = false,
             Recipients = ["0192:222222222", "0192:333333333"],
             SendersFileTransferReference = "ref-1",
+            ExpirationTime = DateTimeOffset.UtcNow.AddDays(30),
             SortDate = DateTimeOffset.UtcNow
         };
         var fileTransferRepository = new Mock<IFileTransferRepository>();
@@ -293,6 +294,7 @@ public class GetFileTransferSummariesHandlerTests
             IsSender = true,
             Recipients = ["0192:222222222"],
             SendersFileTransferReference = $"ref-{index}",
+            ExpirationTime = DateTimeOffset.UtcNow.AddDays(30),
             SortDate = DateTimeOffset.UtcNow.AddMinutes(-index)
         }).ToList();
 

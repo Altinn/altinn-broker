@@ -1,5 +1,5 @@
 import { Card, Heading, Paragraph, Tag } from '@digdir/designsystemet-react'
-import { Tooltip } from '@altinn/altinn-components'
+import { DialogMetadata, Tooltip, type DialogMetadataDueAtProps } from '@altinn/altinn-components'
 import { Link } from 'react-router-dom'
 import './FileTransferCard.css'
 
@@ -10,6 +10,7 @@ type FileTransferCardProps = {
   recipients: string[]
   currentActorName: string
   reference: string
+  deadline?: DialogMetadataDueAtProps
   to: string
 }
 
@@ -20,6 +21,7 @@ export function FileTransferCard({
   recipients,
   currentActorName,
   reference,
+  deadline,
   to,
 }: FileTransferCardProps) {
   const otherRecipientCount = recipients.length - 1
@@ -60,6 +62,7 @@ export function FileTransferCard({
           <Paragraph data-size="sm" className="file-transfer-card__reference">
             Referanse: {reference}
           </Paragraph>
+          {deadline && <DialogMetadata className="file-transfer-card__deadline" dueAt={deadline} />}
         </div>
         <span className="file-transfer-card__chevron" aria-hidden="true">
           ›

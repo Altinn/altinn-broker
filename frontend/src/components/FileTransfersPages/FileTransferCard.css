@@ -36,6 +36,10 @@
   color: #545c7a;
 }
 
+.file-transfer-card__deadline {
+  margin-top: 0.5rem;
+}
+
 .ds-tooltip {
   white-space: pre-line;
   background-color: lightgray;
