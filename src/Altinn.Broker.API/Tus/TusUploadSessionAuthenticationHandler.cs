@@ -15,7 +15,7 @@ public sealed class TusUploadSessionAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory loggerFactory,
     UrlEncoder encoder,
-    TusUploadSessionAuthenticationHelper sessionHelper)
+    ITusUploadSessionAuthenticationHelper sessionHelper)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, loggerFactory, encoder)
 {
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
