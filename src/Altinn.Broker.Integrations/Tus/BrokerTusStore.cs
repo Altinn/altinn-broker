@@ -130,7 +130,8 @@ public class BrokerTusStore(
             throw new TusStoreException($"Unable to accept TUS chunk for file id {fileId} at offset {expectedOffset}.");
         }
 
-        await EnsureStripeBlockBudgetAsync(fileId, partialInfo, layout, fragments, cancellationToken);
+        // The chunk is already accepted, so an aborted request must still get as far as staging it.
+        await EnsureStripeBlockBudgetAsync(fileId, partialInfo, layout, fragments, CancellationToken.None);
 
         var blockIds = new string[fragments.Count];
         long acceptedOffset;
