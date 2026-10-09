@@ -3,6 +3,7 @@ using System.Text;
 using System.Transactions;
 
 using Altinn.Broker.Application.Middlewares;
+using Altinn.Broker.Application.SendNotificationOrder;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
@@ -60,6 +61,10 @@ public class FileTransferPublishService(
             cancellationToken: cancellationToken);
 
         EnqueuePublishedEvents(fileTransfer);
+        if (fileTransfer.HasNotification)
+        {
+            backgroundJobClient.Enqueue<SendNotificationOrderHandler>(handler => handler.Process(fileTransfer.FileTransferId, CancellationToken.None));
+        }
 
         transaction.Complete();
         return true;

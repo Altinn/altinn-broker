@@ -12,4 +12,5 @@ public class InitializeFileTransferRequest
     public required Dictionary<string, string> PropertyList { get; set; }
     public string? Checksum { get; set; }
     public bool DisableVirusScan { get; set; }
+    public NotificationRequest? Notification { get; set;}
 }
