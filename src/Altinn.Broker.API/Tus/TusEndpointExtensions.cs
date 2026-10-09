@@ -7,6 +7,7 @@ using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
@@ -248,6 +249,18 @@ public static class TusEndpointExtensions
             fileTransferId,
             precedingBytes + context.UploadLength,
             singleUploadLength: context.UploadLength);
+        if (context.HasFailed || context.FileConcatenation is FileConcatPartial)
+        {
+            return;
+        }
+
+        // A single-stream upload is staged on one blob, so it can never need more than its block budget of full-size chunks.
+        var maxBlocksPerBlob = context.HttpContext.RequestServices.GetRequiredService<IOptions<AzureStorageOptions>>().Value.MaxBlocksPerStripe;
+        var maxChunkSizeBytes = context.HttpContext.RequestServices.GetRequiredService<IOptions<TusOptions>>().Value.MaxChunkSizeBytes;
+        if (context.UploadLength > maxBlocksPerBlob * maxChunkSizeBytes)
+        {
+            context.FailRequest(Errors.PartialUploadTooLong.StatusCode, Errors.PartialUploadTooLong.Message);
+        }
     }
 
     private static async Task ValidateTotalUploadSizeAsync(
