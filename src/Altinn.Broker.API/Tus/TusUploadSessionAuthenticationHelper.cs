@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.IdPortenDirectAuth;
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Integrations.Tus;
 
@@ -13,15 +14,17 @@ using Microsoft.IdentityModel.Tokens;
 namespace Altinn.Broker.API.Tus;
 
 /// <summary>
-/// Allows expired Altinn/Maskinporten tokens for in-progress TUS uploads when a prior
-/// authenticated session is still active in Redis. Clients should still refresh tokens,
-/// but long uploads must not fail solely because access-token lifetime is shorter than upload duration.
+/// Allows expired Altinn/Maskinporten tokens (bearer) or expired ID-Porten cookie Altinn JWTs
+/// for in-progress TUS uploads when a prior authenticated session is still active in Redis.
+/// Clients should still refresh tokens when they can, but long/overnight uploads must not fail
+/// solely because access-token or ID-Porten lifetime is shorter than upload duration.
 /// </summary>
 public sealed class TusUploadSessionAuthenticationHelper(
     IOptionsMonitor<JwtBearerOptions> jwtOptionsMonitor,
     ITusPartialUploadRegistry partialUploadRegistry,
     TusUploadAuthorizationService tusUploadAuthorizationService,
     ILogger<TusUploadSessionAuthenticationHelper> logger)
+    : ITusUploadSessionAuthenticationHelper
 {
     public async Task<ClaimsPrincipal?> TryValidateExpiredTokenForActiveUploadAsync(
         HttpContext httpContext,
@@ -52,6 +55,70 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return null;
         }
 
+        return await AcceptIfActiveUploadAsync(
+            httpContext,
+            requestPath,
+            principal,
+            p => new ClaimsPrincipal(new ClaimsIdentity(p.Claims, JwtBearerDefaults.AuthenticationScheme)),
+            "bearer",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Cookie-session counterpart to expired-bearer grace: the Altinn JWT in the Broker session
+    /// cookie is expired (or ID-Porten refresh failed), but the TUS upload is still active.
+    /// </summary>
+    public async Task<ClaimsPrincipal?> TryAcceptExpiredAltinnCookieForActiveUploadAsync(
+        HttpContext httpContext,
+        string altinnToken,
+        string? sid,
+        ClaimsPrincipal? existingPrincipal,
+        CancellationToken cancellationToken)
+    {
+        var requestPath = TusRouteHelper.GetRequestPath(httpContext);
+        if (!IsTusUploadDataRequest(httpContext.Request))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(altinnToken) || !TryReadJwt(altinnToken, out var jwt) || jwt is null)
+        {
+            LogRejection(httpContext, requestPath, "missingOrUnreadableAltinnCookieToken", fileTransferId: null);
+            return null;
+        }
+
+        var identity = new ClaimsIdentity(
+            jwt.Claims,
+            AuthorizationConstants.EndUserCookie,
+            ClaimTypes.Name,
+            ClaimTypes.Role);
+        if (!string.IsNullOrEmpty(sid) && !identity.HasClaim("sid", sid))
+        {
+            identity.AddClaim(new Claim("sid", sid));
+        }
+
+        var idPortenIdentity = IdPortenPrincipalClaims.CopyIdentity(existingPrincipal);
+        var principal = idPortenIdentity is null
+            ? new ClaimsPrincipal(identity)
+            : new ClaimsPrincipal([identity, idPortenIdentity]);
+
+        return await AcceptIfActiveUploadAsync(
+            httpContext,
+            requestPath,
+            principal,
+            p => p,
+            AuthorizationConstants.EndUserCookie,
+            cancellationToken);
+    }
+
+    private async Task<ClaimsPrincipal?> AcceptIfActiveUploadAsync(
+        HttpContext httpContext,
+        string? requestPath,
+        ClaimsPrincipal principal,
+        Func<ClaimsPrincipal, ClaimsPrincipal> toAuthenticatedPrincipal,
+        string authTypeForLog,
+        CancellationToken cancellationToken)
+    {
         var fileTransferId = await TryResolveFileTransferIdAsync(httpContext, cancellationToken);
         if (fileTransferId is null)
         {
@@ -73,16 +140,27 @@ public sealed class TusUploadSessionAuthenticationHelper(
             return null;
         }
 
-        var authenticatedPrincipal = new ClaimsPrincipal(
-            new ClaimsIdentity(principal.Claims, JwtBearerDefaults.AuthenticationScheme));
-
         logger.LogInformation(
-            "Accepted expired bearer token for active TUS upload. Method={Method} Path={Path} FileTransferId={FileTransferId}",
+            "Accepted expired {AuthType} token for active TUS upload. Method={Method} Path={Path} FileTransferId={FileTransferId}",
+            authTypeForLog,
             httpContext.Request.Method,
             requestPath,
             fileTransferId);
 
-        return authenticatedPrincipal;
+        return toAuthenticatedPrincipal(principal);
+    }
+
+    private static bool TryReadJwt(string token, out JwtSecurityToken? jwt)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        if (!handler.CanReadToken(token))
+        {
+            jwt = null;
+            return false;
+        }
+
+        jwt = handler.ReadJwtToken(token);
+        return true;
     }
 
     private static bool IsTusUploadDataRequest(HttpRequest request)

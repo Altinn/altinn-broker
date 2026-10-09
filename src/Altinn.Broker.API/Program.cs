@@ -242,6 +242,8 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         .AddIdPortenDirectAuth(config);
 
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
+    services.AddScoped<ITusUploadSessionAuthenticationHelper>(sp =>
+        sp.GetRequiredService<TusUploadSessionAuthenticationHelper>());
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddScoped<IEndUserTokenProvider, EndUserTokenProvider>();

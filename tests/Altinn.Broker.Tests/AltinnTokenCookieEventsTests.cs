@@ -3,6 +3,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.IdPortenDirectAuth;
+using Altinn.Broker.API.Tus;
 using Altinn.Broker.Integrations.Altinn;
 
 using Microsoft.AspNetCore.Authentication;
@@ -110,6 +111,47 @@ public class AltinnTokenCookieEventsTests
     }
 
     [Fact]
+    public async Task ValidatePrincipal_WhenAltinnTokenExpired_AndActiveTusUpload_AcceptsWithoutRefresh()
+    {
+        var refreshService = new StubRefreshService(result: null);
+        var gracePrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("urn:altinn:userid", "1234")],
+            AuthorizationConstants.EndUserCookie));
+        var tusHelper = new StubTusUploadSessionAuthenticationHelper(gracePrincipal);
+        var context = CreateContext(
+            altinnToken: CreateAltinnToken(TimeSpan.FromMinutes(-1)),
+            refreshToken: "refresh-1");
+
+        await CreateEvents(refreshService, tusHelper: tusHelper).ValidatePrincipal(context);
+
+        Assert.NotNull(context.Principal);
+        Assert.True(context.ShouldRenew);
+        Assert.Equal(0, refreshService.Calls);
+        Assert.Equal(1, tusHelper.CookieGraceCalls);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_WhenRefreshFails_AndActiveTusUpload_AcceptsGrace()
+    {
+        // Near-expiry (not fully expired) still tries refresh first; grace is the fallback.
+        var refreshService = new StubRefreshService(result: null);
+        var gracePrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("urn:altinn:userid", "1234")],
+            AuthorizationConstants.EndUserCookie));
+        var tusHelper = new StubTusUploadSessionAuthenticationHelper(gracePrincipal);
+        var context = CreateContext(
+            altinnToken: CreateAltinnToken(TimeSpan.FromSeconds(10)),
+            refreshToken: "refresh-1");
+
+        await CreateEvents(refreshService, tusHelper: tusHelper).ValidatePrincipal(context);
+
+        Assert.NotNull(context.Principal);
+        Assert.True(context.ShouldRenew);
+        Assert.Equal(1, refreshService.Calls);
+        Assert.Equal(1, tusHelper.CookieGraceCalls);
+    }
+
+    [Fact]
     public async Task ValidatePrincipal_WhenAltinnExchangeFails_EndsSession()
     {
         var refreshService = new StubRefreshService(new IdPortenTokens("new-access-token", "refresh-2"));
@@ -184,8 +226,14 @@ public class AltinnTokenCookieEventsTests
         Assert.False(string.IsNullOrEmpty(context.Properties.GetTokenValue(AltinnTokenName)));
     }
 
-    private static AltinnTokenCookieEvents CreateEvents(IIdPortenTokenRefreshService refreshService, bool revoked = false)
-        => new(new StubLogoutSessionStore(revoked), refreshService);
+    private static AltinnTokenCookieEvents CreateEvents(
+        IIdPortenTokenRefreshService refreshService,
+        bool revoked = false,
+        ITusUploadSessionAuthenticationHelper? tusHelper = null)
+        => new(
+            new StubLogoutSessionStore(revoked),
+            refreshService,
+            tusHelper ?? new StubTusUploadSessionAuthenticationHelper());
 
     private static CookieValidatePrincipalContext CreateContext(
         string altinnToken,
@@ -267,6 +315,28 @@ public class AltinnTokenCookieEventsTests
             string refreshToken,
             CancellationToken cancellationToken = default)
             => Task.FromResult(cached);
+    }
+
+    private sealed class StubTusUploadSessionAuthenticationHelper(ClaimsPrincipal? cookieGracePrincipal = null)
+        : ITusUploadSessionAuthenticationHelper
+    {
+        public int CookieGraceCalls { get; private set; }
+
+        public Task<ClaimsPrincipal?> TryValidateExpiredTokenForActiveUploadAsync(
+            HttpContext httpContext,
+            CancellationToken cancellationToken)
+            => Task.FromResult<ClaimsPrincipal?>(null);
+
+        public Task<ClaimsPrincipal?> TryAcceptExpiredAltinnCookieForActiveUploadAsync(
+            HttpContext httpContext,
+            string altinnToken,
+            string? sid,
+            ClaimsPrincipal? existingPrincipal,
+            CancellationToken cancellationToken)
+        {
+            CookieGraceCalls++;
+            return Task.FromResult(cookieGracePrincipal);
+        }
     }
 
     private sealed class StubTokenExchangeService(string? result) : IAltinnTokenExchangeService

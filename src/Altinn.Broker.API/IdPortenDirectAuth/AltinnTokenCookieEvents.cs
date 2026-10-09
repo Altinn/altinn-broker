@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 using Altinn.Broker.API.Configuration;
+using Altinn.Broker.API.Tus;
 using Altinn.Broker.Integrations.Altinn;
 
 using Microsoft.AspNetCore.Authentication;
@@ -14,6 +15,8 @@ namespace Altinn.Broker.API.IdPortenDirectAuth;
 /// If it is expired or close to expiring, refreshes the ID-Porten session and re-exchanges it.
 /// Sets ClaimsPrincipal from the Altinn token so downstream authorization sees urn:altinn:* claims.
 /// Rejects sessions revoked via ID-Porten back-channel logout.
+/// For in-progress TUS uploads, accepts an expired Altinn cookie token the same way expired
+/// Maskinporten bearer tokens are accepted — so overnight browser uploads can finish.
 /// </summary>
 public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 {
@@ -26,13 +29,16 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 
     private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
     private readonly IIdPortenTokenRefreshService _tokenRefreshService;
+    private readonly ITusUploadSessionAuthenticationHelper _tusUploadSessionAuthenticationHelper;
 
     public AltinnTokenCookieEvents(
         IOidcBackChannelLogoutSessionStore logoutSessionStore,
-        IIdPortenTokenRefreshService tokenRefreshService)
+        IIdPortenTokenRefreshService tokenRefreshService,
+        ITusUploadSessionAuthenticationHelper tusUploadSessionAuthenticationHelper)
     {
         _logoutSessionStore = logoutSessionStore;
         _tokenRefreshService = tokenRefreshService;
+        _tusUploadSessionAuthenticationHelper = tusUploadSessionAuthenticationHelper;
     }
 
     /// <summary>
@@ -70,42 +76,51 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             return;
         }
 
-        if (jwt!.ValidTo - ExpiryLeeway <= DateTime.UtcNow)
+        // Fully expired: prefer TUS active-upload grace before calling ID-Porten on every chunk.
+        // Overnight uploads outlive authorization_lifetime; hammering refresh with invalid_grant
+        // would add latency and noise for no benefit once the upload session is established.
+        if (jwt!.ValidTo <= DateTime.UtcNow)
+        {
+            if (await TryAcceptActiveTusUploadAsync(context, altinnToken, sid))
+            {
+                return;
+            }
+        }
+
+        if (jwt.ValidTo - ExpiryLeeway <= DateTime.UtcNow)
         {
             var refreshed = await TryReExchange(context, tokens);
             if (!refreshed)
             {
+                if (await TryAcceptActiveTusUploadAsync(context, altinnToken, sid))
+                {
+                    return;
+                }
+
                 // Reject this request only. Do not SignOut — a parallel TUS chunk may already have
                 // rotated the refresh token and written a newer cookie; deleting ours races that.
                 context.RejectPrincipal();
                 return;
             }
 
-            altinnToken = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
-            if (string.IsNullOrEmpty(altinnToken) || !CanRead(altinnToken, out jwt))
+            var renewedAltinnToken = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
+            if (string.IsNullOrEmpty(renewedAltinnToken) || !CanRead(renewedAltinnToken, out jwt))
             {
+                // Prefer the pre-refresh token for TUS grace; the exchange may have failed after
+                // ID-Porten rotated credentials without storing a usable Altinn JWT.
+                if (await TryAcceptActiveTusUploadAsync(context, altinnToken, sid))
+                {
+                    return;
+                }
+
                 context.RejectPrincipal();
                 return;
             }
+
+            altinnToken = renewedAltinnToken;
         }
 
-        var identity = new ClaimsIdentity(
-            jwt!.Claims,
-            AuthorizationConstants.EndUserCookie,
-            ClaimTypes.Name,
-            ClaimTypes.Role);
-        if (!string.IsNullOrEmpty(sid) && !identity.HasClaim("sid", sid))
-        {
-            identity.AddClaim(new Claim("sid", sid));
-        }
-
-        var idPortenIdentity = IdPortenPrincipalClaims.CopyIdentity(context.Principal);
-        context.ReplacePrincipal(idPortenIdentity is null
-            ? new ClaimsPrincipal(identity)
-            : new ClaimsPrincipal([identity, idPortenIdentity]));
-
-        // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
-        // token and disable sliding expiration.
+        ApplyPrincipal(context, jwt!, sid);
     }
 
     /// <summary>
@@ -138,6 +153,55 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
             new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = rotated.RefreshToken }
         ]);
+    }
+
+    private async Task<bool> TryAcceptActiveTusUploadAsync(
+        CookieValidatePrincipalContext context,
+        string? altinnToken,
+        string? sid)
+    {
+        if (string.IsNullOrEmpty(altinnToken))
+        {
+            return false;
+        }
+
+        var principal = await _tusUploadSessionAuthenticationHelper.TryAcceptExpiredAltinnCookieForActiveUploadAsync(
+            context.HttpContext,
+            altinnToken,
+            sid,
+            context.Principal,
+            CancellationToken.None);
+        if (principal is null)
+        {
+            return false;
+        }
+
+        context.ReplacePrincipal(principal);
+        // Keep the session cookie sliding so overnight TUS traffic does not hit cookie expiry
+        // even though ID-Porten can no longer renew the embedded Altinn token.
+        context.ShouldRenew = true;
+        return true;
+    }
+
+    private static void ApplyPrincipal(CookieValidatePrincipalContext context, JwtSecurityToken jwt, string? sid)
+    {
+        var identity = new ClaimsIdentity(
+            jwt.Claims,
+            AuthorizationConstants.EndUserCookie,
+            ClaimTypes.Name,
+            ClaimTypes.Role);
+        if (!string.IsNullOrEmpty(sid) && !identity.HasClaim("sid", sid))
+        {
+            identity.AddClaim(new Claim("sid", sid));
+        }
+
+        var idPortenIdentity = IdPortenPrincipalClaims.CopyIdentity(context.Principal);
+        context.ReplacePrincipal(idPortenIdentity is null
+            ? new ClaimsPrincipal(identity)
+            : new ClaimsPrincipal([identity, idPortenIdentity]));
+
+        // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
+        // token and disable sliding expiration.
     }
 
     private static async Task EndSession(CookieValidatePrincipalContext context)
