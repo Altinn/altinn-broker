@@ -263,9 +263,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
-    public HttpClient CreateClientWithAuthorization(string token)
+    public HttpClient CreateClientWithAuthorization(string token, bool allowAutoRedirect = true)
     {
-        var client = CreateClient();
+        var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = allowAutoRedirect });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         client.DefaultRequestHeaders.Accept.Clear();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));

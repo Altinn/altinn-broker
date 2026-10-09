@@ -17,4 +17,9 @@ public class FileTransferSummaryEntity
     public required List<string> Recipients { get; set; }
 
     public required string SendersFileTransferReference { get; set; }
+
+    /// <summary>
+    /// What the list sorts by. Not shown anywhere yet; it is the cursor position for the next page.
+    /// </summary>
+    public required DateTimeOffset SortDate { get; set; }
 }

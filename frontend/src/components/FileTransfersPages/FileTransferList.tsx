@@ -1,116 +1,58 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FileTransferSummary } from '../../api/fileTransferSummary'
-import { fetchAuthorizedResources, type AuthorizedResource } from '../../api/resources'
+import { useMemo, useState } from 'react'
+import { Button, List } from '@altinn/altinn-components'
+import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
-import { FileTransferPagination } from './FileTransferPagination'
 import '../../pages/pages.css'
-import { List } from '@altinn/altinn-components'
 import type { SelectedParty } from '../../parties/PartiesContext'
-
-const PAGE_SIZE = 5
 
 type FileTransferListProps = {
   heading: string
   loadingText: string
   loadErrorText: string
   emptyStateText: string
+  /** Keeps the two list views apart in the query cache. */
+  queryKey: string
   currentOrg: SelectedParty
-  fetchTransfers: (resourceIds: string[], onBehalfOf: SelectedParty) => Promise<FileTransferSummary[]>
+  fetchTransfers: FetchFileTransferPage
   toPath: (transferId: string) => string
 }
 
+/**
+ * Mounted with the selected party as its key, so switching actor gives a fresh list rather than
+ * one that has to unpick which request belonged to whom.
+ */
 export function FileTransferList({
   heading,
   loadingText,
   loadErrorText,
   emptyStateText,
+  queryKey,
   currentOrg,
   fetchTransfers,
   toPath,
 }: FileTransferListProps) {
-  const [resources, setResources] = useState<AuthorizedResource[]>([])
-  const [overviews, setOverviews] = useState<FileTransferSummary[] | null>(null)
-  const [loadError, setLoadError] = useState(false)
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
-  const [page, setPage] = useState(1)
-  const currentOrgRef = useRef(currentOrg.partyUuid)
-  currentOrgRef.current = currentOrg.partyUuid
-  const requestIdRef = useRef(0)
 
-  useEffect(() => {
-    const requestedOrgUuid = currentOrg.partyUuid
-    const requestId = ++requestIdRef.current
+  const { resources, items, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useFileTransferList(queryKey, fetchTransfers, currentOrg)
 
-    setSearch('')
-    setResourceFilter('')
-    setPage(1)
-    setOverviews(null)
-    setLoadError(false)
-
-    function isCurrentRequest() {
-      return requestIdRef.current === requestId && currentOrgRef.current === requestedOrgUuid
-    }
-
-    async function loadFileTransfers() {
-      try {
-        const authorizedResources = await fetchAuthorizedResources(currentOrg.organizationNumber)
-        if (!isCurrentRequest()) {
-          return
-        }
-        setResources(authorizedResources)
-
-        const resourceIds = authorizedResources.map((resource) => resource.resourceId)
-        if (resourceIds.length === 0) {
-          if (isCurrentRequest()) {
-            setOverviews([])
-          }
-          return
-        }
-        const transfers = await fetchTransfers(resourceIds, currentOrg)
-        if (isCurrentRequest()) {
-          setOverviews(transfers)
-        }
-      } catch {
-        if (isCurrentRequest()) {
-          setLoadError(true)
-        }
-      }
-    }
-    void loadFileTransfers()
-  }, [currentOrg])
-
+  // Narrows what has been loaded so far. Reaching further back is what "Hent flere" is for.
   const filtered = useMemo(() => {
-    if (!overviews) return []
     const query = search.trim().toLowerCase()
-    return overviews.filter((overview) => {
+    return items.filter((overview) => {
       const reference = overview.sendersFileTransferReference || overview.fileTransferId
       const matchesSearch = !query || reference.toLowerCase().includes(query)
       const matchesResource = !resourceFilter || overview.resourceId === resourceFilter
       return matchesSearch && matchesResource
     })
-  }, [overviews, resources, search, resourceFilter])
+  }, [items, search, resourceFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const cards = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((overview) => ({
-    fileTransferId: overview.fileTransferId,
-    resourceName: resources.find((r) => r.resourceId === overview.resourceId)?.name ?? overview.resourceId,
-    isSender: overview.isSender,
-    sender: overview.sender,
-    recipients: overview.recipients,
-    reference: overview.sendersFileTransferReference || overview.fileTransferId,
-  }))
+  const resourceName = (resourceId: string) =>
+    resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
 
-  function handleSearch(value: string) {
-    setSearch(value)
-    setPage(1)
-  }
-
-  function handleServiceFilter(value: string) {
-    setResourceFilter(value)
-    setPage(1)
-  }
+  const isFiltered = Boolean(search.trim() || resourceFilter)
 
   return (
     <div className="page">
@@ -118,36 +60,52 @@ export function FileTransferList({
 
       <FileTransferFilters
         search={search}
-        onSearchChange={handleSearch}
+        onSearchChange={setSearch}
         resourceFilter={resourceFilter}
-        onResourceFilterChange={handleServiceFilter}
+        onResourceFilterChange={setResourceFilter}
         resources={resources}
       />
 
-      {loadError && <p className="empty-state">{loadErrorText}</p>}
+      {isError && <p className="empty-state">{loadErrorText}</p>}
 
-      {!loadError && overviews === null && <p className="empty-state">{loadingText}</p>}
+      {isLoading && <p className="empty-state">{loadingText}</p>}
 
-      {!loadError && overviews !== null && cards.length === 0 && (
-        <p className="empty-state">{emptyStateText}</p>
+      {!isLoading && !isError && filtered.length === 0 && (
+        <p className="empty-state">
+          {isFiltered && hasNextPage
+            ? 'Ingen treff blant formidlingene som er lastet. Hent flere for å søke lenger tilbake.'
+            : emptyStateText}
+        </p>
       )}
 
       <List className="card-list">
-        {cards.map((card) => (
-          <li key={card.fileTransferId}>
+        {filtered.map((overview) => (
+          <li key={overview.fileTransferId}>
             <FileTransferCard
-              resourceName={card.resourceName}
-              isSender={card.isSender}
-              sender={card.sender}
-              recipients={card.recipients}
+              resourceName={resourceName(overview.resourceId)}
+              isSender={overview.isSender}
+              sender={overview.sender}
+              recipients={overview.recipients}
               currentActorName={currentOrg.name}
-              reference={card.reference}
-              to={toPath(card.fileTransferId)}
+              reference={overview.sendersFileTransferReference || overview.fileTransferId}
+              to={toPath(overview.fileTransferId)}
             />
           </li>
         ))}
       </List>
-      <FileTransferPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+
+      {hasNextPage && (
+        <div className="load-more-row">
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={isFetchingNextPage}
+            onClick={() => void fetchNextPage()}
+          >
+            {isFetchingNextPage ? 'Henter …' : 'Hent flere'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

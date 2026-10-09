@@ -8,6 +8,11 @@ export type FileTransferService = {
   configuration: ResourceConfiguration
   /** Empty means no one may receive on the resource, so no file transfer can be created. */
   allowedRecipients: AllowedRecipient[]
+  /**
+   * Access-list parties (minus the caller), not narrowed by the configured required party.
+   * Used by the configuration editor's required-party dropdown.
+   */
+  accessListCandidates: AllowedRecipient[]
 }
 
 export type FileTransferServiceState =
@@ -48,15 +53,19 @@ export function useFileTransferService(
 
 async function loadService(resourceId: string, party: string): Promise<FileTransferServiceState> {
   try {
-    const [resources, configuration, allowedRecipients] = await Promise.all([
+    const [resources, configuration, allowedRecipients, accessListCandidates] = await Promise.all([
       fetchAuthorizedResources(party),
       getResourceConfiguration(resourceId),
       getAllowedRecipients(resourceId, party),
+      getAllowedRecipients(resourceId, party, { ignoreRequiredParty: true }),
     ])
 
     const resource = resources.find((candidate) => candidate.resourceId === resourceId)
     return resource
-      ? { status: 'loaded', service: { resource, configuration, allowedRecipients } }
+      ? {
+          status: 'loaded',
+          service: { resource, configuration, allowedRecipients, accessListCandidates },
+        }
       : { status: 'missing' }
   } catch {
     return { status: 'failed' }

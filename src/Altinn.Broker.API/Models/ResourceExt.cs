@@ -61,8 +61,7 @@ public class ResourceExt
     public string? RequiredParty { get; set; }
 
     /// <summary>
-    /// Whether the resource may send file transfers with virus scan disabled. Approval
-    /// is granted by Altinn.
+    /// Whether the resource may send file transfers with virus scan disabled.
     /// </summary>
     [JsonPropertyName("approvedForDisabledVirusScan")]
     public bool? ApprovedForDisabledVirusScan { get; set; }

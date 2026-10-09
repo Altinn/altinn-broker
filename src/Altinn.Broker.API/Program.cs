@@ -247,6 +247,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddScoped<IEndUserTokenProvider, EndUserTokenProvider>();
     services.AddTransient<IAuthorizationHandler, EndUserAuthorizationHandler>();
     services.AddTransient<IAuthorizationHandler, EndUserScopeAccessHandler>();
+    services.AddTransient<IAuthorizationHandler, ConfigureResourceAccessHandler>();
     services.AddAuthorization(options =>
     {
         options.AddPolicy(AuthorizationConstants.Sender, policy => policy
@@ -273,6 +274,13 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 AuthorizationConstants.EndUserCookie,
                 AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.ConfigureResource, policy => policy
+            .AddRequirements(new ConfigureResourceAccessRequirement())
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.AnyBrokerScope, policy => policy
             .AddRequirements(new ScopeAccessRequirement(
                 [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))

@@ -41,6 +41,16 @@ public class AltinnAuthorizationService : IAuthorizationService
     public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
         => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, cancellationToken);
 
+    public Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
+        => CheckUserAccess(
+            user,
+            resourceId,
+            party,
+            null,
+            new List<ResourceAccessLevel> { ResourceAccessLevel.Publish },
+            cancellationToken,
+            requireRegisteredResource: false);
+
     public async Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default)
     {
         var recipients = fileTransfer.RecipientCurrentStatuses.DistinctBy(recipient => recipient.Actor.ActorExternalId);
@@ -97,12 +107,17 @@ public class AltinnAuthorizationService : IAuthorizationService
             return [];
         }
 
+        // Only write/read here. Publish for configuration is checked once via CheckAccessAsPublisher
+        // on the gatekeeper resource; bundling it would drop batch size from 200 to 133 resources.
         var sendAction = GetActionId(ResourceAccessLevel.Write);
         var receiveAction = GetActionId(ResourceAccessLevel.Read);
         string[] actions = [sendAction, receiveAction];
         var resourcesPerRequest = MaxDecisionsPerRequest / actions.Length;
         var distinctResourceIds = resourceIds.Distinct(StringComparer.Ordinal).ToList();
-        var access = distinctResourceIds.ToDictionary(resourceId => resourceId, _ => (CanSend: false, CanReceive: false), StringComparer.Ordinal);
+        var access = distinctResourceIds.ToDictionary(
+            resourceId => resourceId,
+            _ => (CanSend: false, CanReceive: false),
+            StringComparer.Ordinal);
 
         async Task ApplyDecisions(IReadOnlyList<string> resourcesToCheck)
         {
@@ -145,9 +160,12 @@ public class AltinnAuthorizationService : IAuthorizationService
                     continue;
                 }
 
-                access[resourceId] = action == sendAction
-                    ? (true, resourceAccess.CanReceive)
-                    : (resourceAccess.CanSend, true);
+                access[resourceId] = action switch
+                {
+                    _ when action == sendAction => (true, resourceAccess.CanReceive),
+                    _ when action == receiveAction => (resourceAccess.CanSend, true),
+                    _ => resourceAccess
+                };
             }
         }
 
@@ -194,7 +212,14 @@ public class AltinnAuthorizationService : IAuthorizationService
             .ToList();
     }
 
-    private async Task<bool> CheckUserAccess(ClaimsPrincipal? user, string resourceId, string party, string? fileTransferId, List<ResourceAccessLevel> rights, CancellationToken cancellationToken = default)
+    private async Task<bool> CheckUserAccess(
+        ClaimsPrincipal? user,
+        string resourceId,
+        string party,
+        string? fileTransferId,
+        List<ResourceAccessLevel> rights,
+        CancellationToken cancellationToken = default,
+        bool requireRegisteredResource = true)
     {
         if (user is null)
         {
@@ -203,13 +228,20 @@ public class AltinnAuthorizationService : IAuthorizationService
         var resource = await _resourceRepository.GetResource(resourceId, cancellationToken);
         if (resource is null)
         {
-            _logger.LogWarning("Resource not found");
-            return false;
+            if (requireRegisteredResource)
+            {
+                _logger.LogWarning("Resource not found");
+                return false;
+            }
         }
-        var bypass = await EvaluateBypassConditions(resource, cancellationToken);
-        if (bypass.HasValue)
+        else
         {
-            return bypass.Value;
+            var bypass = await EvaluateBypassConditions(resource, cancellationToken);
+            if (bypass.HasValue)
+            {
+                return bypass.Value;
+            }
+            resourceId = resource.Id;
         }
         bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
         bool isIdportenToken = IdportenXacmlMapper.IsIdportenToken(user);
@@ -225,7 +257,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             party.WithoutPrefix(),
             fileTransferId,
             rights,
-            resource.Id,
+            resourceId,
             isIdportenToken ? idportenSubjectCategory : null);
         var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -378,6 +410,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             ResourceAccessLevel.Read => "read",
             ResourceAccessLevel.Write => "write",
+            ResourceAccessLevel.Publish => "publish",
             _ => throw new NotImplementedException()
         };
     }

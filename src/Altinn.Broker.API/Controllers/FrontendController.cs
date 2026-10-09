@@ -23,29 +23,33 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write <br/>
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
+    /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
+    /// <c>continuationToken</c> is passed back to read the next page.
     /// </remarks>
     /// <response code="200">Returns the list of active file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     [HttpGet("active-file-transfers")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
-    [ProducesResponseType(typeof(List<FileTransferSummaryExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FileTransferSummaryListExt), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<List<FileTransferSummaryExt>>> GetActiveFileTransfers(
+    public async Task<ActionResult<FileTransferSummaryListExt>> GetActiveFileTransfers(
         [FromQuery] List<string> resourceIds,
         [FromQuery] string? onBehalfOf,
         [FromServices] GetFileTransferSummariesHandler handler,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? continuationToken = null)
     {
         logger.LogInformation("Getting active file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
         {
             ResourceIds = resourceIds,
             OnBehalfOf = onBehalfOf ?? string.Empty,
-            View = FileTransferListView.Active
+            View = FileTransferListView.Active,
+            ContinuationToken = continuationToken
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
-            summaries => Ok(summaries.Select(FileTransferSummaryExtMapper.MapToExternalModel).ToList()),
+            page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),
             Problem
         );
     }
@@ -59,29 +63,33 @@ public class FrontendController(ILogger<FrontendController> logger) : Controller
     /// - altinn:broker.read <br/>
     /// - altinn:broker.write <br/>
     /// A resourceId the caller can't access (or that doesn't exist) is skipped rather than failing the whole call.
+    /// Returns one page, newest first. <c>hasNextPage</c> says whether more exist, and
+    /// <c>continuationToken</c> is passed back to read the next page.
     /// </remarks>
     /// <response code="200">Returns the list of historical file transfer summaries</response>
     /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
     [HttpGet("historical-file-transfers")]
     [Authorize(Policy = AuthorizationConstants.SenderOrRecipient)]
     [Produces("application/json")]
-    [ProducesResponseType(typeof(List<FileTransferSummaryExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FileTransferSummaryListExt), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<List<FileTransferSummaryExt>>> GetHistoricalFileTransfers(
+    public async Task<ActionResult<FileTransferSummaryListExt>> GetHistoricalFileTransfers(
         [FromQuery] List<string> resourceIds,
         [FromQuery] string? onBehalfOf,
         [FromServices] GetFileTransferSummariesHandler handler,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? continuationToken = null)
     {
         logger.LogInformation("Getting historical file transfers for {count} resources", resourceIds.Count);
         var queryResult = await handler.Process(new GetFileTransferSummariesRequest()
         {
             ResourceIds = resourceIds,
             OnBehalfOf = onBehalfOf ?? string.Empty,
-            View = FileTransferListView.Historical
+            View = FileTransferListView.Historical,
+            ContinuationToken = continuationToken
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
-            summaries => Ok(summaries.Select(FileTransferSummaryExtMapper.MapToExternalModel).ToList()),
+            page => Ok(FileTransferSummaryExtMapper.MapToExternalModel(page)),
             Problem
         );
     }

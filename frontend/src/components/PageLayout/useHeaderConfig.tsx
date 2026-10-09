@@ -11,9 +11,11 @@ export function useHeaderConfig(): GlobalHeaderProps {
   const { logout } = useAuth()
   const { status, parties, selfPartyUuid, selectedParty, selectParty } = useParties()
 
+  // Without a currentAccount, GlobalHeader renders a dead "Logg inn" button (onLoginClick
+  // is unset). Fall back to the self account when no organization is selected yet.
   const accountSelector = useAccountSelector({
     partyListDTO: parties,
-    currentAccountUuid: selectedParty?.partyUuid,
+    currentAccountUuid: selectedParty?.partyUuid ?? selfPartyUuid,
     selfAccountUuid: selfPartyUuid,
     isLoading: status === 'loading',
     virtualized: parties.length > 20,

@@ -16,15 +16,15 @@ using Altinn.Broker.Integrations.Maskinporten;
 using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
 
 using StackExchange.Redis;
+
+using tusdotnet.Interfaces;
 
 using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
@@ -137,6 +137,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<ILogger<TusUploadProgressCache>>(),
                 serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
+        services.AddSingleton<ITusFileLockProvider, TusTakeoverFileLockProvider>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
