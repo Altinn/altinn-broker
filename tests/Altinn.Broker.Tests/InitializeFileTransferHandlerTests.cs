@@ -1,4 +1,5 @@
 using Altinn.Broker.Application;
+using Altinn.Broker.Application.CreateNotificationOrder;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Domain;
@@ -85,6 +86,7 @@ public class InitializeFileTransferHandlerTests
             new Mock<IFileTransferStatusRepository>().Object,
             new Mock<IActorFileTransferStatusRepository>().Object,
             new Mock<IBackgroundJobClient>().Object,
+            new Mock<ICreateNotificationOrderHandler>().Object,
             eventBus,
             hostEnvironment.Object,
             new Mock<IAltinnRegisterService>().Object,
@@ -113,6 +115,7 @@ public class InitializeFileTransferHandlerTests
                 It.IsAny<DateTimeOffset>(),
                 It.IsAny<Dictionary<string, string>>(),
                 It.IsAny<string?>(),
+                It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);

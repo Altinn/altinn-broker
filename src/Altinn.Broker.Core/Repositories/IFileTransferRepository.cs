@@ -15,6 +15,7 @@ public interface IFileTransferRepository
         Dictionary<string, string> propertyList,
         string? checksum,
         bool useVirusScan,
+        bool hasNotification,
         CancellationToken cancellationToken);
     Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
