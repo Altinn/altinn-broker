@@ -6,10 +6,12 @@ using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
@@ -20,6 +22,7 @@ public class ConfigureResourceHandler(
     IServiceOwnerRepository serviceOwnerRepository,
     IAuthorizationService authorizationService,
     IHostEnvironment hostEnvironment,
+    IOptions<AzureStorageOptions> azureStorageOptions,
     ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -202,7 +205,10 @@ public class ConfigureResourceHandler(
         {
             return Errors.MaxUploadSizeForVirusScan;
         }
-        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize) return Errors.MaxUploadSizeOverGlobal;
+        if (maxFileTransferSize > azureStorageOptions.Value.MaxTotalTransferBytes)
+        {
+            return Errors.MaxUploadSizeOverGlobal;
+        }
         return null;
     }
 

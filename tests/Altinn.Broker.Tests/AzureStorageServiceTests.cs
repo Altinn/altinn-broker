@@ -3,6 +3,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Integrations.Azure;
+using Azure;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
@@ -159,6 +160,88 @@ public class AzureStorageServiceTests
 
         Assert.Single(service.FirstCommitFlags);
         Assert.True(service.FirstCommitFlags[0]);
+    }
+
+    [Fact]
+    public async Task FinalizeTusUpload_FailsAfterStripesWereCommitted_LeavesTheCommittedStripesInPlace()
+    {
+        // Arrange
+        var fileTransfer = CreateDefaultFileTransfer();
+        var service = CreateFinalizeService(new CommittedStripes(8, 2048, [256, 256, 256, 256, 256, 256, 256, 256]));
+
+        // Act
+        await Assert.ThrowsAsync<RequestFailedException>(
+            () => service.FinalizeTusUpload(CreateDefaultServiceOwner(), fileTransfer, CancellationToken.None));
+
+        // Assert
+        Assert.DoesNotContain(fileTransfer.FileTransferId.ToString(), service.DeletedBlobNames);
+    }
+
+    [Fact]
+    public async Task FinalizeTusUpload_FailsBeforeAnythingWasCommitted_RemovesThePartiallyCopiedDestination()
+    {
+        // Arrange
+        var fileTransfer = CreateDefaultFileTransfer();
+        var service = CreateFinalizeService(new CommittedStripes(0, 0, []));
+
+        // Act
+        await Assert.ThrowsAsync<RequestFailedException>(
+            () => service.FinalizeTusUpload(CreateDefaultServiceOwner(), fileTransfer, CancellationToken.None));
+
+        // Assert
+        Assert.Contains(fileTransfer.FileTransferId.ToString(), service.DeletedBlobNames);
+    }
+
+    private static FinalizeTestAzureStorageService CreateFinalizeService(CommittedStripes committedStripes)
+        => new(
+            committedStripes,
+            Options.Create(new AzureStorageOptions()),
+            Options.Create(new ReportStorageOptions { ConnectionString = "UseDevelopmentStorage=true" }),
+            new Mock<IHostEnvironment>().Object,
+            new Mock<ILogger<AzureStorageService>>().Object);
+
+    private sealed class FinalizeTestAzureStorageService(
+        CommittedStripes committedStripes,
+        IOptions<AzureStorageOptions> azureStorageOptions,
+        IOptions<ReportStorageOptions> reportStorageOptions,
+        IHostEnvironment hostEnvironment,
+        ILogger<AzureStorageService> logger)
+        : AzureStorageService(azureStorageOptions, reportStorageOptions, hostEnvironment, logger)
+    {
+        public List<string> DeletedBlobNames { get; } = [];
+
+        protected override Task<BlobContainerClient> GetBlobContainerClient(
+            FileTransferEntity fileTransferEntity,
+            ServiceOwnerEntity serviceOwnerEntity)
+        {
+            var blobServiceClient = new BlobServiceClient(
+                new Uri("https://unit-test-account.blob.core.windows.net"),
+                new DefaultAzureCredential());
+            return Task.FromResult(blobServiceClient.GetBlobContainerClient("brokerfiles-test"));
+        }
+
+        protected override Task<CommittedStripes> ReadCommittedStripesAsync(
+            BlobContainerClient blobContainerClient,
+            Guid fileTransferId,
+            CancellationToken cancellationToken)
+            => Task.FromResult(committedStripes);
+
+        protected override Task DeleteBlobIfExistsAsync(BlobBaseClient blobClient, CancellationToken cancellationToken)
+        {
+            DeletedBlobNames.Add(blobClient.Name);
+            if (blobClient.Name.StartsWith(AzureStorageConstants.TusBlockStagingBlobPath, StringComparison.Ordinal))
+            {
+                throw new RequestFailedException(503, "Server busy");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        protected override Task<BlobClient?> ResolveTusStagingBlobClientAsync(
+            BlobClient blockStagingBlobClient,
+            BlobClient appendStagingBlobClient,
+            CancellationToken cancellationToken)
+            => throw new RequestFailedException(503, "Server busy");
     }
 
     private static ServiceOwnerEntity CreateDefaultServiceOwner() => new()

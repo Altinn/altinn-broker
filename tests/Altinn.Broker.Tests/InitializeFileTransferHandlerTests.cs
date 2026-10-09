@@ -3,6 +3,7 @@ using Altinn.Broker.Application.CreateNotificationOrder;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
@@ -10,6 +11,7 @@ using Hangfire;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -90,6 +92,7 @@ public class InitializeFileTransferHandlerTests
             eventBus,
             hostEnvironment.Object,
             new Mock<IAltinnRegisterService>().Object,
+            Options.Create(new AzureStorageOptions()),
             NullLogger<InitializeFileTransferHandler>.Instance);
 
         var result = await handler.Process(new InitializeFileTransferRequest
@@ -116,6 +119,7 @@ public class InitializeFileTransferHandlerTests
                 It.IsAny<Dictionary<string, string>>(),
                 It.IsAny<string?>(),
                 It.IsAny<bool>(),
+                It.IsAny<long>(),
                 It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);

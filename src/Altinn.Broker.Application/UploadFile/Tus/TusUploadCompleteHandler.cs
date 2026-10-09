@@ -83,11 +83,12 @@ public class TusUploadCompleteHandler(
             return Errors.UploadFailed;
         }
 
-        var (checksum, uploadLength) = finalizeResult.Value;
+        var (checksum, uploadLength, stripeSizeBytes) = finalizeResult.Value;
         logger.LogInformation(
-            "TUS storage finalized for file transfer {FileTransferId}. UploadLength={UploadLength} ChecksumPresent={ChecksumPresent}",
+            "TUS storage finalized for file transfer {FileTransferId}. UploadLength={UploadLength} StripeSizeBytes={StripeSizeBytes} ChecksumPresent={ChecksumPresent}",
             fileTransferId,
             uploadLength,
+            stripeSizeBytes,
             !string.IsNullOrWhiteSpace(checksum));
 
         var completeResult = await completeFileUploadHandler.Process(
@@ -96,6 +97,7 @@ public class TusUploadCompleteHandler(
                 FileTransferId = fileTransferId,
                 Checksum = checksum,
                 UploadLength = uploadLength,
+                StripeSizeBytes = stripeSizeBytes,
                 DeferChecksumValidation = true
             },
             user,
