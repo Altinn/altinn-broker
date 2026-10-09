@@ -1,23 +1,28 @@
-import { historicalTransfers } from '../data/mockData'
-import { TransferListItem } from '../components/TransferListItem'
+import { getHistoricalFileTransfers } from '../api/historicalFileTransfers'
+import { FileTransferList } from '../components/FileTransfersPages/FileTransferList'
 import { historicalTransferPath } from './routes'
-import './pages.css'
+import { useParties } from '../parties/PartiesContext'
+import { SelectedPartyMessage } from '../parties/SelectedPartyMessage'
 
 export function HistoricalFileTransfersPage() {
-  return (
-    <div className="page">
-      <h2 className="page-heading">Historiske formidlinger Brønnøy sykehus har vært delaktig i</h2>
+  const { selectedParty } = useParties()
 
-      <ul className="transfer-list">
-        {historicalTransfers.map((transfer) => (
-          <TransferListItem
-            key={transfer.id}
-            serviceName={transfer.serviceName}
-            subtitle={transfer.subtitle}
-            to={historicalTransferPath(transfer.id)}
-          />
-        ))}
-      </ul>
-    </div>
+  if (!selectedParty) {
+    return <SelectedPartyMessage loadingText="Laster historiske formidlinger …" />
+  }
+
+  return (
+    <FileTransferList
+      // A fresh list per actor, instead of unpicking which request belonged to whom.
+      key={selectedParty.partyUuid}
+      queryKey="historical-file-transfers"
+      heading="Historiske formidlinger"
+      loadingText="Laster historiske formidlinger …"
+      loadErrorText="Klarte ikke å hente historiske formidlinger."
+      emptyStateText="Ingen historiske formidlinger funnet."
+      currentOrg={selectedParty}
+      fetchTransfers={getHistoricalFileTransfers}
+      toPath={historicalTransferPath}
+    />
   )
 }

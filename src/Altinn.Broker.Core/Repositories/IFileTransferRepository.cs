@@ -20,6 +20,7 @@ public interface IFileTransferRepository
     Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
+    Task<List<FileTransferSummaryEntity>> GetFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken);
     Task SetStorageDetails(
         Guid fileTransferId,

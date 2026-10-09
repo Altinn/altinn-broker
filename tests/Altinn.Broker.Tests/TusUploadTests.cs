@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Models;
-using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Enums;
 using Altinn.Broker.Models;
 using Altinn.Broker.Tests.Factories;
@@ -24,7 +23,7 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
 
     public TusUploadTests(CustomWebApplicationFactory factory)
     {
-        _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN);
+        _senderClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_SENDER_TOKEN, allowAutoRedirect: false);
         _recipientClient = factory.CreateClientWithAuthorization(TestConstants.DUMMY_RECIPIENT_TOKEN);
         _responseSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         _responseSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -88,6 +87,53 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task TusUpload_MultiChunk_HeadResume_Succeeds()
+    {
+        var fileContent = Encoding.UTF8.GetBytes("abcdefghijklmnopqrstuvwxyz0123"); // 30 bytes
+        const int chunkSize = 10;
+
+        var (fileTransferId, uploadUrl) = await TusUploadTestHelper.InitializeAndCreateTusUploadAsync(
+            _senderClient,
+            fileContent.Length);
+
+        var headOffset = await TusUploadTestHelper.HeadUploadOffsetAsync(_senderClient, uploadUrl);
+        Assert.Equal(0, headOffset);
+
+        long offset = 0;
+        while (offset < fileContent.Length)
+        {
+            var chunk = fileContent.AsSpan((int)offset, Math.Min(chunkSize, fileContent.Length - (int)offset)).ToArray();
+            var patchOffset = await TusUploadTestHelper.PatchChunkAsync(_senderClient, uploadUrl, offset, chunk);
+            Assert.Equal(offset + chunk.Length, patchOffset);
+
+            if (patchOffset >= fileContent.Length)
+            {
+                // Upload is complete; HEAD may race with finalize and return 409.
+                offset = patchOffset;
+                break;
+            }
+
+            // HEAD reports durable/committed offset. Wait until staging catches Accepted.
+            headOffset = await TusUploadTestHelper.WaitForHeadOffsetAsync(
+                _senderClient,
+                uploadUrl,
+                expectedOffset: offset + chunk.Length,
+                timeout: TimeSpan.FromSeconds(15));
+            Assert.Equal(offset + chunk.Length, headOffset);
+
+            // Resume from HEAD (as a client would after interrupt), then continue.
+            offset = headOffset;
+        }
+
+        Assert.Equal(fileContent.Length, offset);
+        await TusUploadTestHelper.WaitForPublishedAndAssertDownloadAsync(
+            _senderClient,
+            _recipientClient,
+            fileTransferId,
+            fileContent);
+    }
+
+    [Fact]
     public async Task TusUpload_PartialHead_TwoSegmentLocation_Succeeds()
     {
         var initializeResponse = await _senderClient.PostAsJsonAsync(
@@ -127,5 +173,66 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("0", offsetValues.First());
         Assert.True(headResponse.Headers.TryGetValues("Upload-Length", out var lengthValues));
         Assert.Equal(partialLength.ToString(), lengthValues.First());
+    }
+
+    [Fact]
+    public async Task TusUpload_HeadWhileAPatchIsStalled_TakesOverTheLock()
+    {
+        // Under the 99,999 bytes another test may set as the test resource's maximum file size.
+        const int uploadLength = 96 * 1024;
+        var (fileTransferId, uploadUrl) = await TusUploadTestHelper.InitializeAndCreateTusUploadAsync(_senderClient, uploadLength);
+
+        // A PATCH that stops sending partway holds the upload's lock, like one whose connection dropped unnoticed.
+        using var stall = new CancellationTokenSource();
+        var stalledBody = new StalledContent(uploadLength, stall.Token);
+        var stalledPatch = _senderClient.SendAsync(TusUploadTestHelper.PatchRequest(uploadUrl, 0, stalledBody));
+        try
+        {
+            await stalledBody.ServerIsReading.WaitAsync(TimeSpan.FromSeconds(30));
+
+            var offset = await TusUploadTestHelper.HeadUploadOffsetAsync(_senderClient, uploadUrl)
+                .WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.Equal(0, offset);
+
+            var aborted = await Record.ExceptionAsync(() => stalledPatch.WaitAsync(TimeSpan.FromSeconds(30)));
+            Assert.NotNull(aborted);
+            Assert.IsNotType<TimeoutException>(aborted);
+        }
+        finally
+        {
+            stall.Cancel();
+        }
+
+        var fileContent = new byte[uploadLength];
+        Random.Shared.NextBytes(fileContent);
+        Assert.Equal(uploadLength, await TusUploadTestHelper.PatchChunkAsync(_senderClient, uploadUrl, 0, fileContent));
+        await TusUploadTestHelper.WaitForPublishedAndAssertDownloadAsync(
+            _senderClient,
+            _recipientClient,
+            fileTransferId,
+            fileContent);
+    }
+
+    // Sends 80 KB of its declared length, then stalls. The test server's request pipe holds 64 KB,
+    // so writing more than that only completes once the server is reading the body.
+    private sealed class StalledContent(long declaredLength, CancellationToken stall) : HttpContent
+    {
+        private readonly TaskCompletionSource _serverIsReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task ServerIsReading => _serverIsReading.Task;
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            await stream.WriteAsync(new byte[80 * 1024], stall);
+            await stream.FlushAsync(stall);
+            _serverIsReading.TrySetResult();
+            await Task.Delay(Timeout.Infinite, stall);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = declaredLength;
+            return true;
+        }
     }
 }

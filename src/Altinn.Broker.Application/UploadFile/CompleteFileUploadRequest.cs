@@ -7,5 +7,4 @@ public class CompleteFileUploadRequest
     public long UploadLength { get; set; }
     public long? StripeSizeBytes { get; set; }
     public bool DeferChecksumValidation { get; set; }
-    public DateTimeOffset UploadFinishedTimestamp { get; set; }
 }

@@ -11,17 +11,28 @@ namespace Altinn.Broker.API.IdPortenDirectAuth;
 
 /// <summary>
 /// On each request authenticated via cookie, validates the stored Altinn token.
-/// If expired, attempts re-exchange using the stored ID-Porten access/refresh material.
+/// If it is expired or close to expiring, refreshes the ID-Porten session and re-exchanges it.
 /// Sets ClaimsPrincipal from the Altinn token so downstream authorization sees urn:altinn:* claims.
 /// Rejects sessions revoked via ID-Porten back-channel logout.
 /// </summary>
 public class AltinnTokenCookieEvents : CookieAuthenticationEvents
 {
-    private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
+    /// <summary>
+    /// Re-exchange this far ahead of expiry, so no request travels downstream with a token that
+    /// expires mid-flight. Keep it small: Altinn issues two-minute tokens, so a larger leeway
+    /// renews on every request.
+    /// </summary>
+    private static readonly TimeSpan ExpiryLeeway = TimeSpan.FromSeconds(20);
 
-    public AltinnTokenCookieEvents(IOidcBackChannelLogoutSessionStore logoutSessionStore)
+    private readonly IOidcBackChannelLogoutSessionStore _logoutSessionStore;
+    private readonly IIdPortenTokenRefreshService _tokenRefreshService;
+
+    public AltinnTokenCookieEvents(
+        IOidcBackChannelLogoutSessionStore logoutSessionStore,
+        IIdPortenTokenRefreshService tokenRefreshService)
     {
         _logoutSessionStore = logoutSessionStore;
+        _tokenRefreshService = tokenRefreshService;
     }
 
     /// <summary>
@@ -46,42 +57,38 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
         var sub = GetItem(context.Properties, OidcSessionKeys.Sub);
         if (await _logoutSessionStore.IsRevokedAsync(sid, sub, context.Properties.IssuedUtc))
         {
-            context.RejectPrincipal();
-            await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
+            await EndSession(context);
             return;
         }
 
         var tokens = context.Properties.GetTokens().ToList();
-        var altinnToken = tokens.FirstOrDefault(t => t.Name == "altinn_token")?.Value;
+        var altinnToken = tokens.FirstOrDefault(t => t.Name == OidcSessionKeys.AltinnToken)?.Value;
 
         if (string.IsNullOrEmpty(altinnToken) || !CanRead(altinnToken, out var jwt))
         {
-            context.RejectPrincipal();
-            await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
+            await EndSession(context);
             return;
         }
 
-        if (jwt!.ValidTo < DateTime.UtcNow)
+        if (jwt!.ValidTo - ExpiryLeeway <= DateTime.UtcNow)
         {
             var refreshed = await TryReExchange(context, tokens);
             if (!refreshed)
             {
-                context.RejectPrincipal();
-                await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
+                await EndSession(context);
                 return;
             }
 
-            altinnToken = context.Properties.GetTokenValue("altinn_token");
+            altinnToken = context.Properties.GetTokenValue(OidcSessionKeys.AltinnToken);
             if (string.IsNullOrEmpty(altinnToken) || !CanRead(altinnToken, out jwt))
             {
-                context.RejectPrincipal();
-                await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
+                await EndSession(context);
                 return;
             }
         }
 
         var identity = new ClaimsIdentity(
-            jwt.Claims,
+            jwt!.Claims,
             AuthorizationConstants.EndUserCookie,
             ClaimTypes.Name,
             ClaimTypes.Role);
@@ -90,8 +97,19 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
             identity.AddClaim(new Claim("sid", sid));
         }
 
-        context.ReplacePrincipal(new ClaimsPrincipal(identity));
-        context.ShouldRenew = false;
+        var idPortenIdentity = IdPortenPrincipalClaims.CopyIdentity(context.Principal);
+        context.ReplacePrincipal(idPortenIdentity is null
+            ? new ClaimsPrincipal(identity)
+            : new ClaimsPrincipal([identity, idPortenIdentity]));
+
+        // ShouldRenew is left as the middleware set it; clearing it would discard a refreshed
+        // token and disable sliding expiration.
+    }
+
+    private static async Task EndSession(CookieValidatePrincipalContext context)
+    {
+        context.RejectPrincipal();
+        await context.HttpContext.SignOutAsync(AuthorizationConstants.EndUserCookie);
     }
 
     private static bool CanRead(string token, out JwtSecurityToken? jwt)
@@ -107,26 +125,38 @@ public class AltinnTokenCookieEvents : CookieAuthenticationEvents
         return true;
     }
 
-    private static async Task<bool> TryReExchange(CookieValidatePrincipalContext context, List<AuthenticationToken> tokens)
+    /// <summary>
+    /// Trades the stored refresh token for a fresh ID-Porten access token and exchanges that for a
+    /// new Altinn token. Without it the session dies at the Altinn token's expiry even though the
+    /// cookie is still valid.
+    /// </summary>
+    private async Task<bool> TryReExchange(CookieValidatePrincipalContext context, List<AuthenticationToken> tokens)
     {
-        // Legacy cookies may still carry an ID-Porten access token.
-        var idPortenAccessToken = tokens.FirstOrDefault(t => t.Name == "id_porten_access_token")?.Value;
-        if (string.IsNullOrEmpty(idPortenAccessToken))
+        var refreshToken = tokens.FirstOrDefault(t => t.Name == OidcSessionKeys.IdPortenRefreshToken)?.Value;
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return false;
+        }
+
+        // Not tied to RequestAborted: a cancelled refresh would leave the rotated token unrecorded.
+        var refreshed = await _tokenRefreshService.RefreshAsync(refreshToken, CancellationToken.None);
+        if (refreshed is null)
         {
             return false;
         }
 
         var tokenExchange = context.HttpContext.RequestServices.GetRequiredService<IAltinnTokenExchangeService>();
-        var newAltinnToken = await tokenExchange.ExchangeIdPortenToken(idPortenAccessToken);
+        var newAltinnToken = await tokenExchange.ExchangeIdPortenToken(refreshed.AccessToken, CancellationToken.None);
         if (string.IsNullOrEmpty(newAltinnToken))
         {
             return false;
         }
 
-        var updatedTokens = tokens.Select(t => t.Name == "altinn_token"
-            ? new AuthenticationToken { Name = "altinn_token", Value = newAltinnToken }
-            : t).ToList();
-        context.Properties.StoreTokens(updatedTokens);
+        context.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = newAltinnToken },
+            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = refreshed.RefreshToken }
+        ]);
         context.ShouldRenew = true;
         return true;
     }

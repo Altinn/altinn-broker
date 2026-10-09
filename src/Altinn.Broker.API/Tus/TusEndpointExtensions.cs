@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using tusdotnet;
+using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 using tusdotnet.Models.Configuration;
@@ -57,6 +58,7 @@ public static class TusEndpointExtensions
         return Task.FromResult<DefaultTusConfiguration?>(new DefaultTusConfiguration
         {
             Store = store,
+            FileLockProvider = httpContext.RequestServices.GetRequiredService<ITusFileLockProvider>(),
             Expiration = new SlidingExpiration(tusOptions.UploadExpiration),
             Events = new Events
             {
@@ -321,7 +323,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadStarted,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }
@@ -390,7 +391,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadProcessing,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }

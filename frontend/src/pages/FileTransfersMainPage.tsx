@@ -1,9 +1,13 @@
 import { CardLink } from '../components/CardLink'
+import { useParties } from '../parties/PartiesContext'
 import { OrganizationHeader } from '../components/OrganizationHeader'
 import { PageRoutes } from './routes'
 import './pages.css'
 
 export function FileTransfersMainPage() {
+  const { selectedParty } = useParties()
+  const organizationName = selectedParty?.name ?? ''
+
   return (
     <div className="page">
       <OrganizationHeader />
@@ -13,7 +17,11 @@ export function FileTransfersMainPage() {
         <CardLink
           to={PageRoutes.services}
           title="Se dine formidlingstjenester"
-          description="Formidlingstjenestene Brønnøy sykehus er delaktig i"
+          description={
+            organizationName
+              ? `Formidlingstjenestene ${organizationName} er delaktig i`
+              : 'Formidlingstjenester du er delaktig i'
+          }
         />
       </section>
 
@@ -31,7 +39,7 @@ export function FileTransfersMainPage() {
         <CardLink
           to={PageRoutes.historical}
           title="Historiske formidlinger"
-          description="Fullførte formidlinger Brønnøy sykehus har vært delaktig i"
+          description="Fullførte formidlinger"
         />
       </section>
     </div>

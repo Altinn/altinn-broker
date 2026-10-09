@@ -1,6 +1,8 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.GetAllowedRecipients;
+using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Models;
 using Altinn.Broker.API.Helpers;
@@ -12,15 +14,16 @@ namespace Altinn.Broker.Controllers;
 
 [ApiController]
 [Route("broker/api/v1/resource")]
-[Authorize(Policy = AuthorizationConstants.ServiceOwner)]
 public class ResourceController : Controller
 {
     /// <summary>
     /// Configures a resource with settings to be used within the broker service.
     /// </summary>
     /// <remarks>
-    /// One of the scopes: <br/> 
-    /// - altinn:serviceowner <br/>
+    /// Authorized as: <br/>
+    /// - Service owner (<c>altinn:serviceowner</c>) that owns the resource <br/>
+    /// - End user (ID-porten) acting on behalf of a Broker service owner (<paramref name="onBehalfOf"/>)
+    ///   with the <c>publish</c> action on <c>digdir-broker-administrasjon</c> for that party <br/>
     /// </remarks>
     /// <response code="200">Resource configured successfully</response>
     /// <response code="400"><ul>
@@ -32,10 +35,12 @@ public class ResourceController : Controller
     /// <li>Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it</li>
     /// <li>Invalid file transfer time to live format. Should follow ISO8601 standard for duration. Example: 'P30D' for 30 days</li>
     /// <li>Time to live cannot exceed 365 days</li>
+    /// <li>Missing onBehalfOf when using an ID-porten end-user session</li>
     /// </ul></response>
-    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource, or an end-user session with publish rights</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpPut]
+    [Authorize(Policy = AuthorizationConstants.ConfigureResource)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -43,11 +48,17 @@ public class ResourceController : Controller
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [Route("{resourceId}")]
-    public async Task<ActionResult> ConfigureResource(string resourceId, [FromBody] ResourceExt resourceExt, [FromServices] ConfigureResourceHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult> ConfigureResource(
+        string resourceId,
+        [FromBody] ResourceExt resourceExt,
+        [FromQuery] string? onBehalfOf,
+        [FromServices] ConfigureResourceHandler handler,
+        CancellationToken cancellationToken)
     {
         var result = await handler.Process(new ConfigureResourceRequest()
         {
             ResourceId = resourceId,
+            OnBehalfOf = onBehalfOf,
             MaxFileTransferSize = resourceExt.MaxFileTransferSize,
             FileTransferTimeToLive = resourceExt.FileTransferTimeToLive,
             PurgeFileTransferAfterAllRecipientsConfirmed = resourceExt.PurgeFileTransferAfterAllRecipientsConfirmed,
@@ -55,7 +66,8 @@ public class ResourceController : Controller
             UseManifestFileShim = resourceExt.UseManifestFileShim,
             ExternalServiceCodeLegacy = resourceExt.ExternalServiceCodeLegacy,
             ExternalServiceEditionCodeLegacy = resourceExt.ExternalServiceEditionCodeLegacy,
-            RequiredParty = resourceExt.RequiredParty
+            RequiredParty = resourceExt.RequiredParty,
+            ApprovedForDisabledVirusScan = resourceExt.ApprovedForDisabledVirusScan
         }, HttpContext.User, cancellationToken);
 
         return result.Match(
@@ -68,13 +80,16 @@ public class ResourceController : Controller
     /// Gets information about a resource configuration in broker
     /// </summary>
     /// <remarks>
-    /// One of the scopes: <br/> 
+    /// One of the scopes: <br/>
     /// - altinn:serviceowner <br/>
+    /// - altinn:broker.write <br/>
+    /// - altinn:broker.read <br/>
     /// </remarks>
     /// <response code="200">Detailed information about the resource</response>
-    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="401">You must use a bearer token with one of the broker scopes</response>
     /// <response code="403">The resource needs to be registered as an Altinn 3 resource and it has to be associated with a service owner</response>
     [HttpGet]
+    [Authorize(Policy = AuthorizationConstants.AnyBrokerScope)]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -95,10 +110,112 @@ public class ResourceController : Controller
                 PurgeFileTransferAfterAllRecipientsConfirmed = resource.PurgeFileTransferAfterAllRecipientsConfirmed,
                 PurgeFileTransferGracePeriod = resource.PurgeFileTransferGracePeriod.HasValue ? resource.PurgeFileTransferGracePeriod.Value.ToString() : null,
                 UseManifestFileShim = resource.UseManifestFileShim,
-                RequiredParty = resource.RequiredParty
+                RequiredParty = resource.RequiredParty,
+                ApprovedForDisabledVirusScan = resource.ApprovedForDisabledVirusScan
             }),
             Problem
         );
     }
+    /// <summary>
+    /// Gets the resources ("Dine formidlingstjenester") the authenticated end user has access to on behalf of a party
+    /// </summary>
+    /// <remarks>
+    /// Requires an authenticated end user session (ID-porten login or Altinn portal session). <br/>
+    /// Every resource configured in broker is checked against the end user in one multi-decision
+    /// request to Altinn Authorization. Only resources the user can send and/or receive file
+    /// transfers on for the given party are returned.
+    /// </remarks>
+    /// <response code="200">The resources the end user has access to for the party</response>
+    /// <response code="400">The party is not a valid organization number</response>
+    /// <response code="401">You must be logged in as an end user</response>
+    /// <response code="503">Altinn Authorization could not be reached</response>
+    // The literal "authorized" segment takes route precedence over "{resourceId}" above.
+    [HttpGet]
+    [Route("authorized")]
+    [Authorize(Policy = AuthorizationConstants.EndUser)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<AuthorizedResourceExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult> GetAuthorizedResources(
+        [FromQuery] string party,
+        [FromServices] GetAuthorizedResourcesHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Process(new GetAuthorizedResourcesRequest()
+        {
+            Party = party
+        }, HttpContext.User, cancellationToken);
+
+        return result.Match(
+            (resources) => Ok(resources.Select(resource => new AuthorizedResourceExt()
+            {
+                ResourceId = resource.ResourceId,
+                Name = resource.Name,
+                ServiceOwnerName = resource.ServiceOwnerName,
+                CanSend = resource.CanSend,
+                CanReceive = resource.CanReceive,
+                CanPublish = resource.CanPublish,
+                IsServiceOwner = resource.IsServiceOwner,
+                IsOwned = resource.IsOwned
+            }).ToList()),
+            Problem
+        );
+    }
+
+    /// <summary>
+    /// Gets the organizations the sending party may address a file transfer to on a resource
+    /// </summary>
+    /// <remarks>
+    /// Requires an authenticated end user session (ID-porten login or Altinn portal session). <br/>
+    /// The list can be used as it stands: it is the organizations the API will accept as recipients,
+    /// and needs no further filtering. <br/>
+    /// Normally these are the parties on the resource's access lists in the Resource Registry, resolved
+    /// to organization numbers and names, with the sending party removed. When the resource requires a
+    /// specific party and the sender is not that party, the required party is the only entry, and it is
+    /// omitted altogether if the resource has an access list it is not on. <br/>
+    /// Pass <paramref name="ignoreRequiredParty"/> as true to skip that narrowing and return every
+    /// access-list party (minus the caller). Use that for configuration UIs that need to change the
+    /// required party. <br/>
+    /// An empty list means either that the resource has no access list or that no organization can
+    /// currently receive on it.
+    /// </remarks>
+    /// <response code="200">The organizations that may receive file transfers from the party</response>
+    /// <response code="400">The party is not a valid organization number, or the resource is not configured in broker</response>
+    /// <response code="401">You must be logged in as an end user</response>
+    /// <response code="403">The resource is not registered in the Resource Registry</response>
+    [HttpGet]
+    [Route("{resourceId}/allowed-recipients")]
+    [Authorize(Policy = AuthorizationConstants.EndUser)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<AllowedRecipientExt>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult> GetAllowedRecipients(
+        string resourceId,
+        [FromQuery] string party,
+        [FromQuery] bool ignoreRequiredParty,
+        [FromServices] GetAllowedRecipientsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Process(new GetAllowedRecipientsRequest()
+        {
+            ResourceId = resourceId,
+            Party = party,
+            IgnoreRequiredParty = ignoreRequiredParty
+        }, HttpContext.User, cancellationToken);
+
+        return result.Match(
+            (recipients) => Ok(recipients.Select(recipient => new AllowedRecipientExt()
+            {
+                OrganizationNumber = recipient.OrganizationNumber,
+                Name = recipient.Name
+            }).ToList()),
+            Problem
+        );
+    }
+
     private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
 }

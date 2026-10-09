@@ -22,6 +22,9 @@ param storageAccountName string
 @description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, Front Door forwards /broker/* to APIM.')
 param apiOriginHostName string = ''
 
+@description('Resource ID of an existing Front Door custom domain. Associated with routes; never created by this template.')
+param customDomainId string = ''
+
 var resourceGroupName = '${namePrefix}-rg'
 var frontDoorProfileName = '${namePrefix}-frontend-fd'
 // AFD endpoint names are globally unique across Azure.
@@ -47,6 +50,7 @@ module frontDoor '../../modules/frontDoor/create.bicep' = {
     frontDoorProfileName: frontDoorProfileName
     originHostName: staticWebsite.outputs.staticWebsiteHostName
     apiOriginHostName: apiOriginHostName
+    customDomainId: customDomainId
     endpointName: resolvedEndpointName
   }
 }
@@ -64,5 +68,6 @@ output staticWebsiteHostName string = staticWebsite.outputs.staticWebsiteHostNam
 output frontDoorProfileName string = frontDoor.outputs.profileName
 output frontDoorEndpointName string = frontDoor.outputs.endpointName
 output frontDoorEndpointHostName string = frontDoor.outputs.endpointHostName
+output customDomainId string = frontDoor.outputs.customDomainId
 output resourceGroupName string = resourceGroupName
 output environment string = environment

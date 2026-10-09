@@ -300,6 +300,147 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
+    public async Task<List<FileTransferSummaryEntity>> GetFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
+    {
+        bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
+        bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
+
+        bool hasSenderStatusFilter = fileTransferSearch.SenderStatuses is { Count: > 0 };
+        bool hasRecipientStatusFilter = fileTransferSearch.RecipientStatuses is { Count: > 0 };
+
+        var actorConditions = new List<string>();
+        if (includeSender)
+        {
+            string senderStatusCondition = hasSenderStatusFilter ? " AND f.latest_file_status_id = ANY(@senderStatuses)" : "";
+            actorConditions.Add($"(f.sender_actor_id_fk = @actorId{senderStatusCondition})");
+        }
+        if (includeRecipient)
+        {
+            string recipientStatusCondition = hasRecipientStatusFilter ? " AND f.latest_file_status_id = ANY(@recipientStatuses)" : "";
+            actorConditions.Add($"(EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId){recipientStatusCondition})");
+        }
+        string actorCondition = string.Join(" OR ", actorConditions);
+
+        bool hasStatusFilter = hasSenderStatusFilter || hasRecipientStatusFilter;
+
+        string timestampColumn = hasStatusFilter
+            ? "f.latest_file_status_date"
+            : "f.created";
+
+        string dateCondition = "";
+        if (fileTransferSearch.From.HasValue && fileTransferSearch.To.HasValue)
+        {
+            dateCondition = $"AND {timestampColumn} BETWEEN @from AND @to";
+        }
+        else if (fileTransferSearch.From.HasValue)
+        {
+            dateCondition = $"AND {timestampColumn} > @from";
+        }
+        else if (fileTransferSearch.To.HasValue)
+        {
+            dateCondition = $"AND {timestampColumn} < @to";
+        }
+
+        string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        bool ascending = orderDirection.Equals("ASC", StringComparison.OrdinalIgnoreCase);
+
+        // Keyset paging: continue strictly past the last row of the previous page. The id is part
+        // of the comparison because the timestamp is not unique - without it a page boundary that
+        // lands between two file transfers sharing a timestamp skips or repeats one.
+        string cursorCondition = fileTransferSearch.Cursor is null
+            ? ""
+            : $"AND ({timestampColumn}, f.file_transfer_id_pk) {(ascending ? ">" : "<")} (@cursorDate, @cursorId)";
+
+        // Cap and sort the matching file transfers first (matching_transfers), then fan out to one
+        // row per recipient - doing the LIMIT before the recipient join keeps it "100 file transfers
+        // with all their recipients" rather than "100 rows total" (which would cut a transfer's
+        // recipient list off arbitrarily).
+        string commandString = $@"
+            WITH matching_transfers AS (
+                SELECT
+                    f.file_transfer_id_pk,
+                    f.resource_id,
+                    f.external_file_transfer_reference,
+                    sender.actor_external_id AS sender_actor_external_id,
+                    {timestampColumn} AS sort_date
+                FROM broker.file_transfer f
+                INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
+                WHERE f.resource_id = ANY(@resourceIds)
+                AND ({actorCondition})
+                {dateCondition}
+                {cursorCondition}
+                ORDER BY sort_date {orderDirection}, f.file_transfer_id_pk {orderDirection}
+                LIMIT @limit
+            )
+            SELECT
+                mt.file_transfer_id_pk,
+                mt.resource_id,
+                mt.external_file_transfer_reference,
+                mt.sender_actor_external_id,
+                mt.sort_date,
+                recipient.actor_external_id AS recipient_actor_external_id
+            FROM matching_transfers mt
+            LEFT JOIN broker.actor_file_transfer_latest_status afls ON afls.file_transfer_id_fk = mt.file_transfer_id_pk
+            LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afls.actor_id_fk
+            ORDER BY mt.sort_date {orderDirection}, mt.file_transfer_id_pk {orderDirection};";
+
+        await using var command = dataSource.CreateCommand(commandString);
+        command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
+        command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
+        command.Parameters.AddWithValue("@limit", fileTransferSearch.Limit);
+        if (fileTransferSearch.Cursor is { } cursor)
+        {
+            command.Parameters.AddWithValue("@cursorDate", cursor.SortDate.UtcDateTime);
+            command.Parameters.AddWithValue("@cursorId", cursor.FileTransferId);
+        }
+        if (hasSenderStatusFilter)
+            command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
+        if (hasRecipientStatusFilter)
+            command.Parameters.AddWithValue("@recipientStatuses", fileTransferSearch.RecipientStatuses!.Select(status => (int)status).ToArray());
+        if (fileTransferSearch.From.HasValue)
+            command.Parameters.AddWithValue("@from", fileTransferSearch.From);
+        if (fileTransferSearch.To.HasValue)
+            command.Parameters.AddWithValue("@to", fileTransferSearch.To);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var summaries = new Dictionary<Guid, FileTransferSummaryEntity>();
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
+                if (!summaries.TryGetValue(fileTransferId, out var summary))
+                {
+                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
+                    summary = new FileTransferSummaryEntity()
+                    {
+                        FileTransferId = fileTransferId,
+                        ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
+                        Sender = senderActorExternalId,
+                        IsSender = senderActorExternalId == fileTransferSearch.Actor.ActorExternalId,
+                        SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        // The column is `timestamp` holding UTC, so Npgsql hands back Kind=Unspecified.
+                        // Left as is, the conversion to DateTimeOffset would read it as local time and
+                        // shift the cursor by the machine's offset.
+                        SortDate = new DateTimeOffset(
+                            DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("sort_date")), DateTimeKind.Utc)),
+                        Recipients = new List<string>()
+                    };
+                    summaries[fileTransferId] = summary;
+                }
+
+                var recipientOrdinal = reader.GetOrdinal("recipient_actor_external_id");
+                if (!reader.IsDBNull(recipientOrdinal))
+                {
+                    summary.Recipients.Add(reader.GetString(recipientOrdinal));
+                }
+            }
+
+            return summaries.Values.ToList();
+        }, cancellationToken);
+    }
+
     public async Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         string commandString = @"

@@ -7,10 +7,22 @@ param originHostName string
 @description('APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). When set, /broker/* is forwarded to APIM.')
 param apiOriginHostName string = ''
 
+@description('Resource ID of an existing Front Door custom domain (managed by the platform team). When set, routes are associated with it so redeploys do not leave it Unassociated. This module never creates the domain.')
+param customDomainId string = ''
+
 @description('AFD endpoint name. Must be globally unique across Azure. Hostname becomes {endpointName}-{hash}.azurefd.net.')
 param endpointName string = 'default'
 
 var hasApiOrigin = !empty(apiOriginHostName)
+var hasCustomDomain = !empty(customDomainId)
+
+var routeCustomDomains = hasCustomDomain
+  ? [
+      {
+        id: customDomainId
+      }
+    ]
+  : []
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2023-05-01' = {
   name: frontDoorProfileName
@@ -150,6 +162,7 @@ resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (
     originGroup: {
       id: apiOriginGroup!.id
     }
+    customDomains: routeCustomDomains
     supportedProtocols: [
       'Http'
       'Https'
@@ -174,6 +187,7 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
     originGroup: {
       id: frontendOriginGroup.id
     }
+    customDomains: routeCustomDomains
     ruleSets: hasApiOrigin
       ? [
           {
@@ -198,3 +212,4 @@ resource frontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' =
 output profileName string = frontDoorProfile.name
 output endpointName string = afdEndpoint.name
 output endpointHostName string = afdEndpoint.properties.hostName
+output customDomainId string = customDomainId

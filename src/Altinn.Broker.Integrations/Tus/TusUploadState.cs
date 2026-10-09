@@ -10,6 +10,7 @@ public sealed class TusUploadState : IDisposable
         AcceptedOffset = initialOffset;
         CommittedOffset = initialOffset;
         ProgressSignal = NewProgressSignal();
+        InflightChangedSignal = NewInflightChangedSignal();
         ConcurrentUploader = new SemaphoreSlim(Math.Max(maxParallelBlockUploads, 1));
         UploadMd5 = MD5.Create();
     }
@@ -24,11 +25,26 @@ public sealed class TusUploadState : IDisposable
 
     public int PendingUploads { get; set; }
 
+    /// <summary>
+    /// Number of accepted block uploads that have not finished their full UploadBlockAsync work,
+    /// including <c>IncrementCommittedOffsetAsync</c> after Azure staging. Unlike
+    /// <see cref="PendingUploads"/>, this stays elevated until cache updates complete.
+    /// </summary>
+    public int InflightBlockOperations { get; set; }
+
     public long NextBlockIndex { get; set; }
 
     public Exception? Fault { get; set; }
 
+    /// <summary>
+    /// True while one failed <c>UploadBlockAsync</c> owns draining siblings and reconciling
+    /// AcceptedOffset. Prevents concurrent failures from all waiting on the inflight count.
+    /// </summary>
+    public bool OffsetReconcileElected { get; set; }
+
     public TaskCompletionSource<long> ProgressSignal { get; set; }
+
+    public TaskCompletionSource InflightChangedSignal { get; set; }
 
     public SemaphoreSlim ConcurrentUploader { get; }
 
@@ -41,5 +57,8 @@ public sealed class TusUploadState : IDisposable
     }
 
     private static TaskCompletionSource<long> NewProgressSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private static TaskCompletionSource NewInflightChangedSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

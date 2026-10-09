@@ -43,6 +43,10 @@ public class BrokerTusStore(
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
     private readonly int _maxBlocksPerStripe = Math.Max(azureStorageOptions.Value.MaxBlocksPerStripe, 1);
     private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
+    private readonly long _maxChunkSizeBytes = ResolveMaxChunkSizeBytes(tusOptions.Value.MaxChunkSizeBytes);
+    private readonly TimeSpan _acceptedOffsetReconcileGracePeriod = tusOptions.Value.AcceptedOffsetReconcileGracePeriod > TimeSpan.Zero
+        ? tusOptions.Value.AcceptedOffsetReconcileGracePeriod
+        : TimeSpan.FromMinutes(2);
 
     public async Task<long> AppendDataAsync(string fileId, Stream stream, CancellationToken cancellationToken)
     {
@@ -53,17 +57,28 @@ public class BrokerTusStore(
         var state = await GetOrCreateUploadStateAsync(fileId, cancellationToken);
         timing.Step("getOrCreateUploadState");
 
+        RejectOversizedChunkContentLength(fileId);
+
         using var chunkBuffer = new MemoryStream();
-        await stream.CopyToAsync(chunkBuffer, cancellationToken);
+        var expectedContentLength = httpContextAccessor.HttpContext?.Request.ContentLength;
+        await CopyChunkToBufferAsync(fileId, stream, chunkBuffer, cancellationToken);
         timing.Step("readRequestBody", chunkBuffer.Length);
         if (chunkBuffer.Length == 0)
         {
             return 0;
         }
 
-        if (chunkBuffer.Length > int.MaxValue)
+        // A client timeout/disconnect mid-chunk ends the body early. Accepting those bytes would
+        // advance AcceptedOffset while HEAD still reports the durable offset, permanently locking resume.
+        if (expectedContentLength is > 0 && chunkBuffer.Length < expectedContentLength.Value)
         {
-            throw new TusStoreException($"TUS chunk size exceeds maximum supported size for file id {fileId}.");
+            logger.LogWarning(
+                "TUS PATCH body truncated for file id {FileId}. Received {ReceivedBytes} of {ContentLength} bytes. Leaving offset unchanged for resume.",
+                fileId,
+                chunkBuffer.Length,
+                expectedContentLength.Value);
+            timing.Step("truncatedBodyRejected", chunkBuffer.Length);
+            return 0;
         }
 
         var chunk = chunkBuffer.ToArray();
@@ -140,6 +155,7 @@ public class BrokerTusStore(
             acceptedOffset = acceptResult.NewAcceptedOffset;
             isFinalChunk = acceptedOffset >= state.UploadLength;
             state.PendingUploads += fragments.Count;
+            state.InflightBlockOperations += fragments.Count;
         }
 
         timing.Step("assignBlocks", fragments.Count);
@@ -242,6 +258,50 @@ public class BrokerTusStore(
             }
         }
     }
+
+    private void RejectOversizedChunkContentLength(string fileId)
+    {
+        var contentLength = httpContextAccessor.HttpContext?.Request.ContentLength;
+        if (contentLength is > 0 && contentLength.Value > _maxChunkSizeBytes)
+        {
+            throw CreateChunkTooLargeException(fileId, contentLength.Value);
+        }
+    }
+
+    private async Task CopyChunkToBufferAsync(
+        string fileId,
+        Stream source,
+        MemoryStream destination,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long totalRead = 0;
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            totalRead += bytesRead;
+            if (totalRead > _maxChunkSizeBytes)
+            {
+                throw CreateChunkTooLargeException(fileId, totalRead);
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+        }
+    }
+
+    private TusStoreException CreateChunkTooLargeException(string fileId, long actualBytes)
+        => new(
+            $"TUS chunk size {actualBytes} bytes exceeds maximum allowed size of {_maxChunkSizeBytes} bytes for file id {fileId}.");
+
+    private static long ResolveMaxChunkSizeBytes(long configuredMaxChunkSizeBytes)
+        => configuredMaxChunkSizeBytes > 0
+            ? configuredMaxChunkSizeBytes
+            : TusOptions.DefaultMaxChunkSizeBytes;
 
     private async Task LogUploadCompletionProbeAsync(
         string fileId,
@@ -411,6 +471,14 @@ public class BrokerTusStore(
         fileId = ResolveStoreFileId(fileId);
         using var timing = TusUploadDebugTiming.Start(logger, "GetUploadOffset", fileId);
         var reportDurableOffset = IsHeadOffsetRequest();
+
+        // HEAD always tries to heal Accepted>durable wedges. PATCH only heals when staging is
+        // clearly abandoned, so live pipelining (Accepted ahead of Committed) keeps working.
+        await TryReconcileAcceptedOffsetIfAbandonedAsync(
+            fileId,
+            force: reportDurableOffset,
+            cancellationToken);
+        timing.Step(reportDurableOffset ? "reconcileForHead" : "reconcileForPatch");
 
         var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         if (cachedProgress is not null)
@@ -948,6 +1016,7 @@ public class BrokerTusStore(
         int length)
     {
         await state.ConcurrentUploader.WaitAsync();
+        var releasedSemaphore = false;
         try
         {
             await using var chunkStream = new MemoryStream(chunk, sourceOffset, length, writable: false);
@@ -974,9 +1043,11 @@ public class BrokerTusStore(
             }
 
             await uploadProgressCache.IncrementCommittedOffsetAsync(fileId, length, CancellationToken.None);
+            await RecordUploadActivityAsync(fileId, CancellationToken.None);
         }
         catch (Exception ex)
         {
+            var electedReconciler = false;
             lock (state.SyncRoot)
             {
                 state.Fault = ex;
@@ -984,19 +1055,104 @@ public class BrokerTusStore(
                 var previousProgress = state.ProgressSignal;
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetException(ex);
+
+                // Only one failed operation may drain siblings and reconcile; others must finish
+                // through finally so InflightBlockOperations can drop.
+                if (!state.OffsetReconcileElected)
+                {
+                    state.OffsetReconcileElected = true;
+                    electedReconciler = true;
+                }
+            }
+
+            logger.LogError(
+                ex,
+                "TUS block staging failed for file id {FileId}, block {BlockId}. Rolling accepted offset back to durable storage.",
+                fileId,
+                blockId);
+
+            // Free this slot so queued sibling uploads can finish staging + cache updates
+            // before we snapshot the durable resume point.
+            state.ConcurrentUploader.Release();
+            releasedSemaphore = true;
+
+            if (!electedReconciler)
+            {
+                return;
+            }
+
+            try
+            {
+                await WaitForSiblingBlockOperationsAsync(state);
+                await ReconcileAcceptedOffsetToDurableAsync(fileId, state, CancellationToken.None);
+            }
+            catch (Exception reconcileEx)
+            {
+                logger.LogError(
+                    reconcileEx,
+                    "Failed to reconcile TUS accepted offset after staging failure for file id {FileId}.",
+                    fileId);
+            }
+            finally
+            {
+                lock (state.SyncRoot)
+                {
+                    state.OffsetReconcileElected = false;
+                }
             }
         }
         finally
         {
-            state.ConcurrentUploader.Release();
+            if (!releasedSemaphore)
+            {
+                state.ConcurrentUploader.Release();
+            }
+
+            SignalInflightBlockOperationCompleted(state);
         }
     }
 
     private static TaskCompletionSource<long> NewProgressSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private static void SignalInflightBlockOperationCompleted(TusUploadState state)
+    {
+        lock (state.SyncRoot)
+        {
+            state.InflightBlockOperations = Math.Max(state.InflightBlockOperations - 1, 0);
+            var previousSignal = state.InflightChangedSignal;
+            state.InflightChangedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            previousSignal.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Waits until this is the only remaining inflight block operation. Uses
+    /// <see cref="TusUploadState.InflightBlockOperations"/> (not PendingUploads) so sibling
+    /// <c>IncrementCommittedOffsetAsync</c> calls finish before reconcile snapshots durable state.
+    /// </summary>
+    private static async Task WaitForSiblingBlockOperationsAsync(TusUploadState state)
+    {
+        while (true)
+        {
+            Task waitTask;
+            lock (state.SyncRoot)
+            {
+                if (state.InflightBlockOperations <= 1)
+                {
+                    return;
+                }
+
+                waitTask = state.InflightChangedSignal.Task;
+            }
+
+            await waitTask;
+        }
+    }
+
     private async Task<long> GetDurableStagingOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
+        // A partial shares its stripes with sibling partials, so storage cannot tell how far this one got.
         if (await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
             var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
@@ -1005,7 +1161,218 @@ public class BrokerTusStore(
 
         var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         var stagedLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        return committedLength + stagedLength;
+        var azureDurable = committedLength + stagedLength;
+        if (azureDurable > 0)
+        {
+            return azureDurable;
+        }
+
+        var cachedProgress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        return cachedProgress?.CommittedOffset ?? 0;
+    }
+
+    /// <summary>
+    /// Rolls AcceptedOffset back to what is actually durable when staging failed or the client
+    /// abandoned an in-flight accept. Without this, HEAD reports committed while PATCH validates
+    /// against accepted and the upload is permanently locked.
+    /// </summary>
+    private async Task TryReconcileAcceptedOffsetIfAbandonedAsync(
+        string fileId,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (progress is null || progress.AcceptedOffset <= progress.CommittedOffset)
+        {
+            return;
+        }
+
+        var durableOffset = await GetDurableStagingOffsetAsync(fileId, cancellationToken);
+        if (progress.AcceptedOffset <= durableOffset)
+        {
+            if (progress.CommittedOffset < durableOffset)
+            {
+                await PersistReconciledProgressAsync(fileId, progress, durableOffset, cancellationToken);
+            }
+
+            return;
+        }
+
+        uploadStateRegistry.TryGet(fileId, out var state);
+        var hasLocalPending = false;
+        var hasFault = false;
+        if (state is not null)
+        {
+            lock (state.SyncRoot)
+            {
+                // InflightBlockOperations covers staging + IncrementCommittedOffsetAsync; PendingUploads
+                // can already be zero while a committed-offset cache write is still in flight.
+                hasLocalPending = state.InflightBlockOperations > 0;
+                hasFault = state.Fault is not null;
+            }
+        }
+
+        if (hasLocalPending && !hasFault && !force)
+        {
+            return;
+        }
+
+        if (!hasFault && !force)
+        {
+            // Active pipelining keeps Accepted ahead of Committed briefly; only heal abandoned uploads.
+            if (await HasRecentUploadActivityAsync(fileId, _acceptedOffsetReconcileGracePeriod, cancellationToken))
+            {
+                return;
+            }
+        }
+
+        if (force
+            && !hasFault
+            && hasLocalPending
+            && await HasRecentUploadActivityAsync(fileId, _acceptedOffsetReconcileGracePeriod, cancellationToken))
+        {
+            // HEAD during healthy staging: leave Accepted alone so a later PATCH can still pipeline.
+            return;
+        }
+
+        if (force
+            && !hasFault
+            && !hasLocalPending
+            && await HasRecentUploadActivityAsync(fileId, _acceptedOffsetReconcileGracePeriod, cancellationToken))
+        {
+            // Staging may still be running on another replica.
+            return;
+        }
+
+        await ReconcileAcceptedOffsetToDurableAsync(fileId, state, cancellationToken);
+    }
+
+    private async Task ReconcileAcceptedOffsetToDurableAsync(
+        string fileId,
+        TusUploadState? state,
+        CancellationToken cancellationToken)
+    {
+        var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
+        if (progress is null)
+        {
+            return;
+        }
+
+        var resumePoint = await ResolveDurableResumePointAsync(fileId, progress, cancellationToken);
+        if (progress.AcceptedOffset <= resumePoint.DurableOffset
+            && progress.CommittedOffset >= resumePoint.DurableOffset)
+        {
+            if (state is not null)
+            {
+                lock (state.SyncRoot)
+                {
+                    state.Fault = null;
+                    state.OffsetReconcileElected = false;
+                }
+            }
+
+            return;
+        }
+
+        logger.LogWarning(
+            "Reconciling TUS accepted offset for file id {FileId}. AcceptedOffset={AcceptedOffset} CommittedOffset={CommittedOffset} DurableOffset={DurableOffset} NextBlockIndex={NextBlockIndex}",
+            fileId,
+            progress.AcceptedOffset,
+            progress.CommittedOffset,
+            resumePoint.DurableOffset,
+            resumePoint.NextBlockIndex);
+
+        await uploadProgressCache.SaveAsync(
+            fileId,
+            new TusUploadProgressSnapshot(
+                progress.UploadLength,
+                resumePoint.DurableOffset,
+                resumePoint.DurableOffset,
+                resumePoint.NextBlockIndex),
+            cancellationToken);
+
+        if (state is not null)
+        {
+            lock (state.SyncRoot)
+            {
+                state.AcceptedOffset = resumePoint.DurableOffset;
+                state.CommittedOffset = resumePoint.DurableOffset;
+                state.NextBlockIndex = resumePoint.NextBlockIndex;
+                state.PendingUploads = 0;
+                state.Fault = null;
+                state.OffsetReconcileElected = false;
+            }
+        }
+    }
+
+    private async Task PersistReconciledProgressAsync(
+        string fileId,
+        TusUploadProgressSnapshot progress,
+        long durableOffset,
+        CancellationToken cancellationToken)
+    {
+        var resumePoint = await ResolveDurableResumePointAsync(fileId, progress, cancellationToken);
+        await uploadProgressCache.SaveAsync(
+            fileId,
+            new TusUploadProgressSnapshot(
+                progress.UploadLength,
+                durableOffset,
+                durableOffset,
+                resumePoint.NextBlockIndex),
+            cancellationToken);
+    }
+
+    private async Task<(long DurableOffset, long NextBlockIndex)> ResolveDurableResumePointAsync(
+        string fileId,
+        TusUploadProgressSnapshot progress,
+        CancellationToken cancellationToken)
+    {
+        var stagedSnapshot = await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken)
+            ? null
+            : await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
+
+        if (stagedSnapshot is not null)
+        {
+            var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
+            var durableOffset = Math.Max(
+                Math.Max(stagedSnapshot.TotalLength, committedLength),
+                progress.CommittedOffset);
+            durableOffset = Math.Min(durableOffset, progress.AcceptedOffset);
+            return (durableOffset, stagedSnapshot.NextBlockIndex);
+        }
+
+        var durable = await GetDurableStagingOffsetAsync(fileId, cancellationToken);
+        durable = Math.Max(durable, progress.CommittedOffset);
+        durable = Math.Min(durable, progress.AcceptedOffset);
+
+        // Prefer Azure block metadata above. Without it, keep redis NextBlockIndex so resume
+        // allocates new block IDs after the previously accepted ones (orphaned gap IDs are unused).
+        return (durable, durable > 0 ? progress.NextBlockIndex : 0);
+    }
+
+    private async Task<bool> HasRecentUploadActivityAsync(
+        string fileId,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+    {
+        if (await partialUploadRegistry.TryGetFileTransferIdAsync(fileId, cancellationToken) is Guid mappedFileTransferId)
+        {
+            return await uploadActivityCache.HasRecentActivityAsync(mappedFileTransferId, window, cancellationToken);
+        }
+
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is not null
+            && TusRouteHelper.TryGetFileTransferIdFromRoute(httpContext, out var routeFileTransferId))
+        {
+            return await uploadActivityCache.HasRecentActivityAsync(routeFileTransferId, window, cancellationToken);
+        }
+
+        if (Guid.TryParse(fileId, out var fileTransferId))
+        {
+            return await uploadActivityCache.HasRecentActivityAsync(fileTransferId, window, cancellationToken);
+        }
+
+        return false;
     }
 
     private async Task WaitForDurableCommittedOffsetAsync(
@@ -1645,17 +2012,10 @@ public class BrokerTusStore(
 
     private async Task RenewExpirationAsync(string fileId, CancellationToken cancellationToken)
     {
+        // Expiration renewal must stay separate from upload-activity tracking. HEAD/offset reads
+        // renew expiration via RenewExpirationIfTrackedAsync and must not refresh the reconcile
+        // grace period — activity is recorded only when data is accepted or staged.
         await SetExpirationAsync(fileId, DateTimeOffset.UtcNow.Add(_uploadExpiration), cancellationToken);
-
-        var normalizedFileId = TusRouteHelper.NormalizePartialFileId(fileId);
-        if (await partialUploadRegistry.TryGetFileTransferIdAsync(normalizedFileId, cancellationToken) is Guid fileTransferId)
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-        }
-        else if (Guid.TryParse(normalizedFileId, out fileTransferId))
-        {
-            await uploadActivityCache.RecordActivityAsync(fileTransferId, cancellationToken);
-        }
     }
 
     private async Task RenewExpirationIfTrackedAsync(string fileId, CancellationToken cancellationToken)

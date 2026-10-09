@@ -59,4 +59,10 @@ public class ResourceExt
     /// </summary>
     [JsonPropertyName("requiredParty")]
     public string? RequiredParty { get; set; }
+
+    /// <summary>
+    /// Whether the resource may send file transfers with virus scan disabled.
+    /// </summary>
+    [JsonPropertyName("approvedForDisabledVirusScan")]
+    public bool? ApprovedForDisabledVirusScan { get; set; }
 }

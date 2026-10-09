@@ -1,5 +1,6 @@
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.IdPortenDirectAuth.Options;
+using Altinn.Broker.Common;
 using Altinn.Broker.Integrations.Altinn;
 
 using Microsoft.AspNetCore.Authentication;
@@ -26,6 +27,8 @@ public static class DependencyInjection
             ?? new IdPortenDirectAuthSettings();
 
         services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
+        services.AddHttpClient(IdPortenTokenRefreshService.HttpClientName, client =>
+            client.Timeout = TimeSpan.FromSeconds(10));
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
         {
             var idPortenDirectAuthSettings = sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>().Value;
@@ -37,6 +40,7 @@ public static class DependencyInjection
         });
         services.AddSingleton<IOidcLogoutTokenValidator, OidcLogoutTokenValidator>();
         services.AddSingleton<IOidcBackChannelLogoutSessionStore, OidcBackChannelLogoutSessionStore>();
+        services.AddSingleton<IIdPortenTokenRefreshService, IdPortenTokenRefreshService>();
         services.AddScoped<AltinnTokenCookieEvents>();
 
         builder
@@ -102,9 +106,9 @@ public static class DependencyInjection
                         var requiredAcr = IdPortenDirectAuthDefaults.RequiredAcr;
                         var acr = context.Principal?.FindFirst(ClaimConstants.UserFlow)?.Value
                             ?? context.Principal?.FindFirst("acr")?.Value;
-                        if (!string.IsNullOrEmpty(requiredAcr) && acr != requiredAcr)
+                        if (!string.IsNullOrEmpty(requiredAcr) && !IdPortenAuthenticationLevel.IsSufficient(acr, requiredAcr))
                         {
-                            context.Fail($"Insufficient authentication level. Required: {requiredAcr}, got: {acr}");
+                            context.Fail($"Insufficient authentication level. Required at least: {requiredAcr}, got: {acr}");
                             return;
                         }
 
@@ -126,11 +130,27 @@ public static class DependencyInjection
                             context.Properties!.Items[OidcSessionKeys.Sub] = sub;
                         }
 
+                        var idPortenIdentity = IdPortenPrincipalClaims.CreateIdentity(
+                            context.Principal!,
+                            context.SecurityToken.Issuer);
+
                         var refreshToken = context.TokenEndpointResponse?.RefreshToken ?? string.Empty;
+                        if (string.IsNullOrEmpty(refreshToken))
+                        {
+                            context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger(typeof(DependencyInjection))
+                                .LogWarning(
+                                    "ID-Porten returned no refresh token. The session cannot be renewed and the user " +
+                                    "will be sent through login again once the Altinn token expires. Check that the " +
+                                    "client is registered with refresh_token as an allowed grant type, and that " +
+                                    "refresh_token_lifetime outlives the Altinn token.");
+                        }
+
                         context.Properties!.StoreTokens(
                         [
-                            new AuthenticationToken { Name = "altinn_token", Value = altinnToken },
-                            new AuthenticationToken { Name = "id_porten_refresh_token", Value = refreshToken }
+                            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = altinnToken },
+                            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = refreshToken }
                         ]);
 
                         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
@@ -140,7 +160,8 @@ public static class DependencyInjection
                             AuthorizationConstants.EndUserCookie,
                             System.Security.Claims.ClaimTypes.Name,
                             System.Security.Claims.ClaimTypes.Role);
-                        context.Principal = new System.Security.Claims.ClaimsPrincipal(identity);
+                        context.Principal = new System.Security.Claims.ClaimsPrincipal(
+                            [identity, idPortenIdentity]);
                     }
                 };
             });

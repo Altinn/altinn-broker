@@ -4,6 +4,7 @@ namespace Altinn.Broker.Core.Repositories;
 public interface IResourceRepository
 {
     Task<ResourceEntity?> GetResource(string resourceId, CancellationToken cancellationToken = default);
+    Task<List<ResourceEntity>> GetResources(CancellationToken cancellationToken = default);
     Task UpdateMaxFileTransferSize(string resourceId, long maxSize, CancellationToken cancellationToken = default);
     Task<ResourceEntity> CreateResource(ResourceEntity resource, CancellationToken cancellationToken = default);
     Task UpdateFileRetention(string resourceId, TimeSpan fileTransferTimeToLive, CancellationToken cancellationToken = default);
@@ -13,4 +14,5 @@ public interface IResourceRepository
     Task UpdateExternalServiceCodeLegacy(string resourceId, string externalServiceCodeLegacy, CancellationToken cancellationToken = default);
     Task UpdateExternalServiceEditionCodeLegacy(string resourceId, int? externalServiceEditionCodeLegacy, CancellationToken cancellationToken = default);
     Task UpdateRequiredParty(string resourceId, string? requiredParty, CancellationToken cancellationToken = default);
+    Task UpdateApprovedForDisabledVirusScan(string resourceId, bool approvedForDisabledVirusScan, CancellationToken cancellationToken = default);
 }

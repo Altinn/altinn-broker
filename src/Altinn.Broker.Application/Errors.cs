@@ -1,4 +1,6 @@
-using System.Net;
+﻿using System.Net;
+
+using Altinn.Broker.Application.Settings;
 
 namespace Altinn.Broker.Application;
 
@@ -37,7 +39,30 @@ public static class Errors
     public static Error InvalidByteRange = new Error(29, "The requested byte range is not satisfiable.", HttpStatusCode.RequestedRangeNotSatisfiable);
     public static Error MalwareScanResultNotReady = new Error(30, "File transfer is not yet in UploadProcessing. Retry when upload completion has been recorded.", HttpStatusCode.ServiceUnavailable);
     public static Error InvalidRecipient = new Error(31, "One or more recipients are invalid or could not be found.", HttpStatusCode.BadRequest);
-    public static Error PartialUploadTooLong = new Error(32, "A single upload is too long to be addressed. Split the file transfer into more concatenation partials.", HttpStatusCode.BadRequest);
+    public static Error InvalidParty = new Error(32, "The party must be a valid organization number", HttpStatusCode.BadRequest);
+    public static Error AuthorizationUnavailable = new Error(33, "Could not determine which resources you have access to. Please try again later.", HttpStatusCode.ServiceUnavailable);
+    public static Error MissingOnBehalfOf = new Error(34, "Missing on behalf of parameter for IdPorten token", HttpStatusCode.BadRequest);
+    public static Error AuthorizedPartiesUnavailable = new Error(35, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
+
+    /// <summary>
+    /// Returned when an ID-porten caller lacks publish on the BrokerBox configuration gatekeeper resource.
+    /// </summary>
+    public static Error NoPublishAccessToConfigureResource = new Error(
+        36,
+        $"You must have access according to the access rules for \"{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}\" to edit a service. See: https://tjenesteoversikten.no/resource/{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}",
+        HttpStatusCode.Forbidden);
+
+    public static Error PartyIsNotBrokerServiceOwner = new Error(
+        37,
+        "You must be a service owner to update a resource.",
+        HttpStatusCode.Forbidden);
+
+    public static Error ResourceNotOwnedByParty = new Error(
+        38,
+        "You can only configure resources owned by the organization you act on behalf of.",
+        HttpStatusCode.Forbidden);
+
+    public static Error PartialUploadTooLong = new Error(39, "A single upload is too long to be addressed. Split the file transfer into more concatenation partials.", HttpStatusCode.BadRequest);
 }
 
 public static class StatisticsErrors

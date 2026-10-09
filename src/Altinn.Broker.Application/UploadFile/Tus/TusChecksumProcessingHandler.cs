@@ -93,7 +93,6 @@ public class TusChecksumProcessingHandler(
                 await fileTransferStatusRepository.InsertFileTransferStatus(
                     fileTransferId,
                     FileTransferStatus.Failed,
-                    timestamp: DateTime.UtcNow,
                     detailedFileTransferStatus: "Checksum mismatch",
                     cancellationToken: ct);
                 backgroundJobClient.Enqueue<IBrokerStorageService>(service =>
@@ -164,7 +163,7 @@ public class TusChecksumProcessingHandler(
     {
         await TransactionWithRetriesPolicy.Execute(async ct =>
         {
-            await fileTransferPublishService.TryPublishAsync(fileTransfer, DateTime.UtcNow, ct);
+            await fileTransferPublishService.TryPublishAsync(fileTransfer, ct);
             return Task.CompletedTask;
         }, logger, cancellationToken);
     }

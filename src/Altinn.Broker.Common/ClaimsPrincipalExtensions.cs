@@ -4,8 +4,31 @@ using System.Text.Json;
 using Altinn.Broker.Common.Helpers.Models;
 
 namespace Altinn.Broker.Common;
+
+/// <summary>
+/// Authentication scheme names for Broker end-user cookie sessions.
+/// Keep in sync with <c>AuthorizationConstants</c> in the API project.
+/// </summary>
+public static class BrokerAuthenticationSchemes
+{
+    public const string EndUserCookie = "EndUserCookie";
+    /// <summary>Altinn platform JWT stored in the shared runtime httpOnly cookie.</summary>
+    public const string AltinnPlatformJwtCookie = "AltinnPlatformJwtCookie";
+}
+
 public static class ClaimsPrincipalExtensions
 {
+    /// <summary>
+    /// True when the principal is authenticated via either Broker end-user cookie scheme
+    /// (<see cref="BrokerAuthenticationSchemes.EndUserCookie"/> or
+    /// <see cref="BrokerAuthenticationSchemes.AltinnPlatformJwtCookie"/>).
+    /// </summary>
+    public static bool IsBrokerEndUserCookieAuthenticated(this ClaimsPrincipal user)
+        => user.Identities.Any(identity =>
+            identity.IsAuthenticated
+            && identity.AuthenticationType is BrokerAuthenticationSchemes.EndUserCookie
+                or BrokerAuthenticationSchemes.AltinnPlatformJwtCookie);
+
     public static string? GetCallerOrganizationId(this ClaimsPrincipal user)
     {
         var claims = user.Claims;

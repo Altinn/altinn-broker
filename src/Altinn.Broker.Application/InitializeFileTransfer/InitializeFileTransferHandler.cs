@@ -107,7 +107,7 @@ public class InitializeFileTransferHandler(
                 {
                     return Errors.RecipientNotInAccessList;
                 }
-                var recipientId = await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken);
+                var recipientId = (await altinnRegisterService.LookupPartyByUuid(accessList[0], cancellationToken))?.OrgNumber;
                 if (recipientId is null || recipientId != recipient.WithoutPrefix())
                 {
                     return Errors.RecipientNotInAccessList;
@@ -140,7 +140,7 @@ public class InitializeFileTransferHandler(
         var senderVendor = user?.GetCallerVendorId()?.WithPrefix();
         // Frozen here so a later change to the configured stripe size cannot relayout this transfer and break it.
         var stripeSizeBytes = azureStorageOptions.Value.StripeSizeBytes;
-        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId, request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, stripeSizeBytes, cancellationToken);
+        var fileTransferId = await fileTransferRepository.AddFileTransfer(resource, storageProvider, request.FileName, request.SendersFileTransferReference, request.SenderExternalId.WithoutPrefix().WithPrefix(), request.RecipientExternalIds, fileExpirationTime, request.PropertyList, request.Checksum, !request.DisableVirusScan, stripeSizeBytes, cancellationToken);
         logger.LogInformation("Filetransfer {fileTransferId} initialized", fileTransferId);
         var addRecipientEventTasks = request.RecipientExternalIds.Select(recipientId => actorFileTransferStatusRepository.InsertActorFileTransferStatus(fileTransferId, ActorFileTransferStatus.Initialized, recipientId.WithoutPrefix().WithPrefix(), null, cancellationToken));
         try
@@ -160,7 +160,7 @@ public class InitializeFileTransferHandler(
         await fileTransferRepository.SetFileTransferHangfireJobId(fileTransferId, jobId, cancellationToken);
         return await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
         {
-            await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, vendor: senderVendor, cancellationToken: cancellationToken);
+            await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, vendor: senderVendor, cancellationToken: cancellationToken);
             backgroundJobClient.Enqueue(() => eventBus.Publish(AltinnEventType.FileTransferInitialized, resource.Id, fileTransferId.ToString(), request.SenderExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender));
             return fileTransferId;
         }, logger, cancellationToken);

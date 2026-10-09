@@ -24,11 +24,32 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         {
             return Errors.FileTransferNotFound;
         }
-        var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
-        if (!hasAccess)
+        string? caller;
+        var isIdportenToken = await authorizationService.IsIdPortenToken(user);
+        if (isIdportenToken)
         {
-            return Errors.NoAccessToResource;
+            if (string.IsNullOrWhiteSpace(request.OnBehalfOf))
+            {
+                return Errors.MissingOnBehalfOf;
+            }
+            var onBehalfOf = request.OnBehalfOf;
+            var hasAccess = await authorizationService.CheckIdPortenAccessAsRecipient(user, fileTransfer, onBehalfOf, cancellationToken);
+            if (!hasAccess)
+            {
+                return Errors.NoAccessToResource;
+            }
+            caller = onBehalfOf;
         }
+        else
+        {
+            var hasAccess = await authorizationService.CheckAccessAsRecipient(user, fileTransfer, cancellationToken);
+            if (!hasAccess)
+            {
+                return Errors.NoAccessToResource;
+            }
+            caller = user?.GetCallerOrganizationId();
+        }
+
         if (fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.Published && fileTransfer.FileTransferStatusEntity.Status != FileTransferStatus.AllConfirmedDownloaded)
         {
             return Errors.FileTransferNotAvailable;
@@ -58,7 +79,6 @@ public class DownloadFileHandler(IResourceRepository resourceRepository, IServic
         }
         var download = await brokerStorageService.DownloadFile(serviceOwner, fileTransfer, resolvedRange, cancellationToken);
         var downloadStream = download.Content;
-        var caller = user?.GetCallerOrganizationId();
         if (caller is null)
         {
             return Errors.NoAccessToResource;

@@ -9,4 +9,12 @@ public interface IAuthorizationService
     Task<bool> CheckAccessAsSenderOrRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default);
     Task<bool> CheckAccessForSearch(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default);
     Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// PDP check for the <c>publish</c> action on the resource for the given party (used when configuring a resource).
+    /// </summary>
+    Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default);
+    Task<bool> IsIdPortenToken(ClaimsPrincipal? user);
+    Task<bool> CheckIdPortenAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, string onBehalfOf, CancellationToken cancellationToken = default);
+
+    Task<List<AuthorizedResource>> GetAuthorizedResources(ClaimsPrincipal? user, string party, IReadOnlyList<string> resourceIds, CancellationToken cancellationToken = default);
 }

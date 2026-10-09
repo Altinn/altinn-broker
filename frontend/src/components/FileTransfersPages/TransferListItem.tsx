@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import './TransferListItem.css'
+import { ListItem } from '@altinn/altinn-components'
 
 type TransferListItemProps = {
   serviceName: string
@@ -9,7 +10,7 @@ type TransferListItemProps = {
 
 export function TransferListItem({ serviceName, subtitle, to }: TransferListItemProps) {
   return (
-    <li className="transfer-list-item">
+    <ListItem className="transfer-list-item">
       <Link to={to} className="transfer-list-item__link">
         <div>
           <div className="transfer-list-item__title">{serviceName}</div>
@@ -19,6 +20,6 @@ export function TransferListItem({ serviceName, subtitle, to }: TransferListItem
           ›
         </span>
       </Link>
-    </li>
+    </ListItem>
   )
 }

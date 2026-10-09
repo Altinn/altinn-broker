@@ -1,81 +1,171 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CardLink } from '../components/CardLink'
+import { Alert, Heading, List, ResourceListItem, Searchbar } from '@altinn/altinn-components'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, type LinkProps } from 'react-router-dom'
+import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
 import { OrganizationHeader } from '../components/OrganizationHeader'
-import { fileTransferServices } from '../data/mockData'
+import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
 import './pages.css'
 
+const serviceName = (service: AuthorizedResource) => service.name ?? service.resourceId
+
+/** The resources of one party. Anything for another party is stale after an actor switch. */
+type ResourcesState =
+  | { party: string; status: 'loaded'; services: AuthorizedResource[] }
+  | { party: string; status: 'failed' }
+
 export function FileTransferServicesPage() {
+  const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
+  const [resources, setResources] = useState<ResourcesState | null>(null)
 
-  const creatable = fileTransferServices.filter((s) => s.canCreate)
-  const other = fileTransferServices.filter((s) => !s.canCreate)
+  const party = selectedParty?.organizationNumber
+  const organizationName = selectedParty?.name ?? ''
 
-  const filterBySearch = (name: string) =>
-    name.toLowerCase().includes(search.trim().toLowerCase())
+  useEffect(() => {
+    if (!party) {
+      return
+    }
 
-  const filteredCreatable = useMemo(
-    () => creatable.filter((s) => filterBySearch(s.name)),
-    [creatable, search],
+    let active = true
+    fetchAuthorizedResources(party)
+      .then((authorized) => {
+        if (active) {
+          setResources({ party, status: 'loaded', services: authorized })
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setResources({ party, status: 'failed' })
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [party])
+
+  const current = resources?.party === party ? resources : null
+  const services = useMemo(
+    () => (current?.status === 'loaded' ? current.services : []),
+    [current],
   )
-  const filteredOther = useMemo(
-    () => other.filter((s) => filterBySearch(s.name)),
-    [other, search],
+  const isLoading = partiesStatus === 'loading' || (Boolean(party) && current === null)
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return services.filter((service) => serviceName(service).toLowerCase().includes(query))
+  }, [services, search])
+
+  const sendable = filtered.filter((service) => service.canSend)
+  const receivable = filtered.filter((service) => service.canReceive)
+  const receivableNotSendable = receivable.filter((service) => !service.canSend)
+  const configurable = filtered.filter((service) => service.isOwned)
+  const isServiceOwner = services.some((service) => service.isServiceOwner)
+
+  const serviceItem = (service: AuthorizedResource) => (
+    <ResourceListItem
+      key={service.resourceId}
+      id={service.resourceId}
+      resourceName={serviceName(service)}
+      ownerName={service.serviceOwnerName ?? 'Ukjent eier'}
+      description={service.serviceOwnerName ? `Eid av ${service.serviceOwnerName}` : undefined}
+      variant="default"
+      interactive
+      as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
+    />
   )
+
+  if (partiesStatus === 'failed') {
+    return (
+      <div className="page">
+        <Alert
+          variant="danger"
+          heading="Kunne ikke hente aktører"
+          message="Vi fikk ikke hentet hvilke virksomheter du kan representere. Prøv igjen senere."
+        />
+      </div>
+    )
+  }
+
+  if (partiesStatus === 'loaded' && !selectedParty) {
+    return (
+      <div className="page">
+        <Alert
+          variant="info"
+          heading="Ingen virksomheter"
+          message="Du kan ikke representere noen virksomheter i BrokerBox."
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="page">
       <OrganizationHeader />
 
-      <div className="search-field">
-        <label className="sr-only" htmlFor="service-search">
-          Søk etter formidlingstjenester
-        </label>
-        <input
-          id="service-search"
-          type="search"
-          className="input"
-          placeholder="Søk etter formidlingstjenester"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <Searchbar
+        name="service-search"
+        value={search}
+        placeholder="Søk etter formidlingstjenester"
+        onChange={(event) => setSearch((event.target as HTMLInputElement).value)}
+        onClear={() => setSearch('')}
+      />
 
-      {filteredCreatable.length > 0 && (
+      {isLoading && (
+        <List spacing="sm">
+          {[1, 2, 3].map((placeholder) => (
+            <ResourceListItem
+              key={placeholder}
+              id={`placeholder-${placeholder}`}
+              resourceName="Laster formidlingstjeneste"
+              ownerName="Laster eier"
+              loading
+            />
+          ))}
+        </List>
+      )}
+
+      {current?.status === 'failed' && (
+        <Alert
+          variant="danger"
+          heading="Kunne ikke hente formidlingstjenester"
+          message="Prøv igjen senere."
+        />
+      )}
+
+      {current?.status === 'loaded' && services.length === 0 && (
+        <Alert
+          variant="info"
+          heading="Ingen formidlingstjenester"
+          message={`${organizationName} har ikke tilgang til noen formidlingstjenester.`}
+        />
+      )}
+
+      {sendable.length > 0 && (
         <section className="page-section">
-          <h2 className="page-heading">Formidlingstjenester Brønnøy sykehus kan opprette</h2>
-          <ul className="card-list">
-            {filteredCreatable.map((service) => (
-              <li key={service.id}>
-                <CardLink
-                  to={servicePath(service.id)}
-                  title={service.name}
-                  description={`Eid av ${service.owner}`}
-                  avatarLetter={service.name[0]}
-                />
-              </li>
-            ))}
-          </ul>
+          <Heading size="sm" as="h2">
+            Formidlingstjenester {organizationName} kan sende med
+          </Heading>
+          <List spacing="sm">{sendable.map(serviceItem)}</List>
         </section>
       )}
 
-      {filteredOther.length > 0 && (
+      {receivableNotSendable.length > 0 && (
         <section className="page-section">
-          <h2 className="page-heading">Andre formidlingstjenester Brønnøy sykehus er delaktig i</h2>
-          <ul className="card-list">
-            {filteredOther.map((service) => (
-              <li key={service.id}>
-                <Link to={servicePath(service.id)} className="menu-link">
-                  <span>
-                    <span className="menu-link__title">{service.name}</span>
-                    <span className="menu-link__description">Eid av {service.owner}</span>
-                  </span>
-                  <span aria-hidden="true">›</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <Heading size="sm" as="h2">
+            Andre formidlingstjenester {organizationName} er delaktig i
+          </Heading>
+          <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
+        </section>
+      )}
+
+      {isServiceOwner && configurable.length > 0 && (
+        <section className="page-section">
+          <Heading size="sm" as="h2">
+            Formidlingstjenester {organizationName} kan konfigurere
+          </Heading>
+          <List spacing="sm">{configurable.map(serviceItem)}</List>
         </section>
       )}
     </div>

@@ -12,6 +12,7 @@ using Altinn.Broker.API.Swagger;
 using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
@@ -246,13 +247,51 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
+    services.AddScoped<IEndUserTokenProvider, EndUserTokenProvider>();
     services.AddTransient<IAuthorizationHandler, EndUserAuthorizationHandler>();
+    services.AddTransient<IAuthorizationHandler, EndUserScopeAccessHandler>();
+    services.AddTransient<IAuthorizationHandler, ConfigureResourceAccessHandler>();
     services.AddAuthorization(options =>
     {
-        options.AddPolicy(AuthorizationConstants.Sender, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope)).AddAuthenticationSchemes(AuthorizationConstants.TusUploadSession, JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
-        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
-        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy.AddRequirements(new ScopeAccessRequirement([AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope])).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.Sender, policy => policy
+            .AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.SenderScope))
+            .AddAuthenticationSchemes(
+                AuthorizationConstants.TusUploadSession,
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
+        options.AddPolicy(AuthorizationConstants.Recipient, policy => policy
+            .AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.RecipientScope))
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
+        options.AddPolicy(AuthorizationConstants.SenderOrRecipient, policy => policy
+            .AddRequirements(new ScopeAccessRequirement(
+                [AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.ConfigureResource, policy => policy
+            .AddRequirements(new ConfigureResourceAccessRequirement())
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
+        options.AddPolicy(AuthorizationConstants.AnyBrokerScope, policy => policy
+            .AddRequirements(new ScopeAccessRequirement(
+                [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.EndUser, policy =>
         {

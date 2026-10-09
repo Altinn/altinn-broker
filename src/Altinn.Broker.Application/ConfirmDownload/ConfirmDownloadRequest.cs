@@ -2,4 +2,5 @@
 public class ConfirmDownloadRequest
 {
     public Guid FileTransferId { get; set; }
+    public string? OnBehalfOf { get; set; }
 }

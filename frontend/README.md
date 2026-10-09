@@ -83,6 +83,19 @@ This mirrors how other `*.ui.altinn.no` apps reuse the shared Altinn session.
 | `POST /broker/api/v1/authentication/callback` | OIDC callback (IdPortenDirectAuth) |
 | `GET /broker/api/v1/authentication/logout` | Logout (IdPortenDirectAuth) |
 
+## Choosing an actor
+
+The header lets the user pick which organization they act on behalf of. The list comes from
+`GET /broker/api/v1/party/authorized`, which asks Altinn Access Management
+(`enduser/authorizedparties`) with the end user's own Altinn token. Only organizations are
+offered, since the Broker API identifies parties by organization number.
+
+The selected party is kept in `localStorage` and drives the `party` parameter on API calls such
+as `GET /broker/api/v1/resource/authorized`.
+
+No extra ID-Porten scope is needed: Access Management answers the end user's own Altinn token
+with `altinn:portal/enduser` alone.
+
 ## Configuration
 
 Settings live in the Broker API (`appsettings.json`, `appsettings.Development.json`, or environment variables).
@@ -121,6 +134,33 @@ Fixed in code (not configurable): callback `/broker/api/v1/authentication/callba
 }
 ```
 
+**Refresh tokens and session renewal**
+
+The Altinn token in the session cookie is shorter-lived than the cookie itself. When it expires,
+Broker redeems the stored ID-Porten refresh token and exchanges the new access token for a new
+Altinn token, inside the request. Without a refresh token there is nothing to renew, and the user
+is sent through login every time the Altinn token expires.
+
+ID-Porten controls this through the client registration, not through a scope. `offline_access` is
+not used: it is an ordinary scope there, and the authorization request is rejected with
+`invalid_scope` unless it is registered on the client. `refresh_token` must be an allowed grant
+type, or no refresh token is issued and *"ID-Porten returned no refresh token"* is logged on every
+sign-in.
+
+| Client setting | Default | Effect on Broker |
+|---|---|---|
+| `access_token_lifetime` | 120 s | Inherited by the Altinn token, so renewal runs about every 100 s of active use |
+| `refresh_token_lifetime` | 600 s | Inactivity window — **set to 3600 to match the cookie** |
+| `authorization_lifetime` | 7200 s | Hard cap on a session, regardless of activity |
+
+Keep `access_token_lifetime < refresh_token_lifetime <= authorization_lifetime`.
+
+At the 600-second default the refresh token dies after ten idle minutes while the cookie lives for
+sixty. Sessions in that gap are valid but cannot be renewed, which is the bug in
+Altinn/altinn-broker#1021 — both values express an inactivity timeout, so they have to agree.
+Raising `access_token_lifetime` may not reduce rotation; Altinn can cap the exchanged token
+independently.
+
 ### `AltinnPlatformAuth`
 
 Used for shared Altinn portal session on `*.altinn.no`.
@@ -158,10 +198,11 @@ Token exchange (ID-Porten) and platform refresh (SSO) call Altinn Authentication
 
 In Azure, Front Door can proxy API and SPA on one origin:
 
-1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `altinn-dev-api.azure-api.net`)
-2. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
-3. Set `FRONTEND_BASE_URL` → `IdPortenDirectAuthSettings__SpaBaseUrl` (Front Door URL from the deploy log)
-4. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
+1. Set GitHub secret `API_ORIGIN_HOST_NAME` to the APIM host (e.g. `platform.tt02.altinn.no`)
+2. Set GitHub secret `FRONTEND_CUSTOM_DOMAIN` to the public hostname already created by the platform team (e.g. `ab.tt02.altinn.no`). The deploy looks up that domain on the Front Door profile and associates it with the routes; it never creates the domain.
+3. Leave `VITE_API_BASE_URL` empty so the SPA uses same-origin `/broker/...` URLs
+4. Set `FRONTEND_BASE_URL` → `IdPortenDirectAuthSettings__SpaBaseUrl` (custom domain or Front Door URL from the deploy log)
+5. Register ID-Porten redirect URI: `https://<front-door-host>/broker/api/v1/authentication/callback`
 
 Front Door endpoint names are globally unique. The name is derived from `AZURE_NAME_PREFIX`. After deploy, use the hostname printed in the workflow log for `FRONTEND_BASE_URL` and ID-Porten.
 

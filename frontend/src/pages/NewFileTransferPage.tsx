@@ -1,190 +1,297 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { currentOrganization, getServiceById, organizations } from '../data/mockData'
-import { servicePath } from './routes'
-import './pages.css'
+import { DialogLayout } from '@altinn/altinn-components'
+import {
+  Alert,
+  Button,
+  ErrorSummary,
+  Heading,
+  Paragraph,
+  Spinner,
+  Textfield,
+} from '@digdir/designsystemet-react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
+import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
+import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
+import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
+import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
+import { PartyField } from '../components/NewFileTransferPage/PartyField'
+import { RecipientsField } from '../components/NewFileTransferPage/RecipientsField'
+import { UploadFile } from '../components/NewFileTransferPage/UploadFile'
+import { UploadProgress } from '../components/NewFileTransferPage/UploadProgress'
+import { VirusScanField } from '../components/NewFileTransferPage/VirusScanField'
+import {
+  fieldId,
+  fieldLabels,
+  type NewFileTransferField,
+} from '../components/NewFileTransferPage/formFields'
+import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
+import { useNewFileTransferForm } from '../components/NewFileTransferPage/useNewFileTransferForm'
+import '../components/NewFileTransferPage/newFileTransferPage.css'
+import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
+import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
+import { useParties } from '../parties/PartiesContext'
+import { flattenParties } from '../parties/mapAuthorizedParty'
+import { useUploadActions } from '../upload/uploadsContext'
+import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
+  const { selectedParty } = useParties()
+  return <NewFileTransferPageContent key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}`} />
+}
+
+function NewFileTransferPageContent() {
+  const { serviceId = '' } = useParams()
   const navigate = useNavigate()
-  const service = getServiceById(serviceId)
+  const { status: partiesStatus, parties, selectedParty, selectParty } = useParties()
+  const senderOrgNumber = selectedParty?.organizationNumber ?? ''
+  const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
+  const errorSummaryRef = useRef<HTMLDivElement>(null)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
 
-  const [reference, setReference] = useState('2026/123987')
-  const [metadata, setMetadata] = useState('')
-  const [senderId, setSenderId] = useState('922194912')
-  const [recipientId, setRecipientId] = useState('889640782')
-  const [virusScan, setVirusScan] = useState(true)
-  const [notifyEmail, setNotifyEmail] = useState(true)
-  const [notifySms, setNotifySms] = useState(false)
-  const [fileName, setFileName] = useState('')
+  const { addUploadSuccessListener } = useUploadActions()
+  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
 
-  if (!service) {
+  useEffect(
+    () =>
+      addUploadSuccessListener(({ fileTransferId, resourceId, sender }) => {
+        if (resourceId === serviceId && sender === senderOrgNumber) {
+          navigate(activeTransferPath(fileTransferId), { replace: true })
+        }
+      }),
+    [navigate, senderOrgNumber, serviceId, addUploadSuccessListener],
+  )
+
+  // The upload is only shown as the form's own while acting for the organisation that sends it.
+  const goToUpload = (upload: { resourceId: string; sender: string }) => {
+    const owner = flattenParties(parties).find((party) => party.organizationNumber === upload.sender)
+    if (owner && upload.sender !== senderOrgNumber) {
+      selectParty(owner.partyUuid)
+    }
+    navigate(newFileTransferPath(upload.resourceId))
+  }
+  const { errors, setValue, submitAttempts, values } = form
+
+  useEffect(() => {
+    if (submitAttempts > 0) {
+      errorSummaryRef.current?.focus()
+    }
+  }, [submitAttempts])
+
+  if (partiesStatus === 'failed') {
+    return <p>Klarte ikke å hente aktører.</p>
+  }
+
+  if (partiesStatus === 'loaded' && !selectedParty) {
+    return <p>Du kan ikke representere noen virksomheter i BrokerBox.</p>
+  }
+
+  if (serviceState === null) {
+    return <Spinner aria-label="Henter formidlingstjenesten" />
+  }
+
+  if (serviceState.status === 'failed') {
+    return <p>Klarte ikke å hente formidlingstjenesten.</p>
+  }
+
+  if (serviceState.status === 'missing') {
     return <p>Fant ikke formidlingstjenesten.</p>
   }
 
-  const sender = organizations.find((o) => o.orgNumber.replace(/\s/g, '') === senderId)
-  const recipient = organizations.find((o) => o.orgNumber.replace(/\s/g, '') === recipientId)
-  const displayFileName = fileName || 'formidling'
+  const service = serviceState.service.resource
 
-  const canSubmit = reference && senderId && recipientId && fileName
+  // Reachable by url even when the service detail page withholds the action.
+  if (serviceState.service.allowedRecipients.length === 0) {
+    return (
+      <div className="page">
+        <NoRecipientsNotice />
+      </div>
+    )
+  }
+
+  const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
+    (field) => errors[field],
+  )
+
+  const { active, blockedBy } = form
+  const status = active?.status ?? null
+
+  // An upload that can be carried on takes the primary action over, so there is only one to press.
+  // An interrupted one waits while another upload holds the place.
+  const continueUpload =
+    status === 'paused' || status === 'failed'
+      ? form.resume
+      : form.resumeReady && !blockedBy
+        ? form.resumeInterrupted
+        : null
+
+  // An interrupted upload settled these when it was created, so they are shown but not editable.
+  const detailsLocked = form.interrupted !== null
+
+  const cancellable = (active !== null && active.status !== 'finishing') || form.interrupted !== null
+  if (confirmingCancel && !cancellable) {
+    setConfirmingCancel(false)
+  }
+
+  // The metadata summary entry points at the row input that failed instead of the entire metadata field.
+  const metadataErrorTargetId = (field: NewFileTransferField) =>
+    (field === 'metadata' ? form.metadataErrorInputId : undefined) ?? fieldId(field)
 
   return (
-    <div className="page">
-      <div className="page-actions">
-        <Link to={servicePath(service.id)} className="button button--secondary">
-          ← Avbryt ny formidling
-        </Link>
-      </div>
+    <DialogLayout
+      color="company"
+      backButton={{
+        label: 'Tilbake',
+        as: (props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />,
+      }}
+    >
+      <header className="new-transfer__header">
+        <Heading level={2} data-size="md">
+          Ny formidling
+        </Heading>
+        <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
+      </header>
 
-      <div className="form-card">
-        <h2 className="page-heading">Ny formidling</h2>
-        <p className="page-subheading">{service.name}</p>
+      {form.loading ? (
+        <Spinner aria-label="Henter oppsettet for tjenesten" />
+      ) : (
+        <form
+          className="new-transfer__form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void form.submit()
+          }}
+        >
+          {form.loadError && <Alert data-color="warning">{form.loadError}</Alert>}
 
-        <form className="form-stack" onSubmit={(e) => e.preventDefault()}>
-          <div className="field">
-            <label className="label" htmlFor="referanse">
-              Referanse
-            </label>
-            <input
-              id="referanse"
-              className="input"
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
+          {blockedBy && (
+            <BlockingUploadNotice
+              upload={blockedBy}
+              onContinue={() => goToUpload(blockedBy)}
+              onCancel={form.cancelBlocking}
             />
-          </div>
+          )}
 
-          <div className="field">
-            <label className="label" htmlFor="metadata">
-              Andre metadata
-            </label>
-            <input
-              id="metadata"
-              className="input"
-              type="text"
-              value={metadata}
-              onChange={(e) => setMetadata(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="avsender">
-              Avsender
-            </label>
-            <select
-              id="avsender"
-              className="input"
-              value={senderId}
-              onChange={(e) => setSenderId(e.target.value)}
-            >
-              <option value="">Velg avsender</option>
-              <option value="922194912">922 194 912 – Brønnøy sykehus</option>
-              <option value="985616167">985 616 167 – Sandnessjøen sykehus</option>
-            </select>
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="mottaker">
-              Mottaker
-            </label>
-            <select
-              id="mottaker"
-              className="input"
-              value={recipientId}
-              onChange={(e) => setRecipientId(e.target.value)}
-            >
-              <option value="">Velg mottaker</option>
-              <option value="985616167">985 616 167 – Sandnessjøen sykehus</option>
-              <option value="985627706">985 627 706 – St. Olavs hospital</option>
-              <option value="889640782">889 640 782 – Haukeland sykehus</option>
-              <option value="985399077">985 399 077 – Lovisenberg diakonale sykehus</option>
-            </select>
-          </div>
-
-          <div className="field field--inline">
-            <input
-              id="virusskanning"
-              type="checkbox"
-              checked={virusScan}
-              onChange={(e) => setVirusScan(e.target.checked)}
-            />
-            <label className="label" htmlFor="virusskanning">
-              Virusskanning
-            </label>
-          </div>
-
-          <div className="field">
-            <label className="label" htmlFor="fil">
-              Fil
-            </label>
-            <input
-              id="fil"
-              className="input"
-              type="file"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
-            />
-          </div>
-
-          <fieldset className="fieldset">
-            <legend className="label">
-              Send melding til mottaker når filen er klar for nedlasting
-            </legend>
-            <p className="help-text">Velg alle alternativene som er relevante for deg.</p>
-
-            <div className="field field--inline">
-              <input
-                id="varsling-epost"
-                type="checkbox"
-                checked={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.checked)}
+          <fieldset className="new-transfer__fields" disabled={active !== null}>
+            <fieldset className="new-transfer__fields" disabled={detailsLocked}>
+              <PartyField
+                label="Avsender"
+                description="Du formidler på vegne av denne organisasjonen."
+                name={selectedParty?.name ?? ''}
+                organizationNumber={senderOrgNumber}
               />
-              <label className="label" htmlFor="varsling-epost">
-                E-post
-              </label>
-            </div>
-            {notifyEmail && (
-              <p className="notification-preview">
-                Hei. {sender?.name ?? currentOrganization.name} ({sender?.orgNumber ?? currentOrganization.orgNumber}) har
-                sendt en fil ({displayFileName}) med Referanse {reference} til{' '}
-                {recipient?.name ?? 'Haukeland sykehus'} ({recipient?.orgNumber ?? '889 640 782'}) i Altinn på vegne av
-                Helsedirektoratet. Logg inn på altinn.no, representer {recipient?.name ?? 'Haukeland sykehus'} og velg
-                Meny → Formidling for å laste ned filen.
-              </p>
+
+              <RecipientsField
+                id={fieldId('recipients')}
+                rules={form.rules}
+                selected={values.recipients}
+                error={errors.recipients}
+                onChange={(recipients) => setValue('recipients', recipients)}
+              />
+
+              <Textfield
+                id={fieldId('reference')}
+                label="Referanse"
+                description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
+                value={values.reference}
+                error={errors.reference}
+                maxLength={MAX_REFERENCE_LENGTH}
+                onChange={(event) => setValue('reference', event.target.value)}
+              />
+
+              <MetadataFields
+                id={fieldId('metadata')}
+                entries={values.metadata}
+                rowErrors={form.metadataRowErrors}
+                onChange={(metadata) => setValue('metadata', metadata)}
+              />
+            </fieldset>
+
+            {form.interrupted && (
+              <InterruptedUploadNotice
+                file={form.interrupted.file}
+                uploaded={form.interruptedUploaded}
+                ready={form.resumeReady}
+              />
             )}
 
-            <div className="field field--inline">
-              <input
-                id="varsling-sms"
-                type="checkbox"
-                checked={notifySms}
-                onChange={(e) => setNotifySms(e.target.checked)}
+            <UploadFile
+              id={fieldId('file')}
+              file={values.file}
+              maxFileSize={form.maxFileSize}
+              error={form.wrongFile ?? errors.file}
+              onChange={(file) => setValue('file', file)}
+            />
+
+            <fieldset className="new-transfer__fields" disabled={detailsLocked}>
+              <VirusScanField
+                checked={values.virusScan}
+                locked={form.virusScanLocked}
+                onChange={(virusScan) => setValue('virusScan', virusScan)}
               />
-              <label className="label" htmlFor="varsling-sms">
-                SMS
-              </label>
-            </div>
-            {notifySms && (
-              <p className="notification-preview">
-                Hei. {sender?.name ?? currentOrganization.name} har sendt en fil ({displayFileName}) til{' '}
-                {recipient?.name ?? 'Haukeland sykehus'} i Altinn. Logg inn på altinn.no for å laste ned filen.
-              </p>
-            )}
+            </fieldset>
           </fieldset>
 
-          <div className="form-actions">
-            <button type="button" className="button" disabled={!canSubmit}>
-              Lagre og start opplasting
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => navigate(servicePath(service.id))}
-            >
-              Avbryt
-            </button>
-          </div>
+          {failedFields.length > 0 && (
+            <div ref={errorSummaryRef} tabIndex={-1} className="new-transfer__error-summary">
+              <ErrorSummary>
+                <ErrorSummary.Heading>Rett opp disse før du sender</ErrorSummary.Heading>
+                <ErrorSummary.List>
+                  {failedFields.map((field) => (
+                    <ErrorSummary.Item key={field}>
+                      <ErrorSummary.Link href={`#${metadataErrorTargetId(field)}`}>
+                        {fieldLabels[field]}: {errors[field]}
+                      </ErrorSummary.Link>
+                    </ErrorSummary.Item>
+                  ))}
+                </ErrorSummary.List>
+              </ErrorSummary>
+            </div>
+          )}
+
+          {form.submitError && <Alert data-color="danger">{form.submitError}</Alert>}
+
+          {active && (
+            <UploadProgress status={active.status} onPause={form.pause} onResume={form.resume} />
+          )}
+
+          {confirmingCancel ? (
+            <CancelUploadConfirmation
+              onConfirm={() => {
+                setConfirmingCancel(false)
+                form.cancel()
+              }}
+              onDismiss={() => setConfirmingCancel(false)}
+            />
+          ) : (
+            <div className="new-transfer__actions">
+              {continueUpload || detailsLocked ? (
+                <Button
+                  type="button"
+                  onClick={continueUpload ?? undefined}
+                  disabled={continueUpload === null}
+                >
+                  Fortsett opplastingen
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  loading={active !== null}
+                  disabled={active !== null || blockedBy !== null}
+                >
+                  {active ? 'Laster opp…' : 'Send formidling'}
+                </Button>
+              )}
+              {cancellable && (
+                <Button type="button" variant="secondary" onClick={() => setConfirmingCancel(true)}>
+                  Avbryt opplastingen
+                </Button>
+              )}
+            </div>
+          )}
         </form>
-      </div>
-    </div>
+      )}
+    </DialogLayout>
   )
 }

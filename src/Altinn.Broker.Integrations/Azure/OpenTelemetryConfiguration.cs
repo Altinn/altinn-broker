@@ -1,4 +1,6 @@
-﻿using Azure.Monitor.OpenTelemetry.Exporter;
+﻿using Altinn.Broker.Core.Options;
+
+using Azure.Monitor.OpenTelemetry.Exporter;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -56,13 +58,25 @@ public static class OpenTelemetryConfiguration
         if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
         {
             services.ConfigureOpenTelemetryMeterProvider(metrics =>
-                metrics.AddAzureMonitorMetricExporter(o => o.ConnectionString = applicationInsightsConnectionString));
+                metrics.AddAzureMonitorMetricExporter(o => {
+                    o.ConnectionString = applicationInsightsConnectionString;
+                    o.SamplingRatio = 1.0f;
+                    o.TracesPerSecond = null;
+                }));
 
             services.ConfigureOpenTelemetryTracerProvider(tracing =>
-                tracing.AddAzureMonitorTraceExporter(o => o.ConnectionString = applicationInsightsConnectionString));
+                tracing.AddAzureMonitorTraceExporter(o => {
+                    o.ConnectionString = applicationInsightsConnectionString;
+                    o.SamplingRatio = 1.0f;
+                    o.TracesPerSecond = null;
+                }));
 
             services.ConfigureOpenTelemetryLoggerProvider(logging =>
-                logging.AddAzureMonitorLogExporter(o => o.ConnectionString = applicationInsightsConnectionString));
+                logging.AddAzureMonitorLogExporter(o => {
+                    o.ConnectionString = applicationInsightsConnectionString;
+                    o.SamplingRatio = 1.0f;
+                    o.TracesPerSecond = null;
+                }));
         }
 
         return services;

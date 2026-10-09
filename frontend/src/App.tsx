@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Slide, ToastContainer } from 'react-toastify'
 import { RequireAuth } from './auth/RequireAuth'
 import { ActiveFileTransferDetailPage } from './pages/ActiveFileTransferDetailPage'
 import { ActiveFileTransfersPage } from './pages/ActiveFileTransfersPage'
@@ -9,26 +10,35 @@ import { FileTransfersMainPage } from './pages/FileTransfersMainPage'
 import { HistoricalFileTransferDetailPage } from './pages/HistoricalFileTransferDetailPage'
 import { HistoricalFileTransfersPage } from './pages/HistoricalFileTransfersPage'
 import { NewFileTransferPage } from './pages/NewFileTransferPage'
+import { PartiesProvider } from './parties/PartiesContext'
 import { PageRoutes } from './pages/routes'
+import { UploadsProvider } from './upload/UploadsProvider'
+import 'react-toastify/dist/ReactToastify.css'
+import './toast.css'
 import './App.css'
 
 function App() {
   return (
     <RequireAuth>
-      <Routes>
-        <Route path="/" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
-        <Route element={<FileTransfersLayout />}>
-          <Route path={PageRoutes.fileTransfers} element={<FileTransfersMainPage />} />
-          <Route path={PageRoutes.services} element={<FileTransferServicesPage />} />
-          <Route path={PageRoutes.serviceDetail} element={<FileTransferServiceDetailPage />} />
-          <Route path={PageRoutes.newFileTransfer} element={<NewFileTransferPage />} />
-          <Route path={PageRoutes.active} element={<ActiveFileTransfersPage />} />
-          <Route path={PageRoutes.activeDetail} element={<ActiveFileTransferDetailPage />} />
-          <Route path={PageRoutes.historical} element={<HistoricalFileTransfersPage />} />
-          <Route path={PageRoutes.historicalDetail} element={<HistoricalFileTransferDetailPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
-      </Routes>
+      <PartiesProvider>
+        <UploadsProvider>
+          <ToastContainer position="top-center" theme="colored" transition={Slide} draggable={false} />
+          <Routes>
+            <Route path="/" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
+            <Route element={<FileTransfersLayout />}>
+              <Route path={PageRoutes.fileTransfers} element={<FileTransfersMainPage />} />
+              <Route path={PageRoutes.services} element={<FileTransferServicesPage />} />
+              <Route path={PageRoutes.serviceDetail} element={<FileTransferServiceDetailPage />} />
+              <Route path={PageRoutes.newFileTransfer} element={<NewFileTransferPage />} />
+              <Route path={PageRoutes.active} element={<ActiveFileTransfersPage />} />
+              <Route path={PageRoutes.activeDetail} element={<ActiveFileTransferDetailPage />} />
+              <Route path={PageRoutes.historical} element={<HistoricalFileTransfersPage />} />
+              <Route path={PageRoutes.historicalDetail} element={<HistoricalFileTransferDetailPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to={PageRoutes.fileTransfers} replace />} />
+          </Routes>
+        </UploadsProvider>
+      </PartiesProvider>
     </RequireAuth>
   )
 }
