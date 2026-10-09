@@ -173,6 +173,7 @@ public class InitializeFileTransferHandler(
                 await createNotificationOrderHandler.Process(new CreateNotificationOrderRequest()
                 {
                     FileTransferId = fileTransferId,
+                    SendersFileTransferReference = request.SendersFileTransferReference,
                     ResourceId = resource.Id,
                     SenderExternalId = request.SenderExternalId,
                     FileName = request.FileName,

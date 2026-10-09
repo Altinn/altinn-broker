@@ -31,6 +31,7 @@ public class CreateNotificationOrderHandlerTests
         return new()
         {
             FileTransferId = Guid.NewGuid(),
+            SendersFileTransferReference = "archiveno-20425",
             ResourceId = "resource123",
             SenderExternalId = "0192:991825827",
             FileName = "document.pdf",

@@ -73,7 +73,7 @@ public class CreateNotificationOrderHandler(
                 FileTransferRecipient = fileTransferRecipients[GetFileTransferRecipientNumber(actorId, recipient)]
             };
             var relatedOrganizationNumber = recipient.RelatedOrganizationNumber?.WithoutPrefix();
-            var orderRequest = CreateNotificationOrderRequestV2(request.FileTransferId, request.ResourceId, recipient, notificationId, notificationRequest, resolvedText, requestedSendTime, tokens);
+            var orderRequest = CreateNotificationOrderRequestV2(request.SendersFileTransferReference,request.ResourceId, recipient, notificationId, notificationRequest, resolvedText, requestedSendTime, tokens);
             var (customRecipientType, customRecipientIdentifier) = actorId is null ? DescribeCustomRecipient(recipient) : (null, null);
             var notification = new BrokerNotificationEntity
             {
@@ -212,7 +212,7 @@ public class CreateNotificationOrderHandler(
         $"{fileTransferId}_notification_{recipientIndex}";
 
     private static NotificationOrderRequestV2 CreateNotificationOrderRequestV2(
-        Guid fileTransferId,
+        string sendersReference,
         string resourceId,
         Recipient recipient,
         Guid notificationId,
@@ -223,7 +223,7 @@ public class CreateNotificationOrderHandler(
     {
         var order = new NotificationOrderRequestV2
         {
-            SendersReference = $"bro-{fileTransferId}",
+            SendersReference = $"bro-{sendersReference}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
             IdempotencyId = notificationId,
             Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: false)
@@ -235,7 +235,7 @@ public class CreateNotificationOrderHandler(
             [
                 new ReminderV2
                 {
-                    SendersReference = order.SendersReference,
+                    SendersReference = $"bro-{sendersReference}",
                     DelayDays = ReminderDelayDays,
                     Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: true)
                 }
