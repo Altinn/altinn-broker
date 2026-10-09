@@ -61,21 +61,26 @@ public class BrokerResourceProvisioner(
         IEnumerable<AltinnResourceSearchHit> hits,
         CancellationToken cancellationToken = default)
     {
+        var existingResourceIds = (await resourceRepository.GetResources(cancellationToken))
+            .Select(resource => resource.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var serviceOwnerConfiguredByOrg = new Dictionary<string, bool>(StringComparer.Ordinal);
+
         foreach (var hit in hits)
         {
-            if (!IsBrokerService(hit.ResourceType))
-            {
-                continue;
-            }
-
-            var existing = await resourceRepository.GetResource(hit.Id, cancellationToken);
-            if (existing is not null)
+            if (!IsBrokerService(hit.ResourceType) || existingResourceIds.Contains(hit.Id))
             {
                 continue;
             }
 
             var serviceOwnerId = hit.OrganizationNumber.WithPrefix();
-            if (await serviceOwnerRepository.GetServiceOwner(serviceOwnerId) is null)
+            if (!serviceOwnerConfiguredByOrg.TryGetValue(serviceOwnerId, out var serviceOwnerConfigured))
+            {
+                serviceOwnerConfigured = await serviceOwnerRepository.GetServiceOwner(serviceOwnerId) is not null;
+                serviceOwnerConfiguredByOrg[serviceOwnerId] = serviceOwnerConfigured;
+            }
+
+            if (!serviceOwnerConfigured)
             {
                 logger.LogDebug(
                     "Skipping auto-create of BrokerService {resourceId}: service owner {serviceOwnerId} is not configured",
@@ -91,7 +96,19 @@ public class BrokerResourceProvisioner(
                 OrganizationNumber = hit.OrganizationNumber,
                 ResourceType = hit.ResourceType
             };
-            await CreateIgnoringConflictsAsync(entity, cancellationToken);
+            try
+            {
+                await CreateIgnoringConflictsAsync(entity, cancellationToken);
+                existingResourceIds.Add(hit.Id);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // CreateIgnoringConflictsAsync already logged; skip this hit so listing continues.
+            }
         }
     }
 
