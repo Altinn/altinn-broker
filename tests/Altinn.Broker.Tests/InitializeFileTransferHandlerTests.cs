@@ -69,7 +69,7 @@ public class InitializeFileTransferHandlerTests
 
         var authorizationService = new Mock<IAuthorizationService>();
         authorizationService
-            .Setup(service => service.CheckAccessAsSender(null, resourceId, "0192:991825827", It.IsAny<CancellationToken>()))
+            .Setup(service => service.CheckAccessAsSender(null, resourceId, "0192:991825827", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(true);
 
         var hostEnvironment = new Mock<IHostEnvironment>();
@@ -77,8 +77,12 @@ public class InitializeFileTransferHandlerTests
 
         var fileTransferRepository = new Mock<IFileTransferRepository>();
         var eventBus = new EventBusMiddleware(new Mock<IEventBus>().Object);
-        var handler = new InitializeFileTransferHandler(
+        var resourceProvisioner = new BrokerResourceProvisioner(
             resourceRepository.Object,
+            altinnResourceRepository.Object,
+            serviceOwnerRepository.Object,
+            NullLogger<BrokerResourceProvisioner>.Instance);
+        var handler = new InitializeFileTransferHandler(
             altinnResourceRepository.Object,
             serviceOwnerRepository.Object,
             authorizationService.Object,
@@ -90,6 +94,7 @@ public class InitializeFileTransferHandlerTests
             eventBus,
             hostEnvironment.Object,
             new Mock<IAltinnRegisterService>().Object,
+            resourceProvisioner,
             NullLogger<InitializeFileTransferHandler>.Instance);
 
         var result = await handler.Process(new InitializeFileTransferRequest

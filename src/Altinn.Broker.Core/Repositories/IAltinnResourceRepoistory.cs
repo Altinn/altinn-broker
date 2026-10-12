@@ -12,6 +12,11 @@ public interface IAltinnResourceRepository
     Task<AltinnResourceMetadata?> GetResourceMetadata(string resourceId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Searches Resource Registry for resources of the given <c>resourceType</c> (e.g. BrokerService).
+    /// </summary>
+    Task<IReadOnlyList<AltinnResourceSearchHit>> SearchResourcesByType(string resourceType, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get the service owner name from Resource Registry for a given resource ID.
     /// This returns the name from HasCompetentAuthority.Name (e.g., "Digitaliseringsdirektoratet", "NAV", etc.)
     /// </summary>
