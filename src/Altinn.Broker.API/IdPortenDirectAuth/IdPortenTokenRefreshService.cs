@@ -221,13 +221,13 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
         return null;
     }
 
-    private async Task<IAsyncDisposable?> TryAcquireDistributedLock(
+    private async Task<RefreshLock?> TryAcquireDistributedLock(
         string cacheKey,
         CancellationToken cancellationToken)
     {
         if (_redis is null)
         {
-            return NoOpAsyncDisposable.Instance;
+            return RefreshLock.LocalOnly;
         }
 
         try
@@ -245,12 +245,12 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
                 return null;
             }
 
-            return new RedisLock(db, lockKey, lockValue);
+            return new RefreshLock(new RedisLock(db, lockKey, lockValue), IsDistributed: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Could not acquire the ID-Porten refresh lock; falling back to local single-flight.");
-            return NoOpAsyncDisposable.Instance;
+            return RefreshLock.LocalOnly;
         }
     }
 
@@ -445,6 +445,15 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     /// <summary>Refresh tokens are credentials, so only their hash reaches the cache key.</summary>
     private static string CacheKey(string refreshToken) =>
         $"idporten-refresh:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)))}";
+
+    private sealed class RefreshLock(IAsyncDisposable handle, bool IsDistributed) : IAsyncDisposable
+    {
+        public static RefreshLock LocalOnly { get; } = new(NoOpAsyncDisposable.Instance, IsDistributed: false);
+
+        public bool IsDistributed { get; } = IsDistributed;
+
+        public ValueTask DisposeAsync() => handle.DisposeAsync();
+    }
 
     private sealed class RedisLock(IDatabase db, string key, string value) : IAsyncDisposable
     {
