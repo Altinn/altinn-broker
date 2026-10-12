@@ -191,6 +191,8 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Equal("my-reference", summary.SendersFileTransferReference);
 		Assert.Equal(expirationTime, summary.ExpirationTime);
 		Assert.Equal(new[] { recipient1, recipient2 }.OrderBy(r => r), summary.Recipients.OrderBy(r => r));
+		Assert.Equal(FileTransferStatus.Published, summary.FileTransferStatus);
+		Assert.Null(summary.ActorDownloadStatus);
 	}
 
 	[Fact]
@@ -265,6 +267,35 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var summary = Assert.Single(result);
 		Assert.Equal(fileTransferId, summary.FileTransferId);
 		Assert.False(summary.IsSender);
+		Assert.Equal(FileTransferStatus.Published, summary.FileTransferStatus);
+		Assert.Equal(ActorFileTransferStatus.Initialized, summary.ActorDownloadStatus);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTheViewersOwnDownloadStatus()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var viewerExternalId = NewOrgId();
+		var otherRecipientExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId);
+		await _dataHelper.InsertRecipient(fileTransferId, otherRecipientExternalId, ActorFileTransferStatus.Initialized);
+		await _dataHelper.InsertRecipient(fileTransferId, viewerExternalId, ActorFileTransferStatus.DownloadConfirmed);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
+		var actor = await _dataHelper.GetOrCreateActor(viewerExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			RecipientStatuses = [FileTransferStatus.Published]
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(ActorFileTransferStatus.DownloadConfirmed, summary.ActorDownloadStatus);
 	}
 
 	[Fact]

@@ -4,6 +4,7 @@ import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
 import { getDeadlineProps } from '../../helpers/deadlineHelper'
+import { getFileTransferListStatus } from '../../helpers/fileTransferStatusHelper'
 import '../../pages/pages.css'
 import type { SelectedParty } from '../../parties/PartiesContext'
 
@@ -83,20 +84,26 @@ export function FileTransferList({
       )}
 
       <List className="card-list">
-        {filtered.map((overview) => (
-          <li key={overview.fileTransferId}>
-            <FileTransferCard
-              resourceName={resourceName(overview.resourceId)}
-              isSender={overview.isSender}
-              sender={overview.sender}
-              recipients={overview.recipients}
-              currentActorName={currentOrg.name}
-              reference={overview.sendersFileTransferReference || overview.fileTransferId}
-              deadline={showDeadline ? getDeadlineProps(overview.expirationTime, overview.isSender) : undefined}
-              to={toPath(overview.fileTransferId)}
-            />
-          </li>
-        ))}
+        {filtered.map((overview) => {
+          const listStatus = getFileTransferListStatus(overview)
+          const waitingOnOthers = listStatus?.status.value !== 'requires-attention'
+          return (
+            <li key={overview.fileTransferId}>
+              <FileTransferCard
+                resourceName={resourceName(overview.resourceId)}
+                isSender={overview.isSender}
+                sender={overview.sender}
+                recipients={overview.recipients}
+                currentActorName={currentOrg.name}
+                reference={overview.sendersFileTransferReference || overview.fileTransferId}
+                status={listStatus?.status}
+                extendedStatusLabel={listStatus?.extendedStatusLabel}
+                deadline={showDeadline ? getDeadlineProps(overview.expirationTime, waitingOnOthers) : undefined}
+                to={toPath(overview.fileTransferId)}
+              />
+            </li>
+          )
+        })}
       </List>
 
       {hasNextPage && (

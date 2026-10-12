@@ -36,4 +36,15 @@ public class FileTransferSummaryExt
     /// When the file transfer expires. Recipients must download the file before then.
     /// </summary>
     public DateTimeOffset ExpirationTime { get; set; }
+
+    /// <summary>
+    /// The file transfer's own status, such as UploadProcessing, Published or AllConfirmedDownloaded.
+    /// </summary>
+    public string? FileTransferStatus { get; set; }
+
+    /// <summary>
+    /// The viewer's own download status as a recipient: Initialized, DownloadStarted or DownloadConfirmed.
+    /// Null when the viewer is not a recipient.
+    /// </summary>
+    public string? ActorDownloadStatus { get; set; }
 }

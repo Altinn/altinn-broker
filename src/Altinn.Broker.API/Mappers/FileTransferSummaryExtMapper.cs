@@ -15,7 +15,9 @@ internal static class FileTransferSummaryExtMapper
             IsSender = summary.IsSender,
             Recipients = summary.Recipients,
             SendersFileTransferReference = summary.SendersFileTransferReference,
-            ExpirationTime = summary.ExpirationTime
+            ExpirationTime = summary.ExpirationTime,
+            FileTransferStatus = summary.FileTransferStatus?.ToString(),
+            ActorDownloadStatus = summary.ActorDownloadStatus?.ToString()
         };
     }
 
