@@ -6,6 +6,8 @@ public class ResourceEntity
     public DateTimeOffset? Created { get; set; }
     public string? OrganizationNumber { get; set; }
     public required string ServiceOwnerId { get; set; }
+    /// <summary>Resource Registry <c>resourceType</c> (e.g. BrokerService). Not persisted locally.</summary>
+    public string? ResourceType { get; set; }
     public long? MaxFileTransferSize { get; set; }
     public TimeSpan? FileTransferTimeToLive { get; set; }
     public bool PurgeFileTransferAfterAllRecipientsConfirmed { get; set; } = true;
