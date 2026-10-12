@@ -36,7 +36,12 @@ public sealed class TusUploadSessionAuthenticationHelper(
         var token = ExtractBearerToken(httpContext.Request);
         if (string.IsNullOrWhiteSpace(token))
         {
-            LogRejection(httpContext, requestPath, "missingBearerToken", fileTransferId: null);
+            // Cookie-authenticated BrokerBox uploads hit this scheme first on every PATCH;
+            // no bearer is expected — not a failed expired-token recovery.
+            logger.LogDebug(
+                "Skipping expired-token TUS session auth (no bearer). Method={Method} Path={Path}",
+                httpContext.Request.Method,
+                requestPath);
             return null;
         }
 

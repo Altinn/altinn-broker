@@ -5,6 +5,7 @@ using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
@@ -20,7 +21,6 @@ using OneOf;
 
 namespace Altinn.Broker.Application.InitializeFileTransfer;
 public class InitializeFileTransferHandler(
-    IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAuthorizationService authorizationService,
@@ -32,6 +32,7 @@ public class InitializeFileTransferHandler(
     EventBusMiddleware eventBus,
     IHostEnvironment hostEnvironment,
     IAltinnRegisterService altinnRegisterService,
+    BrokerResourceProvisioner resourceProvisioner,
     ILogger<InitializeFileTransferHandler> logger) : IHandler<InitializeFileTransferRequest, Guid>
 {
     public async Task<OneOf<Guid, Error>> Process(InitializeFileTransferRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -61,15 +62,30 @@ public class InitializeFileTransferHandler(
             }
         }
 
-        var hasAccess = await authorizationService.CheckAccessAsSender(user, request.ResourceId, request.SenderExternalId, cancellationToken);
+        var hasAccess = await authorizationService.CheckAccessAsSender(
+            user,
+            request.ResourceId,
+            request.SenderExternalId,
+            cancellationToken,
+            requireRegisteredResource: false);
         if (!hasAccess)
         {
             return Errors.NoAccessToResource;
         }
-        var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
+        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
+        if (altinnResource is null)
+        {
+            return Errors.InvalidResourceDefinition;
+        }
+        var (resource, provisionOutcome) = await resourceProvisioner.EnsureAsync(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceHasNotBeenConfigured;
+            return provisionOutcome switch
+            {
+                BrokerResourceProvisionOutcome.ServiceOwnerNotConfigured => Errors.ServiceOwnerHasNotBeenConfigured,
+                BrokerResourceProvisionOutcome.NotBrokerService => Errors.ResourceHasNotBeenConfigured,
+                _ => Errors.ResourceHasNotBeenConfigured
+            };
         }
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
@@ -86,11 +102,6 @@ public class InitializeFileTransferHandler(
         if (storageProvider is null)
         {
             return Errors.StorageProviderNotReady;
-        }
-        var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
-        if (altinnResource is null)
-        {
-            return Errors.InvalidResourceDefinition;
         }
         if (altinnResource.AccessListEnabled)
         {
