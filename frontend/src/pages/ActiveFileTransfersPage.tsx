@@ -23,6 +23,7 @@ export function ActiveFileTransfersPage() {
       currentOrg={selectedParty}
       fetchTransfers={getActiveFileTransfers}
       toPath={activeTransferPath}
+      showDeadline
     />
   )
 }
