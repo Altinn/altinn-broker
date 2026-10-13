@@ -61,10 +61,6 @@
   margin-top: 0.15rem;
 }
 
-.search-field {
-  margin: 1rem 0 1.5rem;
-}
-
 .filter-row {
   display: flex;
   flex-wrap: wrap;

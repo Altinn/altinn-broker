@@ -1,8 +1,8 @@
-import { Alert, Heading, List, ResourceListItem, Searchbar } from '@altinn/altinn-components'
+import { Alert, Heading, List, ResourceListItem } from '@altinn/altinn-components'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
-import { OrganizationHeader } from '../components/OrganizationHeader'
+import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
 import './pages.css'
@@ -102,15 +102,16 @@ export function FileTransferServicesPage() {
 
   return (
     <div className="page">
-      <OrganizationHeader />
+      <h1 className="page-heading">Dine formidlingstjenester</h1>
 
-      <Searchbar
-        name="service-search"
-        value={search}
-        placeholder="Søk etter formidlingstjenester"
-        onChange={(event) => setSearch((event.target as HTMLInputElement).value)}
-        onClear={() => setSearch('')}
-      />
+      <div className="filter-row">
+        <SearchField
+          id="service-search"
+          label="Søk etter formidlingstjenester"
+          value={search}
+          onChange={setSearch}
+        />
+      </div>
 
       {isLoading && (
         <List spacing="sm">
