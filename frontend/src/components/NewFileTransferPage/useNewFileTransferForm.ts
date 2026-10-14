@@ -6,13 +6,22 @@ import {
   type ResourceConfiguration,
 } from '../../api/resourceConfiguration'
 import {
+  customRecipientInputId,
   emptyValues,
   metadataInputId,
+  type CustomRecipientEntry,
   type MetadataEntry,
   type NewFileTransferValues,
 } from './formFields'
 import { draftKey, readDraft, writeDraft } from './draftStore'
-import { validate, validateMetadataRows, type MetadataRowError } from './formValidation'
+import {
+  customRecipientsInUse,
+  validate,
+  validateCustomRecipientRows,
+  validateMetadataRows,
+  type CustomRecipientRowError,
+  type MetadataRowError,
+} from './formValidation'
 import { resolveRecipientRules } from './recipientRules'
 import { useFileTransferUpload } from './useFileTransferUpload'
 
@@ -56,6 +65,7 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber }: Options)
     loadError,
     errors: upload.submitAttempts > 0 ? form.errors : {},
     metadataRowErrors: upload.submitAttempts > 0 ? form.metadataRowErrors : [],
+    customRecipientRowErrors: upload.submitAttempts > 0 ? form.customRecipientRowErrors : [],
   }
 }
 
@@ -146,6 +156,15 @@ function useFormValues(
     () => firstMetadataErrorInputId(values.metadata, metadataRowErrors),
     [values.metadata, metadataRowErrors],
   )
+  const customRecipientRowErrors = useMemo(
+    () =>
+      customRecipientsInUse(values) ? validateCustomRecipientRows(values.customRecipients, values.recipients) : [],
+    [values],
+  )
+  const customRecipientErrorInputId = useMemo(
+    () => firstCustomRecipientErrorInputId(values.customRecipients, customRecipientRowErrors),
+    [values.customRecipients, customRecipientRowErrors],
+  )
 
   return {
     rules,
@@ -156,7 +175,21 @@ function useFormValues(
     errors,
     metadataRowErrors,
     metadataErrorInputId,
+    customRecipientRowErrors,
+    customRecipientErrorInputId,
   }
+}
+
+/** The summary has to land the user on an input; this selects the first custom recipient error input's ID */
+function firstCustomRecipientErrorInputId(
+  entries: CustomRecipientEntry[],
+  rowErrors: CustomRecipientRowError[],
+): string | undefined {
+  const index = rowErrors.findIndex((row) => row.identifier ?? row.relatedOrganization)
+  if (index < 0) {
+    return undefined
+  }
+  return customRecipientInputId(entries[index].id, rowErrors[index].identifier ? 'identifier' : 'relatedOrganization')
 }
 
 /** The summary has to land the user on an input; this selects the first metadata error input's ID */
