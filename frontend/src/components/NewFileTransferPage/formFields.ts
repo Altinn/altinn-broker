@@ -97,17 +97,25 @@ export type CustomRecipientIdentifier =
   // | { organizationNumber: string }
 
 /**
+ * The API's email check (EmailRegex in the backend's NotificationValidationHelper), so an address the API would
+ * reject is caught in the frontend.
+ */
+const EMAIL_PATTERN =
+  /^(("[^"]+")|(([a-zA-Z0-9æøåÆØÅ!#$%&'*+\-=?^_`{|}~])+(\.([a-zA-Z0-9æøåÆØÅ!#$%&'*+\-=?^_`{|}~])+)*))@(((([a-zA-Z0-9æøåÆØÅ]([a-zA-Z0-9\-æøåÆØÅ]{0,61})[a-zA-Z0-9æøåÆØÅ]\.)|[a-zA-Z0-9æøåÆØÅ]\.){1,9})([a-zA-Z]{2,14})|((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})))$/
+
+/**
  * Tells from its format which kind of identifier was typed, since the field takes either. Returns null for anything
  * that is neither. Only the format is checked - the API validates the rest.
  */
 export function toCustomRecipientIdentifier(input: string): CustomRecipientIdentifier | null {
   const value = input.trim()
-  if (value.includes('@')) {
+  if (EMAIL_PATTERN.test(value) && !value.includes(';')) {
     return { emailAddress: value }
   }
 
   const compact = value.replace(/\s/g, '')
-  if (/^(\+|00)\d+$/.test(compact)) {
+  // E.164: a country code never starts with 0, and the number is at most 15 digits.
+  if (/^(\+|00)[1-9]\d{1,14}$/.test(compact)) {
     // The API takes both, but storing one form means the same number is always the same recipient.
     return { mobileNumber: compact.startsWith('00') ? `+${compact.slice(2)}` : compact }
   }
