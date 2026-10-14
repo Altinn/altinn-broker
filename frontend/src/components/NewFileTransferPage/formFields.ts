@@ -1,5 +1,4 @@
 import type { CustomRecipientInput, NotificationChannel, NotificationInput } from '../../api/initializeFileTransfer'
-import { toOrgNumber } from '../../helpers/orgIdentifierHelper'
 
 /**
  * Defines which fields exist, what an empty form looks like, and the shape of the values a field holds.
@@ -11,8 +10,8 @@ export type MetadataEntry = {
 }
 
 /**
- * Someone to notify beyond the file transfer's own recipients: an email address, mobile number, organization number
- * or national identity number, notified on behalf of one of the file transfer's recipients.
+ * Someone to notify beyond the file transfer's own recipients: an email address or mobile number, notified on behalf
+ * of one of the file transfer's recipients.
  */
 export type CustomRecipientEntry = {
   id: string
@@ -94,15 +93,12 @@ export function emptyValues(): NewFileTransferValues {
 export type CustomRecipientIdentifier =
   | { emailAddress: string }
   | { mobileNumber: string }
-  | { organizationNumber: string }
-  | { nationalIdentityNumber: string }
-
-const PERSON_URN_PREFIX = 'urn:altinn:person:identifier-no:'
+  // Custom recipient organization number - disabled for now.
+  // | { organizationNumber: string }
 
 /**
- * Tells from its format which kind of identifier was typed, since the field takes any of them. Returns null for
- * anything that is none of them. Only the format is checked - the API checks the rest (e.g. the national identity
- * number's check digits).
+ * Tells from its format which kind of identifier was typed, since the field takes either. Returns null for anything
+ * that is neither. Only the format is checked - the API validates the rest.
  */
 export function toCustomRecipientIdentifier(input: string): CustomRecipientIdentifier | null {
   const value = input.trim()
@@ -120,17 +116,11 @@ export function toCustomRecipientIdentifier(input: string): CustomRecipientIdent
     return { mobileNumber: `+47${compact}` }
   }
 
-  const organizationNumber = toOrgNumber(compact)
-  if (organizationNumber) {
-    return { organizationNumber }
-  }
-
-  const nationalIdentityNumber = compact.toLowerCase().startsWith(PERSON_URN_PREFIX)
-    ? compact.slice(PERSON_URN_PREFIX.length)
-    : compact
-  if (/^\d{11}$/.test(nationalIdentityNumber)) {
-    return { nationalIdentityNumber }
-  }
+  // Custom recipient organization number - disabled for now (needs toOrgNumber from orgIdentifierHelper).
+  // const organizationNumber = toOrgNumber(compact)
+  // if (organizationNumber) {
+  //   return { organizationNumber }
+  // }
 
   return null
 }

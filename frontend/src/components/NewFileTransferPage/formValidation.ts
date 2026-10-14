@@ -155,7 +155,7 @@ function customRecipientIdentifierError(identifier: string): string | undefined 
     return 'Fyll ut hvem som skal varsles.'
   }
   if (!toCustomRecipientIdentifier(identifier)) {
-    return 'Oppgi en e-postadresse, et mobilnummer, et organisasjonsnummer eller et fødselsnummer.'
+    return 'Oppgi en e-postadresse eller et mobilnummer.'
   }
   return undefined
 }

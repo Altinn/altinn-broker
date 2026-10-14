@@ -103,7 +103,7 @@ export function CustomRecipientsFields({
         <Fieldset id={id} tabIndex={-1}>
           <Fieldset.Legend>Varsle valgfrie mottakere</Fieldset.Legend>
           <Fieldset.Description>
-            Oppgi e-postadresse, mobilnummer, organisasjonsnummer eller fødselsnummer, og på vegne av hvilken mottaker
+            Oppgi e-postadresse eller mobilnummer, og på vegne av hvilken mottaker
             varselet gjelder.
           </Fieldset.Description>
           {error && entries.length === 0 && <ValidationMessage>{error}</ValidationMessage>}

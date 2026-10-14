@@ -10,8 +10,8 @@ export type NotificationChannel = 'Email' | 'Sms' | 'EmailPreferred' | 'SmsPrefe
 export type CustomRecipientInput = (
   | { emailAddress: string }
   | { mobileNumber: string }
-  | { organizationNumber: string }
-  | { nationalIdentityNumber: string }
+  // Custom recipient organization number - disabled for now, in the API too.
+  // | { organizationNumber: string }
 ) & { relatedOrganizationNumber: string }
 
 export type NotificationInput = {

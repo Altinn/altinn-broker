@@ -19,7 +19,6 @@ namespace Altinn.Broker.Tests;
 public class CreateNotificationOrderHandlerTests
 {
     private const string DefaultRelatedOrganization = "111111111";
-    private const string ValidNationalIdentityNumber = "01819012012";
 
     private static CreateNotificationOrderRequest CreateRequest(
         List<string>? recipientExternalIds = null,
@@ -174,11 +173,10 @@ public class CreateNotificationOrderHandlerTests
 
     public static TheoryData<Recipient, CustomRecipientType, string> CustomRecipients => new()
     {
-        { new Recipient { OrganizationNumber = "123456789" }, CustomRecipientType.Organization, "0192:123456789" },
-        { new Recipient { OrganizationNumber = "0192:123456789" }, CustomRecipientType.Organization, "0192:123456789" },
-        { new Recipient { OrganizationNumber = "urn:altinn:organization:identifier-no:123456789" }, CustomRecipientType.Organization, "0192:123456789" },
-        { new Recipient { NationalIdentityNumber = ValidNationalIdentityNumber }, CustomRecipientType.Person, $"urn:altinn:person:identifier-no:{ValidNationalIdentityNumber}" },
-        { new Recipient { NationalIdentityNumber = $"urn:altinn:person:identifier-no:{ValidNationalIdentityNumber}" }, CustomRecipientType.Person, $"urn:altinn:person:identifier-no:{ValidNationalIdentityNumber}" },
+        // Custom recipient organization number - disabled for now. Restore with it:
+        // { new Recipient { OrganizationNumber = "123456789" }, CustomRecipientType.Organization, "0192:123456789" },
+        // { new Recipient { OrganizationNumber = "0192:123456789" }, CustomRecipientType.Organization, "0192:123456789" },
+        // { new Recipient { OrganizationNumber = "urn:altinn:organization:identifier-no:123456789" }, CustomRecipientType.Organization, "0192:123456789" },
         { new Recipient { EmailAddress = "test@example.com" }, CustomRecipientType.Email, "test@example.com" },
         { new Recipient { MobileNumber = "+4799999999" }, CustomRecipientType.MobileNumber, "+4799999999" },
     };
@@ -203,12 +201,15 @@ public class CreateNotificationOrderHandlerTests
     }
 
     [Fact]
-    public async Task Process_WithDuplicateRecipientIdentifier_OnlyPersistsOnce()
+    public async Task Process_WithDuplicateCustomRecipient_OnlyPersistsOnce()
     {
         var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
         var request = CreateRequest(
-            recipientExternalIds: ["0192:123456789"],
-            customRecipients: [new Recipient { OrganizationNumber = "123456789" }]);
+            customRecipients:
+            [
+                new Recipient { EmailAddress = "test@example.com" },
+                new Recipient { EmailAddress = "test@example.com" },
+            ]);
 
         await handler.Process(request, CancellationToken.None);
 
@@ -238,8 +239,6 @@ public class CreateNotificationOrderHandlerTests
             recipientExternalIds: [$"0192:{DefaultRelatedOrganization}"],
             customRecipients:
             [
-                new Recipient { OrganizationNumber = "222222222" },
-                new Recipient { NationalIdentityNumber = ValidNationalIdentityNumber },
                 new Recipient { EmailAddress = "test@example.com" },
                 new Recipient { MobileNumber = "+4799999999" },
             ],
@@ -248,7 +247,7 @@ public class CreateNotificationOrderHandlerTests
 
         await handler.Process(request, CancellationToken.None);
 
-        Assert.Equal(5, persisted.Count);
+        Assert.Equal(3, persisted.Count);
         Assert.All(persisted, n => Assert.Equal(NotificationTemplate.GenericAltinnMessage, n.NotificationTemplate));
         Assert.All(persisted, n => Assert.Equal(NotificationChannel.EmailAndSms, n.NotificationChannel));
         var orders = persisted.Select(CapturedOrderRequest).ToList();
@@ -273,13 +272,13 @@ public class CreateNotificationOrderHandlerTests
         var persisted = CapturePersisted(notificationRepository);
         var request = CreateRequest(
             recipientExternalIds: ["0192:111111111", "0192:222222222"],
-            customRecipients: [new Recipient { NationalIdentityNumber = ValidNationalIdentityNumber, RelatedOrganizationNumber = "0192:222222222" }]);
+            customRecipients: [new Recipient { EmailAddress = "test@example.com", RelatedOrganizationNumber = "0192:222222222" }]);
 
         await handler.Process(request, CancellationToken.None);
 
-        var personNotification = persisted.Single(n => n.CustomRecipientType == CustomRecipientType.Person);
-        Assert.Equal("0192:222222222", personNotification.CustomRecipientRelatedOrganization);
-        Assert.Equal("Message for Org Two AS (222222222) from Sender AS", CapturedOrderRequest(personNotification).Recipient.RecipientPerson!.EmailSettings!.Subject);
+        var emailNotification = persisted.Single(n => n.CustomRecipientType == CustomRecipientType.Email);
+        Assert.Equal("0192:222222222", emailNotification.CustomRecipientRelatedOrganization);
+        Assert.Equal("Message for Org Two AS (222222222) from Sender AS", CapturedOrderRequest(emailNotification).Recipient.RecipientEmail!.EmailSettings!.Subject);
     }
 
     [Fact]
@@ -331,7 +330,7 @@ public class CreateNotificationOrderHandlerTests
             [
                 new Recipient { EmailAddress = "first@example.com", RelatedOrganizationNumber = "222222222" },
                 new Recipient { MobileNumber = "+4799999999", RelatedOrganizationNumber = "0192:222222222" },
-                new Recipient { NationalIdentityNumber = ValidNationalIdentityNumber, RelatedOrganizationNumber = "urn:altinn:organization:identifier-no:222222222" },
+                new Recipient { EmailAddress = "second@example.com", RelatedOrganizationNumber = "urn:altinn:organization:identifier-no:222222222" },
             ]);
 
         await handler.Process(request, CancellationToken.None);
@@ -339,39 +338,22 @@ public class CreateNotificationOrderHandlerTests
         registerService.Verify(s => s.LookupOrganizationName("0192:222222222", It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public async Task Process_WithCustomOrganizationRecipientThatIsAlsoAFileTransferRecipient_OnlyNotifiesItAsFileTransferRecipient()
-    {
-        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
-        var persisted = CapturePersisted(notificationRepository);
-        var request = CreateRequest(
-            recipientExternalIds: ["0192:111111111"],
-            customRecipients: [new Recipient { OrganizationNumber = "111111111", RelatedOrganizationNumber = "111111111" }]);
-
-        await handler.Process(request, CancellationToken.None);
-
-        var notification = Assert.Single(persisted);
-        Assert.NotNull(notification.ActorId);
-        Assert.Null(notification.CustomRecipientType);
-    }
-
-    [Theory]
-    [InlineData(ValidNationalIdentityNumber)]
-    [InlineData($"urn:altinn:person:identifier-no:{ValidNationalIdentityNumber}")]
-    public async Task Process_ForCustomRecipientWithNationalIdentityNumber_SendsPersonNumberWithoutPrefix(string nationalIdentityNumber)
-    {
-        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
-        var persisted = CapturePersisted(notificationRepository);
-        var request = CreateRequest(customRecipients: [new Recipient { NationalIdentityNumber = nationalIdentityNumber }], channel: NotificationChannel.EmailPreferred);
-
-        await handler.Process(request, CancellationToken.None);
-
-        var person = CapturedOrderRequest(Assert.Single(persisted)).Recipient.RecipientPerson!;
-        Assert.Equal(ValidNationalIdentityNumber, person.NationalIdentityNumber);
-        Assert.Equal("urn:altinn:resource:resource123", person.ResourceId);
-        Assert.Equal(NotificationChannel.EmailPreferred, person.ChannelSchema);
-        Assert.Equal("Test Organization AS (111111111) received document.pdf (resource: Test Resource). Log in.", person.EmailSettings!.Body);
-    }
+    // Custom recipient organization number - disabled for now. Restore with it:
+    // [Fact]
+    // public async Task Process_WithCustomOrganizationRecipientThatIsAlsoAFileTransferRecipient_OnlyNotifiesItAsFileTransferRecipient()
+    // {
+    //     var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
+    //     var persisted = CapturePersisted(notificationRepository);
+    //     var request = CreateRequest(
+    //         recipientExternalIds: ["0192:111111111"],
+    //         customRecipients: [new Recipient { OrganizationNumber = "111111111", RelatedOrganizationNumber = "111111111" }]);
+    //
+    //     await handler.Process(request, CancellationToken.None);
+    //
+    //     var notification = Assert.Single(persisted);
+    //     Assert.NotNull(notification.ActorId);
+    //     Assert.Null(notification.CustomRecipientType);
+    // }
 
     [Fact]
     public async Task Process_WhenTemplateMissing_Throws()

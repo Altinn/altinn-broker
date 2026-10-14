@@ -3,7 +3,6 @@ using System.Transactions;
 
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
-using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
@@ -114,10 +113,11 @@ public class CreateNotificationOrderHandler(
 
         if (notificationRequest.CustomRecipients is { Count: > 0 })
         {
-            var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
-            resolved.AddRange(notificationRequest.CustomRecipients
-                .Where(recipient => string.IsNullOrEmpty(recipient.OrganizationNumber) || !fileTransferRecipients.Contains(recipient.OrganizationNumber.WithoutPrefix()))
-                .Select(recipient => ((long?)null, recipient)));
+            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, recipient)));
+            // Custom recipient organization number - disabled for now. When re-enabled, skip one that is itself a file
+            // transfer recipient, since it already gets the regular notification:
+            // var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
+            // .Where(recipient => string.IsNullOrEmpty(recipient.OrganizationNumber) || !fileTransferRecipients.Contains(recipient.OrganizationNumber.WithoutPrefix()))
         }
 
         return resolved
@@ -187,8 +187,8 @@ public class CreateNotificationOrderHandler(
 
     private static (CustomRecipientType? Type, string? Identifier) DescribeCustomRecipient(Recipient recipient)
     {
-        if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return (CustomRecipientType.Organization, BuildActorExternalId(recipient));
-        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return (CustomRecipientType.Person, BuildActorExternalId(recipient));
+        // Custom recipient organization number - disabled for now.
+        // if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return (CustomRecipientType.Organization, BuildActorExternalId(recipient));
         if (!string.IsNullOrEmpty(recipient.EmailAddress)) return (CustomRecipientType.Email, recipient.EmailAddress);
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return (CustomRecipientType.MobileNumber, recipient.MobileNumber);
         throw new InvalidOperationException("Recipient must have exactly one identifier");
@@ -197,7 +197,6 @@ public class CreateNotificationOrderHandler(
     private static string BuildActorExternalId(Recipient recipient)
     {
         if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return recipient.OrganizationNumber.WithoutPrefix().WithPrefix();
-        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return $"{UrnConstants.PersonIdAttribute}:{recipient.NationalIdentityNumber.WithoutPrefix()}";
         if (!string.IsNullOrEmpty(recipient.EmailAddress)) return recipient.EmailAddress;
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return recipient.MobileNumber;
         throw new InvalidOperationException("Recipient must have exactly one identifier");
@@ -281,20 +280,6 @@ public class CreateNotificationOrderHandler(
                 RecipientOrganization = new RecipientOrganization
                 {
                     OrgNumber = recipient.OrganizationNumber,
-                    ResourceId = resourceIdWithPrefix,
-                    ChannelSchema = channel,
-                    EmailSettings = emailSettings,
-                    SmsSettings = smsSettings
-                }
-            };
-        }
-        else if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber))
-        {
-            return new RecipientV2
-            {
-                RecipientPerson = new RecipientPerson
-                {
-                    NationalIdentityNumber = recipient.NationalIdentityNumber.WithoutPrefix(),
                     ResourceId = resourceIdWithPrefix,
                     ChannelSchema = channel,
                     EmailSettings = emailSettings,
