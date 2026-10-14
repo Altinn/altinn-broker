@@ -10,7 +10,12 @@ import {
   readStoredUpload,
   type StoredUpload,
 } from '../../upload/uploadSession'
-import { toPropertyList, type NewFileTransferErrors, type NewFileTransferValues } from './formFields'
+import {
+  toNotificationInput,
+  toPropertyList,
+  type NewFileTransferErrors,
+  type NewFileTransferValues,
+} from './formFields'
 import { hasErrors } from './formValidation'
 
 // Adapts the uploads context to this form: scopes the active upload to this resource and sender, and
@@ -71,6 +76,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
         reference: values.reference,
         propertyList: toPropertyList(values.metadata),
         disableVirusScan: !values.virusScan,
+        notification: toNotificationInput(values),
       })
     } catch (error) {
       setSubmitError(describeInitializeError(error))
@@ -195,8 +201,20 @@ function describeInitializeError(error: unknown): string {
     return error.message
   }
   if (error instanceof ApiError) {
-    const detail = (error.body as { detail?: string } | null)?.detail
-    return detail ?? `Formidlingen feilet (HTTP ${error.status}).`
+    const body = error.body as { detail?: string; errorCode?: number } | null
+    const notificationMessage = body?.errorCode ? notificationErrorMessages[body.errorCode] : undefined
+    return notificationMessage ?? body?.detail ?? `Formidlingen feilet (HTTP ${error.status}).`
   }
   return 'Formidlingen feilet. Prøv igjen.'
+}
+
+/** The API's notification errors (NotificationErrors in the backend), worded for the user. */
+const notificationErrorMessages: Record<number, string> = {
+  8001: 'En av de andre som skal varsles mangler e-postadresse eller mobilnummer.',
+  8002: 'En av de andre som skal varsles har både e-postadresse og mobilnummer.',
+  8003: 'En av e-postadressene til de andre som skal varsles er ugyldig.',
+  8004: 'Et av mobilnumrene til de andre som skal varsles er ugyldig.',
+  8005: 'En av de andre som skal varsles mangler hvilken mottaker varselet gjelder.',
+  8006: 'En av de andre som skal varsles er knyttet til en organisasjon som ikke er mottaker av formidlingen.',
+  8007: 'En av de andre som skal varsles er knyttet til et ugyldig organisasjonsnummer.',
 }
