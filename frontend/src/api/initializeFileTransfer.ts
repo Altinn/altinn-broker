@@ -4,6 +4,22 @@ import { requireOrgIdentifier } from '../helpers/orgIdentifierHelper'
 
 const FILE_TRANSFER_PATH = `${BROKER_API_PREFIX}/filetransfer`
 
+export type NotificationChannel = 'Email' | 'Sms' | 'EmailPreferred' | 'SmsPreferred' | 'EmailAndSms'
+
+/** Exactly one identifier, plus the file transfer recipient it is notified on behalf of. */
+export type CustomRecipientInput = (
+  | { emailAddress: string }
+  | { mobileNumber: string }
+  | { organizationNumber: string }
+  | { nationalIdentityNumber: string }
+) & { relatedOrganizationNumber: string }
+
+export type NotificationInput = {
+  notificationChannel: NotificationChannel
+  sendReminder: boolean
+  customRecipients?: CustomRecipientInput[]
+}
+
 export type InitializeFileTransferInput = {
   resourceId: string
   sender: string
@@ -12,6 +28,7 @@ export type InitializeFileTransferInput = {
   reference?: string
   propertyList?: Record<string, string>
   disableVirusScan?: boolean
+  notification?: NotificationInput
 }
 
 /**
@@ -46,6 +63,13 @@ function buildRequestBody(input: InitializeFileTransferInput): FileTransferIniti
     sendersFileTransferReference: input.reference?.trim() || undefined,
     propertyList: input.propertyList ?? {},
     disableVirusScan: input.disableVirusScan ?? false,
+    notification: input.notification && {
+      ...input.notification,
+      customRecipients: input.notification.customRecipients?.map((recipient) => ({
+        ...recipient,
+        relatedOrganizationNumber: requireOrgIdentifier(recipient.relatedOrganizationNumber),
+      })),
+    },
   }
 }
 
@@ -58,4 +82,5 @@ type FileTransferInitializeRequestBody = {
   propertyList?: Record<string, string>
   checksum?: string
   disableVirusScan?: boolean
+  notification?: NotificationInput
 }
