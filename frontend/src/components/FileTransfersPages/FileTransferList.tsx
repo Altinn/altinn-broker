@@ -61,7 +61,7 @@ export function FileTransferList({
 
   return (
     <div className="page">
-      <h2 className="page-heading">{heading}</h2>
+      <h1 className="page-heading">{heading}</h1>
 
       <FileTransferFilters
         search={search}

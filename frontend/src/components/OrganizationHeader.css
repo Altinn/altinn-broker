@@ -1,12 +1,7 @@
 .org-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
   margin-bottom: 1.5rem;
-}
-
-.org-header__number {
-  margin: 0.15rem 0 0;
-  font-size: 0.875rem;
-  color: #545c7a;
+  padding: var(--ds-size-3) var(--ds-size-2);
+  background-color: var(--ds-color-background-default);
+  box-shadow: var(--ds-shadow-xs);
+  border-radius: var(--ds-border-radius-sm);
 }
