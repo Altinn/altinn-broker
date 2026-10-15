@@ -16,11 +16,6 @@ public static class NotificationValidationHelper
     /// </summary>
     private static readonly Regex OrganizationNumberRegex = new($@"^(?:0192:|{Regex.Escape(UrnConstants.OrganizationNumberAttribute)}:)?\d{{9}}$");
 
-    /// <summary>
-    /// "12345678901" or "urn:altinn:person:identifier-no:12345678901" - no other prefixes. Mod11 is checked separately.
-    /// </summary>
-    private static readonly Regex NationalIdentityNumberRegex = new($@"^(?:{Regex.Escape(UrnConstants.PersonIdAttribute)}:)?\d{{11}}$");
-
     public static Error? Validate(NotificationRequest notification, List<string> fileTransferRecipientExternalIds)
     {
         if (notification.CustomRecipients is { Count: > 0 })
@@ -59,7 +54,8 @@ public static class NotificationValidationHelper
 
     private static Error? ValidateCustomRecipientIdentifier(Recipient recipient)
     {
-        var identifierCount = new[] { recipient.OrganizationNumber, recipient.EmailAddress, recipient.MobileNumber, recipient.NationalIdentityNumber }
+        // Custom recipient organization number - disabled for now: add recipient.OrganizationNumber to the count.
+        var identifierCount = new[] { recipient.EmailAddress, recipient.MobileNumber }
             .Count(identifier => !string.IsNullOrEmpty(identifier));
 
         if (identifierCount == 0)
@@ -79,16 +75,11 @@ public static class NotificationValidationHelper
         {
             return NotificationErrors.InvalidMobileNumberProvided;
         }
-        if (recipient.OrganizationNumber is not null && !OrganizationNumberRegex.IsMatch(recipient.OrganizationNumber))
-        {
-            return NotificationErrors.InvalidOrganizationNumberProvided;
-        }
-        // The regex restricts the prefix to the person URN; IsSocialSecurityNumber strips it and checks mod11.
-        if (recipient.NationalIdentityNumber is not null
-            && (!NationalIdentityNumberRegex.IsMatch(recipient.NationalIdentityNumber) || !recipient.NationalIdentityNumber.IsSocialSecurityNumber()))
-        {
-            return NotificationErrors.InvalidNationalIdentityNumberProvided;
-        }
+        // Custom recipient organization number - disabled for now.
+        // if (recipient.OrganizationNumber is not null && !OrganizationNumberRegex.IsMatch(recipient.OrganizationNumber))
+        // {
+        //     return NotificationErrors.InvalidOrganizationNumberProvided;
+        // }
 
         return null;
     }

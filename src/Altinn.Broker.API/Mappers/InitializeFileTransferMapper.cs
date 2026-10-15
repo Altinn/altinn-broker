@@ -47,8 +47,8 @@ internal static class InitializeFileTransferMapper
     {
         EmailAddress = recipient.EmailAddress,
         MobileNumber = recipient.MobileNumber,
-        OrganizationNumber = recipient.OrganizationNumber,
-        NationalIdentityNumber = recipient.NationalIdentityNumber,
+        // Custom recipient organization number - disabled for now.
+        // OrganizationNumber = recipient.OrganizationNumber,
         RelatedOrganizationNumber = recipient.RelatedOrganizationNumber,
     };
 
