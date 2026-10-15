@@ -41,15 +41,14 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return Problem(ServiceOwnerErrors.CallerOrganizationIdNotFound);
         }
         var callerOrganizationIdWithPrefix = callerOrganizationId.WithPrefix();
+        if (callerOrganizationIdWithPrefix == "0192:991825827" && !string.IsNullOrWhiteSpace(serviceOwnerInitializeExt.OrganizationId))
+        {
+            callerOrganizationIdWithPrefix = serviceOwnerInitializeExt.OrganizationId.WithPrefix();
+        }
         var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (existingServiceOwner is not null)
         {
             return Problem(ServiceOwnerErrors.ServiceOwnerAlreadyExists);
-        }
-
-        if (callerOrganizationIdWithPrefix == "0192:991825827" && !string.IsNullOrWhiteSpace(serviceOwnerInitializeExt.OrganizationId))
-        {
-            callerOrganizationIdWithPrefix = serviceOwnerInitializeExt.OrganizationId.WithPrefix();
         }
 
         await serviceOwnerRepository.InitializeServiceOwner(callerOrganizationIdWithPrefix, serviceOwnerInitializeExt.Name);
