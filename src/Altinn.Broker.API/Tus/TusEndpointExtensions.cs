@@ -316,6 +316,19 @@ public static class TusEndpointExtensions
             context.FileId);
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var isPartial = await partialUploadRegistry.IsPartialAsync(
+            TusRouteHelper.NormalizePartialFileId(context.FileId),
+            context.CancellationToken);
+        if (!isPartial)
+        {
+            // Persist the received length before this response returns. Finalize still runs afterwards.
+            await RecordCompletedUploadLengthAsync(
+                context.HttpContext,
+                context.FileId,
+                fileTransferId,
+                context.CancellationToken);
+        }
+
         if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(context.FileId, context.CancellationToken) is not null)
         {
             await MarkUploadProcessingIfNeededAsync(
@@ -326,6 +339,33 @@ public static class TusEndpointExtensions
 
         var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
         await enqueuer.EnqueueConcatenateAsync(fileTransferId, context.FileId, context.CancellationToken);
+    }
+
+    private static async Task RecordCompletedUploadLengthAsync(
+        HttpContext httpContext,
+        string tusFileId,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnFileComplete");
+        var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
+        var uploadLength = await store.GetUploadLengthAsync(tusFileId, cancellationToken);
+        if (uploadLength is null)
+        {
+            logger.LogWarning(
+                "TUS OnFileComplete could not read upload length for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                fileTransferId,
+                tusFileId);
+            return;
+        }
+
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        await fileTransferRepository.SetFileTransferSize(fileTransferId, uploadLength.Value, cancellationToken);
+        logger.LogInformation(
+            "Recorded file transfer size {FileTransferSize} for file transfer {FileTransferId} before finalize",
+            uploadLength.Value,
+            fileTransferId);
     }
 
     private static async Task MarkUploadProcessingIfNeededAsync(

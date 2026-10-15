@@ -555,6 +555,17 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
     }
 
+    public async Task SetFileTransferSize(Guid fileTransferId, long fileTransferSize, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.file_transfer " +
+            "SET file_transfer_size = @filesize " +
+            "WHERE file_transfer_id_pk = @fileTransferId");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddWithValue("@filesize", fileTransferSize);
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+    }
+
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileTransferId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("SELECT key, value FROM broker.file_transfer_property WHERE file_transfer_id_fk = @filetransferId");
