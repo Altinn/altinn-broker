@@ -94,7 +94,7 @@ public class Program
                 parallelPartialUploads);
         }
 
-        await VerifyPublishedAsync(authHttpClient, authOptions, baseUrl, fileTransferId);
+        await VerifyPublishedOrProcessing(authHttpClient, authOptions, baseUrl, fileTransferId);
     }
 
     private static void LogUploadSize(long uploadSize)
@@ -210,7 +210,7 @@ public class Program
         return responseContent.FileTransferId.ToString();
     }
 
-    private static async Task VerifyPublishedAsync(
+    private static async Task VerifyPublishedOrProcessing(
         HttpClient authHttpClient,
         AltinnAuthOptions authOptions,
         string baseUrl,
@@ -233,9 +233,9 @@ public class Program
                 fileTransferId,
                 cancellationToken);
 
-            if (overview.FileTransferStatus == FileTransferStatusExt.Published)
+            if (overview.FileTransferStatus == FileTransferStatusExt.Published || overview.FileTransferStatus == FileTransferStatusExt.UploadProcessing)
             {
-                Console.WriteLine($"Verified file transfer {fileTransferId} is Published.");
+                Console.WriteLine($"Verified file transfer {fileTransferId} is Published or UploadProcessing.");
                 return;
             }
 
