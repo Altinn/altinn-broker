@@ -29,6 +29,7 @@ public interface IFileTransferRepository
         long fileTransferSize,
         CancellationToken cancellationToken
     );
+    Task SetFileTransferSize(Guid fileTransferId, long fileTransferSize, CancellationToken cancellationToken);
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
     Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken);
 
