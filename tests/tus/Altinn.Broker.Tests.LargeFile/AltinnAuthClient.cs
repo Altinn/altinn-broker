@@ -150,6 +150,12 @@ public static class AltinnAuthClient
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var handler = new JsonWebTokenHandler();
+        // The default factory caches signature providers by key id. This RSA is
+        // disposed when the method returns, so a later token refresh would sign
+        // with the disposed key.
+        var signingKey = new RsaSecurityKey(rsa) { KeyId = options.ClientKid };
+        signingKey.CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false };
+
         return handler.CreateToken(new SecurityTokenDescriptor
         {
             Claims = new Dictionary<string, object>
@@ -175,9 +181,7 @@ public static class AltinnAuthClient
                     },
                 },
             },
-            SigningCredentials = new SigningCredentials(
-                new RsaSecurityKey(rsa) { KeyId = options.ClientKid },
-                SecurityAlgorithms.RsaSha256),
+            SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256),
         });
     }
 
