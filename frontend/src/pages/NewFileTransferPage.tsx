@@ -220,9 +220,7 @@ function NewFileTransferPageContent() {
               {values.notifications && (
                 <>
                   <NotificationFields
-                    channel={values.notificationChannel}
                     sendReminder={values.sendReminder}
-                    onChannelChange={(channel) => setValue('notificationChannel', channel)}
                     onSendReminderChange={(sendReminder) => setValue('sendReminder', sendReminder)}
                   />
                   <CustomRecipientsFields

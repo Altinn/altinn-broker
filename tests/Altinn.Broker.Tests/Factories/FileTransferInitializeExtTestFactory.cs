@@ -81,7 +81,7 @@ internal static class FileTransferInitializeExtTestFactory
         SendersFileTransferReference = "test-data",
         Notification = new NotificationRequestExt()
         {
-            NotificationChannel = NotificationChannelExt.Email
+            SendReminder = false
         }
     };
 

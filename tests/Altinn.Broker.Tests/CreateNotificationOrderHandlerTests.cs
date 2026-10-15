@@ -38,7 +38,6 @@ public class CreateNotificationOrderHandlerTests
             FileTransferExpirationTime = DateTime.UtcNow.AddDays(30),
             NotificationRequest = new NotificationRequest
             {
-                NotificationChannel = channel,
                 SendReminder = sendReminder,
                 CustomRecipients = customRecipients
             }

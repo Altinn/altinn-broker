@@ -47,7 +47,6 @@ function writeStored(key: string, values: NewFileTransferValues): void {
     metadata: values.metadata,
     virusScan: values.virusScan,
     notifications: values.notifications,
-    notificationChannel: values.notificationChannel,
     sendReminder: values.sendReminder,
     customRecipientsEnabled: values.customRecipientsEnabled,
     customRecipients: values.customRecipients,

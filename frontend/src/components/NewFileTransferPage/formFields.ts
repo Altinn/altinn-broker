@@ -28,7 +28,6 @@ export type NewFileTransferValues = {
   file: File | null
   virusScan: boolean
   notifications: boolean
-  notificationChannel: NotificationChannel
   sendReminder: boolean
   customRecipientsEnabled: boolean
   customRecipients: CustomRecipientEntry[]
@@ -83,7 +82,6 @@ export function emptyValues(): NewFileTransferValues {
     file: null,
     virusScan: true,
     notifications: false,
-    notificationChannel: 'EmailPreferred',
     sendReminder: false,
     customRecipientsEnabled: false,
     customRecipients: [],
@@ -147,7 +145,6 @@ export function toNotificationInput(values: NewFileTransferValues): Notification
     : []
 
   return {
-    notificationChannel: values.notificationChannel,
     sendReminder: values.sendReminder,
     customRecipients: customRecipients.length > 0 ? customRecipients : undefined,
   }

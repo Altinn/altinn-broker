@@ -1,7 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-using Altinn.Broker.Enums;
 
 namespace Altinn.Broker.Models;
 
@@ -11,13 +9,6 @@ namespace Altinn.Broker.Models;
 /// </summary>
 public class NotificationRequestExt
 {
-    /// <summary>
-    /// The channel to send the notification (and reminder, if requested) on.
-    /// </summary>
-    [JsonPropertyName("notificationChannel")]
-    [Required]
-    public NotificationChannelExt NotificationChannel { get; set; }
-
     /// <summary>
     /// Whether a reminder should be sent if the main notification does not lead to the file transfer being
     /// confirmed/downloaded.
