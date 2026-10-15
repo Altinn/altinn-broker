@@ -321,12 +321,24 @@ public static class TusEndpointExtensions
             context.CancellationToken);
         if (!isPartial)
         {
-            // Persist the received length before this response returns. Finalize still runs afterwards.
-            await RecordCompletedUploadLengthAsync(
-                context.HttpContext,
-                context.FileId,
-                fileTransferId,
-                context.CancellationToken);
+            // Best-effort, so the details page can show the size immediately. A failure here must not
+            // skip finalization; the finalize job writes the same size later.
+            try
+            {
+                await RecordCompletedUploadLengthAsync(
+                    context.HttpContext,
+                    context.FileId,
+                    fileTransferId,
+                    context.CancellationToken);
+            }
+            catch (Exception ex) when (!context.CancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to record file transfer size for file transfer {FileTransferId}. TusFileId={TusFileId}. Finalization will continue.",
+                    fileTransferId,
+                    context.FileId);
+            }
         }
 
         if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(context.FileId, context.CancellationToken) is not null)
