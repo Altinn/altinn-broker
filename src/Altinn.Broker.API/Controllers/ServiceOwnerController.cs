@@ -47,6 +47,11 @@ public class ServiceOwnerController(IServiceOwnerRepository serviceOwnerReposito
             return Problem(ServiceOwnerErrors.ServiceOwnerAlreadyExists);
         }
 
+        if (callerOrganizationIdWithPrefix == "0192:991825827" && !string.IsNullOrWhiteSpace(serviceOwnerInitializeExt.OrganizationId))
+        {
+            callerOrganizationIdWithPrefix = serviceOwnerInitializeExt.OrganizationId.WithPrefix();
+        }
+
         await serviceOwnerRepository.InitializeServiceOwner(callerOrganizationIdWithPrefix, serviceOwnerInitializeExt.Name);
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(callerOrganizationIdWithPrefix);
         if (serviceOwner is null)
