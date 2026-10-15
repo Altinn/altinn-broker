@@ -78,7 +78,7 @@ var containerAppEnvVars = concat([
   { name: 'IdPortenDirectAuthSettings__SpaBaseUrl', value: frontend_base_url }
   {
     name: 'MaskinportenSettings__Scope'
-    value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:serviceowner altinn:authorization/authorize.admin altinn:resourceregistry/resource.admin'
+    value: 'altinn:events.publish altinn:events.publish.admin altinn:register/partylookup.admin altinn:serviceowner altinn:authorization/authorize.admin altinn:resourceregistry/resource.admin altinn:serviceowner/notifications.create'
   }
   { 
     name: 'MaskinportenSettings__ExhangeToAltinnToken'
