@@ -55,10 +55,11 @@ public static class AltinnAuthClient
         CancellationToken cancellationToken)
     {
         var tokenUrl = ResolveMaskinportenTokenUrl(options);
-        var assertion = CreateMaskinportenClientAssertion(options);
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            // A new assertion per attempt: Maskinporten consumes each grant once.
+            var assertion = CreateMaskinportenClientAssertion(options);
             using var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl)
             {
                 Content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -158,6 +159,9 @@ public static class AltinnAuthClient
                 ["iss"] = options.ClientId,
                 ["iat"] = now,
                 ["exp"] = now + 120,
+                // Required. Without a unique jti, jobs started in the same second
+                // produce the same signed grant and Maskinporten rejects the rest.
+                ["jti"] = Guid.NewGuid().ToString(),
                 ["authorization_details"] = new object[]
                 {
                     new Dictionary<string, object>
