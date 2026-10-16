@@ -43,6 +43,63 @@ internal static class TusBlockIds
         return null;
     }
 
+    public static bool TryParseNamespacedBlockId(string blockId, out int partialIndex, out int chunkIndex)
+    {
+        partialIndex = 0;
+        chunkIndex = 0;
+        try
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(blockId));
+            if (decoded.Length == 12
+                && int.TryParse(decoded[..6], out partialIndex)
+                && int.TryParse(decoded[6..], out chunkIndex))
+            {
+                return true;
+            }
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        partialIndex = 0;
+        chunkIndex = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Orders staged partial blocks by their place in Upload-Concat, then by chunk inside that partial.
+    /// <paramref name="concatPositionByPartialIndex"/> maps the creation-order partial index to that place.
+    /// </summary>
+    public static IReadOnlyList<string> OrderByConcatPosition(
+        IReadOnlyList<string> blockIds,
+        IReadOnlyDictionary<int, int> concatPositionByPartialIndex)
+    {
+        var tagged = new List<(string BlockId, int Position, int ChunkIndex)>(blockIds.Count);
+        foreach (var blockId in blockIds)
+        {
+            if (!TryParseNamespacedBlockId(blockId, out var partialIndex, out var chunkIndex))
+            {
+                throw new InvalidOperationException(
+                    $"Staged block '{blockId}' is not a concatenation partial block.");
+            }
+
+            if (!concatPositionByPartialIndex.TryGetValue(partialIndex, out var position))
+            {
+                throw new InvalidOperationException(
+                    $"Staged block for partial index {partialIndex} is not part of the Upload-Concat list.");
+            }
+
+            tagged.Add((blockId, position, chunkIndex));
+        }
+
+        return tagged
+            .OrderBy(entry => entry.Position)
+            .ThenBy(entry => entry.ChunkIndex)
+            .Select(entry => entry.BlockId)
+            .ToList();
+    }
+
     public static long GetMinimumChunkSizeBytes(long uploadLength)
         => uploadLength <= 0 ? 1 : (uploadLength + MaxBlocksPerBlob - 1) / MaxBlocksPerBlob;
 }

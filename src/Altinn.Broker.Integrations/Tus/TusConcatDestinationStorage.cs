@@ -39,6 +39,7 @@ internal static class TusConcatDestinationStorage
             return null;
         }
 
+        // Creation order (partial index, then chunk). Destination commit reorders by Upload-Concat.
         var orderedBlocks = uncommittedBlocks
             .Select(block => new { Block = block, Index = TusBlockIds.TryParseSortableIndex(block.Name) })
             .Where(entry => entry.Index.HasValue)
