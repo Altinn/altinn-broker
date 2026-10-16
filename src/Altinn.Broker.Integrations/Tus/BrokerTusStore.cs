@@ -117,13 +117,6 @@ public class BrokerTusStore(
             throw new TusStoreException($"Unable to accept TUS chunk for file id {fileId} at offset {expectedOffset}.");
         }
 
-        if (acceptResult.BlockIndex >= TusBlockIds.MaxBlocksPerBlob)
-        {
-            throw new TusStoreException(
-                $"Upload exceeds maximum block count ({TusBlockIds.MaxBlocksPerBlob}) for file id {fileId}. " +
-                $"Increase TUS chunk size to at least {TusBlockIds.GetMinimumChunkSizeBytes(uploadLength)} bytes.");
-        }
-
         var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
 
         string blockId;
@@ -1747,13 +1740,7 @@ public class BrokerTusStore(
             throw new TusStoreException(
                 $"Cannot commit TUS concatenation for file id {fileId}. Expanded {commitList.TotalLength} bytes from {stagedSnapshot.BlockIds.Count} staged blocks ({stagedSnapshot.TotalLength} bytes), expected {uploadLength}.");
         }
-
-        if (commitList.BlockIds.Count > TusBlockIds.MaxBlocksPerBlob)
-        {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId}. Expanded block count {commitList.BlockIds.Count} exceeds Azure limit of {TusBlockIds.MaxBlocksPerBlob}.");
-        }
-
+        
         return commitList;
     }
 
