@@ -1,4 +1,4 @@
-import type { CustomRecipientInput, NotificationChannel, NotificationInput } from '../../api/initializeFileTransfer'
+import type { CustomRecipientInput, NotificationInput } from '../../api/initializeFileTransfer'
 
 /**
  * Defines which fields exist, what an empty form looks like, and the shape of the values a field holds.
@@ -18,8 +18,6 @@ export type CustomRecipientEntry = {
   identifier: string
   relatedOrganizationNumber: string
 }
-
-export type { NotificationChannel }
 
 export type NewFileTransferValues = {
   reference: string
