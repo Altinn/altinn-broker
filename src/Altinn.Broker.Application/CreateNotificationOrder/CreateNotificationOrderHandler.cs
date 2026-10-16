@@ -83,7 +83,7 @@ public class CreateNotificationOrderHandler(
                 CustomRecipientIdentifier = customRecipientIdentifier,
                 CustomRecipientRelatedOrganization = actorId is null ? relatedOrganizationNumber?.WithPrefix() : null,
                 NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
-                NotificationChannel = notificationRequest.NotificationChannel,
+                NotificationChannel = NotificationChannel.EmailPreferred,
                 RequestedSendTime = requestedSendTime,
                 Created = DateTimeOffset.UtcNow,
                 IsReminder = false,
@@ -225,7 +225,7 @@ public class CreateNotificationOrderHandler(
             SendersReference = $"bro-{sendersReference}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
             IdempotencyId = notificationId,
-            Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: false)
+            Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailPreferred, resolvedText, tokens, isReminder: false)
         };
 
         if (notificationRequest.SendReminder)
@@ -236,7 +236,7 @@ public class CreateNotificationOrderHandler(
                 {
                     SendersReference = $"bro-{sendersReference}",
                     DelayDays = ReminderDelayDays,
-                    Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: true)
+                    Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailAndSms, resolvedText, tokens, isReminder: true)
                 }
             ];
         }
@@ -255,13 +255,12 @@ public class CreateNotificationOrderHandler(
     private static RecipientV2 CreateRecipientV2(
         string resourceId,
         Recipient recipient,
-        NotificationRequest notificationRequest,
+        NotificationChannel notificationChannel,
         ResolvedNotificationText resolvedText,
         OrderTokenValues tokens,
         bool isReminder)
     {
         var resourceIdWithPrefix = $"urn:altinn:resource:{resourceId}";
-        var channel = notificationRequest.NotificationChannel;
         var emailSubject = ApplyTokens(isReminder ? resolvedText.ReminderEmailSubject : resolvedText.EmailSubject, tokens);
         var emailBody = ApplyTokens(isReminder ? resolvedText.ReminderEmailBody : resolvedText.EmailBody, tokens);
         var smsBody = ApplyTokens(isReminder ? resolvedText.ReminderSmsBody : resolvedText.SmsBody, tokens);
@@ -281,7 +280,7 @@ public class CreateNotificationOrderHandler(
                 {
                     OrgNumber = recipient.OrganizationNumber,
                     ResourceId = resourceIdWithPrefix,
-                    ChannelSchema = channel,
+                    ChannelSchema = notificationChannel,
                     EmailSettings = emailSettings,
                     SmsSettings = smsSettings
                 }

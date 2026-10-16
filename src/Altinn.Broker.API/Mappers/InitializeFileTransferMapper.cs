@@ -37,7 +37,6 @@ internal static class InitializeFileTransferMapper
 
         return new NotificationRequest()
         {
-            NotificationChannel = MapNotificationChannel(notification.NotificationChannel),
             SendReminder = notification.SendReminder,
             CustomRecipients = notification.CustomRecipients?.Select(MapCustomRecipient).ToList(),
         };
@@ -50,15 +49,5 @@ internal static class InitializeFileTransferMapper
         // Custom recipient organization number - disabled for now.
         // OrganizationNumber = recipient.OrganizationNumber,
         RelatedOrganizationNumber = recipient.RelatedOrganizationNumber,
-    };
-
-    private static NotificationChannel MapNotificationChannel(NotificationChannelExt channel) => channel switch
-    {
-        NotificationChannelExt.Email => NotificationChannel.Email,
-        NotificationChannelExt.Sms => NotificationChannel.Sms,
-        NotificationChannelExt.EmailPreferred => NotificationChannel.EmailPreferred,
-        NotificationChannelExt.SmsPreferred => NotificationChannel.SmsPreferred,
-        NotificationChannelExt.EmailAndSms => NotificationChannel.EmailAndSms,
-        _ => throw new InvalidEnumArgumentException(nameof(channel), (int)channel, typeof(NotificationChannelExt))
     };
 }

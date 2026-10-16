@@ -23,8 +23,7 @@ public class CreateNotificationOrderHandlerTests
     private static CreateNotificationOrderRequest CreateRequest(
         List<string>? recipientExternalIds = null,
         List<Recipient>? customRecipients = null,
-        bool sendReminder = false,
-        NotificationChannel channel = NotificationChannel.Email)
+        bool sendReminder = false)
     {
         customRecipients?.ForEach(recipient => recipient.RelatedOrganizationNumber ??= DefaultRelatedOrganization);
         return new()
@@ -38,7 +37,6 @@ public class CreateNotificationOrderHandlerTests
             FileTransferExpirationTime = DateTime.UtcNow.AddDays(30),
             NotificationRequest = new NotificationRequest
             {
-                NotificationChannel = channel,
                 SendReminder = sendReminder,
                 CustomRecipients = customRecipients
             }
@@ -50,12 +48,12 @@ public class CreateNotificationOrderHandlerTests
         Id = 0,
         NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
         Language = "nb",
-        EmailSubject = "Message for $fileTransferRecipient$ from $sendersName$",
-        EmailBody = "$fileTransferRecipient$ received $fileName$ (resource: $resourceName$). Log in.",
-        SmsBody = "SMS: $fileTransferRecipient$ received $fileName$",
-        ReminderEmailSubject = "Reminder for $fileTransferRecipient$",
-        ReminderEmailBody = "Reminder: $fileTransferRecipient$ received $fileName$",
-        ReminderSmsBody = "Reminder SMS: $fileTransferRecipient$ received $fileName$"
+        EmailSubject = "En ny filoverføring er tilgjengelig i Altinn for $fileTransferRecipient$",
+        EmailBody = "Hei. $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen..",
+        SmsBody = "Hei. $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.",
+        ReminderEmailSubject = "Påminnelse - en ny filoverføring er tilgjengelig i Altinn for $fileTransferRecipient$",
+        ReminderEmailBody = "Hei. Dette er en påminnelse om at $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen.",
+        ReminderSmsBody = "Hei. Dette er en påminnelse om at $fileTransferRecipient$ har mottatt filen $fileName$ fra $sendersName$ gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til $resourceName$). Logg inn i Altinn for å se filoverføringen."
     };
 
     private static (
@@ -231,7 +229,7 @@ public class CreateNotificationOrderHandlerTests
     }
 
     [Fact]
-    public async Task Process_ForEveryRecipientType_SendsIdenticalPlainTextOnRequestedChannel()
+    public async Task Process_ForEveryRecipientType_SendsIdenticalPlainTextOnEmailPreferredChannel()
     {
         var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
         var persisted = CapturePersisted(notificationRepository);
@@ -242,14 +240,13 @@ public class CreateNotificationOrderHandlerTests
                 new Recipient { EmailAddress = "test@example.com" },
                 new Recipient { MobileNumber = "+4799999999" },
             ],
-            sendReminder: true,
-            channel: NotificationChannel.EmailAndSms);
+            sendReminder: true);
 
         await handler.Process(request, CancellationToken.None);
 
         Assert.Equal(3, persisted.Count);
         Assert.All(persisted, n => Assert.Equal(NotificationTemplate.GenericAltinnMessage, n.NotificationTemplate));
-        Assert.All(persisted, n => Assert.Equal(NotificationChannel.EmailAndSms, n.NotificationChannel));
+        Assert.All(persisted, n => Assert.Equal(NotificationChannel.EmailPreferred, n.NotificationChannel));
         var orders = persisted.Select(CapturedOrderRequest).ToList();
         var main = orders.Select(o => Settings(o.Recipient)).ToList();
         var reminders = orders.Select(o => Settings(Assert.Single(o.Reminders!).Recipient)).ToList();
@@ -259,7 +256,7 @@ public class CreateNotificationOrderHandlerTests
             Assert.Single(settings.Where(s => s.Sms is not null).Select(s => s.Sms!.Body).Distinct());
             Assert.All(settings.Where(s => s.Email is not null), s => Assert.Equal(EmailContentType.Plain, s.Email!.ContentType));
         }
-        Assert.Equal("Message for Test Organization AS (111111111) from Sender AS", main.First(s => s.Email is not null).Email!.Subject);
+        Assert.Equal("En ny filoverføring er tilgjengelig i Altinn for Test Organization AS (111111111)", main.First(s => s.Email is not null).Email!.Subject);
     }
 
     [Fact]
@@ -278,7 +275,7 @@ public class CreateNotificationOrderHandlerTests
 
         var emailNotification = persisted.Single(n => n.CustomRecipientType == CustomRecipientType.Email);
         Assert.Equal("0192:222222222", emailNotification.CustomRecipientRelatedOrganization);
-        Assert.Equal("Message for Org Two AS (222222222) from Sender AS", CapturedOrderRequest(emailNotification).Recipient.RecipientEmail!.EmailSettings!.Subject);
+        Assert.Equal("En ny filoverføring er tilgjengelig i Altinn for Org Two AS (222222222)", CapturedOrderRequest(emailNotification).Recipient.RecipientEmail!.EmailSettings!.Subject);
     }
 
     [Fact]
@@ -296,7 +293,7 @@ public class CreateNotificationOrderHandlerTests
         await handler.Process(request, CancellationToken.None);
 
         Assert.Equal(2, persisted.Count);
-        Assert.All(persisted, n => Assert.Equal("Message for 222222222 from Sender AS", Settings(CapturedOrderRequest(n).Recipient).Email!.Subject));
+        Assert.All(persisted, n => Assert.Equal("En ny filoverføring er tilgjengelig i Altinn for 222222222", Settings(CapturedOrderRequest(n).Recipient).Email!.Subject));
     }
 
     [Fact]
@@ -370,23 +367,26 @@ public class CreateNotificationOrderHandlerTests
     }
 
     [Fact]
-    public async Task Process_WithSendReminderTrue_AddsOneReminderWithSevenDayDelayAndSameChannel()
+    public async Task Process_WithSendReminderTrue_AddsOneReminderWithSevenDayDelayOnEmailAndSms()
     {
         var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
         var persisted = CapturePersisted(notificationRepository);
         var request = CreateRequest(
             recipientExternalIds: ["0192:123456789"],
-            sendReminder: true,
-            channel: NotificationChannel.SmsPreferred);
+            sendReminder: true);
 
         await handler.Process(request, CancellationToken.None);
 
-        var reminder = Assert.Single(CapturedOrderRequest(Assert.Single(persisted)).Reminders!);
+        var order = CapturedOrderRequest(Assert.Single(persisted));
+        Assert.Equal(NotificationChannel.EmailPreferred, order.Recipient.RecipientOrganization!.ChannelSchema);
+        var reminder = Assert.Single(order.Reminders!);
         Assert.Equal(7, reminder.DelayDays);
         var reminderRecipient = reminder.Recipient.RecipientOrganization!;
-        Assert.Equal(NotificationChannel.SmsPreferred, reminderRecipient.ChannelSchema);
-        Assert.Equal("Reminder for Test Organization AS (123456789)", reminderRecipient.EmailSettings!.Subject);
-        Assert.Equal("Reminder SMS: Test Organization AS (123456789) received document.pdf", reminderRecipient.SmsSettings!.Body);
+        Assert.Equal(NotificationChannel.EmailAndSms, reminderRecipient.ChannelSchema);
+        Assert.Equal("Påminnelse - en ny filoverføring er tilgjengelig i Altinn for Test Organization AS (123456789)", reminderRecipient.EmailSettings!.Subject);
+        Assert.Equal(
+            "Hei. Dette er en påminnelse om at Test Organization AS (123456789) har mottatt filen document.pdf fra Sender AS gjennom Altinn Formidling. (For å se denne filoverføringen kreves tilgang til Test Resource). Logg inn i Altinn for å se filoverføringen.",
+            reminderRecipient.SmsSettings!.Body);
     }
 
     [Fact]

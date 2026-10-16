@@ -4,8 +4,6 @@ import { requireOrgIdentifier } from '../helpers/orgIdentifierHelper'
 
 const FILE_TRANSFER_PATH = `${BROKER_API_PREFIX}/filetransfer`
 
-export type NotificationChannel = 'Email' | 'Sms' | 'EmailPreferred' | 'SmsPreferred' | 'EmailAndSms'
-
 /** Exactly one identifier, plus the file transfer recipient it is notified on behalf of. */
 export type CustomRecipientInput = (
   | { emailAddress: string }
@@ -15,7 +13,6 @@ export type CustomRecipientInput = (
 ) & { relatedOrganizationNumber: string }
 
 export type NotificationInput = {
-  notificationChannel: NotificationChannel
   sendReminder: boolean
   customRecipients?: CustomRecipientInput[]
 }

@@ -1,4 +1,4 @@
-import type { CustomRecipientInput, NotificationChannel, NotificationInput } from '../../api/initializeFileTransfer'
+import type { CustomRecipientInput, NotificationInput } from '../../api/initializeFileTransfer'
 
 /**
  * Defines which fields exist, what an empty form looks like, and the shape of the values a field holds.
@@ -19,8 +19,6 @@ export type CustomRecipientEntry = {
   relatedOrganizationNumber: string
 }
 
-export type { NotificationChannel }
-
 export type NewFileTransferValues = {
   reference: string
   recipients: string[]
@@ -28,7 +26,6 @@ export type NewFileTransferValues = {
   file: File | null
   virusScan: boolean
   notifications: boolean
-  notificationChannel: NotificationChannel
   sendReminder: boolean
   customRecipientsEnabled: boolean
   customRecipients: CustomRecipientEntry[]
@@ -83,7 +80,6 @@ export function emptyValues(): NewFileTransferValues {
     file: null,
     virusScan: true,
     notifications: false,
-    notificationChannel: 'EmailPreferred',
     sendReminder: false,
     customRecipientsEnabled: false,
     customRecipients: [],
@@ -147,7 +143,6 @@ export function toNotificationInput(values: NewFileTransferValues): Notification
     : []
 
   return {
-    notificationChannel: values.notificationChannel,
     sendReminder: values.sendReminder,
     customRecipients: customRecipients.length > 0 ? customRecipients : undefined,
   }

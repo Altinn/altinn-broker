@@ -3,6 +3,7 @@ using System.Transactions;
 
 using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
 
@@ -120,7 +121,7 @@ public class SendNotificationOrderHandler(
             CustomRecipientIdentifier = mainNotificationOrder.CustomRecipientIdentifier,
             CustomRecipientRelatedOrganization = mainNotificationOrder.CustomRecipientRelatedOrganization,
             NotificationTemplate = mainNotificationOrder.NotificationTemplate,
-            NotificationChannel = mainNotificationOrder.NotificationChannel,
+            NotificationChannel = NotificationChannel.EmailAndSms,
             RequestedSendTime = mainNotificationOrder.RequestedSendTime.AddDays(orderRequest.Reminders?.FirstOrDefault()?.DelayDays ?? 0),
             Created = DateTimeOffset.UtcNow,
             IsReminder = true,
