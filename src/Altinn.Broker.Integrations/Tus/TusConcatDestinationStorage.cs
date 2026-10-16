@@ -51,9 +51,10 @@ internal static class TusConcatDestinationStorage
         }
 
         var blockIds = orderedBlocks.Select(entry => entry.Block.Name).ToList();
-        var totalLength = orderedBlocks.Sum(entry => entry.Block.SizeLong);
+        var blockLengths = orderedBlocks.Select(entry => entry.Block.SizeLong).ToList();
+        var totalLength = blockLengths.Sum();
         var nextBlockIndex = orderedBlocks[^1].Index!.Value + 1;
-        return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
+        return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex, blockLengths);
     }
 
     public static async Task SetUploadLengthMetadataAsync(
