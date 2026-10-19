@@ -26,7 +26,7 @@ export async function createUpload(
   return locationPath(response, path)
 }
 
-/** Must be called front to back: creation order decides each partial's place in the file. */
+/** Creates one partial upload. File order is the list passed to concatenateUploads. */
 export async function createPartialUpload(
   fileTransferId: string,
   length: number,
