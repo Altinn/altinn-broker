@@ -3,6 +3,7 @@ using Altinn.Broker.Application.CreateNotificationOrder;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.Middlewares;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
@@ -120,6 +121,7 @@ public class InitializeFileTransferHandlerTests
                 It.IsAny<DateTimeOffset>(),
                 It.IsAny<Dictionary<string, string>>(),
                 It.IsAny<string?>(),
+                It.IsAny<ChecksumAlgorithm>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()),

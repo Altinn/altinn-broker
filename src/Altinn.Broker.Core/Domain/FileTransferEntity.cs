@@ -1,3 +1,5 @@
+using Altinn.Broker.Core.Domain.Enums;
+
 namespace Altinn.Broker.Core.Domain;
 
 public class FileTransferEntity
@@ -16,6 +18,7 @@ public class FileTransferEntity
     public required string FileName { get; set; }
     public long FileTransferSize { get; set; } = 0;
     public string? Checksum { get; set; }
+    public ChecksumAlgorithm ChecksumAlgorithm { get; set; } = ChecksumAlgorithm.MD5;
     public bool UseVirusScan { get; set; }
     public bool HasNotification { get; set; }
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();

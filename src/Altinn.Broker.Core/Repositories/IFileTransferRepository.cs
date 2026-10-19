@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 
 namespace Altinn.Broker.Core.Repositories;
 
@@ -14,6 +15,7 @@ public interface IFileTransferRepository
         DateTimeOffset expirationTime,
         Dictionary<string, string> propertyList,
         string? checksum,
+        ChecksumAlgorithm checksumAlgorithm,
         bool useVirusScan,
         bool hasNotification,
         CancellationToken cancellationToken);
