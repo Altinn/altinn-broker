@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
+import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { CustomRecipientsFields } from '../components/NewFileTransferPage/CustomRecipientsFields'
@@ -257,6 +258,13 @@ function NewFileTransferPageContent() {
             />
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
+              <ChecksumFields
+                algorithm={values.checksumAlgorithm}
+                checksum={values.checksum}
+                error={errors.checksum}
+                onAlgorithmChange={(checksumAlgorithm) => setValue('checksumAlgorithm', checksumAlgorithm)}
+                onChecksumChange={(checksum) => setValue('checksum', checksum)}
+              />
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}

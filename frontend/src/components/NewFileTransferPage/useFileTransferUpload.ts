@@ -11,6 +11,7 @@ import {
   type StoredUpload,
 } from '../../upload/uploadSession'
 import {
+  toChecksumInput,
   toNotificationInput,
   toPropertyList,
   type NewFileTransferErrors,
@@ -75,6 +76,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
         recipients: values.recipients,
         reference: values.reference,
         propertyList: toPropertyList(values.metadata),
+        ...toChecksumInput(values),
         disableVirusScan: !values.virusScan,
         notification: toNotificationInput(values),
       })

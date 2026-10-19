@@ -17,6 +17,8 @@ export type NotificationInput = {
   customRecipients?: CustomRecipientInput[]
 }
 
+export type ChecksumAlgorithm = 'MD5' | 'SHA256'
+
 export type InitializeFileTransferInput = {
   resourceId: string
   sender: string
@@ -24,6 +26,8 @@ export type InitializeFileTransferInput = {
   file: File
   reference?: string
   propertyList?: Record<string, string>
+  checksumAlgorithm: ChecksumAlgorithm
+  checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput
 }
@@ -59,6 +63,8 @@ function buildRequestBody(input: InitializeFileTransferInput): FileTransferIniti
     recipients: input.recipients.map((recipient) => requireOrgIdentifier(recipient)),
     sendersFileTransferReference: input.reference?.trim() || undefined,
     propertyList: input.propertyList ?? {},
+    checksumAlgorithm: input.checksumAlgorithm,
+    checksum: input.checksum?.trim() || undefined,
     disableVirusScan: input.disableVirusScan ?? false,
     notification: input.notification && {
       ...input.notification,
@@ -77,6 +83,7 @@ type FileTransferInitializeRequestBody = {
   recipients: string[]
   sendersFileTransferReference?: string
   propertyList?: Record<string, string>
+  checksumAlgorithm: ChecksumAlgorithm
   checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput
