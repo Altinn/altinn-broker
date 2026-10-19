@@ -17,6 +17,8 @@ export type FileTransferDetails = {
     sendersFileTransferReference?: string
     useVirusScan?: boolean
     fileTransferSize?: number
+    checksum?: string | null
+    checksumAlgorithm?: 'MD5' | 'SHA256' | null
     created?: string | null
     sender?: string
     senderName?: string
