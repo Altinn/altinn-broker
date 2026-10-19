@@ -27,7 +27,9 @@ export function validate(
     recipients: validateRecipients(values.recipients, rules),
     metadata: validateMetadata(values.metadata),
     file: validateFile(values.file, maxFileSize),
-    checksum: validateChecksum(values.checksum, values.checksumAlgorithm),
+    checksum: values.checksumEnabled
+      ? validateChecksum(values.checksum, values.checksumAlgorithm)
+      : undefined,
     customRecipients: validateCustomRecipients(values),
   }
 }

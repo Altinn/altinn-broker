@@ -5,7 +5,9 @@ import {
   ErrorSummary,
   Heading,
   Paragraph,
+  Field,
   Spinner,
+  Switch,
   Textfield,
   Checkbox,
 } from '@digdir/designsystemet-react'
@@ -258,13 +260,26 @@ function NewFileTransferPageContent() {
             />
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
-              <ChecksumFields
-                algorithm={values.checksumAlgorithm}
-                checksum={values.checksum}
-                error={errors.checksum}
-                onAlgorithmChange={(checksumAlgorithm) => setValue('checksumAlgorithm', checksumAlgorithm)}
-                onChecksumChange={(checksum) => setValue('checksum', checksum)}
-              />
+              <Field>
+                <Switch
+                  id={fieldId('checksumEnabled')}
+                  label="Valider sjekksum"
+                  checked={values.checksumEnabled}
+                  onChange={(event) => setValue('checksumEnabled', event.target.checked)}
+                />
+                <Field.Description>
+                  Sjekksummen beregnes når filen er lastet opp.
+                </Field.Description>
+              </Field>
+              {values.checksumEnabled && (
+                <ChecksumFields
+                  algorithm={values.checksumAlgorithm}
+                  checksum={values.checksum}
+                  error={errors.checksum}
+                  onAlgorithmChange={(checksumAlgorithm) => setValue('checksumAlgorithm', checksumAlgorithm)}
+                  onChecksumChange={(checksum) => setValue('checksum', checksum)}
+                />
+              )}
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}

@@ -26,7 +26,7 @@ export type InitializeFileTransferInput = {
   file: File
   reference?: string
   propertyList?: Record<string, string>
-  checksumAlgorithm: ChecksumAlgorithm
+  checksumAlgorithm?: ChecksumAlgorithm
   checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput
@@ -83,7 +83,7 @@ type FileTransferInitializeRequestBody = {
   recipients: string[]
   sendersFileTransferReference?: string
   propertyList?: Record<string, string>
-  checksumAlgorithm: ChecksumAlgorithm
+  checksumAlgorithm?: ChecksumAlgorithm
   checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput

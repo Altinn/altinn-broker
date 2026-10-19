@@ -45,6 +45,7 @@ function writeStored(key: string, values: NewFileTransferValues): void {
     reference: values.reference,
     recipients: values.recipients,
     metadata: values.metadata,
+    checksumEnabled: values.checksumEnabled,
     checksumAlgorithm: values.checksumAlgorithm,
     checksum: values.checksum,
     virusScan: values.virusScan,

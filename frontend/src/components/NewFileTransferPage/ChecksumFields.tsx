@@ -24,10 +24,7 @@ export function ChecksumFields({
   onChecksumChange,
 }: ChecksumFieldsProps) {
   return (
-    <Fieldset>
-      <Fieldset.Legend>Sjekksum</Fieldset.Legend>
-      <Fieldset.Description>Broker beregner sjekksummen når filen er lastet opp.</Fieldset.Description>
-
+    <>
       <Fieldset>
         <Fieldset.Legend>Algoritme</Fieldset.Legend>
         <div className="new-transfer__checksum-algorithms">
@@ -54,6 +51,6 @@ export function ChecksumFields({
         autoComplete="off"
         onChange={(event) => onChecksumChange(event.target.value)}
       />
-    </Fieldset>
+    </>
   )
 }
