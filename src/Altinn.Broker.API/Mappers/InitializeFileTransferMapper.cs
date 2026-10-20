@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Enums;
@@ -23,10 +24,17 @@ internal static class InitializeFileTransferMapper
             PropertyList = fileTransferInitializeExt.PropertyList,
             RecipientExternalIds = fileTransferInitializeExt.Recipients,
             Checksum = fileTransferInitializeExt.Checksum,
+            ChecksumAlgorithm = MapChecksumAlgorithm(fileTransferInitializeExt.ChecksumAlgorithm),
             DisableVirusScan = fileTransferInitializeExt.DisableVirusScan ?? false,
             Notification = MapNotification(fileTransferInitializeExt.Notification)
         };
     }
+
+    private static ChecksumAlgorithm MapChecksumAlgorithm(ChecksumAlgorithmExt algorithm) => algorithm switch
+    {
+        ChecksumAlgorithmExt.SHA256 => ChecksumAlgorithm.SHA256,
+        _ => ChecksumAlgorithm.MD5
+    };
 
     private static NotificationRequest? MapNotification(NotificationRequestExt? notification)
     {

@@ -8,6 +8,8 @@ public class GetActiveFileTransferDetailsResponse
     public string? SendersFileTransferReference { get; set; }
     public string? FileName { get; set; }
     public long? FileTransferSize { get; set; }
+    public string? Checksum { get; set; }
+    public string? ChecksumAlgorithm { get; set; }
     public string? Created { get; set; }
     public bool? UseVirusScan { get; set; }
     public string? Published { get; set; }

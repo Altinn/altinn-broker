@@ -23,6 +23,14 @@ def read_env(name: str, fallback: str | None) -> str | None:
     return value
 
 
+def read_checksum_algorithm() -> str:
+    value = read_env("CHECKSUM_ALGORITHM", "SHA256") or "SHA256"
+    algorithm = value.upper()
+    if algorithm not in ("MD5", "SHA256"):
+        raise RuntimeError(f"CHECKSUM_ALGORITHM must be MD5 or SHA256. Got: {value}")
+    return algorithm
+
+
 def require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
@@ -169,6 +177,7 @@ def main() -> None:
         read_env("TUS_PARALLEL_PARTIAL_UPLOADS", str(DEFAULT_PARALLEL_UPLOADS))
     )
     upload_file_path = read_env("UPLOAD_FILE_PATH", None)
+    checksum_algorithm = read_checksum_algorithm()
     chunk_size = chunk_size_mb * 1024 * 1024
 
     print(f"BASE_URL: {base_url}")
@@ -176,10 +185,11 @@ def main() -> None:
     print(f"ORG_NO: {auth_options.org_number}")
     print(f"CHUNK_SIZE_MB: {chunk_size_mb}")
     print(f"TUS_PARALLEL_PARTIAL_UPLOADS: {parallel_uploads}")
+    print(f"CHECKSUM_ALGORITHM: {checksum_algorithm}")
 
     token = exchange_altinn_token(auth_options)
     file_transfer_id = initialize_file_transfer(
-        base_url, token, auth_options.org_number, resource_id
+        base_url, token, auth_options.org_number, resource_id, checksum_algorithm
     )
     print(f"File transfer id: {file_transfer_id}")
 

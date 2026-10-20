@@ -1,4 +1,8 @@
-import type { CustomRecipientInput, NotificationInput } from '../../api/initializeFileTransfer'
+import type {
+  ChecksumAlgorithm,
+  CustomRecipientInput,
+  NotificationInput,
+} from '../../api/initializeFileTransfer'
 
 /**
  * Defines which fields exist, what an empty form looks like, and the shape of the values a field holds.
@@ -24,6 +28,9 @@ export type NewFileTransferValues = {
   recipients: string[]
   metadata: MetadataEntry[]
   file: File | null
+  checksumEnabled: boolean
+  checksumAlgorithm: ChecksumAlgorithm
+  checksum: string
   virusScan: boolean
   notifications: boolean
   sendReminder: boolean
@@ -36,6 +43,8 @@ export type NewFileTransferField =
   | 'recipients'
   | 'metadata'
   | 'file'
+  | 'checksumEnabled'
+  | 'checksum'
   | 'notifications'
   | 'customRecipients'
 
@@ -46,6 +55,8 @@ export const fieldLabels: Record<NewFileTransferField, string> = {
   recipients: 'Mottakere',
   metadata: 'Metadata',
   file: 'Fil',
+  checksumEnabled: 'Sjekksum',
+  checksum: 'Sjekksum',
   notifications: 'Varslinger',
   customRecipients: 'Andre som skal varsles',
 }
@@ -78,6 +89,9 @@ export function emptyValues(): NewFileTransferValues {
     recipients: [],
     metadata: [],
     file: null,
+    checksumEnabled: false,
+    checksumAlgorithm: 'SHA256',
+    checksum: '',
     virusScan: true,
     notifications: false,
     sendReminder: false,
@@ -145,6 +159,25 @@ export function toNotificationInput(values: NewFileTransferValues): Notification
   return {
     sendReminder: values.sendReminder,
     customRecipients: customRecipients.length > 0 ? customRecipients : undefined,
+  }
+}
+
+/**
+ * The checksum as the API takes it. Nothing is sent until the sender opts in, so Broker keeps its
+ * default. An empty value is omitted so Broker computes the digest after upload.
+ */
+export function toChecksumInput(values: NewFileTransferValues): {
+  checksumAlgorithm?: ChecksumAlgorithm
+  checksum?: string
+} {
+  if (!values.checksumEnabled) {
+    return {}
+  }
+
+  const checksum = values.checksum.trim()
+  return {
+    checksumAlgorithm: values.checksumAlgorithm,
+    checksum: checksum || undefined,
   }
 }
 
