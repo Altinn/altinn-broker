@@ -5,10 +5,12 @@ using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -19,6 +21,7 @@ namespace Altinn.Broker.Tests;
 public class CreateNotificationOrderHandlerTests
 {
     private const string DefaultRelatedOrganization = "111111111";
+    private const string BrokerBaseUrl = "https://platform.tt02.altinn.no";
 
     private static CreateNotificationOrderRequest CreateRequest(
         List<string>? recipientExternalIds = null,
@@ -63,7 +66,7 @@ public class CreateNotificationOrderHandlerTests
         Mock<IIdempotencyEventRepository> IdempotencyRepository,
         Mock<IAltinnRegisterService> RegisterService,
         Mock<IAltinnResourceRepository> ResourceRepository,
-        CreateNotificationOrderHandler Handler) CreateHandler()
+        CreateNotificationOrderHandler Handler) CreateHandler(string brokerBaseUrl = BrokerBaseUrl)
     {
         var actorRepository = new Mock<IActorRepository>();
         var notificationRepository = new Mock<IFileTransferNotificationRepository>();
@@ -102,6 +105,7 @@ public class CreateNotificationOrderHandlerTests
             idempotencyRepository.Object,
             registerService.Object,
             resourceRepository.Object,
+            Options.Create(new GeneralSettings { BrokerBaseUrl = brokerBaseUrl }),
             logger.Object);
 
         return (actorRepository, notificationRepository, templateRepository, idempotencyRepository, registerService, resourceRepository, handler);
@@ -399,5 +403,55 @@ public class CreateNotificationOrderHandlerTests
         await handler.Process(request, CancellationToken.None);
 
         Assert.Null(CapturedOrderRequest(Assert.Single(persisted)).Reminders);
+    }
+
+    [Fact]
+    public async Task Process_WithSendReminderTrue_PointsOrderAndReminderAtTheSameConditionEndpoint()
+    {
+        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
+        var persisted = CapturePersisted(notificationRepository);
+        var request = CreateRequest(recipientExternalIds: ["0192:123456789"], sendReminder: true);
+
+        await handler.Process(request, CancellationToken.None);
+
+        var notification = Assert.Single(persisted);
+        var order = CapturedOrderRequest(notification);
+        var expected = $"{BrokerBaseUrl}/broker/api/v1/notification/{notification.Id}/check";
+        Assert.Equal(expected, order.ConditionEndpoint);
+        Assert.Equal(expected, Assert.Single(order.Reminders!).ConditionEndpoint);
+    }
+
+    [Fact]
+    public async Task Process_WithOneConditionEndpointPerRecipient_GivesEachNotificationItsOwn()
+    {
+        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
+        var persisted = CapturePersisted(notificationRepository);
+        var request = CreateRequest(recipientExternalIds: ["0192:123456789", "0192:987654321"]);
+
+        await handler.Process(request, CancellationToken.None);
+
+        Assert.Equal(2, persisted.Count);
+        var endpoints = persisted.Select(notification => CapturedOrderRequest(notification).ConditionEndpoint).ToList();
+        Assert.Equal(endpoints.Count, endpoints.Distinct().Count());
+        Assert.All(persisted, notification => Assert.Equal(
+            $"{BrokerBaseUrl}/broker/api/v1/notification/{notification.Id}/check",
+            CapturedOrderRequest(notification).ConditionEndpoint));
+    }
+
+    [Theory]
+    [InlineData("https://localhost:7241")]
+    [InlineData("http://127.0.0.1:5096")]
+    [InlineData("")]
+    public async Task Process_WithoutAnExternallyReachableBaseUrl_LeavesTheNotificationUnconditional(string brokerBaseUrl)
+    {
+        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler(brokerBaseUrl);
+        var persisted = CapturePersisted(notificationRepository);
+        var request = CreateRequest(recipientExternalIds: ["0192:123456789"], sendReminder: true);
+
+        await handler.Process(request, CancellationToken.None);
+
+        var order = CapturedOrderRequest(Assert.Single(persisted));
+        Assert.Null(order.ConditionEndpoint);
+        Assert.Null(Assert.Single(order.Reminders!).ConditionEndpoint);
     }
 }
