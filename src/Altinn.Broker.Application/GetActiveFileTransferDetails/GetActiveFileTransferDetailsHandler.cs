@@ -105,6 +105,8 @@ public class GetActiveFileTransferDetailsHandler(
             SendersFileTransferReference = fileTransfer.SendersFileTransferReference,
             FileName = fileTransfer.FileName,
             FileTransferSize = fileTransfer.FileTransferSize,
+            Checksum = string.IsNullOrWhiteSpace(fileTransfer.Checksum) ? null : fileTransfer.Checksum,
+            ChecksumAlgorithm = fileTransfer.ChecksumAlgorithm.ToString(),
             Created = initializedEvent is not null ? FormatTimestamp(initializedEvent.Date) : null,
             Published = publishedEvent is not null ? FormatTimestamp(publishedEvent.Date) : null,
             UseVirusScan = fileTransfer.UseVirusScan,

@@ -14,5 +14,6 @@ public static class LogContextHelpers
         LogContext.PushProperty("recipients", string.Join(',', fileTransferInitalizeExt.Recipients));
         LogContext.PushProperty("sendersFileTransferReference", fileTransferInitalizeExt.SendersFileTransferReference);
         LogContext.PushProperty("checksum", fileTransferInitalizeExt.Checksum);
+        LogContext.PushProperty("checksumAlgorithm", fileTransferInitalizeExt.ChecksumAlgorithm);
     }
 }

@@ -5,6 +5,16 @@ import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
 import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
 
+/** A missing checksum means Broker is still calculating it after upload. */
+function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
+  const value = checksum?.trim()
+  if (!value) {
+    return 'Behandles'
+  }
+
+  return algorithm ? `${algorithm}: ${value}` : value
+}
+
 type FileTransferDetailListProps = {
   transferDetails: FileTransferDetails
 }
@@ -29,6 +39,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       <DetailField label="Opplastet" value={transferDetails.published} />
       <DetailField label="Nedlastingsfrist" value={transferDetails.expirationTime} />
       <DetailField label="Filstørrelse" value={formatFileSize(transferDetails.fileTransferSize)} />
+      <DetailField label="Sjekksum" value={formatChecksum(transferDetails.checksum, transferDetails.checksumAlgorithm)} />
       <DetailField label="Virusskannet" value={transferDetails.useVirusScan ? "Utført" : "Ikke utført"} />
       <DetailField label="Andre metadata" value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)

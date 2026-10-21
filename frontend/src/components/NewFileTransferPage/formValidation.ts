@@ -27,6 +27,9 @@ export function validate(
     recipients: validateRecipients(values.recipients, rules),
     metadata: validateMetadata(values.metadata),
     file: validateFile(values.file, maxFileSize),
+    checksum: values.checksumEnabled
+      ? validateChecksum(values.checksum, values.checksumAlgorithm)
+      : undefined,
     customRecipients: validateCustomRecipients(values),
   }
 }
@@ -205,6 +208,24 @@ function validateCustomRecipients(values: NewFileTransferValues): string | undef
     (row) => row.identifier ?? row.relatedOrganization,
   )
   return failed?.identifier ?? failed?.relatedOrganization
+}
+
+const CHECKSUM_LENGTH = { MD5: 32, SHA256: 64 } as const
+
+function validateChecksum(checksum: string, algorithm: keyof typeof CHECKSUM_LENGTH): string | undefined {
+  const value = checksum.trim()
+  if (!value) {
+    return undefined
+  }
+
+  const expectedLength = CHECKSUM_LENGTH[algorithm]
+  if (value.length !== expectedLength) {
+    return `En ${algorithm}-sjekksum er ${expectedLength} tegn.`
+  }
+  if (value.toLowerCase() !== value) {
+    return 'Sjekksummen må skrives med små bokstaver.'
+  }
+  return undefined
 }
 
 function validateFile(file: File | null, maxFileSize: number | null): string | undefined {

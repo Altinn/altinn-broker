@@ -35,10 +35,17 @@ internal static class FileTransferStatusOverviewExtMapper
         target.Created = fileTransfer.Created;
         target.ExpirationTime = fileTransfer.ExpirationTime;
         target.Checksum = fileTransfer.Checksum;
+        target.ChecksumAlgorithm = MapChecksumAlgorithm(fileTransfer.ChecksumAlgorithm);
         target.UseVirusScan = fileTransfer.UseVirusScan;
         
         return target;
     }
+
+    internal static ChecksumAlgorithmExt MapChecksumAlgorithm(ChecksumAlgorithm algorithm) => algorithm switch
+    {
+        ChecksumAlgorithm.SHA256 => ChecksumAlgorithmExt.SHA256,
+        _ => ChecksumAlgorithmExt.MD5
+    };
 
     internal static FileTransferStatusExt MapToExternalEnum(FileTransferStatus domainEnum)
     {
