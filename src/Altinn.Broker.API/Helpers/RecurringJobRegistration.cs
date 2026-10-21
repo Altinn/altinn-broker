@@ -3,6 +3,7 @@ using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 using Altinn.Broker.Application.MaskinportenJwkRotation;
 using Altinn.Broker.Application.MonthlyStatistics;
+using Altinn.Broker.Application.SendNotificationOrder;
 using Altinn.Broker.Core.Options;
 using Hangfire;
 
@@ -37,6 +38,12 @@ public static class RecurringJobRegistration
             "Finalize previous month statistics rollup",
             handler => handler.RefreshPreviousMonthRollup(CancellationToken.None),
             "0 4 2 * *");
+
+        recurringJobManager.AddOrUpdate<StuckNotificationOrderHandler>(
+            "Order notifications still pending after publish",
+            handler => handler.Process(CancellationToken.None),
+            Cron.Daily(8),
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Oslo") });
 
         recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
             "Cleanup use case test data older than 1 day",
