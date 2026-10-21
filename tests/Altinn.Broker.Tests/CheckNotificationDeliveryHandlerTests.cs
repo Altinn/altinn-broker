@@ -145,7 +145,7 @@ public class CheckNotificationDeliveryHandlerTests
             .Setup(s => s.GetNotificationDetailsV2(notification.ShipmentId!.Value.ToString(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateStatusResponse("Order_Processing", []));
 
-        await handler.Process(notification.Id, CancellationToken.None, attempt: 10);
+        await handler.Process(notification.Id, CancellationToken.None, attempt: CheckNotificationDeliveryHandler.MaxAttempts);
 
         var slackJob = Assert.Single(capturedJobs);
         Assert.Equal(typeof(SendSlackNotificationHandler), slackJob.Job.Type);
