@@ -20,10 +20,7 @@ public static class MobileNumberHelper
             return false;
         }
 
-        if (mobileNumber.StartsWith("00"))
-        {
-            mobileNumber = "+" + mobileNumber.Remove(0, 2);
-        }
+        mobileNumber = Normalize(mobileNumber);
 
         var phoneNumberUtil = PhoneNumberUtil.GetInstance();
 
@@ -36,5 +33,15 @@ public static class MobileNumberHelper
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// The one form a mobile number is stored and sent in, so the same number written differently - "0047…",
+    /// "+47…", with or without spaces - is the same recipient: whitespace removed and a leading "00" as "+".
+    /// </summary>
+    public static string Normalize(string mobileNumber)
+    {
+        var compact = string.Concat(mobileNumber.Where(c => !char.IsWhiteSpace(c)));
+        return compact.StartsWith("00") ? "+" + compact[2..] : compact;
     }
 }

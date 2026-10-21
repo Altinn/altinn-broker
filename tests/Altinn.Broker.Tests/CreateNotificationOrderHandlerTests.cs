@@ -215,6 +215,45 @@ public class CreateNotificationOrderHandlerTests
     }
 
     [Fact]
+    public async Task Process_WithSameEmailInDifferentCase_OnlyNotifiesOnceInLowercase()
+    {
+        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
+        var persisted = CapturePersisted(notificationRepository);
+        var request = CreateRequest(
+            customRecipients:
+            [
+                new Recipient { EmailAddress = "Ola.Nordmann@Example.com" },
+                new Recipient { EmailAddress = "ola.nordmann@example.com" },
+            ]);
+
+        await handler.Process(request, CancellationToken.None);
+
+        var notification = Assert.Single(persisted);
+        Assert.Equal("ola.nordmann@example.com", notification.CustomRecipientIdentifier);
+        Assert.Equal("ola.nordmann@example.com", CapturedOrderRequest(notification).Recipient.RecipientEmail!.EmailAddress);
+    }
+
+    [Fact]
+    public async Task Process_WithSameMobileNumberWrittenDifferently_OnlyNotifiesOnceInNormalizedForm()
+    {
+        var (_, notificationRepository, _, _, _, _, handler) = CreateHandler();
+        var persisted = CapturePersisted(notificationRepository);
+        var request = CreateRequest(
+            customRecipients:
+            [
+                new Recipient { MobileNumber = "004799999999" },
+                new Recipient { MobileNumber = "+4799999999" },
+                new Recipient { MobileNumber = "+47 999 99 999" },
+            ]);
+
+        await handler.Process(request, CancellationToken.None);
+
+        var notification = Assert.Single(persisted);
+        Assert.Equal("+4799999999", notification.CustomRecipientIdentifier);
+        Assert.Equal("+4799999999", CapturedOrderRequest(notification).Recipient.RecipientSms!.PhoneNumber);
+    }
+
+    [Fact]
     public async Task Process_WhenIdempotencyClaimAlreadyTaken_SkipsRecipient()
     {
         var (_, notificationRepository, _, idempotencyRepository, _, _, handler) = CreateHandler();
