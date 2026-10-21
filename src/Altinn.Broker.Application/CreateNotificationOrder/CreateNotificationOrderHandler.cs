@@ -6,12 +6,10 @@ using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
-using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Application.CreateNotificationOrder;
 
@@ -22,7 +20,6 @@ public class CreateNotificationOrderHandler(
     IIdempotencyEventRepository idempotencyEventRepository,
     IAltinnRegisterService altinnRegisterService,
     IAltinnResourceRepository altinnResourceRepository,
-    IOptions<GeneralSettings> generalSettings,
     ILogger<CreateNotificationOrderHandler> logger) : ICreateNotificationOrderHandler
 {
     private const int ReminderDelayDays = 7;
@@ -75,7 +72,7 @@ public class CreateNotificationOrderHandler(
                 FileTransferRecipient = fileTransferRecipients[GetFileTransferRecipientNumber(actorId, recipient)]
             };
             var relatedOrganizationNumber = recipient.RelatedOrganizationNumber?.WithoutPrefix();
-            var orderRequest = CreateNotificationOrderRequestV2(request.SendersFileTransferReference,request.ResourceId, recipient, notificationId, notificationRequest, resolvedText, requestedSendTime, tokens, BuildConditionEndpoint(notificationId));
+            var orderRequest = CreateNotificationOrderRequestV2(request.SendersFileTransferReference,request.ResourceId, recipient, notificationId, notificationRequest, resolvedText, requestedSendTime, tokens);
             var (customRecipientType, customRecipientIdentifier) = actorId is null ? DescribeCustomRecipient(recipient) : (null, null);
             var notification = new BrokerNotificationEntity
             {
@@ -221,14 +218,12 @@ public class CreateNotificationOrderHandler(
         NotificationRequest notificationRequest,
         ResolvedNotificationText resolvedText,
         DateTimeOffset requestedSendTime,
-        OrderTokenValues tokens,
-        string? conditionEndpoint)
+        OrderTokenValues tokens)
     {
         var order = new NotificationOrderRequestV2
         {
             SendersReference = $"bro-{sendersReference}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
-            ConditionEndpoint = conditionEndpoint,
             IdempotencyId = notificationId,
             Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailPreferred, resolvedText, tokens, isReminder: false)
         };
@@ -241,34 +236,12 @@ public class CreateNotificationOrderHandler(
                 {
                     SendersReference = $"bro-{sendersReference}",
                     DelayDays = ReminderDelayDays,
-                    ConditionEndpoint = conditionEndpoint,
                     Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailAndSms, resolvedText, tokens, isReminder: true)
                 }
             ];
         }
 
         return order;
-    }
-
-    /// <summary>
-    /// The endpoint Altinn Notification calls right before sending, to let us stop a notification whose recipient has
-    /// already confirmed the download. One endpoint per notification, since there is one notification per recipient.
-    /// Returns null when we have no externally reachable address to be called back on, which leaves the notification
-    /// unconditional.
-    /// </summary>
-    private string? BuildConditionEndpoint(Guid notificationId)
-    {
-        var baseUrl = generalSettings.Value.BrokerBaseUrl;
-        if (string.IsNullOrWhiteSpace(baseUrl) || !Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsedBaseUrl))
-        {
-            logger.LogWarning("No valid BrokerBaseUrl is configured. Notifications are created without a condition endpoint.");
-            return null;
-        }
-        if (parsedBaseUrl.IsLoopback)
-        {
-            return null;
-        }
-        return $"{baseUrl.TrimEnd('/')}/broker/api/v1/notification/{notificationId}/check";
     }
 
     private static string? ApplyTokens(string? text, OrderTokenValues tokens) =>

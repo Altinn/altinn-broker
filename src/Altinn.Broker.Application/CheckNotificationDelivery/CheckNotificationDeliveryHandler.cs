@@ -25,8 +25,7 @@ public class CheckNotificationDeliveryHandler(
     48 * 60 * 60, 
     72 * 60 * 60];
     private static readonly int MaxAttempts = PollBackoffSeconds.Length + 1;
-    private const string SendConditionNotMetStatus = "Order_SendConditionNotMet";
-    private static readonly string[] FinalOrderStatuses = ["Order_Completed", SendConditionNotMetStatus, "Order_Cancelled"];
+    private static readonly string[] FinalOrderStatuses = ["Order_Completed", "Order_SendConditionNotMet", "Order_Cancelled"];
 
     public async Task Process(Guid notificationId, CancellationToken cancellationToken, int attempt = 1)
     {
@@ -67,15 +66,6 @@ public class CheckNotificationDeliveryHandler(
             backgroundJobClient.Schedule<CheckNotificationDeliveryHandler>(
                 handler => handler.Process(notificationId, CancellationToken.None, attempt + 1),
                 TimeSpan.FromSeconds(delaySeconds));
-            return;
-        }
-
-        if (statusResponse.Status == SendConditionNotMetStatus)
-        {
-            logger.LogInformation(
-                "Notification {NotificationId} for file transfer {FileTransferId} was not sent because the send condition was not met",
-                notificationId,
-                notification.FileTransferId);
             return;
         }
 

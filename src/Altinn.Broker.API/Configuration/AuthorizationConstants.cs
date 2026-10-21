@@ -17,11 +17,9 @@ public static class AuthorizationConstants
     /// <summary>Altinn platform JWT stored in the shared runtime httpOnly cookie.</summary>
     public const string AltinnPlatformJwtCookie = BrokerAuthenticationSchemes.AltinnPlatformJwtCookie;
     public const string EndUser = "EndUser";
-    public const string NotificationCheck = "NotificationCheck";
 
     public const string SenderScope = "altinn:broker.write";
     public const string RecipientScope = "altinn:broker.read";
     public const string ServiceOwnerScope = "altinn:serviceowner";
     public const string MaintenanceScope = "altinn:broker.maintenance";
-    public const string NotificationCheckScope = "altinn:system/notifications.condition.check";
 }

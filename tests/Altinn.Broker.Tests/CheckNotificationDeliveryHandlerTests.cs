@@ -217,20 +217,4 @@ public class CheckNotificationDeliveryHandlerTests
         repository.Verify(r => r.UpdateNotificationSent(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Empty(capturedJobs);
     }
-
-    [Fact]
-    public async Task Process_WhenSendConditionWasNotMet_StopsPollingWithoutMarkingAnythingSent()
-    {
-        var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
-        var notification = CreateNotification();
-        repository.Setup(r => r.GetNotificationById(notification.Id, It.IsAny<CancellationToken>())).ReturnsAsync(notification);
-        notificationService
-            .Setup(s => s.GetNotificationDetailsV2(notification.ShipmentId!.Value.ToString(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateStatusResponse("Order_SendConditionNotMet", []));
-
-        await handler.Process(notification.Id, CancellationToken.None);
-
-        Assert.Empty(capturedJobs);
-        repository.Verify(r => r.UpdateNotificationSent(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
 }
