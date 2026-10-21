@@ -116,7 +116,7 @@ public class CreateNotificationOrderHandler(
 
         if (notificationRequest.CustomRecipients is { Count: > 0 })
         {
-            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, recipient)));
+            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, NormalizeCustomRecipient(recipient))));
             // Custom recipient organization number - disabled for now. When re-enabled, skip one that is itself a file
             // transfer recipient, since it already gets the regular notification:
             // var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
@@ -204,6 +204,18 @@ public class CreateNotificationOrderHandler(
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return recipient.MobileNumber;
         throw new InvalidOperationException("Recipient must have exactly one identifier");
     }
+
+    /// <summary>
+    /// The custom recipient in the one form it is stored, sent and compared in, however it was written: email addresses
+    /// in lowercase, since the same address in different case reaches the same inbox, and mobile numbers as
+    /// <see cref="MobileNumberHelper.Normalize"/> gives them. Copies are then notified only once.
+    /// </summary>
+    private static Recipient NormalizeCustomRecipient(Recipient recipient) => new()
+    {
+        EmailAddress = recipient.EmailAddress?.ToLowerInvariant(),
+        MobileNumber = string.IsNullOrEmpty(recipient.MobileNumber) ? recipient.MobileNumber : MobileNumberHelper.Normalize(recipient.MobileNumber),
+        RelatedOrganizationNumber = recipient.RelatedOrganizationNumber
+    };
 
     private static string BuildRecipientKey(Recipient recipient) =>
         string.IsNullOrEmpty(recipient.RelatedOrganizationNumber)
