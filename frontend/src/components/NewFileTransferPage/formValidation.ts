@@ -142,12 +142,45 @@ export function validateCustomRecipientRows(
   entries: CustomRecipientEntry[],
   recipients: string[],
 ): CustomRecipientRowError[] {
-  return entries.map((entry) => ({
-    identifier: customRecipientIdentifierError(entry.identifier),
-    relatedOrganization: recipients.includes(entry.relatedOrganizationNumber)
+  const seen = new Set<string>()
+  return entries.map((entry) => {
+    const identifier = customRecipientIdentifierError(entry.identifier)
+    const relatedOrganization = recipients.includes(entry.relatedOrganizationNumber)
       ? undefined
-      : 'Velg hvilken mottaker varselet gjelder.',
-  }))
+      : 'Velg hvilken mottaker varselet gjelder.'
+    if (identifier || relatedOrganization) {
+      return { identifier, relatedOrganization }
+    }
+
+    const key = customRecipientKey(entry)
+    if (seen.has(key)) {
+      return { identifier: duplicateCustomRecipientError(entry.identifier) }
+    }
+    seen.add(key)
+    return {}
+  })
+}
+
+/**
+ * Compared as the API would receive them: mobile numbers in their normalised +… form, and email addresses without
+ * regard to case, since the same address in different case reaches the same inbox.
+ */
+function customRecipientKey(entry: CustomRecipientEntry): string {
+  const recognised = toCustomRecipientIdentifier(entry.identifier)
+  let identifier = entry.identifier.trim()
+  if (recognised && 'emailAddress' in recognised) {
+    identifier = `email:${recognised.emailAddress.toLowerCase()}`
+  } else if (recognised && 'mobileNumber' in recognised) {
+    identifier = `mobile:${recognised.mobileNumber}`
+  }
+  return `${identifier}|${entry.relatedOrganizationNumber}`
+}
+
+function duplicateCustomRecipientError(identifier: string): string {
+  const recognised = toCustomRecipientIdentifier(identifier)
+  return recognised && 'mobileNumber' in recognised
+    ? 'Dette mobilnummeret er allerede lagt til for samme mottaker.'
+    : 'Denne e-postadressen er allerede lagt til for samme mottaker.'
 }
 
 function customRecipientIdentifierError(identifier: string): string | undefined {
