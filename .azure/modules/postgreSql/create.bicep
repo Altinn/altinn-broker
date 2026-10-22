@@ -51,7 +51,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   }
   sku: {
     name: environment == 'test'
-    ? 'Standard_B1ms'
+    ? 'Standard_B2s'
     : environment == 'production' ? 'Standard_E8ds_v5' : 'Standard_D2ds_v5'
     tier: environment == 'test' 
     ? 'Burstable' 
@@ -83,7 +83,7 @@ resource maxConnectionsConfiguration 'Microsoft.DBforPostgreSQL/flexibleServers/
   parent: postgres
   dependsOn: [database, configurations]
   properties: {
-    value: prodLikeEnvironment ? '550' : '50'
+    value: prodLikeEnvironment ? '550' : '400'
     source: 'user-override'
   }
 }
