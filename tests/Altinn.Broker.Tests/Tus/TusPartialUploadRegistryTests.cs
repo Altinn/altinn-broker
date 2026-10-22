@@ -1,6 +1,11 @@
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Integrations.Tus;
 
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Internal;
+using Microsoft.Extensions.Options;
+
 using Xunit;
 
 namespace Altinn.Broker.Tests.Tus;
@@ -161,6 +166,25 @@ public class TusPartialUploadRegistryTests
     }
 
     [Fact]
+    public async Task GetPartialUploadsAsync_PartialStillInUseAfterADay_IsListed()
+    {
+        var clock = new ManualClock();
+        var registry = new TusPartialUploadRegistry(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions { Clock = clock })));
+        var fileTransferId = Guid.Parse(FileTransferId);
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+
+        // BrokerTusStore registers the partial again on each request to it
+        clock.UtcNow += TimeSpan.FromHours(23);
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+        clock.UtcNow += TimeSpan.FromHours(2);
+
+        var partialUploads = await registry.GetPartialUploadsAsync(fileTransferId, CancellationToken.None);
+
+        Assert.Equal([new TusPartialUpload("partial-a", 1024)], partialUploads);
+    }
+
+    [Fact]
     public async Task GetPartialUploadsAsync_FileTransferWithoutPartials_ReturnsEmptyList()
     {
         await using var scope = TestHybridCacheFactory.CreateScope();
@@ -169,5 +193,10 @@ public class TusPartialUploadRegistryTests
         var partialUploads = await registry.GetPartialUploadsAsync(Guid.Parse(FileTransferId), CancellationToken.None);
 
         Assert.Empty(partialUploads);
+    }
+
+    private sealed class ManualClock : ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
     }
 }

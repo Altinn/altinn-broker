@@ -110,6 +110,10 @@ public sealed class TusPartialUploadRegistry(
     {
         var existing = await TryGetPartialInfoAsync(partialFileId, cancellationToken);
         var partialIndex = existing?.PartialIndex ?? await AllocatePartialIndexAsync(fileTransferId, cancellationToken);
+        if (existing is not null)
+        {
+            await RefreshPartialIndexCounterAsync(fileTransferId, cancellationToken);
+        }
         await SetCachedValueAsync(
             PartialInfoKey(partialFileId),
             JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex), JsonOptions),
@@ -366,6 +370,23 @@ public sealed class TusPartialUploadRegistry(
         var next = current is null ? 0 : int.Parse(current) + 1;
         await SetCachedValueAsync(key, next.ToString(), cancellationToken);
         return next;
+    }
+
+    // GetPartialUploadsAsync reads the counter, so it has to last as long as the partial uploads do
+    private async Task RefreshPartialIndexCounterAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var key = PartialIndexCounterKey(fileTransferId);
+        if (_database is not null)
+        {
+            await _database.KeyExpireAsync(key, CacheExpiration);
+            return;
+        }
+
+        var lastIndex = await distributedCache.GetStringAsync(key, cancellationToken);
+        if (lastIndex is not null)
+        {
+            await SetCachedValueAsync(key, lastIndex, cancellationToken);
+        }
     }
 
     private async Task<int> GetAllocatedPartialCountAsync(Guid fileTransferId, CancellationToken cancellationToken)
