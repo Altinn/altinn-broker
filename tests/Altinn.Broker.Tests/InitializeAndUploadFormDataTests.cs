@@ -188,6 +188,11 @@ public class InitializeAndUploadFormDataTests : IClassFixture<CustomWebApplicati
             multipart.Add(new StringContent(metadata.Checksum), "Metadata.Checksum");
         }
 
+        if (metadata.ChecksumAlgorithm != ChecksumAlgorithmExt.MD5)
+        {
+            multipart.Add(new StringContent(metadata.ChecksumAlgorithm.ToString()), "Metadata.ChecksumAlgorithm");
+        }
+
         // Add file
         var fileBytes = Encoding.UTF8.GetBytes(fileContent);
         var fileContentBytes = new ByteArrayContent(fileBytes);

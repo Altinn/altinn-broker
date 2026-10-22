@@ -7,9 +7,10 @@ public class Recipient
 
     public string? MobileNumber { get; set; }
 
+    /// <summary>
+    /// The file transfer's own recipients. Custom recipients identified by organization number are disabled for now.
+    /// </summary>
     public string? OrganizationNumber { get; set; }
-
-    public string? NationalIdentityNumber { get; set; }
 
     /// <summary>
     /// For custom recipients only: the file transfer recipient (organization number) this notification is about.

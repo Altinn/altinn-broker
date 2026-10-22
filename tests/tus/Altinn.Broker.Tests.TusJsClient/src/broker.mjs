@@ -2,7 +2,7 @@ function formatPartyId(orgNumber) {
   return orgNumber.includes(':') ? orgNumber : `0192:${orgNumber}`;
 }
 
-function buildInitializePayload(orgNumber, resourceId) {
+function buildInitializePayload(orgNumber, resourceId, checksumAlgorithm) {
   return {
     resourceId,
     fileName: 'input.txt',
@@ -11,10 +11,11 @@ function buildInitializePayload(orgNumber, resourceId) {
     sender: formatPartyId(orgNumber),
     sendersFileTransferReference: 'test-data',
     disableVirusScan: true,
+    checksumAlgorithm,
   };
 }
 
-export async function initializeFileTransfer(baseUrl, token, orgNumber, resourceId) {
+export async function initializeFileTransfer(baseUrl, token, orgNumber, resourceId, checksumAlgorithm) {
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/broker/api/v1/filetransfer`, {
     method: 'POST',
     headers: {
@@ -22,7 +23,7 @@ export async function initializeFileTransfer(baseUrl, token, orgNumber, resource
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(buildInitializePayload(orgNumber, resourceId)),
+    body: JSON.stringify(buildInitializePayload(orgNumber, resourceId, checksumAlgorithm)),
   });
 
   const body = await response.text();

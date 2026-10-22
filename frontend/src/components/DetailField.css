@@ -8,6 +8,7 @@ ul.data-list {
 }
 
 ul.data-list li.data-list-item {
+  overflow-wrap: anywhere;
   --dsc-item-my: 0;
   --dsc-item-px: 1.5rem;
   --dsc-item-py: 1rem;

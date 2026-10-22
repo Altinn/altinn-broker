@@ -5,15 +5,21 @@ import {
   ErrorSummary,
   Heading,
   Paragraph,
+  Field,
   Spinner,
+  Switch,
   Textfield,
+  Checkbox,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
+import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
+import { CustomRecipientsFields } from '../components/NewFileTransferPage/CustomRecipientsFields'
 import { MetadataFields } from '../components/NewFileTransferPage/MetadataFields'
+import { NotificationFields } from '../components/NewFileTransferPage/NotificationFields'
 import { PartyField } from '../components/NewFileTransferPage/PartyField'
 import { RecipientsField } from '../components/NewFileTransferPage/RecipientsField'
 import { UploadFile } from '../components/NewFileTransferPage/UploadFile'
@@ -135,7 +141,9 @@ function NewFileTransferPageContent() {
 
   // The metadata summary entry points at the row input that failed instead of the entire metadata field.
   const metadataErrorTargetId = (field: NewFileTransferField) =>
-    (field === 'metadata' ? form.metadataErrorInputId : undefined) ?? fieldId(field)
+    (field === 'metadata' ? form.metadataErrorInputId : undefined) ??
+    (field === 'customRecipients' ? form.customRecipientErrorInputId : undefined) ??
+    fieldId(field)
 
   return (
     <DialogLayout
@@ -206,6 +214,33 @@ function NewFileTransferPageContent() {
                 rowErrors={form.metadataRowErrors}
                 onChange={(metadata) => setValue('metadata', metadata)}
               />
+              <Checkbox
+                id={fieldId('notifications')}
+                label="Varsle mottakere"
+                checked={values.notifications}
+                onChange={(event) => setValue('notifications', event.target.checked)}
+              />
+              {values.notifications && (
+                <>
+                  <NotificationFields
+                    sendReminder={values.sendReminder}
+                    onSendReminderChange={(sendReminder) => setValue('sendReminder', sendReminder)}
+                  />
+                  <CustomRecipientsFields
+                    id={fieldId('customRecipients')}
+                    enabled={values.customRecipientsEnabled}
+                    entries={values.customRecipients}
+                    rowErrors={form.customRecipientRowErrors}
+                    error={errors.customRecipients}
+                    relatedOrganizations={values.recipients.map((organizationNumber) => ({
+                      organizationNumber,
+                      name: form.rules.options.find((option) => option.organizationNumber === organizationNumber)?.name,
+                    }))}
+                    onEnabledChange={(enabled) => setValue('customRecipientsEnabled', enabled)}
+                    onChange={(customRecipients) => setValue('customRecipients', customRecipients)}
+                  />
+                </>
+              )}
             </fieldset>
 
             {form.interrupted && (
@@ -225,6 +260,26 @@ function NewFileTransferPageContent() {
             />
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
+              <Field>
+                <Switch
+                  id={fieldId('checksumEnabled')}
+                  label="Valider sjekksum"
+                  checked={values.checksumEnabled}
+                  onChange={(event) => setValue('checksumEnabled', event.target.checked)}
+                />
+                <Field.Description>
+                  Sjekksummen beregnes når filen er lastet opp.
+                </Field.Description>
+              </Field>
+              {values.checksumEnabled && (
+                <ChecksumFields
+                  algorithm={values.checksumAlgorithm}
+                  checksum={values.checksum}
+                  error={errors.checksum}
+                  onAlgorithmChange={(checksumAlgorithm) => setValue('checksumAlgorithm', checksumAlgorithm)}
+                  onChecksumChange={(checksum) => setValue('checksum', checksum)}
+                />
+              )}
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}

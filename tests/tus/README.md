@@ -26,6 +26,7 @@ All three clients share the same environment variables and defaults:
 | `TUS_PARALLEL_PARTIAL_UPLOADS` | no | `4` |
 | `GIGABYTES_TO_UPLOAD` | no | **64 MiB** smoke-test size when unset |
 | `UPLOAD_FILE_PATH` | no | — (use with `generate-file.ps1`; ignores `GIGABYTES_TO_UPLOAD`) |
+| `CHECKSUM_ALGORITHM` | no | `SHA256` | `MD5` or `SHA256`. Sent on initialize. The checksum value is omitted, so Broker computes it after upload. |
 
 \* Provide `CLIENT_PEM_FILE` for local runs, or `CLIENT_PEM` with the PEM file **base64-encoded** (`.NET` LargeFile only — for Azure Container Apps and similar).
 

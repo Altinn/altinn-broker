@@ -9,6 +9,19 @@ export type FileTransferSummary = {
   sender: string
   isSender: boolean
   recipients: string[]
+  expirationTime: string
+  fileTransferStatus?:
+    | 'Initialized'
+    | 'UploadStarted'
+    | 'UploadProcessing'
+    | 'Published'
+    | 'Cancelled'
+    | 'AllConfirmedDownloaded'
+    | 'Purged'
+    | 'Failed'
+    | null
+  /** The viewer's own status as a recipient. Null when the viewer is not a recipient. */
+  actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
 }
 
 /** One page of summaries, and how to continue past it. */

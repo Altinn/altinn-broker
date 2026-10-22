@@ -40,6 +40,7 @@ internal static class TusConcatDestinationStorage
             return null;
         }
 
+        // Creation order (partial index, then chunk). Destination commit reorders by Upload-Concat.
         var orderedBlocks = uncommittedBlocks
             .Select(block => new { Block = block, Index = TusBlockIds.TryParseSortableIndex(block.Name) })
             .Where(entry => entry.Index.HasValue)
@@ -51,9 +52,10 @@ internal static class TusConcatDestinationStorage
         }
 
         var blockIds = orderedBlocks.Select(entry => entry.Block.Name).ToList();
-        var totalLength = orderedBlocks.Sum(entry => entry.Block.SizeLong);
+        var blockLengths = orderedBlocks.Select(entry => entry.Block.SizeLong).ToList();
+        var totalLength = blockLengths.Sum();
         var nextBlockIndex = orderedBlocks[^1].Index!.Value + 1;
-        return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex);
+        return new TusStagedBlocksSnapshot(totalLength, blockIds, nextBlockIndex, blockLengths);
     }
 
     public static async Task SetUploadLengthMetadataAsync(

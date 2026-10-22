@@ -3,7 +3,6 @@ using System.Transactions;
 
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Common;
-using Altinn.Broker.Common.Constants;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
@@ -84,7 +83,7 @@ public class CreateNotificationOrderHandler(
                 CustomRecipientIdentifier = customRecipientIdentifier,
                 CustomRecipientRelatedOrganization = actorId is null ? relatedOrganizationNumber?.WithPrefix() : null,
                 NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
-                NotificationChannel = notificationRequest.NotificationChannel,
+                NotificationChannel = NotificationChannel.EmailPreferred,
                 RequestedSendTime = requestedSendTime,
                 Created = DateTimeOffset.UtcNow,
                 IsReminder = false,
@@ -114,10 +113,11 @@ public class CreateNotificationOrderHandler(
 
         if (notificationRequest.CustomRecipients is { Count: > 0 })
         {
-            var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
-            resolved.AddRange(notificationRequest.CustomRecipients
-                .Where(recipient => string.IsNullOrEmpty(recipient.OrganizationNumber) || !fileTransferRecipients.Contains(recipient.OrganizationNumber.WithoutPrefix()))
-                .Select(recipient => ((long?)null, recipient)));
+            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, recipient)));
+            // Custom recipient organization number - disabled for now. When re-enabled, skip one that is itself a file
+            // transfer recipient, since it already gets the regular notification:
+            // var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
+            // .Where(recipient => string.IsNullOrEmpty(recipient.OrganizationNumber) || !fileTransferRecipients.Contains(recipient.OrganizationNumber.WithoutPrefix()))
         }
 
         return resolved
@@ -187,8 +187,8 @@ public class CreateNotificationOrderHandler(
 
     private static (CustomRecipientType? Type, string? Identifier) DescribeCustomRecipient(Recipient recipient)
     {
-        if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return (CustomRecipientType.Organization, BuildActorExternalId(recipient));
-        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return (CustomRecipientType.Person, BuildActorExternalId(recipient));
+        // Custom recipient organization number - disabled for now.
+        // if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return (CustomRecipientType.Organization, BuildActorExternalId(recipient));
         if (!string.IsNullOrEmpty(recipient.EmailAddress)) return (CustomRecipientType.Email, recipient.EmailAddress);
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return (CustomRecipientType.MobileNumber, recipient.MobileNumber);
         throw new InvalidOperationException("Recipient must have exactly one identifier");
@@ -197,7 +197,6 @@ public class CreateNotificationOrderHandler(
     private static string BuildActorExternalId(Recipient recipient)
     {
         if (!string.IsNullOrEmpty(recipient.OrganizationNumber)) return recipient.OrganizationNumber.WithoutPrefix().WithPrefix();
-        if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber)) return $"{UrnConstants.PersonIdAttribute}:{recipient.NationalIdentityNumber.WithoutPrefix()}";
         if (!string.IsNullOrEmpty(recipient.EmailAddress)) return recipient.EmailAddress;
         if (!string.IsNullOrEmpty(recipient.MobileNumber)) return recipient.MobileNumber;
         throw new InvalidOperationException("Recipient must have exactly one identifier");
@@ -226,7 +225,7 @@ public class CreateNotificationOrderHandler(
             SendersReference = $"bro-{sendersReference}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
             IdempotencyId = notificationId,
-            Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: false)
+            Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailPreferred, resolvedText, tokens, isReminder: false)
         };
 
         if (notificationRequest.SendReminder)
@@ -237,7 +236,7 @@ public class CreateNotificationOrderHandler(
                 {
                     SendersReference = $"bro-{sendersReference}",
                     DelayDays = ReminderDelayDays,
-                    Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: true)
+                    Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailAndSms, resolvedText, tokens, isReminder: true)
                 }
             ];
         }
@@ -256,13 +255,12 @@ public class CreateNotificationOrderHandler(
     private static RecipientV2 CreateRecipientV2(
         string resourceId,
         Recipient recipient,
-        NotificationRequest notificationRequest,
+        NotificationChannel notificationChannel,
         ResolvedNotificationText resolvedText,
         OrderTokenValues tokens,
         bool isReminder)
     {
         var resourceIdWithPrefix = $"urn:altinn:resource:{resourceId}";
-        var channel = notificationRequest.NotificationChannel;
         var emailSubject = ApplyTokens(isReminder ? resolvedText.ReminderEmailSubject : resolvedText.EmailSubject, tokens);
         var emailBody = ApplyTokens(isReminder ? resolvedText.ReminderEmailBody : resolvedText.EmailBody, tokens);
         var smsBody = ApplyTokens(isReminder ? resolvedText.ReminderSmsBody : resolvedText.SmsBody, tokens);
@@ -282,21 +280,7 @@ public class CreateNotificationOrderHandler(
                 {
                     OrgNumber = recipient.OrganizationNumber,
                     ResourceId = resourceIdWithPrefix,
-                    ChannelSchema = channel,
-                    EmailSettings = emailSettings,
-                    SmsSettings = smsSettings
-                }
-            };
-        }
-        else if (!string.IsNullOrEmpty(recipient.NationalIdentityNumber))
-        {
-            return new RecipientV2
-            {
-                RecipientPerson = new RecipientPerson
-                {
-                    NationalIdentityNumber = recipient.NationalIdentityNumber.WithoutPrefix(),
-                    ResourceId = resourceIdWithPrefix,
-                    ChannelSchema = channel,
+                    ChannelSchema = notificationChannel,
                     EmailSettings = emailSettings,
                     SmsSettings = smsSettings
                 }

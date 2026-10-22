@@ -20,7 +20,7 @@ public class AltinnTokenEventsHelper
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(nameof(AltinnTokenEventsHelper));
 
-        var sessionHelper = context.HttpContext.RequestServices.GetService<TusUploadSessionAuthenticationHelper>();
+        var sessionHelper = context.HttpContext.RequestServices.GetService<ITusUploadSessionAuthenticationHelper>();
         if (sessionHelper is null)
         {
             logger.LogWarning(

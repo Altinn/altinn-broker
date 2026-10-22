@@ -13,4 +13,13 @@ public interface IIdPortenTokenRefreshService
     /// Returns null when the token is spent, revoked, or ID-Porten is unavailable.
     /// </summary>
     Task<IdPortenTokens?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns rotated tokens if a recent refresh of <paramref name="refreshToken"/> is already
+    /// cached. Does not call ID-Porten. Used when writing the auth cookie so a long-lived request
+    /// cannot Set-Cookie a spent refresh token over a newer session.
+    /// </summary>
+    Task<IdPortenTokens?> GetCachedRotationAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default);
 }

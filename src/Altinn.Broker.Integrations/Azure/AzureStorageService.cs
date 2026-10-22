@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 
@@ -149,7 +150,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             var networkReadBuffer = new byte[1024 * 1024];
             var blockList = new List<string>();
             long position = 0;
-            using var blobMd5 = MD5.Create();
+            using var fileHash = ChecksumHasher.Create(fileTransferEntity.ChecksumAlgorithm);
             var createdBlobByThisAttempt = false;
 
             var uploadTasks = new List<Task>();
@@ -162,7 +163,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 accumulationBuffer.Position = 0;
                 var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                 byte[] blockData = accumulationBuffer.ToArray();
-                blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
+                fileHash.TransformBlock(blockData, 0, blockData.Length, null, 0);
                 blockList.Add(blockId);
                 accumulationBuffer.SetLength(0);
 
@@ -218,9 +219,9 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             if (uploadTasks.Count > 0)
                 await Task.WhenAll(uploadTasks);
 
-            blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            if (blobMd5.Hash is null)
-                throw new Exception("Failed to calculate MD5 hash of uploaded file");
+            fileHash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            if (fileHash.Hash is null)
+                throw new Exception($"Failed to calculate {fileTransferEntity.ChecksumAlgorithm} hash of uploaded file");
 
             var isFirstCommitForFinalCall = !createdBlobByThisAttempt;
             await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForFinalCall, null, cancellationToken);
@@ -229,7 +230,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            return (BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant(), position);
+            return (ChecksumHasher.ToLowerHex(fileHash.Hash), position);
         }
         catch (Exception ex)
         {
@@ -539,12 +540,32 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
+        if (fileTransferEntity.ChecksumAlgorithm == ChecksumAlgorithm.SHA256)
+        {
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in properties.Value.Metadata)
+            {
+                metadata[entry.Key] = entry.Value;
+            }
+
+            metadata[AzureStorageConstants.Sha256ChecksumMetadataKey] = fileTransferEntity.Checksum;
+            await blobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
+            await blobClient.SetHttpHeadersAsync(
+                new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream"
+                },
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         BlobHttpHeaders headers = new BlobHttpHeaders
         {
-            ContentType = "application/octet-stream", // Set appropriate content type
+            ContentType = "application/octet-stream",
             ContentHash = HexStringToByteArray(fileTransferEntity.Checksum)
         };
-        await blobClient.SetHttpHeadersAsync(headers);
+        await blobClient.SetHttpHeadersAsync(headers, cancellationToken: cancellationToken);
     }
 
     public async Task<string?> ComputeFileChecksumAsync(
@@ -564,8 +585,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         if (!layout.IsStriped)
         {
             await using var contentStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
-            var singleBlobHash = await MD5.HashDataAsync(contentStream, cancellationToken);
-            return BitConverter.ToString(singleBlobHash).Replace("-", "").ToLowerInvariant();
+            return await ChecksumHasher.ComputeAsync(contentStream, fileTransferEntity.ChecksumAlgorithm, cancellationToken);
         }
 
         await using var stripedStream = new StripedReadStream(
@@ -574,8 +594,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             (stripeIndex, offsetWithinStripe, length, ct) =>
                 OpenStripe(blobContainerClient, fileTransferEntity.FileTransferId, stripeIndex, offsetWithinStripe, length, ct),
             logger);
-        var hash = await MD5.HashDataAsync(stripedStream, cancellationToken);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        return await ChecksumHasher.ComputeAsync(stripedStream, fileTransferEntity.ChecksumAlgorithm, cancellationToken);
     }
 
     private static byte[] HexStringToByteArray(string hex)

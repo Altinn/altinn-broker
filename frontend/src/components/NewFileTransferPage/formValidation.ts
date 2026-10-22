@@ -1,6 +1,8 @@
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import {
+  toCustomRecipientIdentifier,
+  type CustomRecipientEntry,
   type MetadataEntry,
   type NewFileTransferErrors,
   type NewFileTransferValues,
@@ -25,6 +27,10 @@ export function validate(
     recipients: validateRecipients(values.recipients, rules),
     metadata: validateMetadata(values.metadata),
     file: validateFile(values.file, maxFileSize),
+    checksum: values.checksumEnabled
+      ? validateChecksum(values.checksum, values.checksumAlgorithm)
+      : undefined,
+    customRecipients: validateCustomRecipients(values),
   }
 }
 
@@ -123,6 +129,70 @@ function validateMetadata(metadata: MetadataEntry[]): string | undefined {
   }
   const failed = validateMetadataRows(metadata).find((row) => row.key ?? row.value)
   return failed?.key ?? failed?.value
+}
+
+export type CustomRecipientRowError = {
+  identifier?: string
+  relatedOrganization?: string
+}
+
+/** Rows only count while they are switched on and notifications are wanted at all. */
+export function customRecipientsInUse(values: NewFileTransferValues): boolean {
+  return values.notifications && values.customRecipientsEnabled
+}
+
+export function validateCustomRecipientRows(
+  entries: CustomRecipientEntry[],
+  recipients: string[],
+): CustomRecipientRowError[] {
+  return entries.map((entry) => ({
+    identifier: customRecipientIdentifierError(entry.identifier),
+    relatedOrganization: recipients.includes(entry.relatedOrganizationNumber)
+      ? undefined
+      : 'Velg hvilken mottaker varselet gjelder.',
+  }))
+}
+
+function customRecipientIdentifierError(identifier: string): string | undefined {
+  if (!identifier.trim()) {
+    return 'Fyll ut hvem som skal varsles.'
+  }
+  if (!toCustomRecipientIdentifier(identifier)) {
+    return 'Oppgi en e-postadresse eller et mobilnummer.'
+  }
+  return undefined
+}
+
+/** Summarises the rows for the error summary; the rows themselves carry the message the user acts on. */
+function validateCustomRecipients(values: NewFileTransferValues): string | undefined {
+  if (!customRecipientsInUse(values)) {
+    return undefined
+  }
+  if (values.customRecipients.length === 0) {
+    return 'Legg til minst én som skal varsles, eller slå av varsling av andre.'
+  }
+  const failed = validateCustomRecipientRows(values.customRecipients, values.recipients).find(
+    (row) => row.identifier ?? row.relatedOrganization,
+  )
+  return failed?.identifier ?? failed?.relatedOrganization
+}
+
+const CHECKSUM_LENGTH = { MD5: 32, SHA256: 64 } as const
+
+function validateChecksum(checksum: string, algorithm: keyof typeof CHECKSUM_LENGTH): string | undefined {
+  const value = checksum.trim()
+  if (!value) {
+    return undefined
+  }
+
+  const expectedLength = CHECKSUM_LENGTH[algorithm]
+  if (value.length !== expectedLength) {
+    return `En ${algorithm}-sjekksum er ${expectedLength} tegn.`
+  }
+  if (value.toLowerCase() !== value) {
+    return 'Sjekksummen må skrives med små bokstaver.'
+  }
+  return undefined
 }
 
 function validateFile(file: File | null, maxFileSize: number | null): string | undefined {

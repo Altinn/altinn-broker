@@ -1,5 +1,5 @@
 import { readSessionItem, removeSessionItem, writeSessionItem } from '../../helpers/sessionStorageHelper'
-import type { NewFileTransferValues } from './formFields'
+import { emptyValues, type NewFileTransferValues } from './formFields'
 
 // Saves, reads and clears the session's copy of what has been typed into the form. The chosen
 // file is not part of it: a File cannot be serialised.
@@ -33,7 +33,8 @@ function readStored(key: string): NewFileTransferValues | undefined {
   if (!stored) {
     return undefined
   }
-  const restored = { ...stored, file: null }
+  // A draft stored before a field existed lacks it, so the defaults fill in what is missing.
+  const restored = { ...emptyValues(), ...stored, file: null }
   drafts.set(key, restored)
   return restored
 }
@@ -44,7 +45,14 @@ function writeStored(key: string, values: NewFileTransferValues): void {
     reference: values.reference,
     recipients: values.recipients,
     metadata: values.metadata,
+    checksumEnabled: values.checksumEnabled,
+    checksumAlgorithm: values.checksumAlgorithm,
+    checksum: values.checksum,
     virusScan: values.virusScan,
+    notifications: values.notifications,
+    sendReminder: values.sendReminder,
+    customRecipientsEnabled: values.customRecipientsEnabled,
+    customRecipients: values.customRecipients,
   }
   writeSessionItem(STORAGE_PREFIX + key, stored)
 }

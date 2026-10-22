@@ -636,6 +636,7 @@ public class BrokerTusStore(
 
             previousPartialIndex = partialInfo.Value.PartialIndex;
             await EnsurePartialReadyForConcatenationAsync(partialFileId, partialLength, cancellationToken);
+            // Each Upload-Concat occurrence contributes its bytes, including a repeated partial.
             totalLength += partialLength;
         }
 

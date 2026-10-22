@@ -7,7 +7,7 @@ def _format_party_id(org_number: str) -> str:
     return org_number if ":" in org_number else f"0192:{org_number}"
 
 
-def _build_initialize_payload(org_number: str, resource_id: str) -> dict:
+def _build_initialize_payload(org_number: str, resource_id: str, checksum_algorithm: str) -> dict:
     return {
         "resourceId": resource_id,
         "fileName": "input.txt",
@@ -16,11 +16,12 @@ def _build_initialize_payload(org_number: str, resource_id: str) -> dict:
         "sender": _format_party_id(org_number),
         "sendersFileTransferReference": "test-data",
         "disableVirusScan": True,
+        "checksumAlgorithm": checksum_algorithm,
     }
 
 
 def initialize_file_transfer(
-    base_url: str, token: str, org_number: str, resource_id: str
+    base_url: str, token: str, org_number: str, resource_id: str, checksum_algorithm: str
 ) -> str:
     response = requests.post(
         f"{base_url.rstrip('/')}/broker/api/v1/filetransfer",
@@ -29,7 +30,7 @@ def initialize_file_transfer(
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
-        json=_build_initialize_payload(org_number, resource_id),
+        json=_build_initialize_payload(org_number, resource_id, checksum_algorithm),
         timeout=60,
     )
     if not response.ok:

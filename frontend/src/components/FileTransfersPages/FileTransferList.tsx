@@ -3,6 +3,8 @@ import { Button, List } from '@altinn/altinn-components'
 import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
 import { FileTransferCard } from './FileTransferCard'
 import { FileTransferFilters } from './FileTransferFilters'
+import { getDeadlineProps } from '../../helpers/deadlineHelper'
+import { getFileTransferListStatus } from '../../helpers/fileTransferStatusHelper'
 import '../../pages/pages.css'
 import type { SelectedParty } from '../../parties/PartiesContext'
 
@@ -16,6 +18,8 @@ type FileTransferListProps = {
   currentOrg: SelectedParty
   fetchTransfers: FetchFileTransferPage
   toPath: (transferId: string) => string
+  /** A deadline only matters while the transfer can still be downloaded. */
+  showDeadline?: boolean
 }
 
 /**
@@ -31,6 +35,7 @@ export function FileTransferList({
   currentOrg,
   fetchTransfers,
   toPath,
+  showDeadline = false,
 }: FileTransferListProps) {
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
@@ -56,7 +61,7 @@ export function FileTransferList({
 
   return (
     <div className="page">
-      <h2 className="page-heading">{heading}</h2>
+      <h1 className="page-heading">{heading}</h1>
 
       <FileTransferFilters
         search={search}
@@ -79,19 +84,26 @@ export function FileTransferList({
       )}
 
       <List className="card-list">
-        {filtered.map((overview) => (
-          <li key={overview.fileTransferId}>
-            <FileTransferCard
-              resourceName={resourceName(overview.resourceId)}
-              isSender={overview.isSender}
-              sender={overview.sender}
-              recipients={overview.recipients}
-              currentActorName={currentOrg.name}
-              reference={overview.sendersFileTransferReference || overview.fileTransferId}
-              to={toPath(overview.fileTransferId)}
-            />
-          </li>
-        ))}
+        {filtered.map((overview) => {
+          const listStatus = getFileTransferListStatus(overview)
+          const waitingOnOthers = listStatus?.status.value !== 'requires-attention'
+          return (
+            <li key={overview.fileTransferId}>
+              <FileTransferCard
+                resourceName={resourceName(overview.resourceId)}
+                isSender={overview.isSender}
+                sender={overview.sender}
+                recipients={overview.recipients}
+                currentActorName={currentOrg.name}
+                reference={overview.sendersFileTransferReference || overview.fileTransferId}
+                status={listStatus?.status}
+                extendedStatusLabel={listStatus?.extendedStatusLabel}
+                deadline={showDeadline ? getDeadlineProps(overview.expirationTime, waitingOnOthers) : undefined}
+                to={toPath(overview.fileTransferId)}
+              />
+            </li>
+          )
+        })}
       </List>
 
       {hasNextPage && (

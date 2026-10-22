@@ -5,8 +5,9 @@ namespace Altinn.Broker.Core.Models.Enums;
 /// </summary>
 public enum CustomRecipientType
 {
-    Organization = 0,
-    Person = 1,
-    Email = 2,
-    MobileNumber = 3,
+    Email = 0,
+    MobileNumber = 1,
+
+    // Custom recipient organization number - disabled for now.
+    // Organization = 2,
 }

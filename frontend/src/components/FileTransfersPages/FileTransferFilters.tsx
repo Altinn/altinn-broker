@@ -1,5 +1,6 @@
-import { Search, Select } from '@digdir/designsystemet-react'
+import { Select } from '@digdir/designsystemet-react'
 import type { AuthorizedResource } from '../../api/resources'
+import { SearchField } from '../SearchField'
 
 type FileTransferFiltersProps = {
   search: string
@@ -18,21 +19,7 @@ export function FileTransferFilters({
 }: FileTransferFiltersProps) {
   return (
     <div className="filter-row">
-      <div className="field">
-        <label className="page-subheading" htmlFor="search">
-          Søk på referanse
-        </label>
-        <Search>
-          <Search.Input
-            id="search"
-            aria-label="Søk på referanse"
-            placeholder="Søk..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-          <Search.Clear onClick={() => onSearchChange('')} />
-        </Search>
-      </div>
+      <SearchField id="search" label="Søk på referanse" value={search} onChange={onSearchChange} />
 
       <div className="field">
         <label className="page-subheading" htmlFor="resource-filter">

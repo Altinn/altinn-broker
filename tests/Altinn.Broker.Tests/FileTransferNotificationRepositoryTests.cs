@@ -77,8 +77,6 @@ public class FileTransferNotificationRepositoryTests : IClassFixture<CustomWebAp
     }
 
     [Theory]
-    [InlineData(CustomRecipientType.Organization, "0192:123456789")]
-    [InlineData(CustomRecipientType.Person, "urn:altinn:person:identifier-no:01819012012")]
     [InlineData(CustomRecipientType.Email, "test@example.com")]
     [InlineData(CustomRecipientType.MobileNumber, "+4799999999")]
     public async Task AddNotification_WithCustomRecipient_RoundTripsTypeAndIdentifierWithoutActorId(CustomRecipientType type, string identifier)

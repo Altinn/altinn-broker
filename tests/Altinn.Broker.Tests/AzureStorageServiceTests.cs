@@ -1,6 +1,8 @@
+using System.Security.Cryptography;
 using System.Text;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Integrations.Azure;
 using Azure;
@@ -242,6 +244,41 @@ public class AzureStorageServiceTests
             BlobClient appendStagingBlobClient,
             CancellationToken cancellationToken)
             => throw new RequestFailedException(503, "Server busy");
+    }
+
+    [Theory]
+    [InlineData(ChecksumAlgorithm.MD5)]
+    [InlineData(ChecksumAlgorithm.SHA256)]
+    public async Task UploadFile_ComputesChecksumForSelectedAlgorithm(ChecksumAlgorithm algorithm)
+    {
+        var azureOptions = Options.Create(new AzureStorageOptions
+        {
+            BlockSize = 1024,
+            ConcurrentUploadThreads = 1,
+            BlocksBeforeCommit = 10
+        });
+        var reportOptions = Options.Create(new ReportStorageOptions
+        {
+            ConnectionString = "UseDevelopmentStorage=true"
+        });
+        var service = new TestAzureStorageService(
+            azureOptions,
+            reportOptions,
+            new Mock<IHostEnvironment>().Object,
+            new Mock<ILogger<AzureStorageService>>().Object);
+        var payload = Encoding.UTF8.GetBytes("checksum-bytes");
+        var fileTransfer = CreateDefaultFileTransfer();
+        fileTransfer.ChecksumAlgorithm = algorithm;
+        using var stream = new ChunkedStream(payload, payload.Length);
+
+        var result = await service.UploadFile(CreateDefaultServiceOwner(), fileTransfer, stream, CancellationToken.None);
+
+        var expectedHash = algorithm == ChecksumAlgorithm.SHA256
+            ? SHA256.HashData(payload)
+            : MD5.HashData(payload);
+        Assert.NotNull(result);
+        Assert.Equal(ChecksumHasher.ToLowerHex(expectedHash), result.Value.Checksum);
+        Assert.Equal(payload.Length, result.Value.Length);
     }
 
     private static ServiceOwnerEntity CreateDefaultServiceOwner() => new()

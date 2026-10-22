@@ -67,6 +67,12 @@
   width: fit-content;
 }
 
+.new-transfer__checksum-algorithms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-size-4);
+}
+
 .new-transfer__file {
   display: flex;
   align-items: center;

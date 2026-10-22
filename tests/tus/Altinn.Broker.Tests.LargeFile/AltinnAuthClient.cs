@@ -42,9 +42,10 @@ public static class AltinnAuthClient
         CancellationToken cancellationToken = default)
     {
         var maskinportenToken = await RequestMaskinportenTokenAsync(httpClient, options, cancellationToken);
+        var baseUrl = options.BaseUrl.TrimEnd('/') == "https://altinn-dev-api.azure-api.net" ? "https://platform.tt02.altinn.no" : options.BaseUrl;
         return await ExchangeMaskinportenTokenAsync(
             httpClient,
-            options.BaseUrl,
+            baseUrl,
             maskinportenToken,
             cancellationToken);
     }
