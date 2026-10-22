@@ -4,6 +4,7 @@ import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
 import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
+import { NotificationDetail } from './NotificationDetail'
 
 /** A missing checksum means Broker is still calculating it after upload. */
 function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
@@ -35,6 +36,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
           .map((recipient: RecipientDetail) => formatOrganizationDisplay(recipient.recipientName ?? recipient.recipient, recipient.recipient))
           .join(', ')}
       />
+      <NotificationDetail transferDetails={transferDetails} />
       <DetailField label="Opprettet" value={transferDetails.created} />
       <DetailField label="Opplastet" value={transferDetails.published} />
       <DetailField label="Nedlastingsfrist" value={transferDetails.expirationTime} />

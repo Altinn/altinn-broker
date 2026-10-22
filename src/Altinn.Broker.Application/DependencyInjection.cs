@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<GetActiveFileTransferDetailsHandler>();
         services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
         services.AddScoped<SendNotificationOrderHandler>();
+        services.AddScoped<StuckNotificationOrderHandler>();
         services.AddScoped<CheckNotificationDeliveryHandler>();
     }
 }
