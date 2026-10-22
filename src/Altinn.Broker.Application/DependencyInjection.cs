@@ -12,6 +12,7 @@ using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.GetPartialUploads;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.InitializeFileTransfer;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         services.AddSingleton<ITusFinalizeUploadEnqueuer, TusFinalizeUploadEnqueuer>();
         services.AddScoped<GetFileTransferOverviewHandler>();
         services.AddScoped<GetFileTransferDetailsHandler>();
+        services.AddScoped<GetPartialUploadsHandler>();
         services.AddScoped<DownloadFileHandler>();
         services.AddScoped<ConfirmDownloadHandler>();
         services.AddScoped<GetFileTransfersHandler>();

@@ -143,5 +143,6 @@ public static class DependencyInjection
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
         services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
         services.AddSingleton<ITusUploadKindResolver, TusUploadKindResolver>();
+        services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
     }
 }

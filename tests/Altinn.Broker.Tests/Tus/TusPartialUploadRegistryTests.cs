@@ -1,3 +1,4 @@
+using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Integrations.Tus;
 
 using Xunit;
@@ -105,5 +106,68 @@ public class TusPartialUploadRegistryTests
         Assert.NotNull(secondPartial);
         Assert.Equal(0, firstPartial.Value.PartialIndex);
         Assert.Equal(1, secondPartial.Value.PartialIndex);
+    }
+
+    [Fact]
+    public async Task GetPartialUploadsAsync_ListsTheFileTransfersPartialsInCreationOrder()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.Parse(FileTransferId);
+
+        await registry.RegisterPartialAsync("partial-b", fileTransferId, uploadLength: 2048, CancellationToken.None);
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+        await registry.RegisterPartialAsync("partial-other", Guid.NewGuid(), uploadLength: 512, CancellationToken.None);
+
+        var partialUploads = await registry.GetPartialUploadsAsync(fileTransferId, CancellationToken.None);
+
+        Assert.Equal(
+            [new TusPartialUpload("partial-b", 2048), new TusPartialUpload("partial-a", 1024)],
+            partialUploads);
+    }
+
+    [Fact]
+    public async Task GetPartialUploadsAsync_RegisteringAPartialAgain_KeepsItsPlace()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.Parse(FileTransferId);
+
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+        await registry.RegisterPartialAsync("partial-b", fileTransferId, uploadLength: 2048, CancellationToken.None);
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+
+        var partialUploads = await registry.GetPartialUploadsAsync(fileTransferId, CancellationToken.None);
+
+        Assert.Equal(
+            [new TusPartialUpload("partial-a", 1024), new TusPartialUpload("partial-b", 2048)],
+            partialUploads);
+    }
+
+    [Fact]
+    public async Task GetPartialUploadsAsync_LeavesOutRemovedPartials()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+        var fileTransferId = Guid.Parse(FileTransferId);
+
+        await registry.RegisterPartialAsync("partial-a", fileTransferId, uploadLength: 1024, CancellationToken.None);
+        await registry.RegisterPartialAsync("partial-b", fileTransferId, uploadLength: 2048, CancellationToken.None);
+        await registry.RemovePartialAsync("partial-a", CancellationToken.None);
+
+        var partialUploads = await registry.GetPartialUploadsAsync(fileTransferId, CancellationToken.None);
+
+        Assert.Equal([new TusPartialUpload("partial-b", 2048)], partialUploads);
+    }
+
+    [Fact]
+    public async Task GetPartialUploadsAsync_FileTransferWithoutPartials_ReturnsEmptyList()
+    {
+        await using var scope = TestHybridCacheFactory.CreateScope();
+        var registry = scope.CreatePartialUploadRegistry();
+
+        var partialUploads = await registry.GetPartialUploadsAsync(Guid.Parse(FileTransferId), CancellationToken.None);
+
+        Assert.Empty(partialUploads);
     }
 }

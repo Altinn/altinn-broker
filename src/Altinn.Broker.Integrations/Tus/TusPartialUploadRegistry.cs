@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using Altinn.Broker.Application.UploadFile.Tus;
+
 using Microsoft.Extensions.Caching.Distributed;
 
 using StackExchange.Redis;
@@ -30,6 +32,8 @@ public interface ITusPartialUploadRegistry
     Task<bool> IsPartialAsync(string fileId, CancellationToken cancellationToken);
 
     Task<Guid?> TryGetFileTransferIdAsync(string tusFileId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<TusPartialUpload>> GetPartialUploadsAsync(Guid fileTransferId, CancellationToken cancellationToken);
 
     Task RegisterFinalConcatAsync(string fileId, IReadOnlyList<string> partialFileIds, CancellationToken cancellationToken);
 
@@ -94,6 +98,8 @@ public sealed class TusPartialUploadRegistry(
 
     private static string PartialIndexCounterKey(Guid fileTransferId) => $"tus-partial-index:{fileTransferId:N}";
 
+    private static string PartialByIndexKey(Guid fileTransferId, int partialIndex) => $"tus-partial-by-index:{fileTransferId:N}:{partialIndex}";
+
     private static string NormalizeId(string fileId) => TusRouteHelper.NormalizePartialFileId(fileId);
 
     public async Task RegisterPartialAsync(
@@ -108,6 +114,7 @@ public sealed class TusPartialUploadRegistry(
             PartialInfoKey(partialFileId),
             JsonSerializer.Serialize(new PartialUploadInfoDto(fileTransferId, uploadLength, partialIndex), JsonOptions),
             cancellationToken);
+        await SetCachedValueAsync(PartialByIndexKey(fileTransferId, partialIndex), NormalizeId(partialFileId), cancellationToken);
         await RegisterUploadAsync(partialFileId, uploadLength, cancellationToken);
     }
 
@@ -142,6 +149,29 @@ public sealed class TusPartialUploadRegistry(
     {
         var partialInfo = await TryGetPartialInfoAsync(tusFileId, cancellationToken);
         return partialInfo?.FileTransferId;
+    }
+
+    public async Task<IReadOnlyList<TusPartialUpload>> GetPartialUploadsAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var partialUploads = new List<TusPartialUpload>();
+        var partialCount = await GetAllocatedPartialCountAsync(fileTransferId, cancellationToken);
+        for (var partialIndex = 0; partialIndex < partialCount; partialIndex++)
+        {
+            var partialFileId = await distributedCache.GetStringAsync(PartialByIndexKey(fileTransferId, partialIndex), cancellationToken);
+            if (string.IsNullOrWhiteSpace(partialFileId))
+            {
+                continue;
+            }
+
+            // A removed partial keeps its index entry until the entry expires
+            var partialInfo = await TryGetPartialInfoAsync(partialFileId, cancellationToken);
+            if (partialInfo?.FileTransferId == fileTransferId)
+            {
+                partialUploads.Add(new TusPartialUpload(partialFileId, partialInfo.Value.UploadLength));
+            }
+        }
+
+        return partialUploads;
     }
 
     public async Task RegisterFinalConcatAsync(
@@ -336,6 +366,21 @@ public sealed class TusPartialUploadRegistry(
         var next = current is null ? 0 : int.Parse(current) + 1;
         await SetCachedValueAsync(key, next.ToString(), cancellationToken);
         return next;
+    }
+
+    private async Task<int> GetAllocatedPartialCountAsync(Guid fileTransferId, CancellationToken cancellationToken)
+    {
+        var key = PartialIndexCounterKey(fileTransferId);
+        if (_database is not null)
+        {
+            // Redis holds the number of indexes handed out
+            var count = await _database.StringGetAsync(key);
+            return count.TryParse(out int value) ? value : 0;
+        }
+
+        // The cache holds the last index handed out
+        var lastIndex = await distributedCache.GetStringAsync(key, cancellationToken);
+        return int.TryParse(lastIndex, out var index) ? index + 1 : 0;
     }
 
     private sealed record PartialUploadInfoDto(Guid FileTransferId, long UploadLength, int PartialIndex = 0);
