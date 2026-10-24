@@ -4,7 +4,10 @@ using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+
+using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.Application.UploadFile.Tus;
 
@@ -12,7 +15,8 @@ public class TusUploadValidationService(
     IAuthorizationService authorizationService,
     IFileTransferRepository fileTransferRepository,
     IResourceRepository resourceRepository,
-    IServiceOwnerRepository serviceOwnerRepository)
+    IServiceOwnerRepository serviceOwnerRepository,
+    IOptions<AzureStorageOptions> azureStorageOptions)
 {
     public async Task<(FileTransferEntity FileTransfer, long? MaxUploadSize, Error? Error)> ValidateForUploadAsync(
         ClaimsPrincipal? user,
@@ -152,9 +156,14 @@ public class TusUploadValidationService(
         return null;
     }
 
+    /// <param name="singleUploadLength">
+    /// The length this one TUS upload declares, as opposed to the transfer total. Null when no new
+    /// upload is being created, as on a concatenation final request.
+    /// </param>
     public async Task<(long? MaxUploadSize, Error? Error)> ValidateUploadSizeAsync(
         Guid fileTransferId,
         long uploadLength,
+        long? singleUploadLength,
         CancellationToken cancellationToken)
     {
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
@@ -177,6 +186,13 @@ public class TusUploadValidationService(
         if (resource.MaxFileTransferSize is not null && uploadLength > resource.MaxFileTransferSize)
         {
             return (resource.MaxFileTransferSize, Errors.FileSizeTooBig);
+        }
+
+        if (singleUploadLength > StripeLayout.MaxPartialLength(
+                fileTransfer.StripeSizeBytes ?? 0,
+                azureStorageOptions.Value.MaxBlocksPerStripe))
+        {
+            return (resource.MaxFileTransferSize, Errors.PartialUploadTooLong);
         }
 
         return (resource.MaxFileTransferSize, null);

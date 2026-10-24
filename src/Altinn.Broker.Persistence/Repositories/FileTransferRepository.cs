@@ -1,4 +1,3 @@
-using System.Text;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -28,6 +27,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.created, 
                     f.file_location,
                     f.file_transfer_size,
+                    f.stripe_size_bytes,
                     f.expiration_time,
                     f.hangfire_job_id,
                     f.use_virus_scan,
@@ -101,6 +101,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                    StripeSizeBytes = reader.IsDBNull(reader.GetOrdinal("stripe_size_bytes")) ? null : reader.GetInt64(reader.GetOrdinal("stripe_size_bytes")),
                     Sender = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
@@ -176,7 +177,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, ChecksumAlgorithm checksumAlgorithm, bool useVirusScan, bool hasNotification, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, ChecksumAlgorithm checksumAlgorithm, bool useVirusScan, long stripeSizeBytes, bool hasNotification, CancellationToken cancellationToken = default)
     {
         long actorId;
         var actor = await actorRepository.GetActorAsync(senderExternalId, cancellationToken);
@@ -194,8 +195,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
         var fileTransferId = Guid.NewGuid();
         await using NpgsqlCommand command = dataSource.CreateCommand(
-            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, checksum_algorithm, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan, has_notification) " +
-            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @checksumAlgorithm, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan, @hasNotification)");
+            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, checksum_algorithm, file_transfer_size, stripe_size_bytes, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan, has_notification) " +
+            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @checksumAlgorithm, @fileTransferSize, @stripeSizeBytes, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan, @hasNotification)");
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@resourceId", resource.Id);
@@ -203,6 +204,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
         command.Parameters.AddWithValue("@checksumAlgorithm", checksumAlgorithm.ToString());
         command.Parameters.AddWithValue("@fileTransferSize", DBNull.Value);
+        command.Parameters.AddWithValue("@stripeSizeBytes", stripeSizeBytes);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
@@ -547,13 +549,14 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
+    public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, long? stripeSizeBytes, CancellationToken cancellationToken)
     {
         await using (var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "file_location = @fileLocation, " +
                 "file_transfer_size = @filesize, " +
+                "stripe_size_bytes = @stripeSizeBytes, " +
                 "storage_provider_id_fk = @storageProviderId " +
             "WHERE file_transfer_id_pk = @fileTransferId"))
         {
@@ -561,6 +564,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
             command.Parameters.AddWithValue("@filesize", filesize);
+            command.Parameters.AddWithValue("@stripeSizeBytes", stripeSizeBytes.HasValue ? stripeSizeBytes.Value : DBNull.Value);
             await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
         }
     }
