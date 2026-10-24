@@ -141,6 +141,63 @@ public class BrokerTusStoreConcatOrderTests
     }
 
     [Fact]
+    public async Task ProcessConcatChainStep_PrepareCommit_IgnoresARetriedBlockBeyondTheStripe()
+    {
+        const string fileId = "55555555-5555-5555-5555-555555555555";
+        const string partial = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var fileTransferId = Guid.Parse(fileId);
+        var chunk0 = TusBlockIds.BuildNamespacedBlockId(0, 0);
+        var chunk1 = TusBlockIds.BuildNamespacedBlockId(0, 1);
+        var retried = TusBlockIds.BuildNamespacedBlockId(0, 2);
+
+        _partialRegistry
+            .Setup(x => x.TryGetFinalConcatPartialIdsAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([partial]);
+        _partialRegistry
+            .Setup(x => x.TryGetPartialInfoAsync(partial, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PartialUploadInfo(fileTransferId, UploadLength: 256, PartialIndex: 0, BaseOffset: 0));
+        _partialRegistry
+            .Setup(x => x.TryGetUploadLengthAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(256L);
+        _partialRegistry
+            .Setup(x => x.TryGetConcatStatusAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TusConcatStatus.InProgress);
+
+        _storageResolver
+            .Setup(x => x.GetCommittedStripesAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommittedStripes(0, 0, []));
+        _storageResolver
+            .Setup(x => x.GetStripeBlobLengthAsync(fileId, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0L);
+        _storageResolver
+            .Setup(x => x.TryGetStripeStagedBlocksSnapshotAsync(fileId, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TusStagedBlocksSnapshot(320, [chunk0, chunk1, retried], 3, [128, 128, 64]));
+
+        TusConcatCheckpoint? saved = null;
+        _concatCheckpointStore
+            .Setup(x => x.TryGetCheckpointAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TusConcatCheckpoint(
+                NextStep: TusConcatChainStep.PrepareCommit,
+                ValidatedPartialCount: 1,
+                TotalValidatedLength: 256,
+                StripeSizeBytes: 256));
+        _concatCheckpointStore
+            .Setup(x => x.SaveCheckpointAsync(
+                fileId,
+                It.IsAny<TusConcatCheckpoint>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, TusConcatCheckpoint, CancellationToken>((_, checkpoint, _) => saved = checkpoint)
+            .Returns(Task.CompletedTask);
+
+        var result = await CreateStore().ProcessConcatChainStepAsync(fileId, CancellationToken.None);
+
+        Assert.Equal(TusConcatChainStep.CommitDestination, result.NextStep);
+        Assert.NotNull(saved);
+        Assert.Equal(2, saved.BlockCount);
+        Assert.Equal(256, saved.StagedLength);
+    }
+
+    [Fact]
     public async Task CreateFinalFileAsync_PartialsInCreationOrder_RegistersBoth()
     {
         const string fileId = "44444444-4444-4444-4444-444444444444";

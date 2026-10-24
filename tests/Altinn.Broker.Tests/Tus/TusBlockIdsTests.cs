@@ -86,4 +86,39 @@ public class TusBlockIdsTests
         Assert.Throws<InvalidOperationException>(() =>
             TusBlockIds.ExpandByConcatOrder([blockId], [1], []));
     }
+
+    [Fact]
+    public void OmitRetriedBlocks_DropsTheHighestChunkOfThePartialThatOverranItsStripe()
+    {
+        var kept0 = TusBlockIds.BuildNamespacedBlockId(0, 0);
+        var kept1 = TusBlockIds.BuildNamespacedBlockId(0, 1);
+        var retried = TusBlockIds.BuildNamespacedBlockId(0, 2);
+        var otherPartial = TusBlockIds.BuildNamespacedBlockId(1, 0);
+        var snapshot = new TusStagedBlocksSnapshot(
+            100 + 100 + 64 + 50,
+            [kept0, kept1, retried, otherPartial],
+            4,
+            [100, 100, 64, 50]);
+
+        var fitted = TusBlockIds.OmitRetriedBlocks(snapshot, new Dictionary<int, long>
+        {
+            [0] = 200,
+            [1] = 50
+        });
+
+        Assert.Equal([kept0, kept1, otherPartial], fitted.BlockIds);
+        Assert.Equal(250, fitted.TotalLength);
+    }
+
+    [Fact]
+    public void OmitRetriedBlocks_KeepsABlockThatWouldUndershootThePartial()
+    {
+        var first = TusBlockIds.BuildNamespacedBlockId(0, 0);
+        var tooLargeToDrop = TusBlockIds.BuildNamespacedBlockId(0, 1);
+        var snapshot = new TusStagedBlocksSnapshot(180, [first, tooLargeToDrop], 2, [100, 80]);
+
+        var fitted = TusBlockIds.OmitRetriedBlocks(snapshot, new Dictionary<int, long> { [0] = 150 });
+
+        Assert.Same(snapshot, fitted);
+    }
 }

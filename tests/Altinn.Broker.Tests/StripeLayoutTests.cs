@@ -77,6 +77,17 @@ public class StripeLayoutTests
         Assert.Equal(100, lastStripeLength);
     }
 
+    [Fact]
+    public void BytesOnStripe_PartialCrossingTheBoundary_SplitsAcrossBothStripes()
+    {
+        var layout = new StripeLayout(TotalLength: 300, StripeSize: 256);
+
+        Assert.Equal(176, layout.BytesOnStripe(0, absoluteStart: 80, length: 176));
+        Assert.Equal(0, layout.BytesOnStripe(1, absoluteStart: 80, length: 176));
+        Assert.Equal(56, layout.BytesOnStripe(0, absoluteStart: 200, length: 100));
+        Assert.Equal(44, layout.BytesOnStripe(1, absoluteStart: 200, length: 100));
+    }
+
     [Theory]
     [InlineData(0, 0, 0)]
     [InlineData(99, 0, 99)]

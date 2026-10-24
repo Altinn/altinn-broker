@@ -54,6 +54,31 @@ public readonly record struct StripeLayout(long TotalLength, long StripeSize)
     }
 
     /// <summary>
+    /// How many bytes of <paramref name="length"/> starting at <paramref name="absoluteStart"/> land on
+    /// <paramref name="stripeIndex"/>.
+    /// </summary>
+    public long BytesOnStripe(int stripeIndex, long absoluteStart, long length)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(absoluteStart);
+        ArgumentOutOfRangeException.ThrowIfNegative(length);
+        if (length == 0)
+        {
+            return 0;
+        }
+
+        if (StripeSize <= 0)
+        {
+            return stripeIndex == 0 ? length : 0;
+        }
+
+        var stripeStart = (long)stripeIndex * StripeSize;
+        var stripeEnd = stripeStart + LengthOfStripe(stripeIndex);
+        var overlapStart = Math.Max(absoluteStart, stripeStart);
+        var overlapEnd = Math.Min(absoluteStart + length, stripeEnd);
+        return Math.Max(0, overlapEnd - overlapStart);
+    }
+
+    /// <summary>
     /// One fragment per stripe the chunk touches. Chunk sizes are the client's choice and vary between
     /// requests, so a chunk can straddle any number of boundaries.
     /// </summary>

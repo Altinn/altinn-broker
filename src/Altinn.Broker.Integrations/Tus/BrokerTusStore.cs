@@ -1657,6 +1657,7 @@ public class BrokerTusStore(
                     $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
             }
 
+            stagedSnapshot = await OmitRetriedStripeBlocksAsync(fileId, stripeIndex, layout, stagedSnapshot, cancellationToken);
             if (stagedSnapshot.TotalLength != expectedStripeLength)
             {
                 throw new TusStoreException(
@@ -1739,6 +1740,14 @@ public class BrokerTusStore(
                 $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
         }
 
+        stagedSnapshot = await OmitRetriedStripeBlocksAsync(fileId, stripeIndex, layout, stagedSnapshot, cancellationToken);
+        if (stagedSnapshot.TotalLength != expectedStripeLength)
+        {
+            throw new TusStoreException(
+                $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} staged " +
+                $"{stagedSnapshot.TotalLength} bytes, expected {expectedStripeLength}.");
+        }
+
         var metadata = stripeIndex == 0
             ? new Dictionary<string, string>
             {
@@ -1801,6 +1810,58 @@ public class BrokerTusStore(
             ChainComplete: false,
             ShouldRetryStep: false,
             NextStep: TusConcatChainStep.Cleanup);
+    }
+
+    /// <summary>
+    /// A retried chunk keeps its old uncommitted block and adds another. Chunk indexes only grow,
+    /// so the extras are the highest chunk indexes once a partial has more bytes here than it should.
+    /// </summary>
+    private async Task<TusStagedBlocksSnapshot> OmitRetriedStripeBlocksAsync(
+        string fileId,
+        int stripeIndex,
+        StripeLayout layout,
+        TusStagedBlocksSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (snapshot.BlockLengths is not { Count: > 0 } || snapshot.BlockLengths.Count != snapshot.BlockIds.Count)
+        {
+            return snapshot;
+        }
+
+        var partialFileIds = await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(fileId, cancellationToken);
+        if (partialFileIds is null or { Length: 0 })
+        {
+            return snapshot;
+        }
+
+        var bytesOnStripeByPartialIndex = new Dictionary<int, long>(partialFileIds.Length);
+        foreach (var partialFileId in partialFileIds)
+        {
+            var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
+            if (partialInfo is null)
+            {
+                return snapshot;
+            }
+
+            bytesOnStripeByPartialIndex[partialInfo.Value.PartialIndex] = layout.BytesOnStripe(
+                stripeIndex,
+                partialInfo.Value.BaseOffset,
+                partialInfo.Value.UploadLength);
+        }
+
+        var fitted = TusBlockIds.OmitRetriedBlocks(snapshot, bytesOnStripeByPartialIndex);
+        if (fitted.TotalLength < snapshot.TotalLength)
+        {
+            logger.LogWarning(
+                "TUS concat ignoring {DroppedBytes} bytes of retried blocks on stripe {StripeIndex} for file id {FileId}. Staged {StagedBytes}, keeping {KeptBytes}.",
+                snapshot.TotalLength - fitted.TotalLength,
+                stripeIndex,
+                fileId,
+                snapshot.TotalLength,
+                fitted.TotalLength);
+        }
+
+        return fitted;
     }
 
     /// <summary>
