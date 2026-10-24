@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -10,8 +9,10 @@ using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Azure;
 
 using Xtensible.TusDotNet.Azure;
 
@@ -40,6 +41,7 @@ public class BrokerTusStore(
     private readonly ConcurrentDictionary<string, long> _uploadLengths = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _uploadMetadata = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxParallelBlockUploads = Math.Max(azureStorageOptions.Value.ConcurrentUploadThreads, 1);
+    private readonly int _maxBlocksPerStripe = Math.Max(azureStorageOptions.Value.MaxBlocksPerStripe, 1);
     private readonly TimeSpan _uploadExpiration = tusOptions.Value.UploadExpiration;
     private readonly long _maxChunkSizeBytes = ResolveMaxChunkSizeBytes(tusOptions.Value.MaxChunkSizeBytes);
     private readonly TimeSpan _acceptedOffsetReconcileGracePeriod = tusOptions.Value.AcceptedOffsetReconcileGracePeriod > TimeSpan.Zero
@@ -84,10 +86,20 @@ public class BrokerTusStore(
         var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
         var expectedOffset = progress?.AcceptedOffset ?? state.AcceptedOffset;
 
+        // The base offset turns a partial's PATCH offset into the absolute offset that picks the stripe.
+        var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
+        var layout = await GetStripeLayoutAsync(fileId, partialInfo, uploadLength, cancellationToken);
+        var baseOffset = partialInfo?.BaseOffset ?? 0;
+        var fragments = layout.SplitAcrossStripes(baseOffset + expectedOffset, chunkLength);
+        timing.Step("splitAcrossStripes", fragments.Count);
+
+        EnsureChunkFitsBlockBudget(fileId, layout, expectedOffset, chunkLength);
+
         var acceptResult = await uploadProgressCache.TryAcceptChunkAsync(
             fileId,
             expectedOffset,
             chunkLength,
+            fragments.Count,
             cancellationToken);
         if (acceptResult.Status == TusAcceptChunkStatus.NotFound)
         {
@@ -96,6 +108,7 @@ public class BrokerTusStore(
                 fileId,
                 expectedOffset,
                 chunkLength,
+                fragments.Count,
                 cancellationToken);
         }
 
@@ -117,9 +130,10 @@ public class BrokerTusStore(
             throw new TusStoreException($"Unable to accept TUS chunk for file id {fileId} at offset {expectedOffset}.");
         }
 
-        var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(fileId, cancellationToken);
+        // The chunk is already accepted, so an aborted request must still get as far as staging it.
+        await EnsureStripeBlockBudgetAsync(fileId, partialInfo, layout, fragments, CancellationToken.None);
 
-        string blockId;
+        var blockIds = new string[fragments.Count];
         long acceptedOffset;
         bool isFinalChunk;
 
@@ -130,21 +144,30 @@ public class BrokerTusStore(
                 throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
             }
 
-            blockId = partialInfo is not null
-                ? TusBlockIds.BuildNamespacedBlockId(partialInfo.Value.PartialIndex, acceptResult.BlockIndex)
-                : TusBlockIds.BuildSequentialBlockId(acceptResult.BlockIndex);
-            state.BlockIds.Add(blockId);
+            for (var i = 0; i < fragments.Count; i++)
+            {
+                blockIds[i] = partialInfo is not null
+                    ? TusBlockIds.BuildNamespacedBlockId(partialInfo.Value.PartialIndex, acceptResult.BlockIndex + i)
+                    : TusBlockIds.BuildSequentialBlockId(acceptResult.BlockIndex + i);
+            }
+
             state.AcceptedOffset = acceptResult.NewAcceptedOffset;
-            state.NextBlockIndex = acceptResult.BlockIndex + 1;
+            state.NextBlockIndex = acceptResult.BlockIndex + fragments.Count;
             acceptedOffset = acceptResult.NewAcceptedOffset;
             isFinalChunk = acceptedOffset >= state.UploadLength;
-            state.PendingUploads++;
-            state.InflightBlockOperations++;
+            state.PendingUploads += fragments.Count;
+            state.InflightBlockOperations += fragments.Count;
         }
 
-        timing.Step("assignBlock", blockId);
+        timing.Step("assignBlocks", fragments.Count);
         var destinationFileId = partialInfo?.FileTransferId.ToString();
-        _ = Task.Run(() => UploadBlockAsync(fileId, destinationFileId, state, blockId, chunk));
+        for (var i = 0; i < fragments.Count; i++)
+        {
+            var fragment = fragments[i];
+            var blockId = blockIds[i];
+            _ = Task.Run(() => UploadBlockAsync(fileId, destinationFileId, fragment.StripeIndex, state, blockId, chunk, fragment.SourceOffset, fragment.Length));
+        }
+
         timing.Step("uploadBlock.scheduled", chunkLength);
         await RecordUploadActivityAsync(fileId, cancellationToken);
 
@@ -168,6 +191,73 @@ public class BrokerTusStore(
         }
 
         return chunkLength;
+    }
+
+    /// <summary>
+    /// For a partial the assembled length is not known yet, so only the stripe size is populated.
+    /// That is all <see cref="StripeLayout.SplitAcrossStripes"/> needs.
+    /// </summary>
+    private async Task<StripeLayout> GetStripeLayoutAsync(
+        string fileId,
+        PartialUploadInfo? partialInfo,
+        long uploadLength,
+        CancellationToken cancellationToken)
+    {
+        var lookupId = partialInfo?.FileTransferId.ToString() ?? fileId;
+        var stripeSize = await storageResolver.GetStripeSizeAsync(lookupId, cancellationToken);
+        return StripeLayout.ForUpload(uploadLength, stripeSize, isConcatenationPartial: partialInfo is not null);
+    }
+
+    /// <summary>
+    /// Fails an upload that could never fit on its first chunk rather than hours later at commit time.
+    /// </summary>
+    private void EnsureChunkFitsBlockBudget(string fileId, StripeLayout layout, long expectedOffset, int chunkLength)
+    {
+        if (expectedOffset != 0)
+        {
+            return;
+        }
+
+        var minimumChunkSize = layout.MinimumChunkSize(_maxBlocksPerStripe);
+        if (chunkLength < minimumChunkSize)
+        {
+            throw new TusStoreException(
+                $"Upload chunk size {chunkLength} is too small for file id {fileId}. " +
+                $"Increase TUS chunk size to at least {minimumChunkSize} bytes.");
+        }
+    }
+
+    /// <summary>
+    /// Counted per (file transfer, stripe), not per partial: several partials share one stripe blob,
+    /// and the budget is Azure's per-blob limit.
+    /// </summary>
+    private async Task EnsureStripeBlockBudgetAsync(
+        string fileId,
+        PartialUploadInfo? partialInfo,
+        StripeLayout layout,
+        IReadOnlyList<StripeFragment> fragments,
+        CancellationToken cancellationToken)
+    {
+        if (partialInfo is not { } partial)
+        {
+            return;
+        }
+
+        foreach (var fragment in fragments)
+        {
+            var blockCount = await partialUploadRegistry.IncrementStripeBlockCountAsync(
+                partial.FileTransferId,
+                fragment.StripeIndex,
+                1,
+                cancellationToken);
+            if (blockCount > _maxBlocksPerStripe)
+            {
+                throw new TusStoreException(
+                    $"Upload exceeds the {_maxBlocksPerStripe} block limit for stripe {fragment.StripeIndex} of " +
+                    $"file id {fileId}. Increase TUS chunk size to at least " +
+                    $"{layout.MinimumChunkSize(_maxBlocksPerStripe)} bytes.");
+            }
+        }
     }
 
     private void RejectOversizedChunkContentLength(string fileId)
@@ -225,8 +315,8 @@ public class BrokerTusStore(
         var uploadConcat = await GetUploadConcatAsync(fileId, cancellationToken);
         var committedStagingLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
         var stagedBlocksLength = await storageResolver.GetStagedBlocksLengthAsync(fileId, cancellationToken);
-        var destinationCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
-        var destinationStagedLength = await storageResolver.GetDestinationUncommittedBlocksLengthAsync(fileId, cancellationToken);
+        var destinationCommittedLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
+        var destinationStagedLength = await storageResolver.GetDestinationUncommittedBlocksLengthAsync(fileId, 0, cancellationToken);
         var expectedPatchOffset = acceptedOffset;
         var tusdotnetWillComplete = storeLength is not null
             && expectedPatchOffset == storeLength
@@ -314,7 +404,7 @@ public class BrokerTusStore(
             return true;
         }
 
-        if (await storageResolver.DestinationBlobExistsAsync(fileId, cancellationToken))
+        if ((await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).StripeCount > 0)
         {
             return true;
         }
@@ -454,7 +544,7 @@ public class BrokerTusStore(
             return committedStagingLength;
         }
 
-        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        var destinationLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
         if (destinationLength > 0)
         {
             timing.Step("destinationLength", destinationLength);
@@ -466,7 +556,7 @@ public class BrokerTusStore(
         if (uploadLength is > 0
             && await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
         {
-            var concatCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+            var concatCommittedLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
             if (concatCommittedLength >= uploadLength.Value)
             {
                 timing.Step("concatCompleteCommittedLength", concatCommittedLength);
@@ -509,8 +599,10 @@ public class BrokerTusStore(
     {
         var fileTransferId = GetFileTransferIdFromRouteGuid();
         var finalFileId = fileTransferId.ToString();
+        var stripeSize = await storageResolver.GetStripeSizeAsync(finalFileId, cancellationToken);
 
         long totalLength = 0;
+        var previousPartialIndex = -1;
         foreach (var partialFileReference in partialFiles)
         {
             var partialFileId = TusRouteHelper.NormalizePartialFileId(partialFileReference);
@@ -528,19 +620,38 @@ public class BrokerTusStore(
                 throw new TusStoreException($"Partial upload {partialFileId} does not belong to file transfer {fileTransferId}.");
             }
 
+            if (partialInfo.Value.PartialIndex <= previousPartialIndex)
+            {
+                throw new TusStoreException(
+                    $"Partial uploads must be listed in the order they were created. Partial {partialFileId} " +
+                    $"has index {partialInfo.Value.PartialIndex}, which does not follow {previousPartialIndex}.");
+            }
+
+            if (stripeSize > 0 && partialInfo.Value.BaseOffset != totalLength)
+            {
+                throw new TusStoreException(
+                    $"Partial upload {partialFileId} starts at offset {partialInfo.Value.BaseOffset} but " +
+                    $"{totalLength} bytes precede it. The concatenation is missing a partial.");
+            }
+
+            previousPartialIndex = partialInfo.Value.PartialIndex;
             await EnsurePartialReadyForConcatenationAsync(partialFileId, partialLength, cancellationToken);
             // Each Upload-Concat occurrence contributes its bytes, including a repeated partial.
             totalLength += partialLength;
         }
 
         var normalizedPartialFileIds = partialFiles.Select(TusRouteHelper.NormalizePartialFileId).ToArray();
-        await GetValidatedConcatCommitListAsync(finalFileId, normalizedPartialFileIds, totalLength, cancellationToken);
 
         _uploadLengths[finalFileId] = totalLength;
         _uploadMetadata[finalFileId] = metadata;
         await partialUploadRegistry.RegisterUploadAsync(finalFileId, totalLength, cancellationToken);
         await partialUploadRegistry.RegisterFinalConcatAsync(finalFileId, normalizedPartialFileIds, cancellationToken);
-        await concatCheckpointStore.ClearCheckpointAsync(finalFileId, cancellationToken);
+
+        var layout = new StripeLayout(totalLength, stripeSize);
+        await concatCheckpointStore.SaveCheckpointAsync(
+            finalFileId,
+            new TusConcatCheckpoint(StripeSizeBytes: layout.StripeSize, StripeCount: layout.StripeCount),
+            cancellationToken);
         await storageResolver.SetDestinationUploadLengthAsync(finalFileId, totalLength, cancellationToken);
         var state = RegisterUploadState(finalFileId, totalLength, initialOffset: totalLength);
         state.AcceptedOffset = totalLength;
@@ -733,7 +844,7 @@ public class BrokerTusStore(
             return stagedSnapshot.TotalLength;
         }
 
-        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        var destinationLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
         if (destinationLength > 0)
         {
             timing?.Step("durable.destinationLength", destinationLength);
@@ -899,19 +1010,23 @@ public class BrokerTusStore(
     private async Task UploadBlockAsync(
         string fileId,
         string? destinationFileId,
+        int stripeIndex,
         TusUploadState state,
         string blockId,
-        byte[] chunk)
+        byte[] chunk,
+        int sourceOffset,
+        int length)
     {
         await state.ConcurrentUploader.WaitAsync();
         var releasedSemaphore = false;
         try
         {
-            await using var chunkStream = new MemoryStream(chunk, writable: false);
+            await using var chunkStream = new MemoryStream(chunk, sourceOffset, length, writable: false);
             if (destinationFileId is not null)
             {
                 await storageResolver.StageTusBlockOnDestinationAsync(
                     destinationFileId,
+                    stripeIndex,
                     blockId,
                     chunkStream,
                     CancellationToken.None);
@@ -922,14 +1037,14 @@ public class BrokerTusStore(
             }
             lock (state.SyncRoot)
             {
-                state.CommittedOffset += chunk.Length;
+                state.CommittedOffset += length;
                 state.PendingUploads--;
                 var previousProgress = state.ProgressSignal;
                 state.ProgressSignal = NewProgressSignal();
                 previousProgress.TrySetResult(state.CommittedOffset);
             }
 
-            await uploadProgressCache.IncrementCommittedOffsetAsync(fileId, chunk.Length, CancellationToken.None);
+            await uploadProgressCache.IncrementCommittedOffsetAsync(fileId, length, CancellationToken.None);
             await RecordUploadActivityAsync(fileId, CancellationToken.None);
         }
         catch (Exception ex)
@@ -1039,16 +1154,9 @@ public class BrokerTusStore(
 
     private async Task<long> GetDurableStagingOffsetAsync(string fileId, CancellationToken cancellationToken)
     {
+        // A partial shares its stripes with sibling partials, so storage cannot tell how far this one got.
         if (await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken))
         {
-            var destinationStagedLength = await storageResolver.GetDestinationUncommittedBlocksLengthAsync(
-                fileId,
-                cancellationToken);
-            if (destinationStagedLength > 0)
-            {
-                return destinationStagedLength;
-            }
-
             var progress = await uploadProgressCache.GetAsync(fileId, cancellationToken);
             return progress?.CommittedOffset ?? 0;
         }
@@ -1195,11 +1303,6 @@ public class BrokerTusStore(
                 state.PendingUploads = 0;
                 state.Fault = null;
                 state.OffsetReconcileElected = false;
-                state.BlockIds.Clear();
-                if (resumePoint.BlockIds is { Count: > 0 })
-                {
-                    state.BlockIds.AddRange(resumePoint.BlockIds);
-                }
             }
         }
     }
@@ -1221,13 +1324,13 @@ public class BrokerTusStore(
             cancellationToken);
     }
 
-    private async Task<(long DurableOffset, long NextBlockIndex, IReadOnlyList<string>? BlockIds)> ResolveDurableResumePointAsync(
+    private async Task<(long DurableOffset, long NextBlockIndex)> ResolveDurableResumePointAsync(
         string fileId,
         TusUploadProgressSnapshot progress,
         CancellationToken cancellationToken)
     {
         var stagedSnapshot = await partialUploadRegistry.IsPartialAsync(fileId, cancellationToken)
-            ? await storageResolver.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken)
+            ? null
             : await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
 
         if (stagedSnapshot is not null)
@@ -1237,7 +1340,7 @@ public class BrokerTusStore(
                 Math.Max(stagedSnapshot.TotalLength, committedLength),
                 progress.CommittedOffset);
             durableOffset = Math.Min(durableOffset, progress.AcceptedOffset);
-            return (durableOffset, stagedSnapshot.NextBlockIndex, stagedSnapshot.BlockIds);
+            return (durableOffset, stagedSnapshot.NextBlockIndex);
         }
 
         var durable = await GetDurableStagingOffsetAsync(fileId, cancellationToken);
@@ -1246,7 +1349,7 @@ public class BrokerTusStore(
 
         // Prefer Azure block metadata above. Without it, keep redis NextBlockIndex so resume
         // allocates new block IDs after the previously accepted ones (orphaned gap IDs are unused).
-        return (durable, durable > 0 ? progress.NextBlockIndex : 0, null);
+        return (durable, durable > 0 ? progress.NextBlockIndex : 0);
     }
 
     private async Task<bool> HasRecentUploadActivityAsync(
@@ -1272,34 +1375,6 @@ public class BrokerTusStore(
         }
 
         return false;
-    }
-
-    private async Task WaitForCommittedOffsetAsync(
-        string fileId,
-        TusUploadState state,
-        long targetOffset,
-        CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            Task waitTask;
-            lock (state.SyncRoot)
-            {
-                if (state.Fault is not null)
-                {
-                    throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
-                }
-
-                if (state.CommittedOffset >= targetOffset && state.PendingUploads == 0)
-                {
-                    return;
-                }
-
-                waitTask = state.ProgressSignal.Task;
-            }
-
-            await waitTask.WaitAsync(cancellationToken);
-        }
     }
 
     private async Task WaitForDurableCommittedOffsetAsync(
@@ -1329,73 +1404,6 @@ public class BrokerTusStore(
 
         throw new TusStoreException(
             $"Timed out waiting for TUS blocks to stage for file id {fileId}. Expected {uploadLength} bytes.");
-    }
-
-    private async Task FinalizeUploadAsync(string fileId, TusUploadState state, CancellationToken cancellationToken)
-    {
-        lock (state.SyncRoot)
-        {
-            if (state.Fault is not null)
-            {
-                throw new TusStoreException($"Buffered TUS upload failed for file id {fileId}. {state.Fault.Message}");
-            }
-
-            if (state.PendingUploads > 0)
-            {
-                throw new TusStoreException($"Buffered TUS upload for file id {fileId} has {state.PendingUploads} pending block uploads.");
-            }
-        }
-
-        var uploadLength = state.UploadLength;
-        var committedLength = await storageResolver.GetCommittedStagingLengthAsync(fileId, cancellationToken);
-        if (committedLength >= uploadLength)
-        {
-            logger.LogInformation(
-                "TUS staging already committed for file id {FileId}. CommittedLength={CommittedLength} UploadLength={UploadLength}",
-                fileId,
-                committedLength,
-                uploadLength);
-            await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
-            return;
-        }
-
-        var stagedSnapshot = await storageResolver.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
-        IReadOnlyList<string> blockIds;
-        long stagedTotalLength;
-        if (stagedSnapshot is { BlockIds.Count: > 0 })
-        {
-            blockIds = stagedSnapshot.BlockIds;
-            stagedTotalLength = stagedSnapshot.TotalLength;
-        }
-        else
-        {
-            lock (state.SyncRoot)
-            {
-                if (state.BlockIds.Count == 0)
-                {
-                    throw new TusStoreException($"Cannot finalize TUS upload for file id {fileId} because no blocks were staged.");
-                }
-
-                blockIds = state.BlockIds.ToList();
-                stagedTotalLength = state.CommittedOffset;
-            }
-        }
-
-        if (stagedTotalLength != uploadLength)
-        {
-            throw new TusStoreException(
-                $"Cannot finalize TUS upload for file id {fileId}. Staged {stagedTotalLength} bytes, expected {uploadLength}.");
-        }
-
-        logger.LogInformation(
-            "TUS committing staged blocks for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
-            fileId,
-            blockIds.Count,
-            stagedTotalLength,
-            uploadLength);
-
-        await storageResolver.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
-        await storageResolver.SetStagingUploadLengthAsync(fileId, uploadLength, cancellationToken);
     }
 
     public async Task<bool> IsReadyForStagingFinalizeAsync(string fileId, CancellationToken cancellationToken)
@@ -1491,7 +1499,7 @@ public class BrokerTusStore(
             if (concatStatus is TusConcatStatus.Pending or TusConcatStatus.InProgress)
             {
                 var expectedUploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
-                var committedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+                var committedLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
                 throw new TusStoreException(
                     $"TUS concatenation cannot resume for file id {fileId}: partial references are missing and destination is incomplete ({committedLength}/{expectedUploadLength}).");
             }
@@ -1500,7 +1508,7 @@ public class BrokerTusStore(
         }
 
         var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
-        var destinationCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        var destinationCommittedLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
         if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete
             && destinationCommittedLength >= uploadLength)
         {
@@ -1532,7 +1540,6 @@ public class BrokerTusStore(
             case TusConcatChainStep.CommitDestination:
                 return await ProcessCommitDestinationStepAsync(
                     fileId,
-                    partialFileIds,
                     uploadLength,
                     checkpoint,
                     cancellationToken);
@@ -1629,163 +1636,187 @@ public class BrokerTusStore(
                 $"Concatenated upload length mismatch for file id {fileId}. Expected {uploadLength}, partial sum {checkpoint.TotalValidatedLength}.");
         }
 
-        var commitList = await GetValidatedConcatCommitListAsync(
-            fileId,
-            partialFileIds,
-            uploadLength,
-            cancellationToken);
+        var layout = await GetConcatLayoutAsync(fileId, uploadLength, checkpoint, cancellationToken);
+        var stripeIndex = checkpoint.PreparedStripeCount;
+        var expectedStripeLength = layout.LengthOfStripe(stripeIndex);
+        var committedLength = await storageResolver.GetStripeBlobLengthAsync(fileId, stripeIndex, cancellationToken);
 
+        int preparedBlockCount;
+        long preparedLength;
+        if (committedLength >= expectedStripeLength)
+        {
+            preparedBlockCount = 0;
+            preparedLength = expectedStripeLength;
+        }
+        else
+        {
+            var stagedSnapshot = await storageResolver.TryGetStripeStagedBlocksSnapshotAsync(fileId, stripeIndex, cancellationToken);
+            if (stagedSnapshot is not { BlockIds.Count: > 0 })
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
+            }
+
+            if (stagedSnapshot.TotalLength != expectedStripeLength)
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} staged " +
+                    $"{stagedSnapshot.TotalLength} bytes, expected {expectedStripeLength}.");
+            }
+
+            if (stagedSnapshot.BlockIds.Count > _maxBlocksPerStripe)
+            {
+                throw new TusStoreException(
+                    $"Cannot commit TUS concatenation for file id {fileId}. Stripe {stripeIndex} block count " +
+                    $"{stagedSnapshot.BlockIds.Count} exceeds the limit of {_maxBlocksPerStripe}.");
+            }
+
+            preparedBlockCount = stagedSnapshot.BlockIds.Count;
+            preparedLength = stagedSnapshot.TotalLength;
+        }
+
+        var preparedStripeCount = stripeIndex + 1;
+        var allStripesPrepared = preparedStripeCount >= layout.StripeCount;
         var nextCheckpoint = checkpoint with
         {
-            BlockCount = commitList.BlockIds.Count,
-            StagedLength = commitList.TotalLength,
-            NextStep = TusConcatChainStep.CommitDestination
+            BlockCount = checkpoint.BlockCount + preparedBlockCount,
+            StagedLength = checkpoint.StagedLength + preparedLength,
+            PreparedStripeCount = preparedStripeCount,
+            StripeSizeBytes = layout.StripeSize,
+            StripeCount = layout.StripeCount,
+            NextStep = allStripesPrepared ? TusConcatChainStep.CommitDestination : TusConcatChainStep.PrepareCommit
         };
+
+        if (allStripesPrepared && nextCheckpoint.StagedLength != uploadLength)
+        {
+            throw new TusStoreException(
+                $"Cannot commit TUS concatenation for file id {fileId}. Staged {nextCheckpoint.StagedLength} bytes, expected {uploadLength}.");
+        }
+
         await concatCheckpointStore.SaveCheckpointAsync(fileId, nextCheckpoint, cancellationToken);
 
         logger.LogInformation(
-            "TUS concat chain prepared commit for file id {FileId}. BlockCount={BlockCount} ExpandedBytes={ExpandedBytes} PartialCount={PartialCount}",
+            "TUS concat chain prepared stripe {StripeIndex}/{StripeCount} for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} PartialCount={PartialCount}",
+            preparedStripeCount,
+            layout.StripeCount,
             fileId,
-            commitList.BlockIds.Count,
-            commitList.TotalLength,
+            preparedBlockCount,
+            preparedLength,
             partialFileIds.Length);
 
         return new TusConcatChainStepResult(
             StepCompleted: true,
             ChainComplete: false,
             ShouldRetryStep: false,
-            NextStep: TusConcatChainStep.CommitDestination);
-    }
-
-    private async Task<int[]> ResolvePartialIndexesInConcatOrderAsync(
-        string fileId,
-        IReadOnlyList<string> partialFileIds,
-        CancellationToken cancellationToken)
-    {
-        var indexByPartialFileId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var partialFileIdByIndex = new Dictionary<int, string>();
-        var indexes = new int[partialFileIds.Count];
-        for (var position = 0; position < partialFileIds.Count; position++)
-        {
-            var partialFileId = partialFileIds[position];
-            if (!indexByPartialFileId.TryGetValue(partialFileId, out var partialIndex))
-            {
-                var partialInfo = await partialUploadRegistry.TryGetPartialInfoAsync(partialFileId, cancellationToken);
-                if (partialInfo is null)
-                {
-                    throw new TusStoreException($"Unknown partial upload id {partialFileId}.");
-                }
-
-                partialIndex = partialInfo.Value.PartialIndex;
-                if (partialFileIdByIndex.TryGetValue(partialIndex, out var existingPartialFileId)
-                    && !string.Equals(existingPartialFileId, partialFileId, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new TusStoreException(
-                        $"Cannot commit TUS concatenation for file id {fileId}. Partial index {partialIndex} is assigned to more than one partial.");
-                }
-
-                indexByPartialFileId[partialFileId] = partialIndex;
-                partialFileIdByIndex[partialIndex] = partialFileId;
-            }
-
-            indexes[position] = partialIndex;
-        }
-
-        return indexes;
-    }
-
-    private async Task<TusBlockIds.ConcatCommitList> GetValidatedConcatCommitListAsync(
-        string fileId,
-        IReadOnlyList<string> partialFileIds,
-        long uploadLength,
-        CancellationToken cancellationToken)
-    {
-        var partialIndexesInOrder = await ResolvePartialIndexesInConcatOrderAsync(
-            fileId,
-            partialFileIds,
-            cancellationToken);
-        var stagedSnapshot = await storageResolver.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken);
-        if (stagedSnapshot is not { BlockIds.Count: > 0 })
-        {
-            if (uploadLength == 0)
-            {
-                return new TusBlockIds.ConcatCommitList([], 0);
-            }
-
-            throw new TusStoreException($"Cannot commit TUS concatenation for file id {fileId} because no destination blocks were staged.");
-        }
-
-        if (stagedSnapshot.BlockLengths is null || stagedSnapshot.BlockLengths.Count != stagedSnapshot.BlockIds.Count)
-        {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId} because staged block lengths are missing.");
-        }
-
-        TusBlockIds.ConcatCommitList commitList;
-        try
-        {
-            commitList = TusBlockIds.ExpandByConcatOrder(
-                stagedSnapshot.BlockIds,
-                stagedSnapshot.BlockLengths,
-                partialIndexesInOrder);
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId}. {ex.Message}");
-        }
-
-        if (commitList.TotalLength != uploadLength)
-        {
-            throw new TusStoreException(
-                $"Cannot commit TUS concatenation for file id {fileId}. Expanded {commitList.TotalLength} bytes from {stagedSnapshot.BlockIds.Count} staged blocks ({stagedSnapshot.TotalLength} bytes), expected {uploadLength}.");
-        }
-        
-        return commitList;
+            NextStep: nextCheckpoint.NextStep);
     }
 
     private async Task<TusConcatChainStepResult> ProcessCommitDestinationStepAsync(
         string fileId,
-        string[] partialFileIds,
         long uploadLength,
         TusConcatCheckpoint checkpoint,
         CancellationToken cancellationToken)
     {
-        var destinationCommittedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
-        if (destinationCommittedLength >= uploadLength)
+        var layout = await GetConcatLayoutAsync(fileId, uploadLength, checkpoint, cancellationToken);
+        var stripeIndex = checkpoint.CommittedStripeCount;
+        if (stripeIndex >= layout.StripeCount)
         {
-            var advanced = checkpoint with { NextStep = TusConcatChainStep.Cleanup };
-            await concatCheckpointStore.SaveCheckpointAsync(fileId, advanced, cancellationToken);
-            return new TusConcatChainStepResult(
-                StepCompleted: true,
-                ChainComplete: false,
-                ShouldRetryStep: false,
-                NextStep: TusConcatChainStep.Cleanup);
+            return await AdvanceToCleanupAsync(fileId, checkpoint, cancellationToken);
         }
 
-        var commitList = await GetValidatedConcatCommitListAsync(
-            fileId,
-            partialFileIds,
-            uploadLength,
-            cancellationToken);
+        var expectedStripeLength = layout.LengthOfStripe(stripeIndex);
+
+        var committedLength = await storageResolver.GetStripeBlobLengthAsync(fileId, stripeIndex, cancellationToken);
+        if (committedLength >= expectedStripeLength)
+        {
+            return await AdvanceStripeAsync(fileId, checkpoint, stripeIndex, layout, cancellationToken);
+        }
+
+        var stagedSnapshot = await storageResolver.TryGetStripeStagedBlocksSnapshotAsync(fileId, stripeIndex, cancellationToken);
+        if (stagedSnapshot is not { BlockIds.Count: > 0 })
+        {
+            throw new TusStoreException(
+                $"Cannot commit TUS concatenation for file id {fileId} because no blocks were staged on stripe {stripeIndex}.");
+        }
+
+        var metadata = stripeIndex == 0
+            ? new Dictionary<string, string>
+            {
+                [AzureStorageConstants.TusUploadLengthMetadataKey] = uploadLength.ToString(),
+                [AzureStorageConstants.TusStripeSizeMetadataKey] = layout.StripeSize.ToString(),
+                [AzureStorageConstants.TusStripeCountMetadataKey] = layout.StripeCount.ToString()
+            }
+            : null;
 
         logger.LogInformation(
-            "TUS concat chain committing destination blocks for file id {FileId}. BlockCount={BlockCount} ExpandedBytes={ExpandedBytes} UploadLength={UploadLength}",
+            "TUS concat chain committing stripe {StripeIndex}/{StripeCount} for file id {FileId}. BlockCount={BlockCount} StagedBytes={StagedBytes} UploadLength={UploadLength}",
+            stripeIndex,
+            layout.StripeCount,
             fileId,
-            commitList.BlockIds.Count,
-            commitList.TotalLength,
+            stagedSnapshot.BlockIds.Count,
+            stagedSnapshot.TotalLength,
             uploadLength);
 
-        await storageResolver.CommitBlocksToDestinationAsync(fileId, commitList.BlockIds, cancellationToken);
+        await storageResolver.CommitStripeBlocksAsync(fileId, stripeIndex, stagedSnapshot.BlockIds, metadata, cancellationToken);
 
-        var nextCheckpoint = checkpoint with { NextStep = TusConcatChainStep.Cleanup };
+        return await AdvanceStripeAsync(fileId, checkpoint, stripeIndex, layout, cancellationToken);
+    }
+
+    private async Task<TusConcatChainStepResult> AdvanceStripeAsync(
+        string fileId,
+        TusConcatCheckpoint checkpoint,
+        int stripeIndex,
+        StripeLayout layout,
+        CancellationToken cancellationToken)
+    {
+        var committedStripeCount = stripeIndex + 1;
+        var allCommitted = committedStripeCount >= layout.StripeCount;
+        var nextCheckpoint = checkpoint with
+        {
+            CommittedStripeCount = committedStripeCount,
+            StripeSizeBytes = layout.StripeSize,
+            StripeCount = layout.StripeCount,
+            NextStep = allCommitted ? TusConcatChainStep.Cleanup : TusConcatChainStep.CommitDestination
+        };
         await concatCheckpointStore.SaveCheckpointAsync(fileId, nextCheckpoint, cancellationToken);
 
         return new TusConcatChainStepResult(
             StepCompleted: true,
             ChainComplete: false,
             ShouldRetryStep: false,
+            NextStep: nextCheckpoint.NextStep);
+    }
+
+    private async Task<TusConcatChainStepResult> AdvanceToCleanupAsync(
+        string fileId,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        await concatCheckpointStore.SaveCheckpointAsync(
+            fileId,
+            checkpoint with { NextStep = TusConcatChainStep.Cleanup },
+            cancellationToken);
+        return new TusConcatChainStepResult(
+            StepCompleted: true,
+            ChainComplete: false,
+            ShouldRetryStep: false,
             NextStep: TusConcatChainStep.Cleanup);
+    }
+
+    /// <summary>
+    /// The layout recorded on the checkpoint when the concatenation was accepted, so a configuration
+    /// change part way through an upload cannot relayout it.
+    /// </summary>
+    private async Task<StripeLayout> GetConcatLayoutAsync(
+        string fileId,
+        long uploadLength,
+        TusConcatCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        var stripeSize = checkpoint.StripeSizeBytes > 0
+            ? checkpoint.StripeSizeBytes
+            : await storageResolver.GetStripeSizeAsync(fileId, cancellationToken);
+        return new StripeLayout(uploadLength, stripeSize);
     }
 
     private async Task<TusConcatChainStepResult> ProcessCleanupStepAsync(
@@ -1797,6 +1828,10 @@ public class BrokerTusStore(
         await partialUploadRegistry.MarkConcatCompleteAsync(fileId, cancellationToken);
         await partialUploadRegistry.ClearFinalConcatPartialReferencesAsync(fileId, cancellationToken);
         await concatCheckpointStore.ClearCheckpointAsync(fileId, cancellationToken);
+        if (Guid.TryParse(fileId, out var completedFileTransferId))
+        {
+            await partialUploadRegistry.ClearStripeBlockCountsAsync(completedFileTransferId, cancellationToken);
+        }
 
         logger.LogInformation(
             "TUS concat chain completed cleanup for file id {FileId}. TotalLength={TotalLength} PartialCount={PartialCount}",
@@ -1821,7 +1856,7 @@ public class BrokerTusStore(
         if (await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken) == TusConcatStatus.Complete)
         {
             var uploadLength = await GetCachedUploadLengthAsync(fileId, cancellationToken);
-            var committedLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+            var committedLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
             if (committedLength >= uploadLength)
             {
                 return true;
@@ -1837,7 +1872,7 @@ public class BrokerTusStore(
             return false;
         }
 
-        var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+        var destinationLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
         if (destinationLength < expectedLength)
         {
             return false;
@@ -1866,7 +1901,7 @@ public class BrokerTusStore(
         var concatStatus = await partialUploadRegistry.TryGetConcatStatusAsync(fileId, cancellationToken);
         if (partialFileIds is { Length: > 0 } || concatStatus == TusConcatStatus.Complete)
         {
-            var destinationLength = await storageResolver.GetDestinationBlobLengthAsync(fileId, cancellationToken);
+            var destinationLength = (await storageResolver.GetCommittedStripesAsync(fileId, cancellationToken)).TotalLength;
             return destinationLength >= uploadLength;
         }
 

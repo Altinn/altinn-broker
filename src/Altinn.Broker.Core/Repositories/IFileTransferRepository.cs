@@ -17,6 +17,7 @@ public interface IFileTransferRepository
         string? checksum,
         ChecksumAlgorithm checksumAlgorithm,
         bool useVirusScan,
+        long stripeSizeBytes,
         bool hasNotification,
         CancellationToken cancellationToken);
     Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
@@ -29,6 +30,7 @@ public interface IFileTransferRepository
         long storageProviderId,
         string fileLocation,
         long fileTransferSize,
+        long? stripeSizeBytes,
         CancellationToken cancellationToken
     );
     Task SetFileTransferSize(Guid fileTransferId, long fileTransferSize, CancellationToken cancellationToken);
