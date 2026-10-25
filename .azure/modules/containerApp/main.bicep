@@ -86,6 +86,7 @@ var containerAppEnvVars = concat([
   }
   { name: 'MaskinportenSettings__EncodedJwk', secretRef: 'maskinporten-jwk' }
   { name: 'GeneralSettings__SlackUrl', secretRef: 'slack-url' }
+  { name: 'GeneralSettings__BrokerBaseUrl', value: platform_base_url }
   { name: 'GeneralSettings__ApplicationInsightsConnectionString', secretRef: 'application-insights-connection-string' }
   { name: 'StatisticsApiKey', secretRef: 'statistics-api-key' }
   { name: 'AzureStorageOptions__BlockSize', value: '33554432' } // 32 MiB

@@ -1,3 +1,4 @@
+using Altinn.Broker.Application.CheckNotificationCondition;
 using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Application.ConfigureResource;
 using Altinn.Broker.Application.CreateNotificationOrder;
@@ -70,5 +71,6 @@ public static class DependencyInjection
         services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
         services.AddScoped<SendNotificationOrderHandler>();
         services.AddScoped<CheckNotificationDeliveryHandler>();
+        services.AddScoped<CheckNotificationConditionHandler>();
     }
 }
