@@ -3,11 +3,11 @@ import { useAccountSelector } from '@altinn/altinn-components'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { useParties } from '../../parties/PartiesContext'
-import { PageRoutes } from '../../pages/routes'
+import { getFrontPageLink } from './altinnLinks'
 import { useSidebarMenu } from './useSidebarMenu'
 
 export function useHeaderConfig(): GlobalHeaderProps {
-  const sidebarMenu = useSidebarMenu()
+  const { desktopMenu, mobileMenu } = useSidebarMenu()
   const { logout } = useAuth()
   const { status, parties, selfPartyUuid, selectedParty, selectParty } = useParties()
 
@@ -25,7 +25,7 @@ export function useHeaderConfig(): GlobalHeaderProps {
 
   return {
     logo: {
-      as: (props) => <Link {...props} to={PageRoutes.fileTransfers} />,
+      as: (props) => <Link {...props} to={getFrontPageLink()} />,
     },
     locale: {
       title: 'Språk/language',
@@ -40,12 +40,13 @@ export function useHeaderConfig(): GlobalHeaderProps {
     globalMenu: {
       menuLabel: 'Meny',
       backLabel: 'Tilbake',
-      menu: sidebarMenu,
+      menu: desktopMenu,
       logoutButton: {
         label: 'Logg ut',
         onClick: () => logout('/'),
       },
     },
-    desktopMenu: sidebarMenu,
+    desktopMenu,
+    mobileMenu,
   }
 }
