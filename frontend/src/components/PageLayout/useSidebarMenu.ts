@@ -17,7 +17,6 @@ import {
 import { useLocation } from 'react-router-dom'
 import { claimValue } from '../../auth/types'
 import { useAuth } from '../../auth/AuthContext'
-import { useParties } from '../../parties/PartiesContext'
 import { PageRoutes } from '../../pages/routes'
 import {
   getAccessManagementLink,
@@ -57,9 +56,7 @@ function isRouteSelected(currentRoute: string, targetRoute: string) {
 export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuProps; mobileMenu: MenuProps } {
   const { pathname } = useLocation()
   const { user } = useAuth()
-  const { parties } = useParties()
   const endUserName = (user && claimValue(user, 'name')) || 'Deg'
-  const hasOnlySelfParty = parties.every((party) => party.type === 'Person')
 
   const menuGroups: MenuProps['groups'] = {
     global: {
@@ -153,26 +150,22 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
   }
 
   const profileShortcutItems: MenuItemProps[] = [
-    ...(hasOnlySelfParty
-      ? []
-      : [
-          {
-            id: 'parties',
-            groupId: 'profile-children',
-            icon: HeartIcon,
-            size: 'sm' as const,
-            title: 'Aktører og favoritter',
-            as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/parties') }),
-          },
-          {
-            id: 'notifications',
-            groupId: 'profile-children',
-            icon: BellIcon,
-            size: 'sm' as const,
-            title: 'Varslingsadresser',
-            as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/notifications') }),
-          },
-        ]),
+    {
+      id: 'parties',
+      groupId: 'profile-children',
+      icon: HeartIcon,
+      size: 'sm',
+      title: 'Aktører og favoritter',
+      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/parties') }),
+    },
+    {
+      id: 'notifications',
+      groupId: 'profile-children',
+      icon: BellIcon,
+      size: 'sm',
+      title: 'Varslingsadresser',
+      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/notifications') }),
+    },
     {
       id: 'saved-searches-profile',
       groupId: 'saved-searches',
