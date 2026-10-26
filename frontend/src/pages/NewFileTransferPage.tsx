@@ -12,7 +12,7 @@ import {
   Checkbox,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
+import { Link, type LinkProps, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
 import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
@@ -38,15 +38,24 @@ import { useFileTransferService } from '../components/FileTransferServiceDetailP
 import { useParties } from '../parties/PartiesContext'
 import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
-import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
+import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
+import { PageRoutes, RESUME_PARAM, activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const { selectedParty } = useParties()
-  return <NewFileTransferPageContent key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}`} />
+  const resumeTransferId = searchParams.get(RESUME_PARAM)
+  return (
+    <NewFileTransferPageContent
+      key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}:${resumeTransferId ?? ''}`}
+      resumeTransferId={resumeTransferId}
+    />
+  )
 }
 
-function NewFileTransferPageContent() {
+/** With a transfer whose upload stopped, the form continues that upload instead of sending a new one. */
+function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: string | null }) {
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
   const { status: partiesStatus, parties, selectedParty, selectParty } = useParties()
@@ -56,7 +65,9 @@ function NewFileTransferPageContent() {
   const [confirmingCancel, setConfirmingCancel] = useState(false)
 
   const { addUploadSuccessListener } = useUploadActions()
-  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
+  const resumable = useResumableUpload(resumeTransferId, serviceId, selectedParty)
+  const resume = resumable.status === 'ready' ? resumable.upload : null
+  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, resume })
 
   useEffect(
     () =>
@@ -104,6 +115,21 @@ function NewFileTransferPageContent() {
     return <p>Fant ikke formidlingstjenesten.</p>
   }
 
+  if (resumable.status === 'missing' || resumable.status === 'failed') {
+    return (
+      <div className="page">
+        <Alert data-color="warning">
+          {resumable.status === 'missing'
+            ? 'Opplastingen kan ikke fortsettes. Filen ble ikke lastet opp ferdig, så formidlingen må sendes på nytt.'
+            : 'Klarte ikke å hente opplastingen. Prøv igjen senere.'}
+        </Alert>
+        <p>
+          <Link to={PageRoutes.drafts}>Tilbake til utkastene</Link>
+        </p>
+      </div>
+    )
+  }
+
   const service = serviceState.service.resource
 
   // Reachable by url even when the service detail page withholds the action.
@@ -131,10 +157,22 @@ function NewFileTransferPageContent() {
         ? form.resumeInterrupted
         : null
 
-  // An interrupted upload settled these when it was created, so they are shown but not editable.
-  const detailsLocked = form.interrupted !== null
+  // The transfer settled these when it was sent, so they are shown but not editable.
+  const detailsLocked = resume !== null
 
   const cancellable = (active !== null && active.status !== 'finishing') || form.interrupted !== null
+
+  // A cancelled upload can't be continued, so the form goes back to sending a new transfer.
+  const cancelUpload = () => {
+    if (active) {
+      form.cancel()
+    } else {
+      form.discardInterrupted()
+    }
+    if (resumeTransferId) {
+      navigate(newFileTransferPath(serviceId), { replace: true })
+    }
+  }
   if (confirmingCancel && !cancellable) {
     setConfirmingCancel(false)
   }
@@ -155,12 +193,12 @@ function NewFileTransferPageContent() {
     >
       <header className="new-transfer__header">
         <Heading level={2} data-size="md">
-          Ny formidling
+          {resumeTransferId ? 'Fortsett formidling' : 'Ny formidling'}
         </Heading>
         <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
       </header>
 
-      {form.loading ? (
+      {form.loading || resumable.status === 'loading' ? (
         <Spinner aria-label="Henter oppsettet for tjenesten" />
       ) : (
         <form
@@ -245,8 +283,9 @@ function NewFileTransferPageContent() {
 
             {form.interrupted && (
               <InterruptedUploadNotice
-                file={form.interrupted.file}
-                uploaded={form.interruptedUploaded}
+                fileName={form.interrupted.fileName}
+                fileSize={form.interrupted.fileSize}
+                uploaded={form.interrupted.plan.uploadedBytes}
                 ready={form.resumeReady}
               />
             )}
@@ -258,6 +297,7 @@ function NewFileTransferPageContent() {
               error={form.wrongFile ?? errors.file}
               onChange={(file) => setValue('file', file)}
             />
+            {form.checkingFile && <Paragraph data-size="sm">Sjekker at det er den samme filen …</Paragraph>}
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <Field>
@@ -315,13 +355,13 @@ function NewFileTransferPageContent() {
             <CancelUploadConfirmation
               onConfirm={() => {
                 setConfirmingCancel(false)
-                form.cancel()
+                cancelUpload()
               }}
               onDismiss={() => setConfirmingCancel(false)}
             />
           ) : (
             <div className="new-transfer__actions">
-              {continueUpload || detailsLocked ? (
+              {continueUpload || form.interrupted ? (
                 <Button
                   type="button"
                   onClick={continueUpload ?? undefined}

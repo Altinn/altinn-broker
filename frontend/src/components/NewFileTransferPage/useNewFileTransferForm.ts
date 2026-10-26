@@ -24,10 +24,13 @@ import {
 } from './formValidation'
 import { resolveRecipientRules } from './recipientRules'
 import { useFileTransferUpload } from './useFileTransferUpload'
+import type { ResumableUpload } from './useResumableUpload'
 
 type Options = {
   resourceId: string
   senderOrgNumber: string
+  /** A stopped upload to continue, whose transfer settled the form when it was sent. */
+  resume: ResumableUpload | null
 }
 
 type LoadedResource = {
@@ -40,7 +43,7 @@ type LoadedResource = {
  * Owns everything the form does: what the resource allows, who may receive, what the user typed,
  * and the send. The page itself only lays the fields out.
  */
-export function useNewFileTransferForm({ resourceId, senderOrgNumber }: Options) {
+export function useNewFileTransferForm({ resourceId, senderOrgNumber, resume }: Options) {
   const { configuration, recipients, loading, loadError } = useResourceContext(
     resourceId,
     senderOrgNumber,
@@ -50,12 +53,14 @@ export function useNewFileTransferForm({ resourceId, senderOrgNumber }: Options)
     recipients,
     senderOrgNumber,
     draftKey(resourceId, senderOrgNumber),
+    resume?.values ?? null,
   )
   const upload = useFileTransferUpload({
     resourceId,
     senderOrgNumber,
     values: form.values,
     errors: form.errors,
+    resume,
   })
 
   return {
@@ -111,18 +116,26 @@ function useResourceContext(resourceId: string, senderOrgNumber: string) {
   }
 }
 
-/** The draft the user is editing, narrowed to what the API accepts, and its validation errors. */
+/**
+ * The draft the user is editing, narrowed to what the API accepts, and its validation errors. When an
+ * upload is continued, its transfer's values are shown instead, and only the file can be picked; the
+ * draft is left as it was for the next new transfer.
+ */
 function useFormValues(
   configuration: ResourceConfiguration | null,
   recipients: AllowedRecipient[],
   senderOrgNumber: string,
   key: string,
+  locked: Omit<NewFileTransferValues, 'file'> | null,
 ) {
-  const [draft, setDraft] = useState(() => readDraft(key) ?? emptyValues())
+  const [draft, setDraft] = useState(() => (locked ? emptyValues() : (readDraft(key) ?? emptyValues())))
+  const isLocked = locked !== null
 
   useEffect(() => {
-    writeDraft(key, draft)
-  }, [key, draft])
+    if (!isLocked) {
+      writeDraft(key, draft)
+    }
+  }, [key, draft, isLocked])
 
   const rules = useMemo(
     () => resolveRecipientRules(recipients, configuration?.requiredParty ?? null, senderOrgNumber),
@@ -131,12 +144,15 @@ function useFormValues(
   const requiredParty = rules.requiredParty
   const virusScanLocked = !configuration?.approvedForDisabledVirusScan
   const values = useMemo<NewFileTransferValues>(
-    () => ({
-      ...draft,
-      recipients: requiredParty ? [requiredParty.organizationNumber] : draft.recipients,
-      virusScan: virusScanLocked || draft.virusScan,
-    }),
-    [draft, requiredParty, virusScanLocked],
+    () =>
+      locked
+        ? { ...locked, file: draft.file }
+        : {
+            ...draft,
+            recipients: requiredParty ? [requiredParty.organizationNumber] : draft.recipients,
+            virusScan: virusScanLocked || draft.virusScan,
+          },
+    [draft, locked, requiredParty, virusScanLocked],
   )
   const maxFileSize = effectiveMaxFileTransferSize(
     configuration?.maxFileTransferSize ?? null,
