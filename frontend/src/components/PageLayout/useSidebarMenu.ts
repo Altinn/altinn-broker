@@ -20,7 +20,6 @@ import { useAuth } from '../../auth/AuthContext'
 import { claimValue } from '../../auth/types'
 import { useLanguage } from '../../i18n/useLanguage'
 import { PageRoutes } from '../../pages/routes'
-import { useParties } from '../../parties/PartiesContext'
 import {
   getAccessManagementLink,
   getArbeidsflateLink,
@@ -59,11 +58,9 @@ function isRouteSelected(currentRoute: string, targetRoute: string) {
 export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuProps; mobileMenu: MenuProps } {
   const { pathname } = useLocation()
   const { user } = useAuth()
-  const { parties } = useParties()
   const { language } = useLanguage()
   const { t } = useTranslation()
   const endUserName = (user && claimValue(user, 'name')) || t('word.you')
-  const hasOnlySelfParty = parties.every((party) => party.type === 'Person')
 
   const menuGroups: MenuProps['groups'] = {
     global: {
@@ -157,26 +154,22 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
   }
 
   const profileShortcutItems: MenuItemProps[] = [
-    ...(hasOnlySelfParty
-      ? []
-      : [
-          {
-            id: 'parties',
-            groupId: 'profile-children',
-            icon: HeartIcon,
-            size: 'sm' as const,
-            title: t('menu.parties'),
-            as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/parties') }),
-          },
-          {
-            id: 'notifications',
-            groupId: 'profile-children',
-            icon: BellIcon,
-            size: 'sm' as const,
-            title: t('menu.notifications'),
-            as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/notifications') }),
-          },
-        ]),
+    {
+      id: 'parties',
+      groupId: 'profile-children',
+      icon: HeartIcon,
+      size: 'sm',
+      title: t('menu.parties'),
+      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/parties') }),
+    },
+    {
+      id: 'notifications',
+      groupId: 'profile-children',
+      icon: BellIcon,
+      size: 'sm',
+      title: t('menu.notifications'),
+      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/notifications') }),
+    },
     {
       id: 'saved-searches-profile',
       groupId: 'saved-searches',

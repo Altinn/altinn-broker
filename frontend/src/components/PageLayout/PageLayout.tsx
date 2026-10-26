@@ -11,6 +11,16 @@ import { useFooter } from './useFooter'
 import { useHeaderConfig } from './useHeaderConfig'
 import { useSidebarMenu } from './useSidebarMenu'
 
+/** Prefer the new page title, then the layout landmark the skip link already targets. */
+function routeFocusTarget(): HTMLElement | null {
+  const main = document.getElementById('main-content')
+  const heading = main?.querySelector('h1')
+  if (heading instanceof HTMLElement) {
+    return heading
+  }
+  return main
+}
+
 function getBreadcrumbItems(
   pathname: string,
   label: (key: string) => string,
@@ -90,9 +100,16 @@ export function PageLayout() {
       return
     }
 
-    document.body.setAttribute('tabindex', '-1')
-    document.body.focus({ preventScroll: true })
-    document.body.removeAttribute('tabindex')
+    const target = routeFocusTarget()
+    if (!target) {
+      return
+    }
+
+    // Headings are not focusable until tabIndex is set. #main-content already is.
+    if (!target.hasAttribute('tabindex')) {
+      target.tabIndex = -1
+    }
+    target.focus({ preventScroll: true })
   }, [pathname])
 
   const layoutProps: LayoutProps = {
