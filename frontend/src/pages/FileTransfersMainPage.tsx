@@ -1,6 +1,7 @@
 import { CardLink } from '../components/CardLink'
 import { useParties } from '../parties/PartiesContext'
 import { OrganizationHeader } from '../components/OrganizationHeader'
+import { IncompleteUploadsBanner } from '../components/FileTransfersPages/IncompleteUploadsBanner'
 import { PageRoutes } from './routes'
 import './pages.css'
 
@@ -12,6 +13,9 @@ export function FileTransfersMainPage() {
     <div className="page">
       <OrganizationHeader />
 
+      {/* Keyed by actor, so a switch doesn't show the previous actor's drafts. */}
+      {selectedParty && <IncompleteUploadsBanner key={selectedParty.partyUuid} party={selectedParty} />}
+
       <section className="page-section">
         <h2 className="page-heading">Dine formidlingstjenester</h2>
         <CardLink
@@ -22,6 +26,15 @@ export function FileTransfersMainPage() {
               ? `Formidlingstjenestene ${organizationName} er delaktig i`
               : 'Formidlingstjenester du er delaktig i'
           }
+        />
+      </section>
+
+      <section className="page-section">
+        <h2 className="page-heading">Utkast</h2>
+        <CardLink
+          to={PageRoutes.drafts}
+          title="Dine utkast"
+          description="Formidlinger der filen ikke er ferdig lastet opp"
         />
       </section>
 

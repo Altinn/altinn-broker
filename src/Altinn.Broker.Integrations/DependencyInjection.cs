@@ -2,6 +2,7 @@
 using Altinn.ApiClients.Maskinporten.Extensions;
 using Altinn.ApiClients.Maskinporten.Services;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
@@ -144,5 +145,8 @@ public static class DependencyInjection
         services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
         services.AddSingleton<ITusUploadKindResolver, TusUploadKindResolver>();
         services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
+        services.AddSingleton<IUploadPlanStore, UploadPlanStore>();
+        services.AddSingleton<ITusUploadProgressReader, TusUploadProgressReader>();
+
     }
 }
