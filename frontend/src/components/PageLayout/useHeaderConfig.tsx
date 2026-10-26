@@ -1,7 +1,9 @@
 import type { GlobalHeaderProps } from '@altinn/altinn-components'
 import { useAccountSelector } from '@altinn/altinn-components'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import { useLanguage } from '../../i18n/useLanguage'
 import { useParties } from '../../parties/PartiesContext'
 import { getFrontPageLink } from './altinnLinks'
 import { useSidebarMenu } from './useSidebarMenu'
@@ -10,6 +12,8 @@ export function useHeaderConfig(): GlobalHeaderProps {
   const { desktopMenu, mobileMenu } = useSidebarMenu()
   const { logout } = useAuth()
   const { status, parties, selfPartyUuid, selectedParty, selectParty } = useParties()
+  const { language, selectLanguage } = useLanguage()
+  const { t } = useTranslation()
 
   // Without a currentAccount, GlobalHeader renders a dead "Logg inn" button (onLoginClick
   // is unset). Fall back to the self account when no organization is selected yet.
@@ -20,29 +24,32 @@ export function useHeaderConfig(): GlobalHeaderProps {
     isLoading: status === 'loading',
     virtualized: parties.length > 20,
     onSelectAccount: selectParty,
-    languageCode: 'nb',
+    languageCode: language,
   })
 
   return {
     logo: {
-      as: (props) => <Link {...props} to={getFrontPageLink()} />,
+      as: (props) => <Link {...props} to={getFrontPageLink(language)} />,
     },
     locale: {
-      title: 'Språk/language',
+      title: t('locale.title'),
+      backLabel: t('word.back'),
       options: [
-        { label: 'Bokmål', value: 'nb', checked: true },
-        { label: 'Nynorsk', value: 'nn', checked: false },
-        { label: 'English', value: 'en', checked: false },
+        { label: t('locale.nb'), value: 'nb', checked: language === 'nb' },
+        { label: t('locale.nn'), value: 'nn', checked: language === 'nn' },
+        { label: t('locale.en'), value: 'en', checked: language === 'en' },
       ],
-      onSelect: () => {},
+      onSelect: (value) => {
+        void selectLanguage(value)
+      },
     },
     accountSelector,
     globalMenu: {
-      menuLabel: 'Meny',
-      backLabel: 'Tilbake',
+      menuLabel: t('word.menu'),
+      backLabel: t('word.back'),
       menu: desktopMenu,
       logoutButton: {
-        label: 'Logg ut',
+        label: t('word.log_out'),
         onClick: () => logout('/'),
       },
     },
