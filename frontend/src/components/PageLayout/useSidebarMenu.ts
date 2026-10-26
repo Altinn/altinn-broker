@@ -13,7 +13,6 @@ import {
   MenuGridIcon,
   PadlockLockedFillIcon,
   PersonCircleIcon,
-  PlusIcon,
 } from '@navikt/aksel-icons'
 import { useLocation } from 'react-router-dom'
 import { claimValue } from '../../auth/types'
@@ -63,11 +62,6 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
   const hasOnlySelfParty = parties.every((party) => party.type === 'Person')
 
   const menuGroups: MenuProps['groups'] = {
-    shortcuts: {
-      divider: true,
-      size: 'sm',
-      title: 'Snarveier',
-    },
     global: {
       divider: false,
     },
@@ -133,30 +127,6 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
     },
   ]
 
-  const shortcuts: MenuItemProps[] = [
-    {
-      id: 'new-schema',
-      groupId: 'shortcuts',
-      icon: PlusIcon,
-      title: 'Nytt skjema',
-      as: createMenuItemComponent({ to: getNewFormLink() }),
-    },
-    {
-      id: 'profile',
-      groupId: 'shortcuts-profile',
-      icon: PersonCircleIcon,
-      title: 'Din profil',
-      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile') }),
-    },
-    {
-      id: 'saved-searches',
-      groupId: 'shortcuts-profile',
-      icon: MagnifyingGlassIcon,
-      title: 'Lagrede søk',
-      as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/saved-searches') }),
-    },
-  ]
-
   const helpItems: MenuItemProps[] = [
     {
       id: 'start-business',
@@ -215,8 +185,20 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
 
   const sidebarMenu: MenuProps = {
     variant: 'tinted',
-    groups: menuGroups,
-    items: [inboxItem, ...fileTransferItems, ...shortcuts, helpPages],
+    groups: {
+      global: { divider: false },
+      help: { divider: true, size: 'sm' },
+    },
+    items: [
+      ...fileTransferItems,
+      {
+        id: 'help-pages',
+        groupId: 'help',
+        icon: ExternalLinkIcon,
+        title: 'Hjelpesider',
+        as: createMenuItemComponent({ to: getNeedHelpLink(), isExternal: true }),
+      },
+    ],
   }
 
   const mobileMenu: MenuProps = {
