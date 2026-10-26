@@ -1,4 +1,5 @@
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { i18n } from '../../i18n/config'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import {
   toCustomRecipientIdentifier,
@@ -40,10 +41,10 @@ export function hasErrors(errors: NewFileTransferErrors): boolean {
 
 function validateReference(reference: string): string | undefined {
   if (!reference.trim()) {
-    return 'Referanse må fylles ut.'
+    return i18n.t('page.validation.reference_required')
   }
   if (reference.length > MAX_REFERENCE_LENGTH) {
-    return `Referanse kan være maks ${MAX_REFERENCE_LENGTH} tegn.`
+    return i18n.t('page.validation.reference_max', { max: MAX_REFERENCE_LENGTH })
   }
   return undefined
 }
@@ -54,18 +55,18 @@ function validateRecipients(recipients: string[], rules: RecipientRules): string
   if (requiredParty) {
     return recipients.length === 1 && recipients[0] === requiredParty.organizationNumber
       ? undefined
-      : `Tjenesten krever at ${requiredParty.name} er eneste mottaker.`
+      : i18n.t('page.validation.recipient_only', { name: requiredParty.name })
   }
 
   if (recipients.length === 0) {
-    return 'Velg minst én mottaker.'
+    return i18n.t('page.validation.recipient_min')
   }
 
   const outsideAccessList = recipients.find(
     (recipient) => !options.some((option) => option.organizationNumber === recipient),
   )
   return outsideAccessList
-    ? `${formatOrgNumber(outsideAccessList)} står ikke i tilgangslisten for tjenesten.`
+    ? i18n.t('page.validation.recipient_not_allowed', { org: formatOrgNumber(outsideAccessList) })
     : undefined
 }
 
@@ -85,23 +86,23 @@ export function validateMetadataRows(metadata: MetadataEntry[]): MetadataRowErro
 function metadataKeyError(rawKey: string, duplicates: Set<string>): string | undefined {
   const key = rawKey.trim()
   if (!key) {
-    return 'Nøkkel må fylles ut.'
+    return i18n.t('page.validation.metadata_key_required')
   }
   if (key.length > MAX_METADATA_KEY_LENGTH) {
-    return `Nøkkel kan være maks ${MAX_METADATA_KEY_LENGTH} tegn.`
+    return i18n.t('page.validation.metadata_key_max', { max: MAX_METADATA_KEY_LENGTH })
   }
   if (duplicates.has(key)) {
-    return 'To metadata kan ikke ha samme nøkkel.'
+    return i18n.t('page.validation.metadata_key_duplicate')
   }
   return undefined
 }
 
 function metadataValueError(value: string): string | undefined {
   if (!value.trim()) {
-    return 'Verdi må fylles ut.'
+    return i18n.t('page.validation.metadata_value_required')
   }
   if (value.length > MAX_METADATA_VALUE_LENGTH) {
-    return `Verdi kan være maks ${MAX_METADATA_VALUE_LENGTH} tegn.`
+    return i18n.t('page.validation.metadata_value_max', { max: MAX_METADATA_VALUE_LENGTH })
   }
   return undefined
 }
@@ -125,7 +126,7 @@ function duplicateKeys(metadata: MetadataEntry[]): Set<string> {
 /** Summarises the rows for the error summary; the rows themselves carry the message the user acts on. */
 function validateMetadata(metadata: MetadataEntry[]): string | undefined {
   if (metadata.length > MAX_METADATA_ENTRIES) {
-    return `Du kan legge til maks ${MAX_METADATA_ENTRIES} metadata.`
+    return i18n.t('page.validation.metadata_max', { max: MAX_METADATA_ENTRIES })
   }
   const failed = validateMetadataRows(metadata).find((row) => row.key ?? row.value)
   return failed?.key ?? failed?.value
@@ -149,16 +150,16 @@ export function validateCustomRecipientRows(
     identifier: customRecipientIdentifierError(entry.identifier),
     relatedOrganization: recipients.includes(entry.relatedOrganizationNumber)
       ? undefined
-      : 'Velg hvilken mottaker varselet gjelder.',
+      : i18n.t('page.validation.custom_related'),
   }))
 }
 
 function customRecipientIdentifierError(identifier: string): string | undefined {
   if (!identifier.trim()) {
-    return 'Fyll ut hvem som skal varsles.'
+    return i18n.t('page.validation.custom_who')
   }
   if (!toCustomRecipientIdentifier(identifier)) {
-    return 'Oppgi en e-postadresse eller et mobilnummer.'
+    return i18n.t('page.validation.custom_contact')
   }
   return undefined
 }
@@ -169,7 +170,7 @@ function validateCustomRecipients(values: NewFileTransferValues): string | undef
     return undefined
   }
   if (values.customRecipients.length === 0) {
-    return 'Legg til minst én som skal varsles, eller slå av varsling av andre.'
+    return i18n.t('page.validation.custom_min')
   }
   const failed = validateCustomRecipientRows(values.customRecipients, values.recipients).find(
     (row) => row.identifier ?? row.relatedOrganization,
@@ -187,26 +188,29 @@ function validateChecksum(checksum: string, algorithm: keyof typeof CHECKSUM_LEN
 
   const expectedLength = CHECKSUM_LENGTH[algorithm]
   if (value.length !== expectedLength) {
-    return `En ${algorithm}-sjekksum er ${expectedLength} tegn.`
+    return i18n.t('page.validation.checksum_length', { algorithm, length: expectedLength })
   }
   if (value.toLowerCase() !== value) {
-    return 'Sjekksummen må skrives med små bokstaver.'
+    return i18n.t('page.validation.checksum_lowercase')
   }
   return undefined
 }
 
 function validateFile(file: File | null, maxFileSize: number | null): string | undefined {
   if (!file) {
-    return 'Velg en fil.'
+    return i18n.t('page.validation.file_required')
   }
   if (file.size === 0) {
-    return 'Filen er tom.'
+    return i18n.t('page.validation.file_empty')
   }
   if (file.name.length > MAX_FILE_NAME_LENGTH) {
-    return `Filnavnet kan være maks ${MAX_FILE_NAME_LENGTH} tegn.`
+    return i18n.t('page.validation.file_name_max', { max: MAX_FILE_NAME_LENGTH })
   }
   if (maxFileSize !== null && file.size > maxFileSize) {
-    return `Filen er ${formatFileSize(file.size)}. Tjenesten tillater maks ${formatFileSize(maxFileSize)}.`
+    return i18n.t('page.validation.file_too_big', {
+      size: formatFileSize(file.size),
+      max: formatFileSize(maxFileSize),
+    })
   }
   return undefined
 }

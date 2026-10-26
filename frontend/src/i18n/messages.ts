@@ -1,7 +1,9 @@
 /**
- * Shell copy for Bokmål, Nynorsk, and English.
- * Shared Altinn labels follow Arbeidsflate. Broker pages stay Norwegian until a later pass.
+ * Shell and page copy for Bokmål, Nynorsk, and English.
+ * Shared Altinn labels follow Arbeidsflate.
  */
+import { pageMessages } from './pageMessages'
+
 const nb = {
   word: {
     menu: 'Meny',
@@ -60,6 +62,7 @@ const nb = {
     privacy: 'Personvern',
     accessibility: 'Tilgjengelighet',
   },
+  page: pageMessages.nb,
 }
 
 export type ShellMessages = typeof nb
@@ -124,6 +127,7 @@ export const messages: Record<'nb' | 'nn' | 'en', ShellMessages> = {
       privacy: 'Personvern',
       accessibility: 'Tilgjengelegheit',
     },
+    page: pageMessages.nn,
   },
   en: {
     word: {
@@ -183,5 +187,6 @@ export const messages: Record<'nb' | 'nn' | 'en', ShellMessages> = {
       privacy: 'Privacy',
       accessibility: 'Accessibility',
     },
+    page: pageMessages.en,
   },
 }

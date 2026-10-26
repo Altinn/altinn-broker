@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'react-toastify'
 import type { FileTransferDetails } from '../../api/fileTransferDetail'
 import type { SelectedParty } from '../../parties/PartiesContext'
@@ -15,6 +16,7 @@ type FileTransferActionsProps = {
 }
 
 export function FileTransferActions({ transferDetails, onBehalfOf, onDownloadConfirmed, onDownloadStarted }: FileTransferActionsProps) {
+  const { t } = useTranslation()
   const [isConfirming, setIsConfirming] = useState(false)
 
   const isSender = transferDetails.isSender === true
@@ -32,7 +34,7 @@ export function FileTransferActions({ transferDetails, onBehalfOf, onDownloadCon
     } catch (error) {
       console.error('Error confirming download:', error)
       // Confirming deletes the files, so the user has to know it did not go through.
-      toast.error('Klarte ikke å bekrefte nedlastingen. Prøv igjen.')
+      toast.error(t('page.detail.confirm_failed'))
     } finally {
       setIsConfirming(false)
     }
@@ -57,17 +59,17 @@ export function FileTransferActions({ transferDetails, onBehalfOf, onDownloadCon
               href={getFileTransferDownloadUrl(transferDetails.fileTransferId, onBehalfOf)}
               onClick={handleStartDownloadClick}
             >
-              Start nedlasting
+              {t('page.detail.start_download')}
             </a>
           )}
           {canConfirmDownload && (
             <button type="button" className="button" disabled={isConfirming} onClick={handleConfirmDownload}>
-              Bekreft nedlasting
+              {t('page.detail.confirm_download')}
             </button>
           )}
           {isDownloadConfirmed && (
             <button type="button" className="button" disabled>
-              Nedlasting bekreftet
+              {t('page.detail.download_confirmed')}
             </button>
           )}
         </div>

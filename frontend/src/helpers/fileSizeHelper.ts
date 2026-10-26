@@ -1,3 +1,5 @@
+import { intlLocale } from '../i18n/config'
+
 const UNITS = ['B', 'kB', 'MB', 'GB', 'TB']
 const BYTES_PER_GB = 1000 ** 3
 
@@ -9,7 +11,7 @@ export function formatFileSize(bytes: number | undefined): string {
 
   const { value, unit } = toLargestUnit(bytes)
 
-  return `${value.toLocaleString('nb-NO', { maximumSignificantDigits: 3 })} ${UNITS[unit]}`
+  return `${value.toLocaleString(intlLocale(), { maximumSignificantDigits: 3 })} ${UNITS[unit]}`
 }
 
 /** Decimal gigabytes, matching how the API expresses its size limits. */

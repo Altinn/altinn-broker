@@ -12,6 +12,7 @@ import {
   Checkbox,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
 import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
@@ -27,7 +28,8 @@ import { UploadProgress } from '../components/NewFileTransferPage/UploadProgress
 import { VirusScanField } from '../components/NewFileTransferPage/VirusScanField'
 import {
   fieldId,
-  fieldLabels,
+  fieldLabel,
+  newFileTransferFields,
   type NewFileTransferField,
 } from '../components/NewFileTransferPage/formFields'
 import { MAX_REFERENCE_LENGTH } from '../components/NewFileTransferPage/formValidation'
@@ -47,6 +49,7 @@ export function NewFileTransferPage() {
 }
 
 function NewFileTransferPageContent() {
+  const { t } = useTranslation()
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
   const { status: partiesStatus, parties, selectedParty, selectParty } = useParties()
@@ -85,23 +88,23 @@ function NewFileTransferPageContent() {
   }, [submitAttempts])
 
   if (partiesStatus === 'failed') {
-    return <p>Klarte ikke å hente aktører.</p>
+    return <p>{t('page.parties.load_failed_short')}</p>
   }
 
   if (partiesStatus === 'loaded' && !selectedParty) {
-    return <p>Du kan ikke representere noen virksomheter i BrokerBox.</p>
+    return <p>{t('page.parties.none_message')}</p>
   }
 
   if (serviceState === null) {
-    return <Spinner aria-label="Henter formidlingstjenesten" />
+    return <Spinner aria-label={t('page.service.loading')} />
   }
 
   if (serviceState.status === 'failed') {
-    return <p>Klarte ikke å hente formidlingstjenesten.</p>
+    return <p>{t('page.service.load_failed_short')}</p>
   }
 
   if (serviceState.status === 'missing') {
-    return <p>Fant ikke formidlingstjenesten.</p>
+    return <p>{t('page.service.missing_short')}</p>
   }
 
   const service = serviceState.service.resource
@@ -115,9 +118,7 @@ function NewFileTransferPageContent() {
     )
   }
 
-  const failedFields = (Object.keys(fieldLabels) as NewFileTransferField[]).filter(
-    (field) => errors[field],
-  )
+  const failedFields = newFileTransferFields.filter((field) => errors[field])
 
   const { active, blockedBy } = form
   const status = active?.status ?? null
@@ -149,19 +150,19 @@ function NewFileTransferPageContent() {
     <DialogLayout
       color="company"
       backButton={{
-        label: 'Tilbake',
+        label: t('page.common.back'),
         as: (props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />,
       }}
     >
       <header className="new-transfer__header">
         <Heading level={2} data-size="md">
-          Ny formidling
+          {t('page.new.title')}
         </Heading>
         <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
       </header>
 
       {form.loading ? (
-        <Spinner aria-label="Henter oppsettet for tjenesten" />
+        <Spinner aria-label={t('page.service.loading_settings')} />
       ) : (
         <form
           className="new-transfer__form"
@@ -184,8 +185,8 @@ function NewFileTransferPageContent() {
           <fieldset className="new-transfer__fields" disabled={active !== null}>
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <PartyField
-                label="Avsender"
-                description="Du formidler på vegne av denne organisasjonen."
+                label={t('page.common.sender')}
+                description={t('page.new.sender_description')}
                 name={selectedParty?.name ?? ''}
                 organizationNumber={senderOrgNumber}
               />
@@ -200,8 +201,8 @@ function NewFileTransferPageContent() {
 
               <Textfield
                 id={fieldId('reference')}
-                label="Referanse"
-                description="Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere."
+                label={t('page.common.reference')}
+                description={t('page.new.reference_description')}
                 value={values.reference}
                 error={errors.reference}
                 maxLength={MAX_REFERENCE_LENGTH}
@@ -216,7 +217,7 @@ function NewFileTransferPageContent() {
               />
               <Checkbox
                 id={fieldId('notifications')}
-                label="Varsle mottakere"
+                label={t('page.new.notify')}
                 checked={values.notifications}
                 onChange={(event) => setValue('notifications', event.target.checked)}
               />
@@ -263,12 +264,12 @@ function NewFileTransferPageContent() {
               <Field>
                 <Switch
                   id={fieldId('checksumEnabled')}
-                  label="Valider sjekksum"
+                  label={t('page.new.validate_checksum')}
                   checked={values.checksumEnabled}
                   onChange={(event) => setValue('checksumEnabled', event.target.checked)}
                 />
                 <Field.Description>
-                  Sjekksummen beregnes når filen er lastet opp.
+                  {t('page.new.checksum_computed')}
                 </Field.Description>
               </Field>
               {values.checksumEnabled && (
@@ -291,12 +292,12 @@ function NewFileTransferPageContent() {
           {failedFields.length > 0 && (
             <div ref={errorSummaryRef} tabIndex={-1} className="new-transfer__error-summary">
               <ErrorSummary>
-                <ErrorSummary.Heading>Rett opp disse før du sender</ErrorSummary.Heading>
+                <ErrorSummary.Heading>{t('page.new.fix_errors')}</ErrorSummary.Heading>
                 <ErrorSummary.List>
                   {failedFields.map((field) => (
                     <ErrorSummary.Item key={field}>
                       <ErrorSummary.Link href={`#${metadataErrorTargetId(field)}`}>
-                        {fieldLabels[field]}: {errors[field]}
+                        {fieldLabel(field)}: {errors[field]}
                       </ErrorSummary.Link>
                     </ErrorSummary.Item>
                   ))}
@@ -327,7 +328,7 @@ function NewFileTransferPageContent() {
                   onClick={continueUpload ?? undefined}
                   disabled={continueUpload === null}
                 >
-                  Fortsett opplastingen
+                  {t('page.new.continue_upload')}
                 </Button>
               ) : (
                 <Button
@@ -335,12 +336,12 @@ function NewFileTransferPageContent() {
                   loading={active !== null}
                   disabled={active !== null || blockedBy !== null}
                 >
-                  {active ? 'Laster opp…' : 'Send formidling'}
+                  {active ? t('page.new.uploading') : t('page.new.send')}
                 </Button>
               )}
               {cancellable && (
                 <Button type="button" variant="secondary" onClick={() => setConfirmingCancel(true)}>
-                  Avbryt opplastingen
+                  {t('page.new.cancel_upload')}
                 </Button>
               )}
             </div>
