@@ -1,4 +1,6 @@
 import type { FooterProps } from '@altinn/altinn-components'
+import { useTranslation } from 'react-i18next'
+import { useLanguage } from '../../i18n/useLanguage'
 import {
   getAboutAltinnLink,
   getAccessibilityLink,
@@ -8,16 +10,19 @@ import {
 } from './altinnLinks'
 
 export function useFooter(): FooterProps {
+  const { language } = useLanguage()
+  const { t } = useTranslation()
+
   return {
-    address: 'Digitaliseringsdirektoratet, Postboks 1382 Vika, 0114 Oslo. ',
-    address2: 'Org.nr. 991 825 827',
+    address: t('footer.address'),
+    address2: t('footer.address2'),
     menu: {
       items: [
-        { id: 'help', href: getNeedHelpLink(), title: 'Hjelp og kontakt' },
-        { id: 'about', href: getAboutAltinnLink(), title: 'Om Altinn' },
-        { id: 'announcements', href: getAnnouncementsLink(), title: 'Driftsmeldinger' },
-        { id: 'privacy', href: getPrivacyLink(), title: 'Personvern' },
-        { id: 'accessibility', href: getAccessibilityLink(), title: 'Tilgjengelighet' },
+        { id: 'help', href: getNeedHelpLink(language), title: t('footer.help') },
+        { id: 'about', href: getAboutAltinnLink(language), title: t('footer.about') },
+        { id: 'announcements', href: getAnnouncementsLink(language), title: t('footer.announcements') },
+        { id: 'privacy', href: getPrivacyLink(language), title: t('footer.privacy') },
+        { id: 'accessibility', href: getAccessibilityLink(language), title: t('footer.accessibility') },
       ],
     },
   }

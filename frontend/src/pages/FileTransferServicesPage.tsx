@@ -1,5 +1,6 @@
 import { Alert, Heading, List, ResourceListItem } from '@altinn/altinn-components'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
 import { SearchField } from '../components/SearchField'
@@ -15,6 +16,7 @@ type ResourcesState =
   | { party: string; status: 'failed' }
 
 export function FileTransferServicesPage() {
+  const { t } = useTranslation()
   const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
   const [resources, setResources] = useState<ResourcesState | null>(null)
@@ -68,8 +70,8 @@ export function FileTransferServicesPage() {
       key={service.resourceId}
       id={service.resourceId}
       resourceName={serviceName(service)}
-      ownerName={service.serviceOwnerName ?? 'Ukjent eier'}
-      description={service.serviceOwnerName ? `Eid av ${service.serviceOwnerName}` : undefined}
+      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
+      description={service.serviceOwnerName ? t('page.common.owned_by', { name: service.serviceOwnerName }) : undefined}
       variant="default"
       interactive
       as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
@@ -81,8 +83,8 @@ export function FileTransferServicesPage() {
       <div className="page">
         <Alert
           variant="danger"
-          heading="Kunne ikke hente aktører"
-          message="Vi fikk ikke hentet hvilke virksomheter du kan representere. Prøv igjen senere."
+          heading={t('page.parties.load_failed_heading')}
+          message={t('page.parties.load_failed_message')}
         />
       </div>
     )
@@ -93,8 +95,8 @@ export function FileTransferServicesPage() {
       <div className="page">
         <Alert
           variant="info"
-          heading="Ingen virksomheter"
-          message="Du kan ikke representere noen virksomheter i BrokerBox."
+          heading={t('page.parties.none_heading')}
+          message={t('page.parties.none_message')}
         />
       </div>
     )
@@ -102,12 +104,12 @@ export function FileTransferServicesPage() {
 
   return (
     <div className="page">
-      <h1 className="page-heading">Dine formidlingstjenester</h1>
+      <h1 className="page-heading">{t('page.services.title')}</h1>
 
       <div className="filter-row">
         <SearchField
           id="service-search"
-          label="Søk etter formidlingstjenester"
+          label={t('page.services.search')}
           value={search}
           onChange={setSearch}
         />
@@ -119,8 +121,8 @@ export function FileTransferServicesPage() {
             <ResourceListItem
               key={placeholder}
               id={`placeholder-${placeholder}`}
-              resourceName="Laster formidlingstjeneste"
-              ownerName="Laster eier"
+              resourceName={t('page.services.loading_name')}
+              ownerName={t('page.services.loading_owner')}
               loading
             />
           ))}
@@ -130,23 +132,23 @@ export function FileTransferServicesPage() {
       {current?.status === 'failed' && (
         <Alert
           variant="danger"
-          heading="Kunne ikke hente formidlingstjenester"
-          message="Prøv igjen senere."
+          heading={t('page.services.load_failed_heading')}
+          message={t('page.common.try_later')}
         />
       )}
 
       {current?.status === 'loaded' && services.length === 0 && (
         <Alert
           variant="info"
-          heading="Ingen formidlingstjenester"
-          message={`${organizationName} har ikke tilgang til noen formidlingstjenester.`}
+          heading={t('page.services.empty_heading')}
+          message={t('page.services.empty_message', { name: organizationName })}
         />
       )}
 
       {sendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan sende med
+            {t('page.services.can_send', { name: organizationName })}
           </Heading>
           <List spacing="sm">{sendable.map(serviceItem)}</List>
         </section>
@@ -155,7 +157,7 @@ export function FileTransferServicesPage() {
       {receivableNotSendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Andre formidlingstjenester {organizationName} er delaktig i
+            {t('page.services.involved', { name: organizationName })}
           </Heading>
           <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
         </section>
@@ -164,7 +166,7 @@ export function FileTransferServicesPage() {
       {isServiceOwner && configurable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan konfigurere
+            {t('page.services.can_configure', { name: organizationName })}
           </Heading>
           <List spacing="sm">{configurable.map(serviceItem)}</List>
         </section>

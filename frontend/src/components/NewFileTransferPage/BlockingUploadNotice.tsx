@@ -1,6 +1,8 @@
 import { Alert, Button, Heading, Paragraph } from '@digdir/designsystemet-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { i18n } from '../../i18n/config'
 import { useUploadProgress, type ActiveUpload } from '../../upload/uploadsContext'
 import { CancelUploadConfirmation } from './CancelUploadConfirmation'
 
@@ -11,6 +13,7 @@ type BlockingUploadNoticeProps = {
 }
 
 export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingUploadNoticeProps) {
+  const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
   const percent = useUploadProgress()?.percent ?? null
 
@@ -26,15 +29,18 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
         {heading(upload)}
       </Heading>
       <Paragraph data-size="sm">
-        «{upload.fileName}» ({formatFileSize(upload.fileSize)}){progressText(upload, percent)}. Du
-        kan laste opp én fil om gangen, så denne må fullføres eller avbrytes før du sender en ny.
+        {t('page.blocking.body', {
+          name: upload.fileName,
+          size: formatFileSize(upload.fileSize),
+          progress: progressText(upload, percent),
+        })}
       </Paragraph>
       {confirming ? (
         <CancelUploadConfirmation onConfirm={onCancel} onDismiss={() => setConfirming(false)} />
       ) : (
         <div className="new-transfer__resume-actions">
           <Button type="button" variant="secondary" data-size="sm" onClick={onContinue}>
-            Gå til opplastingen
+            {t('page.blocking.go')}
           </Button>
           {cancellable && (
             <Button
@@ -43,7 +49,7 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
               data-size="sm"
               onClick={() => setConfirming(true)}
             >
-              Avbryt den opplastingen
+              {t('page.blocking.cancel')}
             </Button>
           )}
         </div>
@@ -54,19 +60,21 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
 
 function progressText(upload: ActiveUpload, percent: number | null): string {
   if (percent !== null) {
-    return ` er ${percent} % lastet opp`
+    return i18n.t('page.blocking.percent', { percent })
   }
-  return upload.status === 'initializing' ? ' er ikke kommet i gang ennå' : ' er ikke fullført'
+  return upload.status === 'initializing'
+    ? i18n.t('page.blocking.not_started')
+    : i18n.t('page.blocking.incomplete')
 }
 
 function heading(upload: ActiveUpload): string {
   switch (upload.status) {
     case 'failed':
-      return 'En annen opplasting stoppet'
+      return i18n.t('page.blocking.failed')
     case 'pausing':
     case 'paused':
-      return 'En annen opplasting er satt på pause'
+      return i18n.t('page.blocking.paused')
     default:
-      return 'En annen opplasting pågår'
+      return i18n.t('page.blocking.active')
   }
 }

@@ -7,16 +7,18 @@ import {
   ChatExclamationmarkIcon,
   ExternalLinkIcon,
   FileCheckmarkIcon,
-  InboxFillIcon,
   HeartIcon,
+  InboxFillIcon,
   MagnifyingGlassIcon,
   MenuGridIcon,
   PadlockLockedFillIcon,
   PersonCircleIcon,
 } from '@navikt/aksel-icons'
+import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
-import { claimValue } from '../../auth/types'
 import { useAuth } from '../../auth/AuthContext'
+import { claimValue } from '../../auth/types'
+import { useLanguage } from '../../i18n/useLanguage'
 import { PageRoutes } from '../../pages/routes'
 import {
   getAccessManagementLink,
@@ -56,7 +58,9 @@ function isRouteSelected(currentRoute: string, targetRoute: string) {
 export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuProps; mobileMenu: MenuProps } {
   const { pathname } = useLocation()
   const { user } = useAuth()
-  const endUserName = (user && claimValue(user, 'name')) || 'Deg'
+  const { language } = useLanguage()
+  const { t } = useTranslation()
+  const endUserName = (user && claimValue(user, 'name')) || t('word.you')
 
   const menuGroups: MenuProps['groups'] = {
     global: {
@@ -68,7 +72,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
     },
     'profile-shortcut': {
       divider: true,
-      title: `Logget inn som ${endUserName}`,
+      title: t('menu.logged_in_as', { name: endUserName }),
     },
   }
 
@@ -77,7 +81,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
     groupId: 'global',
     size: 'lg',
     icon: InboxFillIcon,
-    title: 'Innboks',
+    title: t('menu.inbox'),
     selected: false,
     as: createMenuItemComponent({ to: getArbeidsflateLink('/') }),
   }
@@ -88,7 +92,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
       groupId: 'global',
       size: 'lg',
       icon: ArrowRightLeftIcon,
-      title: 'Formidlinger',
+      title: t('menu.file_transfers'),
       selected: isRouteSelected(pathname, PageRoutes.fileTransfers),
       expanded: true,
       as: createMenuItemComponent({ to: PageRoutes.fileTransfers }),
@@ -98,7 +102,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
           size: 'md',
           groupId: 'file-transfers',
           icon: PersonCircleIcon,
-          title: 'Dine formidlingstjenester',
+          title: t('menu.services'),
           selected: isRouteSelected(pathname, PageRoutes.services),
           as: createMenuItemComponent({ to: PageRoutes.services }),
         },
@@ -107,7 +111,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
           size: 'md',
           groupId: 'file-transfers',
           icon: FileCheckmarkIcon,
-          title: 'Aktive formidlinger',
+          title: t('menu.active'),
           selected: isRouteSelected(pathname, PageRoutes.active),
           as: createMenuItemComponent({ to: PageRoutes.active }),
         },
@@ -116,7 +120,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
           size: 'md',
           groupId: 'file-transfers',
           icon: ArchiveIcon,
-          title: 'Historiske formidlinger',
+          title: t('menu.historical'),
           selected: isRouteSelected(pathname, PageRoutes.historical),
           as: createMenuItemComponent({ to: PageRoutes.historical }),
         },
@@ -129,15 +133,15 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
       id: 'start-business',
       groupId: 'help',
       icon: Buildings2Icon,
-      title: 'Starte og drive bedrift',
-      as: createMenuItemComponent({ to: getStartNewBusinessLink() }),
+      title: t('menu.start_business'),
+      as: createMenuItemComponent({ to: getStartNewBusinessLink(language) }),
     },
     {
       id: 'need-help',
       groupId: 'help',
       icon: ChatExclamationmarkIcon,
-      title: 'Trenger du hjelp?',
-      as: createMenuItemComponent({ to: getNeedHelpLink() }),
+      title: t('menu.need_help'),
+      as: createMenuItemComponent({ to: getNeedHelpLink(language) }),
     },
   ]
 
@@ -145,8 +149,8 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
     id: 'help-pages',
     groupId: 'help',
     icon: ExternalLinkIcon,
-    title: 'Hjelpesider',
-    as: createMenuItemComponent({ to: getHelpPagesLink(), isExternal: true }),
+    title: t('menu.help_pages'),
+    as: createMenuItemComponent({ to: getHelpPagesLink(language), isExternal: true }),
   }
 
   const profileShortcutItems: MenuItemProps[] = [
@@ -155,7 +159,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
       groupId: 'profile-children',
       icon: HeartIcon,
       size: 'sm',
-      title: 'Aktører og favoritter',
+      title: t('menu.parties'),
       as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/parties') }),
     },
     {
@@ -163,7 +167,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
       groupId: 'profile-children',
       icon: BellIcon,
       size: 'sm',
-      title: 'Varslingsadresser',
+      title: t('menu.notifications'),
       as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/notifications') }),
     },
     {
@@ -171,7 +175,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
       groupId: 'saved-searches',
       icon: MagnifyingGlassIcon,
       size: 'sm',
-      title: 'Lagrede søk',
+      title: t('menu.saved_searches'),
       as: createMenuItemComponent({ to: getArbeidsflateLink('/profile/saved-searches') }),
     },
   ]
@@ -188,8 +192,8 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
         id: 'help-pages',
         groupId: 'help',
         icon: ExternalLinkIcon,
-        title: 'Hjelpesider',
-        as: createMenuItemComponent({ to: getNeedHelpLink(), isExternal: true }),
+        title: t('menu.help_pages'),
+        as: createMenuItemComponent({ to: getNeedHelpLink(language), isExternal: true }),
       },
     ],
   }
@@ -206,7 +210,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
         icon: PadlockLockedFillIcon,
         as: 'a',
         href: getAccessManagementLink(),
-        title: 'Tilgangsstyring',
+        title: t('menu.access_management'),
         selected: false,
       },
       {
@@ -214,8 +218,8 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
         groupId: 'global',
         size: 'lg',
         icon: MenuGridIcon,
-        title: 'Alle skjema og tjenester',
-        as: createMenuItemComponent({ to: getNewFormLink() }),
+        title: t('menu.all_forms'),
+        as: createMenuItemComponent({ to: getNewFormLink(language) }),
         selected: false,
       },
       {
@@ -223,8 +227,8 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
         groupId: 'global',
         size: 'lg',
         icon: MagnifyingGlassIcon,
-        title: 'Søk i Altinn',
-        as: createMenuItemComponent({ to: `${getFrontPageLink()}/sok?` }),
+        title: t('menu.search'),
+        as: createMenuItemComponent({ to: `${getFrontPageLink(language)}/sok?` }),
         selected: false,
       },
       ...helpItems,
@@ -235,7 +239,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
         size: 'sm',
         as: createMenuItemComponent({ to: getArbeidsflateLink('/profile') }),
         icon: PersonCircleIcon,
-        title: 'Din profil',
+        title: t('menu.profile'),
         selected: false,
         expanded: true,
         items: profileShortcutItems,
