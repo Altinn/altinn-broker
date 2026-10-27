@@ -1,14 +1,29 @@
-import type { BreadcrumbsLinkProps } from '@altinn/altinn-components'
-import { Layout, type LayoutProps } from '@altinn/altinn-components'
-import { useMemo } from 'react'
+import type { BreadcrumbsLinkProps, LayoutProps } from '@altinn/altinn-components'
+import { Layout } from '@altinn/altinn-components'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, type LinkProps, Outlet, useLocation } from 'react-router-dom'
 import { PageRoutes } from '../../pages/routes'
+import { getBannerLink, getFrontPageLink } from './altinnLinks'
 import { useFooter } from './useFooter'
 import { useHeaderConfig } from './useHeaderConfig'
 import { useSidebarMenu } from './useSidebarMenu'
 
+/** Prefer the new page title, then the layout landmark the skip link already targets. */
+function routeFocusTarget(): HTMLElement | null {
+  const main = document.getElementById('main-content')
+  const heading = main?.querySelector('h1')
+  if (heading instanceof HTMLElement) {
+    return heading
+  }
+  return main
+}
+
 function getBreadcrumbItems(pathname: string): BreadcrumbsLinkProps[] {
   const items: BreadcrumbsLinkProps[] = [
+    {
+      label: 'Start',
+      as: (props: LinkProps) => <Link {...props} to={getFrontPageLink()} />,
+    },
     {
       label: 'Formidlinger',
       as: (props: LinkProps) => <Link {...props} to={PageRoutes.fileTransfers} />,
@@ -24,9 +39,7 @@ function getBreadcrumbItems(pathname: string): BreadcrumbsLinkProps[] {
     if (pathname.match(/\/file-transfers\/services\/[^/]+/)) {
       items.push({
         label: 'Formidlingstjeneste',
-        as: (props: LinkProps) => (
-          <Link {...props} to={pathname.replace(/\/new$/, '')} />
-        ),
+        as: (props: LinkProps) => <Link {...props} to={pathname.replace(/\/new$/, '')} />,
       })
     }
 
@@ -63,18 +76,42 @@ export function PageLayout() {
   const { pathname } = useLocation()
   const header = useHeaderConfig()
   const footer = useFooter()
-  const sidebarMenu = useSidebarMenu()
+  const { sidebarMenu } = useSidebarMenu()
+  const isInitialRender = useRef(true)
 
   const breadcrumbItems = useMemo(() => getBreadcrumbItems(pathname), [pathname])
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    if (isInitialRender.current) {
+      isInitialRender.current = false
+      return
+    }
+
+    const target = routeFocusTarget()
+    if (!target) {
+      return
+    }
+
+    // Headings are not focusable until tabIndex is set. #main-content already is.
+    if (!target.hasAttribute('tabindex')) {
+      target.tabIndex = -1
+    }
+    target.focus({ preventScroll: true })
+  }, [pathname])
 
   const layoutProps: LayoutProps = {
     theme: 'subtle',
     color: 'company',
+    banner: {
+      title: 'Savner du noe i innboksen?',
+      link: { label: 'Slik får du tilgang på nytt.', href: getBannerLink() },
+    },
     skipLink: {
       href: '#main-content',
       color: 'inherit',
       size: 'xs',
-      children: 'Hopp til hovedinnhold',
+      children: 'Hopp til hovedinnholdet',
     },
     header,
     footer,
@@ -83,7 +120,7 @@ export function PageLayout() {
       menu: sidebarMenu,
     },
     breadcrumbs: {
-      ariaLabel: 'Brødsmulesti',
+      ariaLabel: 'Du er her:',
       items: breadcrumbItems,
     },
   }

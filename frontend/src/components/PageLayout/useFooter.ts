@@ -1,16 +1,23 @@
 import type { FooterProps } from '@altinn/altinn-components'
+import {
+  getAboutAltinnLink,
+  getAccessibilityLink,
+  getAnnouncementsLink,
+  getNeedHelpLink,
+  getPrivacyLink,
+} from './altinnLinks'
 
 export function useFooter(): FooterProps {
   return {
-    address: 'Digitaliseringsdirektoratet,',
-    address2: 'Postboks 1382 Vika, 0114 Oslo. Org.nr. 991 825 827',
+    address: 'Digitaliseringsdirektoratet, Postboks 1382 Vika, 0114 Oslo. ',
+    address2: 'Org.nr. 991 825 827',
     menu: {
       items: [
-        { id: 'help', href: 'https://info.altinn.no/hjelp/', title: 'Hjelp og kontakt' },
-        { id: 'about', href: 'https://info.altinn.no/om-altinn/', title: 'Om Altinn' },
-        { id: 'announcements', href: 'https://info.altinn.no/om-altinn/driftsmeldinger/', title: 'Driftsmeldinger' },
-        { id: 'privacy', href: 'https://info.altinn.no/om-altinn/personvern/', title: 'Personvern' },
-        { id: 'accessibility', href: 'https://info.altinn.no/om-altinn/tilgjengelighet/', title: 'Tilgjengelighet' },
+        { id: 'help', href: getNeedHelpLink(), title: 'Hjelp og kontakt' },
+        { id: 'about', href: getAboutAltinnLink(), title: 'Om Altinn' },
+        { id: 'announcements', href: getAnnouncementsLink(), title: 'Driftsmeldinger' },
+        { id: 'privacy', href: getPrivacyLink(), title: 'Personvern' },
+        { id: 'accessibility', href: getAccessibilityLink(), title: 'Tilgjengelighet' },
       ],
     },
   }
