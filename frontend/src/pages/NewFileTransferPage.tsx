@@ -5,9 +5,9 @@ import {
   ErrorSummary,
   Heading,
   Paragraph,
-  Field,
+  // Field,
   Spinner,
-  Switch,
+  // Switch,
   Textfield,
   Checkbox,
 } from '@digdir/designsystemet-react'
@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
-import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
+// import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { CustomRecipientsFields } from '../components/NewFileTransferPage/CustomRecipientsFields'
@@ -261,6 +261,7 @@ function NewFileTransferPageContent() {
             />
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
+              {/* Checksum form hidden for now; restore by uncommenting.
               <Field>
                 <Switch
                   id={fieldId('checksumEnabled')}
@@ -281,6 +282,7 @@ function NewFileTransferPageContent() {
                   onChecksumChange={(checksum) => setValue('checksum', checksum)}
                 />
               )}
+              */}
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}

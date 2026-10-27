@@ -4,18 +4,18 @@ import { DetailField } from '../DetailField'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
-import { i18n } from '../../i18n/config'
+// import { i18n } from '../../i18n/config'
 import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
 
 /** A missing checksum means Broker is still calculating it after upload. */
-function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
-  const value = checksum?.trim()
-  if (!value) {
-    return i18n.t('page.detail.processing')
-  }
-
-  return algorithm ? `${algorithm}: ${value}` : value
-}
+// function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
+//   const value = checksum?.trim()
+//   if (!value) {
+//     return i18n.t('page.detail.processing')
+//   }
+//
+//   return algorithm ? `${algorithm}: ${value}` : value
+// }
 
 type FileTransferDetailListProps = {
   transferDetails: FileTransferDetails
@@ -42,7 +42,9 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       <DetailField label={t('page.detail.uploaded')} value={transferDetails.published} />
       <DetailField label={t('page.detail.deadline')} value={transferDetails.expirationTime} />
       <DetailField label={t('page.detail.file_size')} value={formatFileSize(transferDetails.fileTransferSize)} />
+      {/* Checksum hidden for now; restore by uncommenting.
       <DetailField label={t('page.detail.checksum')} value={formatChecksum(transferDetails.checksum, transferDetails.checksumAlgorithm)} />
+      */}
       <DetailField label={t('page.detail.virus_scanned')} value={transferDetails.useVirusScan ? t('page.detail.virus_done') : t('page.detail.virus_not_done')} />
       <DetailField label={t('page.detail.metadata')} value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)
