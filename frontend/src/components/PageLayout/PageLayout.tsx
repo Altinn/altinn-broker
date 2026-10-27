@@ -115,10 +115,10 @@ export function PageLayout() {
   const layoutProps: LayoutProps = {
     theme: 'subtle',
     color: 'company',
-    banner: {
+    /*banner: {
       title: t('banner.title'),
       link: { label: t('banner.link'), href: getBannerLink(language) },
-    },
+    },*/
     skipLink: {
       href: '#main-content',
       color: 'inherit',
