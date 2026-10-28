@@ -87,6 +87,7 @@ public class CreateNotificationOrderHandler(
                 RequestedSendTime = requestedSendTime,
                 Created = DateTimeOffset.UtcNow,
                 IsReminder = false,
+                Status = NotificationDeliveryStatus.Pending,
                 OrderRequest = JsonSerializer.Serialize(orderRequest)
             };
             await fileTransferNotificationRepository.AddNotification(notification, cancellationToken);

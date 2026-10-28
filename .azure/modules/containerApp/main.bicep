@@ -88,9 +88,11 @@ var containerAppEnvVars = concat([
   { name: 'GeneralSettings__SlackUrl', secretRef: 'slack-url' }
   { name: 'GeneralSettings__ApplicationInsightsConnectionString', secretRef: 'application-insights-connection-string' }
   { name: 'StatisticsApiKey', secretRef: 'statistics-api-key' }
-  { name: 'AzureStorageOptions__BlockSize', value: '33554432' }
+  { name: 'AzureStorageOptions__BlockSize', value: '33554432' } // 32 MiB
   { name: 'AzureStorageOptions__ConcurrentUploadThreads', value: '3' }
   { name: 'AzureStorageOptions__BlocksBeforeCommit', value: '1000' }
+  { name: 'AzureStorageOptions__StripeSizeBytes', value: '274877906944' } // 256 GiB
+  { name: 'AzureStorageOptions__MaxBlocksPerStripe', value: '50000' }
   { name: 'TusOptions__UploadExpiration', value: '24:00:00' }
   { name: 'DistributedCacheOptions__RedisConnectionString', secretRef: 'redis-connection-string' }
   { name: 'ReportStorageOptions__ConnectionString', secretRef: 'storage-connection-string' }

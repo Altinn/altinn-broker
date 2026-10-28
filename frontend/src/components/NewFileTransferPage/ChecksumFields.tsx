@@ -1,4 +1,5 @@
 import { Fieldset, Radio, Textfield } from '@digdir/designsystemet-react'
+import { useTranslation } from 'react-i18next'
 import type { ChecksumAlgorithm } from '../../api/initializeFileTransfer'
 import { fieldId } from './formFields'
 
@@ -23,10 +24,11 @@ export function ChecksumFields({
   onAlgorithmChange,
   onChecksumChange,
 }: ChecksumFieldsProps) {
+  const { t } = useTranslation()
   return (
     <>
       <Fieldset>
-        <Fieldset.Legend>Algoritme</Fieldset.Legend>
+        <Fieldset.Legend>{t('page.checksum.algorithm')}</Fieldset.Legend>
         <div className="new-transfer__checksum-algorithms">
           {ALGORITHMS.map((option) => (
             <Radio
@@ -43,8 +45,8 @@ export function ChecksumFields({
 
       <Textfield
         id={fieldId('checksum')}
-        label="Kontroller mot denne sjekksummen (valgfritt)"
-        description="La feltet stå tomt hvis Broker bare skal beregne og lagre sjekksummen."
+        label={t('page.checksum.label')}
+        description={t('page.checksum.description')}
         value={checksum}
         error={error}
         spellCheck={false}

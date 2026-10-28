@@ -7,6 +7,7 @@ import {
 } from '@digdir/designsystemet-react'
 import { FileIcon, TrashIcon } from '@navikt/aksel-icons'
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 
 type UploadFileProps = {
@@ -20,6 +21,7 @@ type UploadFileProps = {
 }
 
 export function UploadFile({ id, file, maxFileSize, error, disabled, onChange }: UploadFileProps) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const clear = () => {
@@ -32,14 +34,14 @@ export function UploadFile({ id, file, maxFileSize, error, disabled, onChange }:
 
   return (
     <Field>
-      <Label htmlFor={id}>Fil</Label>
+      <Label htmlFor={id}>{t('page.upload.file')}</Label>
       <FileUpload>
-        <Field.Description>Dra filen hit, eller velg den fra maskinen</Field.Description>
+        <Field.Description>{t('page.upload.drop')}</Field.Description>
         {maxFileSize !== null && (
-          <Field.Description>Maks {formatFileSize(maxFileSize)}</Field.Description>
+          <Field.Description>{t('page.upload.max', { size: formatFileSize(maxFileSize) })}</Field.Description>
         )}
         <Button asChild variant="secondary">
-          <span>Velg fil</span>
+          <span>{t('page.upload.choose')}</span>
         </Button>
         <input
           ref={inputRef}
@@ -58,7 +60,7 @@ export function UploadFile({ id, file, maxFileSize, error, disabled, onChange }:
           <span className="new-transfer__file-size">{formatFileSize(file.size)}</span>
           <Button variant="tertiary" data-color="danger" onClick={clear} disabled={disabled}>
             <TrashIcon aria-hidden />
-            Fjern
+            {t('page.upload.remove')}
           </Button>
         </div>
       )}

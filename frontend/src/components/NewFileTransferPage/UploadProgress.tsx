@@ -1,8 +1,10 @@
 import { Button } from '@digdir/designsystemet-react'
 import { PauseIcon, PlayIcon } from '@navikt/aksel-icons'
+import { useTranslation } from 'react-i18next'
 import type { UploadProgress as Progress } from '../../api/tus/tusUpload'
 import { formatRemainingTime } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { i18n } from '../../i18n/config'
 import { useUploadProgress, type UploadStatus } from '../../upload/uploadsContext'
 
 type UploadProgressProps = {
@@ -12,23 +14,24 @@ type UploadProgressProps = {
 }
 
 export function UploadProgress({ status, onPause, onResume }: UploadProgressProps) {
+  const { t } = useTranslation()
   const progress = useUploadProgress()
 
   return (
     <div className="new-transfer__progress">
-      <progress value={progress?.percent ?? 0} max={100} aria-label="Opplasting" />
+      <progress value={progress?.percent ?? 0} max={100} aria-label={t('page.upload.aria')} />
       <div className="new-transfer__progress-status">
         <p>{statusText(status, progress)}</p>
         {(status === 'paused' || status === 'pausing') && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onResume}>
             <PlayIcon aria-hidden />
-            Fortsett
+            {t('page.upload.continue')}
           </Button>
         )}
         {status === 'uploading' && (
           <Button type="button" variant="tertiary" data-size="sm" onClick={onPause}>
             <PauseIcon aria-hidden />
-            Pause
+            {t('page.upload.pause')}
           </Button>
         )}
       </div>
@@ -43,23 +46,26 @@ export function UploadProgress({ status, onPause, onResume }: UploadProgressProp
 
 function statusText(status: UploadStatus, progress: Progress | null): string {
   if (status === 'initializing' || !progress) {
-    return 'Oppretter formidlingen…'
+    return i18n.t('page.upload.creating')
   }
 
-  const amount = `${formatFileSize(progress.loaded)} av ${formatFileSize(progress.total)}`
+  const amount = i18n.t('page.upload.of', {
+    loaded: formatFileSize(progress.loaded),
+    total: formatFileSize(progress.total),
+  })
   const sent = `${progress.percent} % (${amount})`
 
   switch (status) {
     case 'failed':
-      return `Stoppet på ${sent}`
+      return i18n.t('page.upload.stopped_at', { progress: sent })
     case 'paused':
-      return `Pauset på ${sent}`
+      return i18n.t('page.upload.paused_at', { progress: sent })
     case 'pausing':
-      return `Pauser på ${sent} — fullfører delene som er i gang`
+      return i18n.t('page.upload.pausing_at', { progress: sent })
     case 'finishing':
-      return 'Setter sammen filen…'
+      return i18n.t('page.upload.assembling')
     default:
-      return [`Laster opp — ${sent}`, rate(progress), remaining(progress)]
+      return [i18n.t('page.upload.uploading', { progress: sent }), rate(progress), remaining(progress)]
         .filter(Boolean)
         .join(' · ')
   }
@@ -68,31 +74,33 @@ function statusText(status: UploadStatus, progress: Progress | null): string {
 // Readable status text for screen readers
 function screenReaderStatusText(status: UploadStatus, progress: Progress | null): string {
   if (status === 'initializing' || !progress) {
-    return 'Oppretter formidlingen'
+    return i18n.t('page.upload.creating_plain')
   }
 
-  const tenths = `${Math.floor(progress.percent / 10) * 10} prosent`
+  const tenths = i18n.t('page.upload.percent_label', { percent: Math.floor(progress.percent / 10) * 10 })
 
   switch (status) {
     case 'failed':
-      return `Opplastingen stoppet på ${tenths}`
+      return i18n.t('page.upload.sr_stopped', { percent: tenths })
     case 'paused':
-      return `Opplastingen er pauset på ${tenths}`
+      return i18n.t('page.upload.sr_paused', { percent: tenths })
     case 'pausing':
-      return 'Pauser opplastingen'
+      return i18n.t('page.upload.sr_pausing')
     case 'finishing':
-      return 'Setter sammen filen'
+      return i18n.t('page.upload.assembling_plain')
     default:
-      return `Laster opp, ${tenths}`
+      return i18n.t('page.upload.sr_uploading', { percent: tenths })
   }
 }
 
 function rate(progress: Progress): string {
-  return progress.bytesPerSecond === null ? '' : `${formatFileSize(progress.bytesPerSecond)}/s`
+  return progress.bytesPerSecond === null
+    ? ''
+    : i18n.t('page.upload.rate', { size: formatFileSize(progress.bytesPerSecond) })
 }
 
 function remaining(progress: Progress): string {
   return progress.secondsRemaining === null
     ? ''
-    : `${formatRemainingTime(progress.secondsRemaining)} igjen`
+    : i18n.t('page.duration.remaining', { time: formatRemainingTime(progress.secondsRemaining) })
 }

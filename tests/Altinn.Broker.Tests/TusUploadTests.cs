@@ -176,6 +176,47 @@ public class TusUploadTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task GetPartialUploads_ListsThePartialsInCreationOrder()
+    {
+        var initializeResponse = await _senderClient.PostAsJsonAsync(
+            "broker/api/v1/filetransfer",
+            FileTransferInitializeExtTestFactory.BasicFileTransfer());
+        Assert.True(initializeResponse.IsSuccessStatusCode, await initializeResponse.Content.ReadAsStringAsync());
+        var initializeResult = await initializeResponse.Content.ReadFromJsonAsync<FileTransferInitializeResponseExt>(_responseSerializerOptions);
+        Assert.NotNull(initializeResult);
+        var fileTransferId = initializeResult.FileTransferId.ToString();
+
+        var partialUploadIds = new List<string>();
+        foreach (var partialLength in new[] { 2048, 1024 })
+        {
+            var createRequest = new HttpRequestMessage(HttpMethod.Post, $"broker/api/v1/filetransfer/upload/tus/{fileTransferId}");
+            createRequest.Headers.Add("Tus-Resumable", "1.0.0");
+            createRequest.Headers.Add("Upload-Length", partialLength.ToString());
+            createRequest.Headers.Add("Upload-Concat", "partial");
+            var createResponse = await _senderClient.SendAsync(createRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            Assert.NotNull(createResponse.Headers.Location);
+            partialUploadIds.Add(createResponse.Headers.Location.ToString().TrimEnd('/').Split('/').Last());
+        }
+
+        var partialUploads = await _senderClient.GetFromJsonAsync<PartialUploadsExt>(
+            $"broker/api/v1/filetransfer/{fileTransferId}/partialuploads",
+            _responseSerializerOptions);
+
+        Assert.NotNull(partialUploads);
+        Assert.Equal(partialUploadIds, partialUploads.PartialUploads.Select(partialUpload => partialUpload.PartialUploadId));
+        Assert.Equal([2048L, 1024L], partialUploads.PartialUploads.Select(partialUpload => partialUpload.UploadLength));
+    }
+
+    [Fact]
+    public async Task GetPartialUploads_UnknownFileTransfer_ReturnsNotFound()
+    {
+        var response = await _senderClient.GetAsync($"broker/api/v1/filetransfer/{Guid.NewGuid()}/partialuploads");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task TusUpload_HeadWhileAPatchIsStalled_TakesOverTheLock()
     {
         // Under the 99,999 bytes another test may set as the test resource's maximum file size.

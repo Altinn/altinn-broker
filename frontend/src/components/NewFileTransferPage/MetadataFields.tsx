@@ -1,6 +1,7 @@
 import { Button, Fieldset, Textfield } from '@digdir/designsystemet-react'
 import { PlusIcon, TrashIcon } from '@navikt/aksel-icons'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createMetadataEntry, metadataInputId, type MetadataEntry } from './formFields'
 import {
   MAX_METADATA_ENTRIES,
@@ -24,6 +25,7 @@ export function MetadataFields({
   disabled,
   onChange,
 }: MetadataFieldsProps) {
+  const { t } = useTranslation()
   const keyInputs = useRef(new Map<string, HTMLInputElement>())
   const pendingFocus = useRef<string | null>(null)
 
@@ -53,9 +55,9 @@ export function MetadataFields({
 
   return (
     <Fieldset id={id} tabIndex={-1}>
-      <Fieldset.Legend>Andre metadata</Fieldset.Legend>
+      <Fieldset.Legend>{t('page.metadata.legend')}</Fieldset.Legend>
       <Fieldset.Description>
-        Valgfrie nøkkel/verdi-par som følger formidlingen. Maks {MAX_METADATA_ENTRIES} par.
+        {t('page.metadata.description', { max: MAX_METADATA_ENTRIES })}
       </Fieldset.Description>
 
       {entries.map((entry, index) => (
@@ -67,7 +69,7 @@ export function MetadataFields({
               }
             }}
             id={metadataInputId(entry.id, 'key')}
-            label="Nøkkel"
+            label={t('page.metadata.key')}
             value={entry.key}
             error={rowErrors[index]?.key}
             disabled={disabled}
@@ -76,7 +78,7 @@ export function MetadataFields({
           />
           <Textfield
             id={metadataInputId(entry.id, 'value')}
-            label="Verdi"
+            label={t('page.metadata.value')}
             value={entry.value}
             error={rowErrors[index]?.value}
             disabled={disabled}
@@ -90,7 +92,7 @@ export function MetadataFields({
             onClick={() => remove(entry.id)}
           >
             <TrashIcon aria-hidden />
-            <span className="sr-only">Fjern metadata {index + 1}</span>
+            <span className="sr-only">{t('page.metadata.remove', { index: index + 1 })}</span>
           </Button>
         </div>
       ))}
@@ -102,7 +104,7 @@ export function MetadataFields({
         onClick={add}
       >
         <PlusIcon aria-hidden />
-        Legg til metadata
+        {t('page.metadata.add')}
       </Button>
     </Fieldset>
   )

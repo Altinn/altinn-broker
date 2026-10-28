@@ -1,4 +1,5 @@
 import { Alert } from '@altinn/altinn-components'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import {
   LoadingServiceDetails,
@@ -9,6 +10,7 @@ import { useParties } from '../parties/PartiesContext'
 import './pages.css'
 
 export function FileTransferServiceDetailPage() {
+  const { t } = useTranslation()
   const { serviceId = '' } = useParams()
   const { selectedParty } = useParties()
   const state = useFileTransferService(serviceId, selectedParty?.organizationNumber)
@@ -30,8 +32,8 @@ export function FileTransferServiceDetailPage() {
         <div className="page">
           <Alert
             variant="info"
-            heading="Fant ikke formidlingstjenesten"
-            message={`${selectedParty?.name} har ikke tilgang til denne formidlingstjenesten.`}
+            heading={t('page.service.missing_heading')}
+            message={t('page.service.missing_message', { name: selectedParty?.name ?? '' })}
           />
         </div>
       )
@@ -40,8 +42,8 @@ export function FileTransferServiceDetailPage() {
         <div className="page">
           <Alert
             variant="danger"
-            heading="Kunne ikke hente formidlingstjenesten"
-            message="Prøv igjen senere."
+            heading={t('page.service.load_failed_heading')}
+            message={t('page.common.try_later')}
           />
         </div>
       )

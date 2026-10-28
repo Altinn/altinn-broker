@@ -1,4 +1,5 @@
 import { Select } from '@digdir/designsystemet-react'
+import { useTranslation } from 'react-i18next'
 import type { AuthorizedResource } from '../../api/resources'
 import { SearchField } from '../SearchField'
 
@@ -17,21 +18,22 @@ export function FileTransferFilters({
   onResourceFilterChange,
   resources,
 }: FileTransferFiltersProps) {
+  const { t } = useTranslation()
   return (
     <div className="filter-row">
-      <SearchField id="search" label="Søk på referanse" value={search} onChange={onSearchChange} />
+      <SearchField id="search" label={t('page.list.search')} value={search} onChange={onSearchChange} />
 
       <div className="field">
         <label className="page-subheading" htmlFor="resource-filter">
-          Filtrer på tjeneste
+          {t('page.list.filter')}
         </label>
         <Select
           id="resource-filter"
-          aria-label="Filtrer på tjeneste"
+          aria-label={t('page.list.filter')}
           value={resourceFilter}
           onChange={(e) => onResourceFilterChange(e.target.value)}
         >
-          <Select.Option value="">Alle tjenester</Select.Option>
+          <Select.Option value="">{t('page.list.all_services')}</Select.Option>
           {resources.map((resource) => (
             <Select.Option key={resource.resourceId} value={resource.resourceId}>
               {resource.name ?? resource.resourceId}

@@ -1,6 +1,7 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
 import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { AllowedRecipient } from '../../api/allowedRecipients'
 import type { ResourceConfiguration } from '../../api/resourceConfiguration'
 import { formatDuration } from '../../helpers/durationHelper'
@@ -15,16 +16,15 @@ import {
   messageWithOptionalInlineLink,
   type LocalizedApiError,
 } from '../../i18n/apiErrors'
+import { i18n } from '../../i18n/config'
 import {
   useResourceConfigurationEditor,
-  VIRUS_SCAN_SIZE_HINT,
+  virusScanSizeHint,
   type ConfigurationDraft,
   type ConfigurationDraftErrors,
 } from './useResourceConfigurationEditor'
 import './fileTransferServiceDetailPage.css'
 
-const NOT_SET = '–'
-const NO_LIMIT = 'Ingen grense satt'
 const NO_REQUIRED_PARTY = ''
 
 function LocalizedErrorText({ error }: { error: LocalizedApiError }) {
@@ -74,6 +74,7 @@ export function ResourceConfigurationList({
   sender,
   accessListCandidates,
 }: ResourceConfigurationListProps) {
+  const { t } = useTranslation()
   const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
   const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
   const partyOptions = useMemo(
@@ -86,7 +87,7 @@ export function ResourceConfigurationList({
     <div className="resource-configuration">
       <Field className="resource-configuration__edit-toggle">
         <Switch
-          label="Rediger oppsett"
+          label={t('page.config.edit')}
           checked={editor.editing}
           onChange={(event) => {
             if (event.target.checked) {
@@ -152,6 +153,8 @@ function ConfigurationForm({
   onSave,
   onCancel,
 }: ConfigurationFormProps) {
+  const { t } = useTranslation()
+  const hint = virusScanSizeHint()
   return (
     <form
       className="resource-configuration__form"
@@ -161,8 +164,8 @@ function ConfigurationForm({
       }}
     >
       <Textfield
-        label="Maks filstørrelse (GB)"
-        description={`La feltet stå tomt når ingen grense skal endres. ${VIRUS_SCAN_SIZE_HINT}`}
+        label={t('page.config.max_size_gb')}
+        description={t('page.config.max_size_description', { hint })}
         value={draft.maxFileTransferSizeGb}
         onChange={(event) => onChange('maxFileTransferSizeGb', event.target.value)}
         error={errors.maxFileTransferSizeGb}
@@ -170,7 +173,7 @@ function ConfigurationForm({
         disabled={saving}
       />
       <Textfield
-        label="Levetid for formidling (dager)"
+        label={t('page.config.lifetime_days')}
         value={draft.fileTransferTimeToLiveDays}
         onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
         error={errors.fileTransferTimeToLiveDays}
@@ -179,14 +182,14 @@ function ConfigurationForm({
       />
       <Field>
         <Switch
-          label="Slettes når alle mottakere har bekreftet"
+          label={t('page.config.purge_when_confirmed')}
           checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
           onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
           disabled={saving}
         />
       </Field>
       <Textfield
-        label="Venteperiode før sletting (timer)"
+        label={t('page.config.grace_hours')}
         value={draft.purgeFileTransferGracePeriodHours}
         onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
         error={errors.purgeFileTransferGracePeriodHours}
@@ -194,10 +197,8 @@ function ConfigurationForm({
         disabled={saving}
       />
       <Field>
-        <Label htmlFor="required-party">Påkrevd part</Label>
-        <Field.Description>
-          Velg avsender eller en part fra tilgangslisten. La stå uten valg for ingen påkrevd part.
-        </Field.Description>
+        <Label htmlFor="required-party">{t('page.config.required_party')}</Label>
+        <Field.Description>{t('page.config.required_party_description')}</Field.Description>
         <Select
           id="required-party"
           value={draft.requiredParty}
@@ -205,7 +206,7 @@ function ConfigurationForm({
           disabled={saving}
           aria-invalid={errors.requiredParty ? true : undefined}
         >
-          <Select.Option value={NO_REQUIRED_PARTY}>Ingen påkrevd part</Select.Option>
+          <Select.Option value={NO_REQUIRED_PARTY}>{t('page.config.no_required_party')}</Select.Option>
           {partyOptions.map((party) => (
             <Select.Option key={party.organizationNumber} value={party.organizationNumber}>
               {formatOrganizationDisplay(party.name, party.organizationNumber)}
@@ -216,21 +217,21 @@ function ConfigurationForm({
       </Field>
       <Field>
         <Switch
-          label="Virusskanning påkrevd"
+          label={t('page.config.virus_required')}
           checked={draft.virusScanRequired}
           onChange={(event) => onChange('virusScanRequired', event.target.checked)}
           disabled={saving}
           aria-invalid={errors.virusScanRequired ? true : undefined}
         />
-        <Field.Description>{VIRUS_SCAN_SIZE_HINT}</Field.Description>
+        <Field.Description>{hint}</Field.Description>
         {errors.virusScanRequired && <ValidationMessage>{errors.virusScanRequired}</ValidationMessage>}
       </Field>
       <div className="resource-configuration__actions">
         <Button type="submit" disabled={saving}>
-          {saving ? 'Lagrer…' : 'Lagre'}
+          {saving ? t('page.common.saving') : t('page.common.save')}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>
-          Avbryt
+          {t('page.common.cancel')}
         </Button>
       </div>
     </form>
@@ -267,42 +268,42 @@ function buildRequiredPartyOptions(
 function configurationFields(configuration: ResourceConfiguration, partyOptions: AllowedRecipient[]) {
   return [
     {
-      label: 'Maks filstørrelse',
+      label: i18n.t('page.config.max_size'),
       value:
         configuration.maxFileTransferSize === null
-          ? NO_LIMIT
+          ? i18n.t('page.config.no_limit')
           : formatFileSize(configuration.maxFileTransferSize),
     },
     {
-      label: 'Levetid for formidling',
+      label: i18n.t('page.config.lifetime'),
       value: formatDuration(configuration.fileTransferTimeToLive),
     },
     {
-      label: 'Slettes når alle mottakere har bekreftet',
+      label: i18n.t('page.config.purge_when_confirmed'),
       value: yesNo(configuration.purgeFileTransferAfterAllRecipientsConfirmed),
     },
     {
-      label: 'Venteperiode før sletting',
+      label: i18n.t('page.config.grace'),
       value: formatDuration(configuration.purgeFileTransferGracePeriod),
     },
     {
-      label: 'Påkrevd part',
+      label: i18n.t('page.config.required_party'),
       value: requiredPartyDisplay(configuration.requiredParty, partyOptions),
     },
     {
-      label: 'Virusskanning påkrevd',
+      label: i18n.t('page.config.virus_required'),
       value: yesNo(!configuration.approvedForDisabledVirusScan),
     },
   ]
 }
 
 function yesNo(value: boolean): string {
-  return value ? 'Ja' : 'Nei'
+  return value ? i18n.t('page.common.yes') : i18n.t('page.common.no')
 }
 
 function requiredPartyDisplay(identifier: string | null, partyOptions: AllowedRecipient[]): string {
   if (!identifier) {
-    return NOT_SET
+    return i18n.t('page.common.not_set')
   }
 
   const digits = toOrgNumber(identifier)

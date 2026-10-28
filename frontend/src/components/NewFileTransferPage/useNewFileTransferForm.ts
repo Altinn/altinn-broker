@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { i18n } from '../../i18n/config'
 import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import {
   effectiveMaxFileTransferSize,
@@ -88,7 +89,7 @@ function useResourceContext(resourceId: string, senderOrgNumber: string) {
       .catch(() => ({
         configuration: null,
         recipients: [],
-        error: 'Kunne ikke hente oppsettet for tjenesten. Prøv å laste siden på nytt.',
+        error: i18n.t('page.service.settings_error'),
       }))
       .then((result) => {
         if (!cancelled) {
@@ -150,17 +151,25 @@ function useFormValues(
     [],
   )
 
-  const errors = useMemo(() => validate(values, maxFileSize, rules), [values, maxFileSize, rules])
-  const metadataRowErrors = useMemo(() => validateMetadataRows(values.metadata), [values.metadata])
+  const language = i18n.language
+  const errors = useMemo(() => {
+    void language
+    return validate(values, maxFileSize, rules)
+  }, [values, maxFileSize, rules, language])
+  const metadataRowErrors = useMemo(() => {
+    void language
+    return validateMetadataRows(values.metadata)
+  }, [values.metadata, language])
   const metadataErrorInputId = useMemo(
     () => firstMetadataErrorInputId(values.metadata, metadataRowErrors),
     [values.metadata, metadataRowErrors],
   )
-  const customRecipientRowErrors = useMemo(
-    () =>
-      customRecipientsInUse(values) ? validateCustomRecipientRows(values.customRecipients, values.recipients) : [],
-    [values],
-  )
+  const customRecipientRowErrors = useMemo(() => {
+    void language
+    return customRecipientsInUse(values)
+      ? validateCustomRecipientRows(values.customRecipients, values.recipients)
+      : []
+  }, [values, language])
   const customRecipientErrorInputId = useMemo(
     () => firstCustomRecipientErrorInputId(values.customRecipients, customRecipientRowErrors),
     [values.customRecipients, customRecipientRowErrors],

@@ -1,3 +1,4 @@
+using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Integrations.Azure;
 
 using Azure;
@@ -9,8 +10,8 @@ namespace Altinn.Broker.Integrations.Tus;
 
 internal static class TusConcatDestinationStorage
 {
-    public static BlockBlobClient GetDestinationBlockBlobClient(BlobContainerClient containerClient, Guid fileTransferId)
-        => containerClient.GetBlockBlobClient(fileTransferId.ToString());
+    public static BlockBlobClient GetDestinationBlockBlobClient(BlobContainerClient containerClient, Guid fileTransferId, int stripeIndex = 0)
+        => containerClient.GetBlockBlobClient(StripeLayout.GetStripeBlobName(fileTransferId, stripeIndex));
 
     public static async Task<IReadOnlyList<BlobBlock>?> TryGetUncommittedBlocksAsync(
         BlockBlobClient blockBlobClient,

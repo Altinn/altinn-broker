@@ -9,6 +9,7 @@ using Altinn.Broker.Integrations.Altinn.AccessManagement;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Notifications;
+using Altinn.Broker.Integrations.Altinn.Profile;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
@@ -87,6 +88,8 @@ public static class DependencyInjection
         // Calls on behalf of the logged in end user, so it carries their Altinn token instead of a Maskinporten token.
         services.AddHttpClient<IAltinnAccessManagementService, AltinnAccessManagementService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
             .AddStandardRetryPolicy();
+        services.AddHttpClient<IAltinnProfileService, AltinnProfileService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
 
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
@@ -143,5 +146,6 @@ public static class DependencyInjection
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
         services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
         services.AddSingleton<ITusUploadKindResolver, TusUploadKindResolver>();
+        services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
     }
 }

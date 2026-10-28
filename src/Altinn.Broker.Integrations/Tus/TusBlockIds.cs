@@ -1,10 +1,18 @@
 using System.Text;
 
+using Altinn.Broker.Core.Domain;
+
 namespace Altinn.Broker.Integrations.Tus;
 
 internal static class TusBlockIds
 {
     public const int MaxBlocksPerBlob = 50_000;
+
+    /// <summary>
+    /// Both indices are encoded as D6. Widening the format is not backwards compatible: Azure rejects
+    /// a commit whose block ids decode to different lengths.
+    /// </summary>
+    public const int MaxNamespacedIndex = StripeLayout.MaxNamespacedBlockIndex;
 
     public static string BuildSequentialBlockId(long blockIndex)
     {
@@ -14,6 +22,13 @@ internal static class TusBlockIds
 
     public static string BuildNamespacedBlockId(int partialIndex, long blockIndex)
     {
+        if ((uint)partialIndex > MaxNamespacedIndex || (ulong)blockIndex > MaxNamespacedIndex)
+        {
+            throw new InvalidOperationException(
+                $"TUS block id space exhausted (partial {partialIndex}, block {blockIndex}). " +
+                $"Both indices must be at most {MaxNamespacedIndex}.");
+        }
+
         var blockName = $"{partialIndex:D6}{blockIndex:D6}";
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(blockName));
     }
@@ -137,6 +152,91 @@ internal static class TusBlockIds
         }
 
         return new ConcatCommitList(expandedBlockIds, totalLength);
+    }
+
+    /// <summary>
+    /// Drops retried chunks from a stripe's uncommitted block list. A retry stages a new block id and
+    /// leaves the earlier block in place, so the list is longer than the partial's bytes on this stripe.
+    /// Retries are handed higher chunk indexes, which makes the surplus the highest indexes of that partial.
+    /// A block is kept when dropping it would make the partial shorter than the bytes it owes this stripe.
+    /// </summary>
+    public static TusStagedBlocksSnapshot OmitRetriedBlocks(
+        TusStagedBlocksSnapshot snapshot,
+        IReadOnlyDictionary<int, long> bytesOnStripeByPartialIndex)
+    {
+        if (snapshot.BlockLengths is not { Count: > 0 } lengths || lengths.Count != snapshot.BlockIds.Count)
+        {
+            return snapshot;
+        }
+
+        var positionsByPartial = new Dictionary<int, List<(int ChunkIndex, int Position)>>();
+        for (var position = 0; position < snapshot.BlockIds.Count; position++)
+        {
+            if (!TryParseNamespacedBlockId(snapshot.BlockIds[position], out var partialIndex, out var chunkIndex))
+            {
+                continue;
+            }
+
+            if (!positionsByPartial.TryGetValue(partialIndex, out var positions))
+            {
+                positions = [];
+                positionsByPartial[partialIndex] = positions;
+            }
+
+            positions.Add((chunkIndex, position));
+        }
+
+        var drop = new bool[snapshot.BlockIds.Count];
+        var droppedAny = false;
+        foreach (var (partialIndex, positions) in positionsByPartial)
+        {
+            if (!bytesOnStripeByPartialIndex.TryGetValue(partialIndex, out var expectedOnStripe))
+            {
+                continue;
+            }
+
+            positions.Sort(static (left, right) => left.ChunkIndex.CompareTo(right.ChunkIndex));
+            var sum = 0L;
+            foreach (var position in positions)
+            {
+                sum += lengths[position.Position];
+            }
+
+            for (var index = positions.Count - 1; index >= 0 && sum > expectedOnStripe; index--)
+            {
+                var length = lengths[positions[index].Position];
+                if (sum - length < expectedOnStripe)
+                {
+                    break;
+                }
+
+                drop[positions[index].Position] = true;
+                droppedAny = true;
+                sum -= length;
+            }
+        }
+
+        if (!droppedAny)
+        {
+            return snapshot;
+        }
+
+        var blockIds = new List<string>(snapshot.BlockIds.Count);
+        var blockLengths = new List<long>(snapshot.BlockIds.Count);
+        var totalLength = 0L;
+        for (var position = 0; position < snapshot.BlockIds.Count; position++)
+        {
+            if (drop[position])
+            {
+                continue;
+            }
+
+            blockIds.Add(snapshot.BlockIds[position]);
+            blockLengths.Add(lengths[position]);
+            totalLength += lengths[position];
+        }
+
+        return new TusStagedBlocksSnapshot(totalLength, blockIds, snapshot.NextBlockIndex, blockLengths);
     }
 
     public static long GetMinimumChunkSizeBytes(long uploadLength)
