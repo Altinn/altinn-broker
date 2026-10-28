@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import type { NotificationReminderDetail, RecipientNotificationDetail } from '../api/fileTransferDetail'
 
 export type NotificationTagColor = 'success' | 'danger' | 'warning' | 'info' | 'neutral'
@@ -14,45 +15,53 @@ export type NotificationStatusDisplay = {
 export function getNotificationStatusDisplay(
   notification: RecipientNotificationDetail,
   isPublished: boolean,
+  t: TFunction,
 ): NotificationStatusDisplay {
   switch (notification.status) {
     case 'Pending':
       return isPublished
-        ? { label: 'Varsel bestilles', color: 'info' }
-        : { label: 'Varsel sendes når filen er klar', color: 'neutral' }
+        ? { label: t('page.detail.notification_pending'), color: 'info' }
+        : { label: t('page.detail.notification_pending_unpublished'), color: 'neutral' }
     case 'Ordered':
-      return { label: 'Varsel er bestilt – utsendelse ikke bekreftet', color: 'info' }
+      return { label: t('page.detail.notification_ordered_not_confirmed'), color: 'info' }
     case 'Sent':
-      return { label: notification.sentTime ? `Varslet ${notification.sentTime}` : 'Varslet', color: 'success' }
+      return {
+        label: notification.sentTime
+          ? t('page.detail.notification_sent_at', { time: notification.sentTime })
+          : t('page.detail.notification_sent'),
+        color: 'success',
+      }
     case 'Rejected':
     case 'NotDelivered':
-      return { label: 'Kunne ikke varsles', color: 'danger' }
+      return { label: t('page.detail.notification_rejected'), color: 'danger' }
     case 'ConditionNotMet':
-      return { label: 'Varsel ikke sendt', color: 'neutral' }
+      return { label: t('page.detail.notification_condition_not_met'), color: 'neutral' }
     case 'OrderUnconfirmed':
-      return { label: 'Utsendelse kunne ikke bekreftes', color: 'warning' }
+      return { label: t('page.detail.notification_order_unconfirmed'), color: 'warning' }
   }
 }
 
-export function formatReminderStatus(reminder: NotificationReminderDetail): string {
+export function formatReminderStatus(reminder: NotificationReminderDetail, t: TFunction): string {
   switch (reminder.status) {
     case 'Pending':
     case 'Ordered':
-      return reminder.time ? `Påminnelse planlagt ${reminder.time}` : 'Påminnelse planlagt'
+      return reminder.time
+        ? t('page.detail.reminder_scheduled_at', { time: reminder.time })
+        : t('page.detail.reminder_scheduled')
     case 'Sent':
-      return reminder.time ? `Påminnelse sendt ${reminder.time}` : 'Påminnelse sendt'
+      return reminder.time ? t('page.detail.reminder_sent_at', { time: reminder.time }) : t('page.detail.reminder_sent')
     case 'Rejected':
     case 'NotDelivered':
-      return 'Påminnelse kunne ikke sendes'
+      return t('page.detail.reminder_rejected')
     case 'ConditionNotMet':
-      return 'Påminnelse ikke sendt'
+      return t('page.detail.reminder_condition_not_met')
     case 'OrderUnconfirmed':
-      return 'Utsendelse av påminnelse kunne ikke bekreftes'
+      return t('page.detail.reminder_order_unconfirmed')
   }
 }
 
-export function formatCustomRecipientCount(notification: RecipientNotificationDetail): string | undefined {
+export function formatCustomRecipientCount(notification: RecipientNotificationDetail, t: TFunction): string | undefined {
   const { customRecipientCount: count, customRecipientsNotifiedCount: notified } = notification
   if (count === 0) return undefined
-  return `Andre varslingsmottakere: ${notified} av ${count} varslet`
+  return t('page.detail.custom_recipients_notified', { notified, count })
 }
