@@ -15,7 +15,10 @@ public class CheckNotificationDeliveryHandler(
     ILogger<CheckNotificationDeliveryHandler> logger)
 {
     private static readonly int[] PollBackoffSeconds = 
-    [60, 
+    [60,
+    2 * 60,
+    4 * 60,
+    8 * 60,
     15 * 60, 
     4 * 60 * 60, 
     8 * 60 * 60, 
@@ -24,8 +27,9 @@ public class CheckNotificationDeliveryHandler(
     36 * 60 * 60, 
     48 * 60 * 60, 
     72 * 60 * 60];
-    private static readonly int MaxAttempts = PollBackoffSeconds.Length + 1;
-    private static readonly string[] FinalOrderStatuses = ["Order_Completed", "Order_SendConditionNotMet", "Order_Cancelled"];
+    public static readonly int MaxAttempts = PollBackoffSeconds.Length + 1;
+    private const string OrderSendConditionNotMet = "Order_SendConditionNotMet";
+    private static readonly string[] FinalOrderStatuses = ["Order_Completed", OrderSendConditionNotMet, "Order_Cancelled"];
 
     public async Task Process(Guid notificationId, CancellationToken cancellationToken, int attempt = 1)
     {
@@ -69,6 +73,12 @@ public class CheckNotificationDeliveryHandler(
             return;
         }
 
+        if (statusResponse.Status == OrderSendConditionNotMet)
+        {
+            await fileTransferNotificationRepository.UpdateStatus(notificationId, NotificationDeliveryStatus.ConditionNotMet, null, cancellationToken);
+            return;
+        }
+
         var sentRecipients = statusResponse.Recipients.Where(r => r.IsSent()).ToList();
         var failedRecipients = statusResponse.Recipients.Where(r => r.Status.IsFailed()).ToList();
         if (failedRecipients.Count > 0)
@@ -83,6 +93,10 @@ public class CheckNotificationDeliveryHandler(
         if (sentRecipients.Count == 0)
         {
             logger.LogError("Notification {NotificationId} reached final status {Status} with no successfully delivered recipients", notificationId, statusResponse.Status);
+            var reason = failedRecipients.Count > 0
+                ? string.Join(", ", failedRecipients.Select(r => r.Status).Distinct())
+                : statusResponse.Status;
+            await fileTransferNotificationRepository.UpdateStatus(notificationId, NotificationDeliveryStatus.NotDelivered, reason, cancellationToken);
             return;
         }
 

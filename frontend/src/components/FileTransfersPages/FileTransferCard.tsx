@@ -1,4 +1,5 @@
 import { Card, Heading, Paragraph, Tag } from '@digdir/designsystemet-react'
+import { useTranslation } from 'react-i18next'
 import {
   DialogMetadata,
   Tooltip,
@@ -33,6 +34,7 @@ export function FileTransferCard({
   deadline,
   to,
 }: FileTransferCardProps) {
+  const { t } = useTranslation()
   const otherRecipientCount = recipients.length - 1
   const visibleRecipient = isSender ? (recipients[0] ?? '') : currentActorName
   const hasOtherRecipients = otherRecipientCount > 0
@@ -52,24 +54,26 @@ export function FileTransferCard({
               {resourceName}
             </Heading>
             <Tag data-color={isSender ? 'accent' : 'neutral'} data-size="sm">
-              {isSender ? 'Avsender' : 'Mottaker'}
+              {isSender ? t('page.common.sender') : t('page.common.recipient')}
             </Tag>
           </div>
           <Paragraph data-size="sm" className="file-transfer-card__party">
-            Avsender: {sender}
+            {t('page.list.sender_line', { name: sender })}
           </Paragraph>
           <Paragraph data-size="sm" className="file-transfer-card__party">
-            Mottaker: {visibleRecipient}
+            {t('page.list.recipient_line', { name: visibleRecipient })}
             {hasOtherRecipients && (
               <Tooltip content={otherRecipients.join('\n')}>
                 <span className="file-transfer-card__counterparty-extra" tabIndex={0}>
-                  (+{otherRecipientCount} {otherRecipientCount === 1 ? 'annen' : 'andre'})
+                  {otherRecipientCount === 1
+                    ? t('page.list.other_one', { count: otherRecipientCount })
+                    : t('page.list.other_many', { count: otherRecipientCount })}
                 </span>
               </Tooltip>
             )}
           </Paragraph>
           <Paragraph data-size="sm" className="file-transfer-card__reference">
-            Referanse: {reference}
+            {t('page.list.reference_line', { reference })}
           </Paragraph>
           {(status || deadline) && (
             <DialogMetadata

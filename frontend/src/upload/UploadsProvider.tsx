@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../api/client'
+import { i18n } from '../i18n/config'
 import { hasReceivedFile } from '../api/fileTransferStatus'
 import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
@@ -53,7 +54,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
 
   const markReceived = useCallback<UploadActions['markReceived']>(({ resourceId, sender, plan }) => {
     clearDraft(draftKey(resourceId, sender))
-    toast.success('Formidlingen er sendt, og filen er lastet opp.')
+    toast.success(i18n.t('page.upload_errors.sent'))
     for (const listener of listenersRef.current) {
       listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
     }
@@ -277,16 +278,16 @@ function isAbortError(error: unknown): boolean {
 
 function describeUploadError(error: unknown): string {
   if (error instanceof FileChangedError) {
-    return 'Filen er endret eller flyttet etter at opplastingen startet, så den kan ikke fortsette. Avbryt opplastingen, velg filen på nytt og send igjen.'
+    return i18n.t('page.upload_errors.changed_during')
   }
   if (!(error instanceof ApiError)) {
-    return 'Opplastingen stoppet. Fortsett for å laste opp resten av filen.'
+    return i18n.t('page.upload_errors.stopped')
   }
   if (error.status === 0) {
-    return 'Mistet kontakten med serveren. Fortsett opplastingen når du er på nett igjen — det som er lastet opp beholdes.'
+    return i18n.t('page.upload_errors.offline')
   }
   if (isUploadGone(error)) {
-    return 'Opplastingen er ikke lenger tilgjengelig på serveren. Send formidlingen på nytt.'
+    return i18n.t('page.upload_errors.gone')
   }
-  return `Opplastingen stoppet (HTTP ${error.status}). Fortsett for å laste opp resten av filen.`
+  return i18n.t('page.upload_errors.stopped_status', { status: error.status })
 }

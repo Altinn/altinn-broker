@@ -4,9 +4,34 @@ import { BROKER_API_PREFIX } from './config'
 
 const ACTIVE_FILETRANSFER_DETAILS_PATH = `${BROKER_API_PREFIX}/frontend/file-transfer-details/{fileTransferId}`
 
+export type NotificationDeliveryStatus =
+    | 'Pending'
+    | 'Ordered'
+    | 'Rejected'
+    | 'Sent'
+    | 'NotDelivered'
+    | 'ConditionNotMet'
+    | 'OrderUnconfirmed'
+
+export type NotificationReminderDetail = {
+    status: NotificationDeliveryStatus
+    time?: string | null
+}
+
+export type RecipientNotificationDetail = {
+    status: NotificationDeliveryStatus
+    sentTime?: string | null
+    statusReason?: string | null
+    reminder?: NotificationReminderDetail | null
+    customRecipientCount: number
+    customRecipientsNotifiedCount: number
+}
+
 export type RecipientDetail = {
     recipient: string
     recipientName?: string
+    // Null when no notification was ordered for the recipient, and - for a recipient viewing - on the other recipients.
+    notification?: RecipientNotificationDetail | null
 }
 
 export type FileTransferDetails = {
@@ -37,6 +62,7 @@ export type NotificationDetails = {
     enabled: boolean
     sendReminder: boolean
     customRecipients: { identifier: string; relatedOrganizationNumber: string }[]
+
 }
 
 export function getFileTransferDetails(

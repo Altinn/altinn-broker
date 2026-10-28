@@ -11,13 +11,16 @@ import {
 import { daysToIso8601, hoursToIso8601, timeSpanToDays, timeSpanToHours } from '../../helpers/durationHelper'
 import { bytesToGb, gbToBytes } from '../../helpers/fileSizeHelper'
 import { toOrgIdentifier, toOrgNumber } from '../../helpers/orgIdentifierHelper'
+import { i18n } from '../../i18n/config'
 import { localizeApiError, type LocalizedApiError } from '../../i18n/apiErrors'
 
 const MAX_TTL_DAYS = 365
 const MAX_GRACE_HOURS = 24
 const VIRUS_SCAN_MAX_GB = bytesToGb(VIRUS_SCAN_MAX_SIZE_BYTES)
-const VIRUS_SCAN_SIZE_HINT =
-  `Filstørrelse over ${VIRUS_SCAN_MAX_GB} GB krever at virusskanning er slått av.`
+
+export function virusScanSizeHint(): string {
+  return i18n.t('page.config.virus_hint', { maxGb: VIRUS_SCAN_MAX_GB })
+}
 
 export type ConfigurationDraft = {
   maxFileTransferSizeGb: string
@@ -100,7 +103,7 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
       setDisplayed(refreshed)
       setDraft(toDraft(refreshed))
       setEditing(false)
-      toast.success('Oppsettet er lagret.')
+      toast.success(i18n.t('page.config.saved'))
     } catch (error) {
       setSaveError(describeSaveError(error, resourceId))
     } finally {
@@ -139,8 +142,6 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
   }
 }
 
-export { VIRUS_SCAN_SIZE_HINT }
-
 function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   const errors: ConfigurationDraftErrors = {}
 
@@ -148,30 +149,31 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   if (maxSize !== '') {
     const gb = Number(maxSize.replace(',', '.'))
     if (!Number.isFinite(gb) || gb <= 0) {
-      errors.maxFileTransferSizeGb = 'Oppgi en filstørrelse større enn 0 GB.'
+      errors.maxFileTransferSizeGb = i18n.t('page.config.size_positive')
     } else if (draft.virusScanRequired && gb > VIRUS_SCAN_MAX_GB) {
-      errors.maxFileTransferSizeGb = VIRUS_SCAN_SIZE_HINT
-      errors.virusScanRequired = VIRUS_SCAN_SIZE_HINT
+      const hint = virusScanSizeHint()
+      errors.maxFileTransferSizeGb = hint
+      errors.virusScanRequired = hint
     }
   }
 
   const ttl = Number(draft.fileTransferTimeToLiveDays.replace(',', '.'))
   if (!Number.isFinite(ttl) || ttl <= 0) {
-    errors.fileTransferTimeToLiveDays = 'Oppgi levetid som et positivt antall dager.'
+    errors.fileTransferTimeToLiveDays = i18n.t('page.config.lifetime_positive')
   } else if (ttl > MAX_TTL_DAYS) {
-    errors.fileTransferTimeToLiveDays = `Levetiden kan ikke overstige ${MAX_TTL_DAYS} dager.`
+    errors.fileTransferTimeToLiveDays = i18n.t('page.config.lifetime_max', { max: MAX_TTL_DAYS })
   }
 
   const grace = Number(draft.purgeFileTransferGracePeriodHours.replace(',', '.'))
   if (!Number.isFinite(grace) || grace < 0) {
-    errors.purgeFileTransferGracePeriodHours = 'Oppgi venteperioden som et ikke-negativt antall timer.'
+    errors.purgeFileTransferGracePeriodHours = i18n.t('page.config.grace_non_negative')
   } else if (grace > MAX_GRACE_HOURS) {
-    errors.purgeFileTransferGracePeriodHours = `Venteperioden kan ikke overstige ${MAX_GRACE_HOURS} timer.`
+    errors.purgeFileTransferGracePeriodHours = i18n.t('page.config.grace_max', { max: MAX_GRACE_HOURS })
   }
 
   const party = draft.requiredParty.trim()
   if (party !== '' && !toOrgNumber(party)) {
-    errors.requiredParty = 'Velg en gyldig part fra listen.'
+    errors.requiredParty = i18n.t('page.config.party_invalid')
   }
 
   return errors
@@ -214,12 +216,12 @@ function toConfigureInput(
 function describeSaveError(error: unknown, resourceId: string): LocalizedApiError {
   if (error instanceof ApiError) {
     const localized = localizeApiError(error.body, { resourceId })
-    if (localized.errorCode !== undefined || localized.message !== 'Noe gikk galt. Prøv igjen.') {
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
       return localized
     }
-    return { message: `Lagring feilet (HTTP ${error.status}).` }
+    return { message: i18n.t('page.errors.save_failed_status', { status: error.status }) }
   }
-  return { message: 'Lagring feilet. Prøv igjen.' }
+  return { message: i18n.t('page.errors.save_failed') }
 }
 
 function formatGbInput(bytes: number): string {

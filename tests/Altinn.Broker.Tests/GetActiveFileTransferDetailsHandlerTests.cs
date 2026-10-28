@@ -138,7 +138,7 @@ public class GetActiveFileTransferDetailsHandlerTests
                 // The reminder's own row repeats the custom recipient, and is not a choice of its own.
                 CreateNotification(fileTransfer.FileTransferId, customRecipient: ("ola@example.com", "0192:991825827"), isReminder: true),
             ]);
-        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), notificationRepository: notificationRepository);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
 
         var result = await handler.Process(
             new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
@@ -157,7 +157,7 @@ public class GetActiveFileTransferDetailsHandlerTests
     {
         var fileTransfer = CreateFileTransfer(senderExternalId: CallerExternalId, recipientStatuses: []);
         var notificationRepository = new Mock<IFileTransferNotificationRepository>(MockBehavior.Strict);
-        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), notificationRepository: notificationRepository);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
 
         var result = await handler.Process(
             new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
@@ -170,8 +170,12 @@ public class GetActiveFileTransferDetailsHandlerTests
     {
         var fileTransfer = CreateFileTransfer(recipientStatuses: []);
         fileTransfer.HasNotification = true;
-        var notificationRepository = new Mock<IFileTransferNotificationRepository>(MockBehavior.Strict);
-        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), notificationRepository: notificationRepository);
+        // The recipient's own notification status is still read, but the sender's choices are not returned.
+        var notificationRepository = new Mock<IFileTransferNotificationRepository>();
+        notificationRepository
+            .Setup(repository => repository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
 
         var result = await handler.Process(
             new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
@@ -253,6 +257,81 @@ public class GetActiveFileTransferDetailsHandlerTests
         Assert.Equal(CallerOrganizationNumber, authorizedParty);
     }
 
+    [Fact]
+    public async Task Process_CallerIsSender_ReturnsEveryRecipientsNotification()
+    {
+        const string otherRecipientExternalId = "0192:222222222";
+        var fileTransfer = CreateFileTransfer(
+            senderExternalId: CallerExternalId,
+            recipientStatuses: [CreateRecipientStatus(10, "0192:333333333"), CreateRecipientStatus(11, otherRecipientExternalId)]);
+        fileTransfer.HasNotification = true;
+        var sent = new DateTimeOffset(2026, 1, 1, 12, 30, 0, TimeSpan.Zero);
+        var notificationRepository = CreateFileTransferNotificationRepository(
+        [
+            CreateNotification(fileTransfer.FileTransferId, 10, NotificationDeliveryStatus.Sent, notificationSent: sent),
+            CreateNotification(fileTransfer.FileTransferId, 10, NotificationDeliveryStatus.Ordered, isReminder: true),
+            CreateNotification(fileTransfer.FileTransferId, null, NotificationDeliveryStatus.Sent, customRecipientRelatedOrganization: "0192:333333333"),
+            CreateNotification(fileTransfer.FileTransferId, null, NotificationDeliveryStatus.Rejected, customRecipientRelatedOrganization: "0192:333333333"),
+            CreateNotification(fileTransfer.FileTransferId, 11, NotificationDeliveryStatus.Rejected, statusReason: "Missing contact information"),
+        ]);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var recipients = result.AsT0.Recipients!;
+        var first = recipients.Single(r => r.Recipient == "0192:333333333").Notification!;
+        Assert.Equal("Sent", first.Status);
+        Assert.Equal(sent.ToString("dd.MM.yyyy HH:mm"), first.SentTime);
+        Assert.Equal("Ordered", first.Reminder!.Status);
+        Assert.Equal(new DateTimeOffset(2026, 1, 8, 10, 0, 0, TimeSpan.Zero).ToString("dd.MM.yyyy HH:mm"), first.Reminder.Time);
+        Assert.Equal(2, first.CustomRecipientCount);
+        Assert.Equal(1, first.CustomRecipientsNotifiedCount);
+        var other = recipients.Single(r => r.Recipient == otherRecipientExternalId).Notification!;
+        Assert.Equal("Rejected", other.Status);
+        Assert.Null(other.Reminder);
+        Assert.Equal(0, other.CustomRecipientCount);
+    }
+
+    [Fact]
+    public async Task Process_CallerIsRecipient_ReturnsOnlyItsOwnNotification()
+    {
+        var fileTransfer = CreateFileTransfer(
+            recipientStatuses: [CreateRecipientStatus(1, CallerExternalId), CreateRecipientStatus(11, "0192:222222222")]);
+        fileTransfer.HasNotification = true;
+        var notificationRepository = CreateFileTransferNotificationRepository(
+        [
+            CreateNotification(fileTransfer.FileTransferId, 1, NotificationDeliveryStatus.Ordered),
+            CreateNotification(fileTransfer.FileTransferId, 11, NotificationDeliveryStatus.Sent),
+        ]);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var recipients = result.AsT0.Recipients!;
+        Assert.Equal("Ordered", recipients.Single(r => r.Recipient == CallerExternalId).Notification!.Status);
+        Assert.Null(recipients.Single(r => r.Recipient == "0192:222222222").Notification);
+    }
+
+    [Fact]
+    public async Task Process_NoNotificationOrdered_DoesNotLookUpNotifications()
+    {
+        var fileTransfer = CreateFileTransfer(senderExternalId: CallerExternalId, recipientStatuses: [CreateRecipientStatus(10, "0192:333333333")]);
+        var handler = CreateHandler(
+            fileTransferRepository: CreateFileTransferRepository(fileTransfer),
+            fileTransferNotificationRepository: new Mock<IFileTransferNotificationRepository>(MockBehavior.Strict));
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.False(result.AsT0.Notification?.Enabled);
+        Assert.Null(result.AsT0.Recipients!.Single().Notification);
+    }
+
     private static GetActiveFileTransferDetailsHandler CreateHandler(
         Mock<IFileTransferRepository>? fileTransferRepository = null,
         Mock<IAuthorizationService>? authorizationService = null,
@@ -261,15 +340,15 @@ public class GetActiveFileTransferDetailsHandlerTests
         Mock<IFileTransferStatusRepository>? fileTransferStatusRepository = null,
         Mock<IResourceRepository>? resourceRepository = null,
         Mock<IAltinnResourceRepository>? altinnResourceRepository = null,
-        Mock<IFileTransferNotificationRepository>? notificationRepository = null)
+        Mock<IFileTransferNotificationRepository>? fileTransferNotificationRepository = null)
     {
         actorRepository ??= CreateActorRepository();
-        notificationRepository ??= new Mock<IFileTransferNotificationRepository>();
         authorizationService ??= CreateAuthorizationService();
         altinnRegisterService ??= CreateAltinnRegisterService();
         fileTransferStatusRepository ??= CreateFileTransferStatusRepository();
         resourceRepository ??= CreateResourceRepository();
         altinnResourceRepository ??= CreateAltinnResourceRepository();
+        fileTransferNotificationRepository ??= CreateFileTransferNotificationRepository([]);
 
         return new GetActiveFileTransferDetailsHandler(
             authorizationService.Object,
@@ -279,31 +358,54 @@ public class GetActiveFileTransferDetailsHandlerTests
             fileTransferStatusRepository.Object,
             resourceRepository.Object,
             altinnResourceRepository.Object,
-            notificationRepository.Object,
+            fileTransferNotificationRepository.Object,
             NullLogger<GetActiveFileTransferDetailsHandler>.Instance);
     }
+
+    private static Mock<IFileTransferNotificationRepository> CreateFileTransferNotificationRepository(List<BrokerNotificationEntity> notifications)
+    {
+        var fileTransferNotificationRepository = new Mock<IFileTransferNotificationRepository>();
+        fileTransferNotificationRepository
+            .Setup(repository => repository.GetNotificationsForFileTransfer(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(notifications);
+        return fileTransferNotificationRepository;
+    }
+
+    private static ActorFileTransferStatusEntity CreateRecipientStatus(long actorId, string actorExternalId) => new()
+    {
+        FileTransferId = Guid.NewGuid(),
+        Actor = new ActorEntity { ActorId = actorId, ActorExternalId = actorExternalId },
+        Status = ActorFileTransferStatus.Initialized,
+        Date = DateTimeOffset.UtcNow,
+    };
 
     private static BrokerNotificationEntity CreateNotification(
         Guid fileTransferId,
         long? actorId = null,
+        NotificationDeliveryStatus status = NotificationDeliveryStatus.Pending,
         (string Identifier, string RelatedOrganization)? customRecipient = null,
+        bool isReminder = false,
         string? orderRequest = null,
-        bool isReminder = false)
-        => new()
-        {
-            Id = Guid.NewGuid(),
-            FileTransferId = fileTransferId,
-            ActorId = actorId,
-            CustomRecipientType = customRecipient is null ? null : CustomRecipientType.Email,
-            CustomRecipientIdentifier = customRecipient?.Identifier,
-            CustomRecipientRelatedOrganization = customRecipient?.RelatedOrganization,
-            NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
-            NotificationChannel = NotificationChannel.EmailPreferred,
-            RequestedSendTime = DateTimeOffset.UtcNow,
-            Created = DateTimeOffset.UtcNow,
-            IsReminder = isReminder,
-            OrderRequest = orderRequest,
-        };
+        string? customRecipientRelatedOrganization = null,
+        DateTimeOffset? notificationSent = null,
+        string? statusReason = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        FileTransferId = fileTransferId,
+        ActorId = actorId,
+        CustomRecipientType = actorId is null ? CustomRecipientType.Email : null,
+        CustomRecipientIdentifier = actorId is null ? customRecipient?.Identifier ?? "someone@example.com" : null,
+        CustomRecipientRelatedOrganization = customRecipient?.RelatedOrganization ?? customRecipientRelatedOrganization,
+        NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
+        NotificationChannel = isReminder ? NotificationChannel.EmailAndSms : NotificationChannel.EmailPreferred,
+        RequestedSendTime = new DateTimeOffset(2026, 1, 8, 10, 0, 0, TimeSpan.Zero),
+        Created = DateTimeOffset.UtcNow,
+        IsReminder = isReminder,
+        OrderRequest = orderRequest,
+        Status = status,
+        NotificationSent = notificationSent,
+        StatusReason = statusReason,
+    };
 
     private static Mock<IFileTransferRepository> CreateFileTransferRepository(FileTransferEntity fileTransfer)
     {

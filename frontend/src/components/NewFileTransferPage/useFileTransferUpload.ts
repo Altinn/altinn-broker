@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/client'
-import { FileChangedError, discardUpload } from '../../api/tus/tusUpload'
 import { toUploadPlan } from '../../api/uploadPlan'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { i18n } from '../../i18n/config'
+import { FileChangedError, discardUpload } from '../../api/tus/tusUpload'
 import { InvalidOrgNumberError } from '../../helpers/orgIdentifierHelper'
 import { matchesFingerprint } from '../../upload/fileFingerprint'
 import { UploadPlanError, useActiveUpload, useUploadActions } from '../../upload/uploadsContext'
@@ -167,29 +168,34 @@ function describeMismatch(upload: ResumableUpload, file: File): string | null {
 
 function describeInitializeError(error: unknown): string {
   if (error instanceof UploadPlanError) {
-    return `${describeInitializeError(error.cause)} Formidlingen ble opprettet med id ${error.fileTransferId}, men filen ble ikke lastet opp.`
+    return `${describeInitializeError(error.cause)} ${i18n.t('page.upload_errors.created_not_uploaded', { id: error.fileTransferId })}`
   }
   if (error instanceof FileChangedError) {
-    return 'Filen er endret eller flyttet etter at du valgte den. Velg filen på nytt.'
+    return i18n.t('page.upload_errors.changed')
   }
   if (error instanceof InvalidOrgNumberError) {
-    return error.message
+    return i18n.t('page.upload_errors.invalid_org', { value: error.value })
   }
   if (error instanceof ApiError) {
     const body = error.body as { detail?: string; errorCode?: number } | null
-    const notificationMessage = body?.errorCode ? notificationErrorMessages[body.errorCode] : undefined
-    return notificationMessage ?? body?.detail ?? `Formidlingen feilet (HTTP ${error.status}).`
+    const notificationMessage = notificationErrorMessage(body?.errorCode)
+    return notificationMessage ?? body?.detail ?? i18n.t('page.upload_errors.failed_status', { status: error.status })
   }
-  return 'Formidlingen feilet. Prøv igjen.'
+  return i18n.t('page.upload_errors.failed')
 }
 
 /** The API's notification errors (NotificationErrors in the backend), worded for the user. */
-const notificationErrorMessages: Record<number, string> = {
-  8001: 'En av de andre som skal varsles mangler e-postadresse eller mobilnummer.',
-  8002: 'En av de andre som skal varsles har både e-postadresse og mobilnummer.',
-  8003: 'En av e-postadressene til de andre som skal varsles er ugyldig.',
-  8004: 'Et av mobilnumrene til de andre som skal varsles er ugyldig.',
-  8005: 'En av de andre som skal varsles mangler hvilken mottaker varselet gjelder.',
-  8006: 'En av de andre som skal varsles er knyttet til en organisasjon som ikke er mottaker av formidlingen.',
-  8007: 'En av de andre som skal varsles er knyttet til et ugyldig organisasjonsnummer.',
+function notificationErrorMessage(errorCode: number | undefined): string | undefined {
+  switch (errorCode) {
+    case 8001:
+    case 8002:
+    case 8003:
+    case 8004:
+    case 8005:
+    case 8006:
+    case 8007:
+      return i18n.t(`page.upload_errors.c${errorCode}`)
+    default:
+      return undefined
+  }
 }
