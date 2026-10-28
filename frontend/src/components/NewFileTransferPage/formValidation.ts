@@ -151,7 +151,7 @@ export function validateCustomRecipientRows(
     const identifier = customRecipientIdentifierError(entry.identifier)
     const relatedOrganization = recipients.includes(entry.relatedOrganizationNumber)
       ? undefined
-      : 'Velg hvilken mottaker varselet gjelder.'
+      : i18n.t('page.validation.custom_related')
     if (identifier || relatedOrganization) {
       return { identifier, relatedOrganization }
     }
@@ -183,8 +183,8 @@ function customRecipientKey(entry: CustomRecipientEntry): string {
 function duplicateCustomRecipientError(identifier: string): string {
   const recognised = toCustomRecipientIdentifier(identifier)
   return recognised && 'mobileNumber' in recognised
-    ? 'Dette mobilnummeret er allerede lagt til for samme mottaker.'
-    : 'Denne e-postadressen er allerede lagt til for samme mottaker.'
+    ? i18n.t('page.validation.custom_related_number_added')
+    : i18n.t('page.validation.custom_related_email_added')
   }
 
 function customRecipientIdentifierError(identifier: string): string | undefined {
