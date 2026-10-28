@@ -1,0 +1,22 @@
+ul.notification-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  /* Keeps the last recipient's tag off the divider below when no custom recipient line follows it. */
+  padding: 0 0 0.5rem;
+}
+
+.notification-detail__recipient {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.notification-detail__heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

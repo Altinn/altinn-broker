@@ -6,6 +6,7 @@ import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
 // import { i18n } from '../../i18n/config'
 import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
+import { NotificationDetail } from './NotificationDetail'
 
 /** A missing checksum means Broker is still calculating it after upload. */
 // function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
@@ -38,6 +39,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
           .map((recipient: RecipientDetail) => formatOrganizationDisplay(recipient.recipientName ?? recipient.recipient, recipient.recipient))
           .join(', ')}
       />
+      <NotificationDetail transferDetails={transferDetails} />
       <DetailField label={t('page.detail.created')} value={transferDetails.created} />
       <DetailField label={t('page.detail.uploaded')} value={transferDetails.published} />
       <DetailField label={t('page.detail.deadline')} value={transferDetails.expirationTime} />
