@@ -195,8 +195,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
     >
       <header className="new-transfer__header">
         <Heading level={2} data-size="md">
-          {resumeTransferId ? 'Fortsett formidling' : 'Ny formidling'}
-          {t('page.new.title')}
+          {resumeTransferId ? t('page.new.resume_title') : t('page.new.title')}
         </Heading>
         <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
       </header>

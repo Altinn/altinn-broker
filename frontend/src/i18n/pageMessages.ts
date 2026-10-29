@@ -219,6 +219,7 @@ const pageNb = {
   },
   new: {
     title: 'Ny formidling',
+    resume_title: 'Fortsett opplastingen',
     sender_description: 'Du formidler på vegne av denne organisasjonen.',
     reference_description: 'Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere.',
     notify: 'Varsle mottakere',
@@ -600,6 +601,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     new: {
       title: 'Ny formidling',
+      resume_title: "Fortsett opplastinga",
       sender_description: 'Du formidlar på vegner av denne organisasjonen.',
       reference_description: 'Din eigen referanse til formidlinga, slik at du kan kjenne ho att seinare.',
       notify: 'Varsle mottakarar',
@@ -976,6 +978,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     new: {
       title: 'New file transfer',
+      resume_title: 'Resume upload',
       sender_description: 'You are sending on behalf of this organization.',
       reference_description: 'Your own reference for the file transfer, so you can recognize it later.',
       notify: 'Notify recipients',
