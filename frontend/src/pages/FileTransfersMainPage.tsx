@@ -32,16 +32,15 @@ export function FileTransfersMainPage() {
       </section>
 
       <section className="page-section">
-        <h2 className="page-heading">Utkast</h2>
+        <h2 className="page-heading">{t('page.home.draft_heading')}</h2>
         <CardLink
           to={PageRoutes.drafts}
-          title="Dine utkast"
-          description="Formidlinger der filen ikke er ferdig lastet opp"
+          title={t('page.home.draft_title')}
+          description={t('page.home.draft_description')}
         />
       </section>
 
       <section className="page-section">
-        <h2 className="page-heading">Aktive formidlinger</h2>
         <h2 className="page-heading">{t('page.home.active_heading')}</h2>
         <CardLink
           to={PageRoutes.active}

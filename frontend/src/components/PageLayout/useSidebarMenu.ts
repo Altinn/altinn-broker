@@ -116,7 +116,7 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
           size: 'md',
           groupId: 'file-transfers',
           icon: DocPencilIcon,
-          title: 'Utkast',
+          title: t('menu.drafts'),
           selected: isRouteSelected(pathname, PageRoutes.drafts),
           as: createMenuItemComponent({ to: PageRoutes.drafts }),
         },
