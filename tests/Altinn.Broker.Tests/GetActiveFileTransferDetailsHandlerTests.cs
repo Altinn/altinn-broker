@@ -1,10 +1,12 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GetActiveFileTransferDetails;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models.Enums;
+using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Tests.Helpers;
@@ -118,6 +120,68 @@ public class GetActiveFileTransferDetailsHandlerTests
         Assert.True(response.IsSender);
         Assert.Null(response.ActorDownloadStatus);
         Assert.Equal("AwaitingRecipients", response.Status);
+    }
+
+    [Fact]
+    public async Task Process_CallerIsSenderOfTransferWithNotification_ReturnsTheSendersChoices()
+    {
+        var fileTransfer = CreateFileTransfer(senderExternalId: CallerExternalId, recipientStatuses: []);
+        fileTransfer.HasNotification = true;
+        var withReminder = JsonSerializer.Serialize(new NotificationOrderRequestV2 { Reminders = [new ReminderV2 { DelayDays = 7 }] });
+        var notificationRepository = new Mock<IFileTransferNotificationRepository>();
+        notificationRepository
+            .Setup(repository => repository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                CreateNotification(fileTransfer.FileTransferId, actorId: 7, orderRequest: withReminder),
+                CreateNotification(fileTransfer.FileTransferId, customRecipient: ("ola@example.com", "0192:991825827"), orderRequest: withReminder),
+                // The reminder's own row repeats the custom recipient, and is not a choice of its own.
+                CreateNotification(fileTransfer.FileTransferId, customRecipient: ("ola@example.com", "0192:991825827"), isReminder: true),
+            ]);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        var notification = result.AsT0.Notification;
+        Assert.NotNull(notification);
+        Assert.True(notification.Enabled);
+        Assert.True(notification.SendReminder);
+        var customRecipient = Assert.Single(notification.CustomRecipients);
+        Assert.Equal("ola@example.com", customRecipient.Identifier);
+        Assert.Equal("991825827", customRecipient.RelatedOrganizationNumber);
+    }
+
+    [Fact]
+    public async Task Process_CallerIsSenderOfTransferWithoutNotification_ReturnsNotificationDisabled()
+    {
+        var fileTransfer = CreateFileTransfer(senderExternalId: CallerExternalId, recipientStatuses: []);
+        var notificationRepository = new Mock<IFileTransferNotificationRepository>(MockBehavior.Strict);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        Assert.False(result.AsT0.Notification?.Enabled);
+    }
+
+    [Fact]
+    public async Task Process_CallerIsRecipient_ReturnsNoNotification()
+    {
+        var fileTransfer = CreateFileTransfer(recipientStatuses: []);
+        fileTransfer.HasNotification = true;
+        // The recipient's own notification status is still read, but the sender's choices are not returned.
+        var notificationRepository = new Mock<IFileTransferNotificationRepository>();
+        notificationRepository
+            .Setup(repository => repository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var handler = CreateHandler(fileTransferRepository: CreateFileTransferRepository(fileTransfer), fileTransferNotificationRepository: notificationRepository);
+
+        var result = await handler.Process(
+            new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
+
+        Assert.False(result.AsT0.IsSender);
+        Assert.Null(result.AsT0.Notification);
     }
 
     [Theory]
@@ -264,7 +328,7 @@ public class GetActiveFileTransferDetailsHandlerTests
             new GetActiveFileTransferDetailsRequest { FileTransferId = fileTransfer.FileTransferId, OnBehalfOf = CallerOrganizationNumber }, null, CancellationToken.None);
 
         Assert.True(result.IsT0);
-        Assert.False(result.AsT0.HasNotification);
+        Assert.False(result.AsT0.Notification?.Enabled);
         Assert.Null(result.AsT0.Recipients!.Single().Notification);
     }
 
@@ -317,9 +381,11 @@ public class GetActiveFileTransferDetailsHandlerTests
 
     private static BrokerNotificationEntity CreateNotification(
         Guid fileTransferId,
-        long? actorId,
-        NotificationDeliveryStatus status,
+        long? actorId = null,
+        NotificationDeliveryStatus status = NotificationDeliveryStatus.Pending,
+        (string Identifier, string RelatedOrganization)? customRecipient = null,
         bool isReminder = false,
+        string? orderRequest = null,
         string? customRecipientRelatedOrganization = null,
         DateTimeOffset? notificationSent = null,
         string? statusReason = null) => new()
@@ -328,13 +394,14 @@ public class GetActiveFileTransferDetailsHandlerTests
         FileTransferId = fileTransferId,
         ActorId = actorId,
         CustomRecipientType = actorId is null ? CustomRecipientType.Email : null,
-        CustomRecipientIdentifier = actorId is null ? "someone@example.com" : null,
-        CustomRecipientRelatedOrganization = customRecipientRelatedOrganization,
+        CustomRecipientIdentifier = actorId is null ? customRecipient?.Identifier ?? "someone@example.com" : null,
+        CustomRecipientRelatedOrganization = customRecipient?.RelatedOrganization ?? customRecipientRelatedOrganization,
         NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
         NotificationChannel = isReminder ? NotificationChannel.EmailAndSms : NotificationChannel.EmailPreferred,
         RequestedSendTime = new DateTimeOffset(2026, 1, 8, 10, 0, 0, TimeSpan.Zero),
         Created = DateTimeOffset.UtcNow,
         IsReminder = isReminder,
+        OrderRequest = orderRequest,
         Status = status,
         NotificationSent = notificationSent,
         StatusReason = statusReason,

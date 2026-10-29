@@ -15,8 +15,9 @@ import {
   type UploadProgress,
   type UploadRun,
 } from '../api/tus/tusUpload'
+import { saveUploadPlan, type FileFingerprint } from '../api/uploadPlan'
 import { clearDraft, draftKey } from '../components/NewFileTransferPage/draftStore'
-import { clearStoredUpload, saveStoredUpload } from './uploadSession'
+import { fingerprintFile } from './fileFingerprint'
 import {
   ActiveUploadContext,
   UploadActionsContext,
@@ -52,7 +53,6 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const markReceived = useCallback<UploadActions['markReceived']>(({ resourceId, sender, plan }) => {
-    clearStoredUpload(resourceId, sender)
     clearDraft(draftKey(resourceId, sender))
     toast.success(i18n.t('page.upload_errors.sent'))
     for (const listener of listenersRef.current) {
@@ -62,8 +62,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (upload: PlannedUpload, alreadySent: number, paused = false) => {
-      saveStoredUpload(upload)
-      update({ error: '' })
+      update({ error: '', fileTransferId: upload.plan.fileTransferId })
 
       let loaded = alreadySent
       const session: Running = {
@@ -94,7 +93,6 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         if (isUploadGone(error)) {
           sessionRef.current = null
           discardUpload(upload.plan)
-          clearStoredUpload(upload.resourceId, upload.sender)
           show(null)
           return
         }
@@ -130,6 +128,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       const { signal } = session.controller
       let fileTransferId: string | undefined
       let plan: UploadPlan
+      // Read while the transfer is created; only continuing elsewhere needs it, so failing is no error.
+      const fingerprint = fingerprintFile(input.file).catch(() => null)
       try {
         await assertFileUnchanged(input.file)
         fileTransferId = await initializeFileTransfer(input, signal)
@@ -148,6 +148,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         return
       }
       const upload = { resourceId: input.resourceId, sender: input.sender, plan, file: input.file }
+      void keepPlan(plan, fingerprint)
       await run(upload, 0, session.paused)
     },
     [run, show],
@@ -200,7 +201,6 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     }
     if (session) {
       discardUpload(session.upload.plan)
-      clearStoredUpload(session.upload.resourceId, session.upload.sender)
     }
   }, [show])
 
@@ -240,13 +240,31 @@ async function fileReceived(plan: UploadPlan, run: UploadRun): Promise<void> {
   }
 }
 
+/**
+ * Gives the server the plan, so the upload can be continued from another browser if it stops. The
+ * upload runs either way, so a failure only costs that, and the user is told.
+ */
+async function keepPlan(plan: UploadPlan, fingerprint: Promise<FileFingerprint | null>): Promise<void> {
+  try {
+    const taken = await fingerprint
+    if (!taken) {
+      throw new Error('The file could not be read for its fingerprint')
+    }
+    await saveUploadPlan(plan, taken)
+  } catch (error) {
+    console.error('Could not save the upload plan', error)
+    toast.warning('Hvis opplastingen stopper, kan den bare fortsettes fra denne fanen.')
+  }
+}
+
 function newActiveUpload(
-  { resourceId, sender, file }: { resourceId: string; sender: string; file: File },
+  { resourceId, sender, file, plan }: { resourceId: string; sender: string; file: File; plan?: UploadPlan },
   status: UploadStatus,
 ): ActiveUpload {
   return {
     resourceId,
     sender,
+    fileTransferId: plan?.fileTransferId ?? null,
     fileName: file.name,
     fileSize: file.size,
     status,

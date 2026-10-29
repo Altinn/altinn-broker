@@ -1,4 +1,5 @@
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -17,6 +18,7 @@ public class StuckFileTransferHandler(
     IFileTransferRepository fileTransferRepository,
     ITusUploadFinalizationProgressService tusUploadFinalizationProgressService,
     ITusUploadActivityCache tusUploadActivityCache,
+    IUploadPlanStore uploadPlanStore,
     IBackgroundJobClient backgroundJobClient,
     SlackStuckFileTransferNotifier slackNotifier,
     ILogger<StuckFileTransferHandler> logger)
@@ -52,6 +54,7 @@ public class StuckFileTransferHandler(
             {
                 logger.LogError("File transfer {fileTransferId} has been stuck in UploadStarted for more than {thresholdMinutes} minutes. Marking as failed.", fileTransferStatus.FileTransferId, _stuckInUploadStartingThresholdMinutes);
                 await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, detailedFileTransferStatus: "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken: cancellationToken);
+                await uploadPlanStore.RemoveAsync(fileTransferStatus.FileTransferId, cancellationToken);
                 backgroundJobClient.Enqueue<IEventBus>((eventBus) => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender, CancellationToken.None));
                 return Task.CompletedTask;
             }, logger, cancellationToken);

@@ -22,7 +22,26 @@ public class GetActiveFileTransferDetailsResponse
     public string? Status { get; set; }
     public bool? IsSender { get; set; }
     public string? ActorDownloadStatus { get; set; }
-    public bool? HasNotification { get; set; }
+    /// <summary>
+    /// The notifications the transfer was sent with. Only for the sender: they hold the sender's own
+    /// addresses, and recipients see these details too.
+    /// </summary>
+    public NotificationDetails? Notification { get; set; }
+}
+
+public class NotificationDetails
+{
+    public required bool Enabled { get; set; }
+    public required bool SendReminder { get; set; }
+    public required List<CustomRecipientDetails> CustomRecipients { get; set; }
+}
+
+public class CustomRecipientDetails
+{
+    /// <summary>The email address or mobile number notified.</summary>
+    public required string Identifier { get; set; }
+    /// <summary>The organization number of the recipient the notification is on behalf of.</summary>
+    public required string RelatedOrganizationNumber { get; set; }
 }
 
 public class RecipientDetails

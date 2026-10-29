@@ -10,6 +10,8 @@ export type UploadStatus = 'initializing' | UploadRunStatus | 'failed'
 export type ActiveUpload = {
   resourceId: string
   sender: string
+  /** Null until the transfer has been created. */
+  fileTransferId: string | null
   fileName: string
   fileSize: number
   status: UploadStatus

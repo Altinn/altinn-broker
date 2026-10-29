@@ -55,7 +55,14 @@ export type FileTransferDetails = {
     status?: string
     isSender?: boolean
     actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
-    hasNotification?: boolean
+    notification?: NotificationDetails | null
+}
+
+export type NotificationDetails = {
+    enabled: boolean
+    sendReminder: boolean
+    customRecipients: { identifier: string; relatedOrganizationNumber: string }[]
+
 }
 
 export function getFileTransferDetails(

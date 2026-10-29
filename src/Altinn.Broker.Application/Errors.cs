@@ -63,8 +63,11 @@ public static class Errors
         HttpStatusCode.Forbidden);
 
     public static Error PartialUploadTooLong = new Error(39, "A single upload is too long to be addressed. Split the file transfer into more concatenation partials.", HttpStatusCode.BadRequest);
+
     public static Error InvalidProfileLanguage = new Error(40, "Language must be nb, nn, or en.", HttpStatusCode.BadRequest);
     public static Error ProfileLanguageUnavailable = new Error(41, "Could not read or update the language in your Altinn profile. Please try again later.", HttpStatusCode.ServiceUnavailable);
+    public static Error InvalidUploadPlan = new Error(42, "The upload plan does not match the file transfer or its uploads.", HttpStatusCode.BadRequest);
+    public static Error UploadPlanNotFound = new Error(43, "The file transfer has no upload that can be continued.", HttpStatusCode.NotFound);
 }
 
 public static class StatisticsErrors
