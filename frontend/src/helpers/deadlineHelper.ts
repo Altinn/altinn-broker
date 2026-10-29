@@ -1,4 +1,5 @@
 import type { DialogMetadataDueAtProps } from '@altinn/altinn-components'
+import { i18n } from '../i18n/config'
 import { formatDateTime } from './dateTimeHelper'
 
 const SOON_THRESHOLD_DAYS = 14
@@ -15,7 +16,7 @@ export function getDeadlineProps(expirationTime: string, waitingOnOthers: boolea
   }
 
   const remaining = new Date(expirationTime).getTime() - Date.now()
-  const label = `${remaining < 0 ? 'Frist utgått' : 'Frist'}: ${formatted}`
+  const label = `${remaining < 0 ? i18n.t('page.deadline.expired') : i18n.t('page.deadline.due')}: ${formatted}`
 
   if (waitingOnOthers) {
     return { datetime: expirationTime, label, color: 'neutral', variant: 'outline' }

@@ -34,6 +34,7 @@ public class Program
         var parallelPartialUploads = int.Parse(
             ReadEnv("TUS_PARALLEL_PARTIAL_UPLOADS", DefaultParallelPartialUploads.ToString())!);
         var uploadFilePath = ReadEnv("UPLOAD_FILE_PATH", null);
+        var checksumAlgorithm = ParseChecksumAlgorithm(ReadEnv("CHECKSUM_ALGORITHM", "SHA256")!);
         var chunkSize = chunkSizeMb * 1024 * 1024;
 
         Console.WriteLine($"BASE_URL: {baseUrl}");
@@ -41,6 +42,7 @@ public class Program
         Console.WriteLine($"ORG_NO: {authOptions.OrgNumber}");
         Console.WriteLine($"CHUNK_SIZE_MB: {chunkSizeMb}");
         Console.WriteLine($"TUS_PARALLEL_PARTIAL_UPLOADS: {parallelPartialUploads}");
+        Console.WriteLine($"CHECKSUM_ALGORITHM: {checksumAlgorithm}");
 
         using var authHttpClient = new HttpClient(new SocketsHttpHandler());
         var token = await AltinnAuthClient.ExchangeAltinnTokenAsync(authHttpClient, authOptions);
@@ -50,7 +52,8 @@ public class Program
             httpClient,
             baseUrl,
             authOptions.OrgNumber,
-            resourceId);
+            resourceId,
+            checksumAlgorithm);
         Console.WriteLine($"File transfer id: {fileTransferId}");
 
         if (uploadFilePath is not null)
@@ -141,6 +144,18 @@ public class Program
         return string.IsNullOrEmpty(value) ? fallback : value;
     }
 
+    private static ChecksumAlgorithmExt ParseChecksumAlgorithm(string value)
+    {
+        if (Enum.TryParse<ChecksumAlgorithmExt>(value, ignoreCase: true, out var algorithm)
+            && Enum.IsDefined(algorithm))
+        {
+            return algorithm;
+        }
+
+        throw new InvalidOperationException(
+            $"CHECKSUM_ALGORITHM must be MD5 or SHA256. Got: {value}");
+    }
+
     private static string RequireEnv(string name)
     {
         var value = Environment.GetEnvironmentVariable(name);
@@ -177,9 +192,10 @@ public class Program
         string baseUrl,
         string orgNumber,
         string resourceId,
+        ChecksumAlgorithmExt checksumAlgorithm,
         CancellationToken cancellationToken = default)
     {
-        var payload = BasicFileTransfer(orgNumber, resourceId);
+        var payload = BasicFileTransfer(orgNumber, resourceId, checksumAlgorithm);
         using var httpRequestMessage = new HttpRequestMessage
         {
             RequestUri = new Uri(baseUrl.TrimEnd('/') + "/broker/api/v1/filetransfer"),
@@ -299,10 +315,14 @@ public class Program
         throw new InvalidOperationException("Overview request failed after token refresh.");
     }
 
-    private static FileTransferInitalizeExt BasicFileTransfer(string orgNumber, string resourceId) => new()
+    private static FileTransferInitalizeExt BasicFileTransfer(
+        string orgNumber,
+        string resourceId,
+        ChecksumAlgorithmExt checksumAlgorithm) => new()
     {
         ResourceId = resourceId,
         Checksum = null,
+        ChecksumAlgorithm = checksumAlgorithm,
         FileName = "input.txt",
         PropertyList = [],
         Recipients = ["0192:310880442"],

@@ -1,6 +1,5 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.InitializeFileTransfer;
-using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 
 using PhoneNumbers;
@@ -20,7 +19,6 @@ public class NotificationValidationHelperTests
     private static readonly List<string> FileTransferRecipients = [$"0192:{FileTransferRecipient}"];
 
     private static NotificationRequest CreateRequest(
-        NotificationChannel channel = NotificationChannel.Email,
         bool sendReminder = false,
         List<Recipient>? customRecipients = null,
         bool setRelatedOrganization = true)
@@ -31,7 +29,6 @@ public class NotificationValidationHelperTests
         }
         return new()
         {
-            NotificationChannel = channel,
             SendReminder = sendReminder,
             CustomRecipients = customRecipients
         };
@@ -62,19 +59,6 @@ public class NotificationValidationHelperTests
     public void Validate_WithCustomRecipientRelatedToFileTransferRecipient_InAnyAllowedFormat_ReturnsNull(string relatedOrganizationNumber)
     {
         var request = CreateRequest(customRecipients: [new Recipient { EmailAddress = "test@example.com", RelatedOrganizationNumber = relatedOrganizationNumber }]);
-
-        Assert.Null(Validate(request));
-    }
-
-    [Theory]
-    [InlineData(NotificationChannel.Email)]
-    [InlineData(NotificationChannel.Sms)]
-    [InlineData(NotificationChannel.EmailAndSms)]
-    [InlineData(NotificationChannel.EmailPreferred)]
-    [InlineData(NotificationChannel.SmsPreferred)]
-    public void Validate_WithAnyChannel_ReturnsNull(NotificationChannel channel)
-    {
-        var request = CreateRequest(channel: channel, sendReminder: true);
 
         Assert.Null(Validate(request));
     }

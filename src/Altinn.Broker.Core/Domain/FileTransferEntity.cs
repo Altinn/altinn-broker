@@ -1,3 +1,5 @@
+using Altinn.Broker.Core.Domain.Enums;
+
 namespace Altinn.Broker.Core.Domain;
 
 public class FileTransferEntity
@@ -15,7 +17,13 @@ public class FileTransferEntity
     public string? HangfireJobId { get; set; }
     public required string FileName { get; set; }
     public long FileTransferSize { get; set; } = 0;
+    /// <summary>
+    /// Bytes per stripe blob, or null when the content is a single block blob named {FileTransferId}.
+    /// See <see cref="StripeLayout"/>.
+    /// </summary>
+    public long? StripeSizeBytes { get; set; }
     public string? Checksum { get; set; }
+    public ChecksumAlgorithm ChecksumAlgorithm { get; set; } = ChecksumAlgorithm.MD5;
     public bool UseVirusScan { get; set; }
     public bool HasNotification { get; set; }
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();

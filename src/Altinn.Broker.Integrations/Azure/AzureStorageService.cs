@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
 
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
-using Altinn.Broker.Core.Services;
 
 using Azure;
 using Azure.Identity;
@@ -52,9 +53,15 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
     public async Task<BrokerFileDownload> DownloadFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransfer, ByteRange? range, CancellationToken cancellationToken)
     {
         var blobContainerClient = await GetBlobContainerClient(fileTransfer, serviceOwnerEntity);
-        var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
+        var layout = StripeLayout.ForStoredContent(fileTransfer);
         try
         {
+            if (layout.IsStriped)
+            {
+                return await DownloadStripedFile(blobContainerClient, fileTransfer, layout, range, cancellationToken);
+            }
+
+            var blobClient = blobContainerClient.GetBlobClient(fileTransfer.FileTransferId.ToString());
             var options = new BlobDownloadOptions();
             if (range is not null)
             {
@@ -75,6 +82,44 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
+    private async Task<BrokerFileDownload> DownloadStripedFile(
+        BlobContainerClient blobContainerClient,
+        FileTransferEntity fileTransfer,
+        StripeLayout layout,
+        ByteRange? range,
+        CancellationToken cancellationToken)
+    {
+        var effectiveRange = range ?? new ByteRange(0, fileTransfer.FileTransferSize);
+        var stripedStream = new StripedReadStream(
+            layout,
+            effectiveRange,
+            (stripeIndex, offsetWithinStripe, length, ct) =>
+                OpenStripe(blobContainerClient, fileTransfer.FileTransferId, stripeIndex, offsetWithinStripe, length, ct),
+            logger);
+
+        await stripedStream.PrimeAsync(cancellationToken);
+
+        return new BrokerFileDownload(
+            Content: stripedStream,
+            TotalLength: fileTransfer.FileTransferSize,
+            SegmentLength: effectiveRange.Length,
+            ETag: null);
+    }
+
+    private static async ValueTask<Stream> OpenStripe(
+        BlobContainerClient blobContainerClient,
+        Guid fileTransferId,
+        int stripeIndex,
+        long offsetWithinStripe,
+        long length,
+        CancellationToken cancellationToken)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(StripeLayout.GetStripeBlobName(fileTransferId, stripeIndex));
+        var content = await blobClient.DownloadStreamingAsync(
+            new BlobDownloadOptions { Range = new HttpRange(offsetWithinStripe, length) },
+            cancellationToken);
+        return content.Value.Content;
+    }
 
     // Content-Range is only present on ranged responses and has the format "bytes {start}-{end}/{total}"
     private static long? ParseTotalLengthFromContentRange(string? contentRange)
@@ -105,7 +150,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             var networkReadBuffer = new byte[1024 * 1024];
             var blockList = new List<string>();
             long position = 0;
-            using var blobMd5 = MD5.Create();
+            using var fileHash = ChecksumHasher.Create(fileTransferEntity.ChecksumAlgorithm);
             var createdBlobByThisAttempt = false;
 
             var uploadTasks = new List<Task>();
@@ -118,7 +163,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 accumulationBuffer.Position = 0;
                 var blockId = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
                 byte[] blockData = accumulationBuffer.ToArray();
-                blobMd5.TransformBlock(blockData, 0, blockData.Length, null, 0);
+                fileHash.TransformBlock(blockData, 0, blockData.Length, null, 0);
                 blockList.Add(blockId);
                 accumulationBuffer.SetLength(0);
 
@@ -174,9 +219,9 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             if (uploadTasks.Count > 0)
                 await Task.WhenAll(uploadTasks);
 
-            blobMd5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            if (blobMd5.Hash is null)
-                throw new Exception("Failed to calculate MD5 hash of uploaded file");
+            fileHash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            if (fileHash.Hash is null)
+                throw new Exception($"Failed to calculate {fileTransferEntity.ChecksumAlgorithm} hash of uploaded file");
 
             var isFirstCommitForFinalCall = !createdBlobByThisAttempt;
             await CommitBlocks(blockBlobClient, blockList.ToList(), firstCommit: isFirstCommitForFinalCall, null, cancellationToken);
@@ -185,7 +230,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             logger.LogInformation($"Successfully uploaded {position / (1024.0 * 1024.0 * 1024.0):N2} GiB " +
                 $"in {stopwatch.ElapsedMilliseconds / 1000.0:N1}s (avg: {finalSpeedMBps:N2} MB/s)");
 
-            return (BitConverter.ToString(blobMd5.Hash).Replace("-", "").ToLowerInvariant(), position);
+            return (ChecksumHasher.ToLowerHex(fileHash.Hash), position);
         }
         catch (Exception ex)
         {
@@ -238,11 +283,19 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
     public async Task DeleteFile(ServiceOwnerEntity serviceOwnerEntity, FileTransferEntity fileTransferEntity, CancellationToken cancellationToken)
     {
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
-        var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
 
         try
         {
-            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            // Listed, not derived: the entity may be partially hydrated or have no layout recorded yet.
+            await foreach (var blob in blobContainerClient.GetBlobsAsync(
+                BlobTraits.None,
+                BlobStates.None,
+                prefix: StripeLayout.GetStripeBlobPrefix(fileTransferEntity.FileTransferId),
+                cancellationToken: cancellationToken))
+            {
+                await blobContainerClient.DeleteBlobIfExistsAsync(blob.Name, cancellationToken: cancellationToken);
+            }
+
             var tusStagingAppendBlob = blobContainerClient.GetBlobClient(
                 Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
             await tusStagingAppendBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
@@ -257,7 +310,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         }
     }
 
-    public async Task<(string? Checksum, long Length)?> FinalizeTusUpload(
+    public async Task<(string? Checksum, long Length, long? StripeSizeBytes)?> FinalizeTusUpload(
         ServiceOwnerEntity serviceOwnerEntity,
         FileTransferEntity fileTransferEntity,
         CancellationToken cancellationToken)
@@ -270,26 +323,34 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             Path.Combine(AzureStorageConstants.TusStagingBlobPath, fileTransferEntity.FileTransferId.ToString()));
         var destinationBlobClient = blobContainerClient.GetBlockBlobClient(fileTransferEntity.FileTransferId.ToString());
 
+        CommittedStripes? committedStripes = null;
         try
         {
-            if (await destinationBlobClient.ExistsAsync(cancellationToken))
+            committedStripes = await ReadCommittedStripesAsync(
+                blobContainerClient,
+                fileTransferEntity.FileTransferId,
+                cancellationToken);
+            if (committedStripes.StripeCount > 0)
             {
-                var destinationProperties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-                var destinationLength = destinationProperties.Value.ContentLength;
                 string? destinationChecksum = null;
-                if (destinationProperties.Value.ContentHash is { Length: > 0 } contentHash)
+                if (committedStripes.StripeCount == 1)
                 {
-                    destinationChecksum = BitConverter.ToString(contentHash).Replace("-", "").ToLowerInvariant();
+                    var destinationProperties = await destinationBlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                    if (destinationProperties.Value.ContentHash is { Length: > 0 } contentHash)
+                    {
+                        destinationChecksum = BitConverter.ToString(contentHash).Replace("-", "").ToLowerInvariant();
+                    }
                 }
 
                 logger.LogInformation(
-                    "TUS destination blob already committed for {FileTransferId}. Skipping staging copy. Size={ContentLength}",
+                    "TUS destination already committed for {FileTransferId}. Skipping staging copy. StripeCount={StripeCount} Size={ContentLength}",
                     fileTransferEntity.FileTransferId,
-                    destinationLength);
+                    committedStripes.StripeCount,
+                    committedStripes.TotalLength);
 
-                await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-                await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-                return (destinationChecksum, destinationLength);
+                await DeleteBlobIfExistsAsync(blockStagingBlobClient, cancellationToken);
+                await DeleteBlobIfExistsAsync(appendStagingBlobClient, cancellationToken);
+                return (destinationChecksum, committedStripes.TotalLength, committedStripes.StripeSizeBytes);
             }
 
             var stagingBlobClient = await ResolveTusStagingBlobClientAsync(
@@ -346,15 +407,15 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                     cancellationToken: cancellationToken);
             }
 
-            await stagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            await appendStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-            await blockStagingBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            await DeleteBlobIfExistsAsync(stagingBlobClient, cancellationToken);
+            await DeleteBlobIfExistsAsync(appendStagingBlobClient, cancellationToken);
+            await DeleteBlobIfExistsAsync(blockStagingBlobClient, cancellationToken);
 
             logger.LogInformation(
                 "Finalized TUS upload for {fileTransferId}, size {contentLength}",
                 fileTransferEntity.FileTransferId,
                 contentLength);
-            return (checksum, contentLength);
+            return (checksum, contentLength, null);
         }
         catch (Exception ex)
         {
@@ -362,12 +423,36 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
                 "Error finalizing TUS upload for {fileTransferId}: {errorMessage}",
                 fileTransferEntity.FileTransferId,
                 ex.Message);
-            await destinationBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            if (committedStripes is { StripeCount: 0 })
+            {
+                try
+                {
+                    // Not the request token: it may already be cancelled, which would mask the fault above.
+                    await DeleteBlobIfExistsAsync(destinationBlobClient, CancellationToken.None);
+                }
+                catch (RequestFailedException cleanupException)
+                {
+                    logger.LogError(
+                        "Failed to remove the partially copied destination blob for {fileTransferId}: {errorMessage}",
+                        fileTransferEntity.FileTransferId,
+                        cleanupException.Message);
+                }
+            }
+
             throw;
         }
     }
 
-    private static async Task<BlobClient?> ResolveTusStagingBlobClientAsync(
+    protected virtual Task<CommittedStripes> ReadCommittedStripesAsync(
+        BlobContainerClient blobContainerClient,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+        => CommittedStripes.ReadAsync(blobContainerClient, fileTransferId, cancellationToken);
+
+    protected virtual async Task DeleteBlobIfExistsAsync(BlobBaseClient blobClient, CancellationToken cancellationToken)
+        => await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+
+    protected virtual async Task<BlobClient?> ResolveTusStagingBlobClientAsync(
         BlobClient blockStagingBlobClient,
         BlobClient appendStagingBlobClient,
         CancellationToken cancellationToken)
@@ -387,7 +472,7 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
         return null;
     }
 
-        public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
+    public async Task<string> UploadReportFileToStorage(string fileName, Stream stream, CancellationToken cancellationToken)
     {
         try
         {
@@ -446,14 +531,41 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             logger.LogError("Did not set checksum content hash because checksum was not found on file transfer");
             return;
         }
+        if (StripeLayout.ForStoredContent(fileTransferEntity).IsStriped)
+        {
+            logger.LogInformation(
+                "Skipping Content-MD5 for striped file transfer {fileTransferId}; the whole file checksum is held on the file transfer",
+                fileTransferEntity.FileTransferId);
+            return;
+        }
         var blobContainerClient = await GetBlobContainerClient(fileTransferEntity, serviceOwnerEntity);
         var blobClient = blobContainerClient.GetBlobClient(fileTransferEntity.FileTransferId.ToString());
+        if (fileTransferEntity.ChecksumAlgorithm == ChecksumAlgorithm.SHA256)
+        {
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in properties.Value.Metadata)
+            {
+                metadata[entry.Key] = entry.Value;
+            }
+
+            metadata[AzureStorageConstants.Sha256ChecksumMetadataKey] = fileTransferEntity.Checksum;
+            await blobClient.SetMetadataAsync(metadata, cancellationToken: cancellationToken);
+            await blobClient.SetHttpHeadersAsync(
+                new BlobHttpHeaders
+                {
+                    ContentType = "application/octet-stream"
+                },
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         BlobHttpHeaders headers = new BlobHttpHeaders
         {
-            ContentType = "application/octet-stream", // Set appropriate content type
+            ContentType = "application/octet-stream",
             ContentHash = HexStringToByteArray(fileTransferEntity.Checksum)
         };
-        await blobClient.SetHttpHeadersAsync(headers);
+        await blobClient.SetHttpHeadersAsync(headers, cancellationToken: cancellationToken);
     }
 
     public async Task<string?> ComputeFileChecksumAsync(
@@ -469,9 +581,20 @@ public class AzureStorageService(IOptions<AzureStorageOptions> azureStorageOptio
             return null;
         }
 
-        await using var contentStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
-        var hash = await MD5.HashDataAsync(contentStream, cancellationToken);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        var layout = StripeLayout.ForStoredContent(fileTransferEntity);
+        if (!layout.IsStriped)
+        {
+            await using var contentStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+            return await ChecksumHasher.ComputeAsync(contentStream, fileTransferEntity.ChecksumAlgorithm, cancellationToken);
+        }
+
+        await using var stripedStream = new StripedReadStream(
+            layout,
+            new ByteRange(0, layout.TotalLength),
+            (stripeIndex, offsetWithinStripe, length, ct) =>
+                OpenStripe(blobContainerClient, fileTransferEntity.FileTransferId, stripeIndex, offsetWithinStripe, length, ct),
+            logger);
+        return await ChecksumHasher.ComputeAsync(stripedStream, fileTransferEntity.ChecksumAlgorithm, cancellationToken);
     }
 
     private static byte[] HexStringToByteArray(string hex)

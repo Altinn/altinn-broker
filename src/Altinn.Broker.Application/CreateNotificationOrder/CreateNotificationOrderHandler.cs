@@ -83,10 +83,11 @@ public class CreateNotificationOrderHandler(
                 CustomRecipientIdentifier = customRecipientIdentifier,
                 CustomRecipientRelatedOrganization = actorId is null ? relatedOrganizationNumber?.WithPrefix() : null,
                 NotificationTemplate = NotificationTemplate.GenericAltinnMessage,
-                NotificationChannel = notificationRequest.NotificationChannel,
+                NotificationChannel = NotificationChannel.EmailPreferred,
                 RequestedSendTime = requestedSendTime,
                 Created = DateTimeOffset.UtcNow,
                 IsReminder = false,
+                Status = NotificationDeliveryStatus.Pending,
                 OrderRequest = JsonSerializer.Serialize(orderRequest)
             };
             await fileTransferNotificationRepository.AddNotification(notification, cancellationToken);
@@ -113,7 +114,7 @@ public class CreateNotificationOrderHandler(
 
         if (notificationRequest.CustomRecipients is { Count: > 0 })
         {
-            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, recipient)));
+            resolved.AddRange(notificationRequest.CustomRecipients.Select(recipient => ((long?)null, NormalizeCustomRecipient(recipient))));
             // Custom recipient organization number - disabled for now. When re-enabled, skip one that is itself a file
             // transfer recipient, since it already gets the regular notification:
             // var fileTransferRecipients = request.RecipientExternalIds.Select(id => id.WithoutPrefix()).ToHashSet();
@@ -202,6 +203,18 @@ public class CreateNotificationOrderHandler(
         throw new InvalidOperationException("Recipient must have exactly one identifier");
     }
 
+    /// <summary>
+    /// The custom recipient in the one form it is stored, sent and compared in, however it was written: email addresses
+    /// in lowercase, since the same address in different case reaches the same inbox, and mobile numbers as
+    /// <see cref="MobileNumberHelper.Normalize"/> gives them. Copies are then notified only once.
+    /// </summary>
+    private static Recipient NormalizeCustomRecipient(Recipient recipient) => new()
+    {
+        EmailAddress = recipient.EmailAddress?.ToLowerInvariant(),
+        MobileNumber = string.IsNullOrEmpty(recipient.MobileNumber) ? recipient.MobileNumber : MobileNumberHelper.Normalize(recipient.MobileNumber),
+        RelatedOrganizationNumber = recipient.RelatedOrganizationNumber
+    };
+
     private static string BuildRecipientKey(Recipient recipient) =>
         string.IsNullOrEmpty(recipient.RelatedOrganizationNumber)
             ? BuildActorExternalId(recipient)
@@ -225,7 +238,7 @@ public class CreateNotificationOrderHandler(
             SendersReference = $"bro-{sendersReference}",
             RequestedSendTime = requestedSendTime.UtcDateTime,
             IdempotencyId = notificationId,
-            Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: false)
+            Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailPreferred, resolvedText, tokens, isReminder: false)
         };
 
         if (notificationRequest.SendReminder)
@@ -236,7 +249,7 @@ public class CreateNotificationOrderHandler(
                 {
                     SendersReference = $"bro-{sendersReference}",
                     DelayDays = ReminderDelayDays,
-                    Recipient = CreateRecipientV2(resourceId, recipient, notificationRequest, resolvedText, tokens, isReminder: true)
+                    Recipient = CreateRecipientV2(resourceId, recipient, NotificationChannel.EmailAndSms, resolvedText, tokens, isReminder: true)
                 }
             ];
         }
@@ -255,13 +268,12 @@ public class CreateNotificationOrderHandler(
     private static RecipientV2 CreateRecipientV2(
         string resourceId,
         Recipient recipient,
-        NotificationRequest notificationRequest,
+        NotificationChannel notificationChannel,
         ResolvedNotificationText resolvedText,
         OrderTokenValues tokens,
         bool isReminder)
     {
         var resourceIdWithPrefix = $"urn:altinn:resource:{resourceId}";
-        var channel = notificationRequest.NotificationChannel;
         var emailSubject = ApplyTokens(isReminder ? resolvedText.ReminderEmailSubject : resolvedText.EmailSubject, tokens);
         var emailBody = ApplyTokens(isReminder ? resolvedText.ReminderEmailBody : resolvedText.EmailBody, tokens);
         var smsBody = ApplyTokens(isReminder ? resolvedText.ReminderSmsBody : resolvedText.SmsBody, tokens);
@@ -281,7 +293,7 @@ public class CreateNotificationOrderHandler(
                 {
                     OrgNumber = recipient.OrganizationNumber,
                     ResourceId = resourceIdWithPrefix,
-                    ChannelSchema = channel,
+                    ChannelSchema = notificationChannel,
                     EmailSettings = emailSettings,
                     SmsSettings = smsSettings
                 }

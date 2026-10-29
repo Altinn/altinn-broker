@@ -3,8 +3,10 @@ using System.Transactions;
 
 using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Hangfire;
 
@@ -23,7 +25,10 @@ public class SendNotificationOrderHandler(
         logger.LogInformation("Starting notification sending process for file transfer {FileTransferId}", fileTransferId);
 
         var notificationOrders = await fileTransferNotificationRepository.GetNotificationsForFileTransfer(fileTransferId, cancellationToken);
-        var pendingOrders = notificationOrders.Where(order => order.NotificationOrderId is null && order.ShipmentId is null).ToList();
+        // Rejected ones are left out: Altinn Notifications would refuse them again.
+        var pendingOrders = notificationOrders
+            .Where(order => order.Status == NotificationDeliveryStatus.Pending && order.NotificationOrderId is null && order.ShipmentId is null)
+            .ToList();
         if (pendingOrders.Count == 0)
         {
             logger.LogInformation("No pending notification orders found for file transfer {FileTransferId}", fileTransferId);
@@ -31,9 +36,31 @@ public class SendNotificationOrderHandler(
         }
         logger.LogInformation("Sending {Count} notification order(s) for file transfer {FileTransferId}", pendingOrders.Count, fileTransferId);
 
+        // One recipient failing must not keep the others from being ordered, so each is attempted before the job fails.
+        // The job then throws, so Hangfire retries it - and a retry only picks up those still pending.
+        var failures = new List<Exception>();
         foreach (var notificationOrder in pendingOrders)
         {
-            await SendNotificationOrderForRecipient(notificationOrder, fileTransferId, cancellationToken);
+            try
+            {
+                await SendNotificationOrderForRecipient(notificationOrder, fileTransferId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(
+                    exception,
+                    "Failed to order notification {NotificationOrderId} for file transfer {FileTransferId}; the others are still attempted",
+                    notificationOrder.Id,
+                    fileTransferId);
+                failures.Add(exception);
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(
+                $"Failed to order {failures.Count} of {pendingOrders.Count} notification(s) for file transfer {fileTransferId}",
+                failures);
         }
     }
 
@@ -72,10 +99,21 @@ public class SendNotificationOrderHandler(
         }
 
         logger.LogInformation("Sending notification order {IdempotencyId} for file transfer {FileTransferId}", orderRequest.IdempotencyId, fileTransferId);
-        var notificationResponse = await altinnNotificationService.CreateNotificationV2(orderRequest, cancellationToken);
-        if (notificationResponse is null)
+        NotificationOrderResponseV2 notificationResponse;
+        try
         {
-            logger.LogError("Failed to create notification for file transfer {FileTransferId}, notification order {NotificationOrderId}", fileTransferId, notificationOrder.Id);
+            notificationResponse = await altinnNotificationService.CreateNotificationV2(orderRequest, cancellationToken);
+        }
+        catch (NotificationOrderRejectedException rejection)
+        {
+            // Not retried: the same order would be refused again. Recorded so the sender can see it was never sent - and
+            // since the reminder is part of the same order, no reminder exists either.
+            logger.LogWarning(
+                "Altinn Notifications rejected notification order {NotificationOrderId} for file transfer {FileTransferId}: {Reason}",
+                notificationOrder.Id,
+                fileTransferId,
+                rejection.Reason);
+            await fileTransferNotificationRepository.UpdateStatus(notificationOrder.Id, NotificationDeliveryStatus.Rejected, rejection.Reason, cancellationToken);
             return;
         }
 
@@ -120,12 +158,13 @@ public class SendNotificationOrderHandler(
             CustomRecipientIdentifier = mainNotificationOrder.CustomRecipientIdentifier,
             CustomRecipientRelatedOrganization = mainNotificationOrder.CustomRecipientRelatedOrganization,
             NotificationTemplate = mainNotificationOrder.NotificationTemplate,
-            NotificationChannel = mainNotificationOrder.NotificationChannel,
+            NotificationChannel = NotificationChannel.EmailAndSms,
             RequestedSendTime = mainNotificationOrder.RequestedSendTime.AddDays(orderRequest.Reminders?.FirstOrDefault()?.DelayDays ?? 0),
             Created = DateTimeOffset.UtcNow,
             IsReminder = true,
             NotificationOrderId = notificationOrderId,
             ShipmentId = reminderResponse.ShipmentId,
+            Status = NotificationDeliveryStatus.Ordered,
             OrderRequest = JsonSerializer.Serialize(orderRequest)
         };
         await fileTransferNotificationRepository.AddNotification(reminderNotification, cancellationToken);

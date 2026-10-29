@@ -4,8 +4,6 @@ import { requireOrgIdentifier } from '../helpers/orgIdentifierHelper'
 
 const FILE_TRANSFER_PATH = `${BROKER_API_PREFIX}/filetransfer`
 
-export type NotificationChannel = 'Email' | 'Sms' | 'EmailPreferred' | 'SmsPreferred' | 'EmailAndSms'
-
 /** Exactly one identifier, plus the file transfer recipient it is notified on behalf of. */
 export type CustomRecipientInput = (
   | { emailAddress: string }
@@ -15,10 +13,11 @@ export type CustomRecipientInput = (
 ) & { relatedOrganizationNumber: string }
 
 export type NotificationInput = {
-  notificationChannel: NotificationChannel
   sendReminder: boolean
   customRecipients?: CustomRecipientInput[]
 }
+
+export type ChecksumAlgorithm = 'MD5' | 'SHA256'
 
 export type InitializeFileTransferInput = {
   resourceId: string
@@ -27,6 +26,8 @@ export type InitializeFileTransferInput = {
   file: File
   reference?: string
   propertyList?: Record<string, string>
+  checksumAlgorithm?: ChecksumAlgorithm
+  checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput
 }
@@ -62,6 +63,8 @@ function buildRequestBody(input: InitializeFileTransferInput): FileTransferIniti
     recipients: input.recipients.map((recipient) => requireOrgIdentifier(recipient)),
     sendersFileTransferReference: input.reference?.trim() || undefined,
     propertyList: input.propertyList ?? {},
+    checksumAlgorithm: input.checksumAlgorithm,
+    checksum: input.checksum?.trim() || undefined,
     disableVirusScan: input.disableVirusScan ?? false,
     notification: input.notification && {
       ...input.notification,
@@ -80,6 +83,7 @@ type FileTransferInitializeRequestBody = {
   recipients: string[]
   sendersFileTransferReference?: string
   propertyList?: Record<string, string>
+  checksumAlgorithm?: ChecksumAlgorithm
   checksum?: string
   disableVirusScan?: boolean
   notification?: NotificationInput

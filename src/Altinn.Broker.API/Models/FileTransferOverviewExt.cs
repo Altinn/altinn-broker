@@ -28,9 +28,15 @@ public class FileTransferOverviewExt
     public string? SendersFileTransferReference { get; set; } = string.Empty;
 
     /// <summary>
-    /// MD5 checksum for file data.
+    /// Checksum for file data. The algorithm is <see cref="ChecksumAlgorithm"/>.
     /// </summary>
     public string? Checksum { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Algorithm used for <see cref="Checksum"/>.
+    /// </summary>
+    [JsonPropertyName("checksumAlgorithm")]
+    public ChecksumAlgorithmExt ChecksumAlgorithm { get; set; } = ChecksumAlgorithmExt.MD5;
 
     /// <summary>
     /// Is virus scan enabled for the file transfer
