@@ -35,6 +35,9 @@ public class StuckFileTransferHandlerTests
     {
         var tusProgress = tusProgressService?.Object ?? CreateDefaultTusProgressService();
         var activityCache = tusActivityCache?.Object ?? CreateDefaultTusActivityCache();
+        fileTransferStatusRepository
+            .Setup(r => r.GetInitializedFileTransfersWithStartedUploadOlderThanDate(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<FileTransferStatusEntity>());
 
         return new StuckFileTransferHandler(
             fileTransferStatusRepository.Object,
@@ -174,6 +177,56 @@ public class StuckFileTransferHandlerTests
     }
 
     [Fact]
+    public async Task CheckForStuckFileTransfers_WhenStuckInInitializedAfterUploadStarted_SendsSlackNotification()
+    {
+        // Arrange
+        var fileTransferStatusRepository = new Mock<IFileTransferStatusRepository>();
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+        var slackClient = new Mock<ISlackClient>();
+        slackClient.Setup(s => s.PostAsync(It.IsAny<SlackMessage>())).ReturnsAsync(true);
+        var monitorLogger = new Mock<ILogger<StuckFileTransferHandler>>();
+        var notifierLogger = new Mock<ILogger<SlackStuckFileTransferNotifier>>();
+        var hostEnvironment = new Mock<IHostEnvironment>();
+        hostEnvironment.SetupGet(e => e.EnvironmentName).Returns("Test");
+        var slackSettings = new SlackSettings(hostEnvironment.Object);
+        var slackNotifier = new SlackStuckFileTransferNotifier(notifierLogger.Object, slackClient.Object, hostEnvironment.Object, slackSettings);
+        var handler = CreateHandler(fileTransferStatusRepository, fileTransferRepository, backgroundJobClient, slackNotifier, monitorLogger);
+        var cancellationToken = new CancellationToken();
+        var fileTransferId = Guid.NewGuid();
+        fileTransferStatusRepository.Setup(r => r
+            .GetCurrentFileTransferStatusesOfStatusAndOlderThanDate(It.IsAny<List<FileTransferStatus>>(), It.IsAny<DateTime>(), cancellationToken))
+            .ReturnsAsync(new List<FileTransferStatusEntity>());
+        fileTransferStatusRepository.Setup(r => r
+            .GetInitializedFileTransfersWithStartedUploadOlderThanDate(It.IsAny<DateTime>(), cancellationToken))
+            .ReturnsAsync(new List<FileTransferStatusEntity>
+            {
+                new()
+                {
+                    FileTransferId = fileTransferId,
+                    Status = FileTransferStatus.Initialized,
+                    Date = DateTime.UtcNow.AddMinutes(-16)
+                }
+            });
+
+        // Act
+        await handler.CheckForStuckFileTransfers(cancellationToken);
+
+        // Assert
+        slackClient.Verify(s => s.PostAsync(It.Is<SlackMessage>(m =>
+            m.Text.Contains(fileTransferId.ToString()) &&
+            m.Text.Contains("Initialized") &&
+            m.Text.Contains("Upload was started"))),
+            Times.Once);
+        fileTransferStatusRepository.Verify(r => r.InsertFileTransferStatus(
+            It.IsAny<Guid>(),
+            It.IsAny<FileTransferStatus>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CheckForStuckFileTransfers_WhenStuckInUploadStarted_InsertsFailedAndEnqueuesUploadFailedEvent()
     {
         // Arrange
@@ -214,7 +267,6 @@ public class StuckFileTransferHandlerTests
         fileTransferStatusRepository.Setup(r => r.InsertFileTransferStatus(
                 fileTransferId,
                 FileTransferStatus.Failed,
-                It.IsAny<DateTimeOffset>(),
                 It.Is<string>(d => d.Contains("UploadStarted")),
                 It.IsAny<string?>(),
                 cancellationToken))
@@ -243,7 +295,6 @@ public class StuckFileTransferHandlerTests
         fileTransferStatusRepository.Verify(r => r.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.Failed,
-            It.IsAny<DateTimeOffset>(),
             It.Is<string>(d => d.Contains("UploadStarted")),
             It.IsAny<string?>(),
             cancellationToken), Times.Once);
@@ -322,7 +373,6 @@ public class StuckFileTransferHandlerTests
         fileTransferStatusRepository.Verify(r => r.InsertFileTransferStatus(
             It.IsAny<Guid>(),
             FileTransferStatus.Failed,
-            It.IsAny<DateTimeOffset>(),
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Never);

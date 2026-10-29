@@ -6,11 +6,14 @@ using Altinn.Broker.Integrations.Altinn;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+
+using StackExchange.Redis;
 
 namespace Altinn.Broker.API.IdPortenDirectAuth;
 
@@ -27,6 +30,8 @@ public static class DependencyInjection
             ?? new IdPortenDirectAuthSettings();
 
         services.AddHttpClient<IAltinnTokenExchangeService, AltinnTokenExchangeService>();
+        services.AddHttpClient(IdPortenTokenRefreshService.HttpClientName, client =>
+            client.Timeout = TimeSpan.FromSeconds(10));
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
         {
             var idPortenDirectAuthSettings = sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>().Value;
@@ -38,6 +43,13 @@ public static class DependencyInjection
         });
         services.AddSingleton<IOidcLogoutTokenValidator, OidcLogoutTokenValidator>();
         services.AddSingleton<IOidcBackChannelLogoutSessionStore, OidcBackChannelLogoutSessionStore>();
+        services.AddSingleton<IIdPortenTokenRefreshService>(sp => new IdPortenTokenRefreshService(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            sp.GetRequiredService<IOptions<IdPortenDirectAuthSettings>>(),
+            sp.GetRequiredService<IConfigurationManager<OpenIdConnectConfiguration>>(),
+            sp.GetRequiredService<IDistributedCache>(),
+            sp.GetRequiredService<ILogger<IdPortenTokenRefreshService>>(),
+            sp.GetService<IConnectionMultiplexer>()));
         services.AddScoped<AltinnTokenCookieEvents>();
 
         builder
@@ -132,10 +144,22 @@ public static class DependencyInjection
                             context.SecurityToken.Issuer);
 
                         var refreshToken = context.TokenEndpointResponse?.RefreshToken ?? string.Empty;
+                        if (string.IsNullOrEmpty(refreshToken))
+                        {
+                            context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger(typeof(DependencyInjection))
+                                .LogWarning(
+                                    "ID-Porten returned no refresh token. The session cannot be renewed and the user " +
+                                    "will be sent through login again once the Altinn token expires. Check that the " +
+                                    "client is registered with refresh_token as an allowed grant type, and that " +
+                                    "refresh_token_lifetime outlives the Altinn token.");
+                        }
+
                         context.Properties!.StoreTokens(
                         [
-                            new AuthenticationToken { Name = "altinn_token", Value = altinnToken },
-                            new AuthenticationToken { Name = "id_porten_refresh_token", Value = refreshToken }
+                            new AuthenticationToken { Name = OidcSessionKeys.AltinnToken, Value = altinnToken },
+                            new AuthenticationToken { Name = OidcSessionKeys.IdPortenRefreshToken, Value = refreshToken }
                         ]);
 
                         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();

@@ -17,11 +17,14 @@ namespace Altinn.Broker.Application.GetAllowedRecipients;
 /// Lists the organizations a party may address a file transfer to on a resource: the parties on the
 /// resource's access lists, narrowed to what <see cref="Errors.RequiredPartyInvalidRecipientConfiguration"/>
 /// and <see cref="Errors.RecipientNotInAccessList"/> would otherwise reject at initialization.
+/// Pass <see cref="GetAllowedRecipientsRequest.IgnoreRequiredParty"/> to get the unfiltered access-list
+/// candidate set for configuration UIs.
 /// </summary>
 public class GetAllowedRecipientsHandler(
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IAltinnRegisterService registerService,
+    BrokerResourceProvisioner resourceProvisioner,
     ILogger<GetAllowedRecipientsHandler> logger) : IHandler<GetAllowedRecipientsRequest, List<AllowedRecipientOverview>>
 {
     public async Task<OneOf<List<AllowedRecipientOverview>, Error>> Process(GetAllowedRecipientsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -35,7 +38,17 @@ public class GetAllowedRecipientsHandler(
         var resource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         if (resource is null)
         {
-            return Errors.ResourceHasNotBeenConfigured;
+            var (provisioned, outcome) = await resourceProvisioner.EnsureAsync(request.ResourceId, cancellationToken);
+            if (provisioned is null)
+            {
+                return outcome switch
+                {
+                    BrokerResourceProvisionOutcome.ServiceOwnerNotConfigured => Errors.ServiceOwnerHasNotBeenConfigured,
+                    BrokerResourceProvisionOutcome.NotFoundInRegistry => Errors.InvalidResourceDefinition,
+                    _ => Errors.ResourceHasNotBeenConfigured
+                };
+            }
+            resource = provisioned;
         }
 
         var accessList = await altinnResourceRepository.GetAccessListMembersOfResource(request.ResourceId, cancellationToken);
@@ -45,9 +58,12 @@ public class GetAllowedRecipientsHandler(
         }
 
         // A required party that is the sender itself puts no constraint on the recipients, which
-        // mirrors how InitializeFileTransferHandler accepts the transfer.
+        // mirrors how InitializeFileTransferHandler accepts the transfer. Configuration UIs that
+        // need the full access-list candidate set pass IgnoreRequiredParty to skip this narrowing.
         var requiredParty = resource.RequiredParty?.WithoutPrefix();
-        if (!string.IsNullOrWhiteSpace(requiredParty) && requiredParty != sender)
+        if (!request.IgnoreRequiredParty
+            && !string.IsNullOrWhiteSpace(requiredParty)
+            && requiredParty != sender)
         {
             return await RequiredPartyOnly(request.ResourceId, requiredParty, accessList.Restricted, cancellationToken);
         }

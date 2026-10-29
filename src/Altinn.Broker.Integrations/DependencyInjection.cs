@@ -5,8 +5,11 @@ using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Altinn.AccessManagement;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
+using Altinn.Broker.Integrations.Altinn.Notifications;
+using Altinn.Broker.Integrations.Altinn.Profile;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
@@ -14,15 +17,15 @@ using Altinn.Broker.Integrations.Maskinporten;
 using Altinn.Broker.Persistence.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
 
 using StackExchange.Redis;
+
+using tusdotnet.Interfaces;
 
 using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
@@ -76,7 +79,18 @@ public static class DependencyInjection
             services.AddHttpClient<IAltinnResourceRepository, AltinnResourceRegistryRepository>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
                     .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnResourceRepository>()
                     .AddStandardRetryPolicy();
+
+            services.RegisterMaskinportenClientDefinition<SettingsJwkClientDefinition>(typeof(IAltinnNotificationService).FullName, maskinportenSettings);
+            services.AddHttpClient<IAltinnNotificationService, AltinnNotificationService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+                    .AddMaskinportenHttpMessageHandler<SettingsJwkClientDefinition, IAltinnNotificationService>()
+                    .AddStandardRetryPolicy();
         }
+        // Calls on behalf of the logged in end user, so it carries their Altinn token instead of a Maskinporten token.
+        services.AddHttpClient<IAltinnAccessManagementService, AltinnAccessManagementService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
+        services.AddHttpClient<IAltinnProfileService, AltinnProfileService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
+
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
         if (string.IsNullOrWhiteSpace(generalSettings.SlackUrl))
@@ -126,10 +140,12 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<ILogger<TusUploadProgressCache>>(),
                 serviceProvider.GetService<IConnectionMultiplexer>()));
         services.AddSingleton<ITusUploadActivityCache, TusUploadActivityCache>();
+        services.AddSingleton<ITusFileLockProvider, TusTakeoverFileLockProvider>();
         services.AddScoped<BrokerTusStore>();
         services.AddScoped<ITusStorageResolver, TusStorageResolver>();
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
         services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
         services.AddSingleton<ITusUploadKindResolver, TusUploadKindResolver>();
+        services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
     }
 }

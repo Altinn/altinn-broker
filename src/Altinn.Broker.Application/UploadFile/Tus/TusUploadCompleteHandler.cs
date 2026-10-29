@@ -56,6 +56,14 @@ public class TusUploadCompleteHandler(
             return Errors.ServiceOwnerNotConfigured;
         }
 
+        if (fileTransfer.FileTransferStatusEntity.Status == FileTransferStatus.Initialized)
+        {
+            logger.LogError(
+                "TUS completion failed for file transfer {FileTransferId}: upload was started but status is still Initialized",
+                fileTransferId);
+            return Errors.UploadFailed;
+        }
+
         if (fileTransfer.FileTransferStatusEntity.Status is not (
             FileTransferStatus.UploadStarted or FileTransferStatus.UploadProcessing))
         {
@@ -75,12 +83,12 @@ public class TusUploadCompleteHandler(
             return Errors.UploadFailed;
         }
 
-        var (checksum, uploadLength) = finalizeResult.Value;
-        var uploadFinishedTimeStamp = DateTime.UtcNow;
+        var (checksum, uploadLength, stripeSizeBytes) = finalizeResult.Value;
         logger.LogInformation(
-            "TUS storage finalized for file transfer {FileTransferId}. UploadLength={UploadLength} ChecksumPresent={ChecksumPresent}",
+            "TUS storage finalized for file transfer {FileTransferId}. UploadLength={UploadLength} StripeSizeBytes={StripeSizeBytes} ChecksumPresent={ChecksumPresent}",
             fileTransferId,
             uploadLength,
+            stripeSizeBytes,
             !string.IsNullOrWhiteSpace(checksum));
 
         var completeResult = await completeFileUploadHandler.Process(
@@ -89,8 +97,8 @@ public class TusUploadCompleteHandler(
                 FileTransferId = fileTransferId,
                 Checksum = checksum,
                 UploadLength = uploadLength,
-                DeferChecksumValidation = true,
-                UploadFinishedTimestamp = uploadFinishedTimeStamp
+                StripeSizeBytes = stripeSizeBytes,
+                DeferChecksumValidation = true
             },
             user,
             cancellationToken);

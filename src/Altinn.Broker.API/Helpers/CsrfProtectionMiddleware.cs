@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-using Altinn.Broker.API.Configuration;
+using Altinn.Broker.Common;
 
 namespace Altinn.Broker.API.Helpers;
 
@@ -36,8 +36,5 @@ public class CsrfProtectionMiddleware
     }
 
     private static bool IsCookieAuthenticated(ClaimsPrincipal user)
-        => user.Identities.Any(identity =>
-            identity.IsAuthenticated
-            && identity.AuthenticationType is AuthorizationConstants.EndUserCookie
-                or AuthorizationConstants.AltinnPlatformJwtCookie);
+        => user.IsBrokerEndUserCookieAuthenticated();
 }

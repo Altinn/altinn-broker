@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddSingleton<IMonthlyStatisticsRepository, MonthlyStatisticsRepository>();
         services.AddSingleton<IFileTransferStatusRepository, FileTransferStatusRepository>();
         services.AddSingleton<IActorFileTransferStatusRepository, ActorFileTransferStatusRepository>();
+        services.AddSingleton<IFileTransferNotificationRepository, FileTransferNotificationRepository>();
+        services.AddSingleton<INotificationTemplateRepository, NotificationTemplateRepository>();
         services.AddSingleton<IServiceOwnerRepository, ServiceOwnerRepository>();
         services.AddSingleton<IPartyRepository, PartyRepository>();
     }

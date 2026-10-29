@@ -6,15 +6,24 @@ using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OneOf;
 
 namespace Altinn.Broker.Application.ConfigureResource;
-public class ConfigureResourceHandler(IResourceRepository resourceRepository, IAltinnResourceRepository altinnResourceRepository, IServiceOwnerRepository serviceOwnerRepository, IHostEnvironment hostEnvironment, ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
+public class ConfigureResourceHandler(
+    IResourceRepository resourceRepository,
+    IAltinnResourceRepository altinnResourceRepository,
+    IServiceOwnerRepository serviceOwnerRepository,
+    IAuthorizationService authorizationService,
+    IHostEnvironment hostEnvironment,
+    IOptions<AzureStorageOptions> azureStorageOptions,
+    ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
@@ -23,6 +32,21 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         ResourceEntity? existingResource = await resourceRepository.GetResource(request.ResourceId, cancellationToken);
         ResourceEntity? altinnResourceToCreate = null;
 
+        // End-user cookie sessions (ID-porten exchanged cookie or Altinn platform JWT cookie)
+        // must use onBehalfOf + gatekeeper publish. Service-owner bearer tokens use org ownership.
+        var isEndUserCall = (user is not null && user.IsBrokerEndUserCookieAuthenticated())
+            || await authorizationService.IsIdPortenToken(user);
+        if (isEndUserCall)
+        {
+            var accessError = await AuthorizeIdPortenPublisher(request, user, cancellationToken);
+            if (accessError is not null)
+            {
+                return accessError;
+            }
+        }
+
+        var onBehalfOfParty = request.OnBehalfOf?.WithoutPrefix();
+
         if (existingResource is null)
         {
             var altinnResource = await altinnResourceRepository.GetResource(request.ResourceId, cancellationToken);
@@ -30,18 +54,47 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
             {
                 return Errors.InvalidResourceDefinition;
             }
+
+            if (isEndUserCall
+                && altinnResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
+            {
+                return Errors.ResourceNotOwnedByParty;
+            }
+            if (!isEndUserCall
+                && altinnResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+            {
+                return Errors.NoAccessToResource;
+            }
             if (await serviceOwnerRepository.GetServiceOwner(altinnResource.ServiceOwnerId) is null)
             {
                 return Errors.ServiceOwnerHasNotBeenConfigured;
             }
             altinnResourceToCreate = altinnResource;
         }
+        else if (isEndUserCall
+            && existingResource.ServiceOwnerId.WithoutPrefix() != onBehalfOfParty)
+        {
+            return Errors.ResourceNotOwnedByParty;
+        }
+        else if (!isEndUserCall
+            && existingResource.ServiceOwnerId.WithoutPrefix() != user?.GetCallerOrganizationId())
+        {
+            return Errors.NoAccessToResource;
+        }
 
         var resourceForValidation = existingResource ?? altinnResourceToCreate;
+        var approvedForDisabledVirusScan =
+            request.ApprovedForDisabledVirusScan ?? resourceForValidation?.ApprovedForDisabledVirusScan ?? false;
 
         if (request.MaxFileTransferSize is not null)
         {
-            var error = ValidateMaxFileTransferSize(resourceForValidation, request.MaxFileTransferSize.Value);
+            var error = ValidateMaxFileTransferSize(approvedForDisabledVirusScan, request.MaxFileTransferSize.Value);
+            if (error is not null) return error;
+        }
+        else if (request.ApprovedForDisabledVirusScan is false
+            && resourceForValidation?.MaxFileTransferSize is long existingMax)
+        {
+            var error = ValidateMaxFileTransferSize(approvedForDisabledVirusScan: false, existingMax);
             if (error is not null) return error;
         }
         if (request.FileTransferTimeToLive is not null)
@@ -99,20 +152,64 @@ public class ConfigureResourceHandler(IResourceRepository resourceRepository, IA
         {
             await resourceRepository.UpdateRequiredParty(existingResource!.Id, request.RequiredParty, cancellationToken);
         }
+        if (request.ApprovedForDisabledVirusScan is not null)
+        {
+            await resourceRepository.UpdateApprovedForDisabledVirusScan(
+                existingResource!.Id,
+                request.ApprovedForDisabledVirusScan.Value,
+                cancellationToken);
+        }
         return Task.CompletedTask;
     }
 
-    private Error? ValidateMaxFileTransferSize(ResourceEntity? resource, long maxFileTransferSize)
+    private async Task<Error?> AuthorizeIdPortenPublisher(
+        ConfigureResourceRequest request,
+        ClaimsPrincipal? user,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.OnBehalfOf))
+        {
+            return Errors.MissingOnBehalfOf;
+        }
+
+        var party = request.OnBehalfOf.WithoutPrefix();
+        if (!party.IsOrganizationNumber())
+        {
+            return Errors.InvalidParty;
+        }
+
+        if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
+        {
+            return Errors.PartyIsNotBrokerServiceOwner;
+        }
+
+        var hasAccess = await authorizationService.CheckAccessAsPublisher(
+            user,
+            ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+            party,
+            cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoPublishAccessToConfigureResource;
+        }
+
+        return null;
+    }
+
+    private Error? ValidateMaxFileTransferSize(bool approvedForDisabledVirusScan, long maxFileTransferSize)
     {
         if (maxFileTransferSize < 0) return Errors.MaxUploadSizeCannotBeNegative;
         if (maxFileTransferSize == 0) return Errors.MaxUploadSizeCannotBeZero;
         if (hostEnvironment.IsProduction()
-            && !(resource?.ApprovedForDisabledVirusScan ?? false)
+            && !approvedForDisabledVirusScan
             && maxFileTransferSize > ApplicationConstants.MaxVirusScanUploadSize)
         {
             return Errors.MaxUploadSizeForVirusScan;
         }
-        if (maxFileTransferSize > ApplicationConstants.MaxFileUploadSize) return Errors.MaxUploadSizeOverGlobal;
+        if (maxFileTransferSize > azureStorageOptions.Value.MaxTotalTransferBytes)
+        {
+            return Errors.MaxUploadSizeOverGlobal;
+        }
         return null;
     }
 

@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 
 namespace Altinn.Broker.Core.Repositories;
 
@@ -14,20 +15,25 @@ public interface IFileTransferRepository
         DateTimeOffset expirationTime,
         Dictionary<string, string> propertyList,
         string? checksum,
+        ChecksumAlgorithm checksumAlgorithm,
         bool useVirusScan,
+        long stripeSizeBytes,
+        bool hasNotification,
         CancellationToken cancellationToken);
     Task<FileTransferEntity?> GetFileTransfer(Guid fileTransferId, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersAssociatedWithActor(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task<List<Guid>> GetFileTransfersForRecipientWithRecipientStatus(FileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
-    Task<List<FileTransferSummaryEntity>> GetActiveFileTransferSummariesAssociatedWithActor(ActiveFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
+    Task<List<FileTransferSummaryEntity>> GetFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken);
     Task SetChecksum(Guid fileTransferId, string checksum, CancellationToken cancellationToken);
     Task SetStorageDetails(
         Guid fileTransferId,
         long storageProviderId,
         string fileLocation,
         long fileTransferSize,
+        long? stripeSizeBytes,
         CancellationToken cancellationToken
     );
+    Task SetFileTransferSize(Guid fileTransferId, long fileTransferSize, CancellationToken cancellationToken);
     Task SetFileTransferHangfireJobId(Guid fileTransferId, string hangfireJobId, CancellationToken cancellationToken);
     Task<(List<FileTransferEntity> FileTransfers, Dictionary<Guid, string> ServiceOwnerIds)> GetFileTransfersForReportWithServiceOwnerIds(CancellationToken cancellationToken);
 

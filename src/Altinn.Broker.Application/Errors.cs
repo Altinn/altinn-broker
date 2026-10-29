@@ -1,4 +1,6 @@
-using System.Net;
+﻿using System.Net;
+
+using Altinn.Broker.Application.Settings;
 
 namespace Altinn.Broker.Application;
 
@@ -27,7 +29,7 @@ public static class Errors
     public static Error ConfirmDownloadBeforeDownloadStarted = new Error(19, "Cannot confirm before the files have been downloaded", HttpStatusCode.BadRequest);
     public static Error NotApprovedForDisabledVirusScan = new Error(20, "In order to use file transfers without virus scan the service resource needs to be approved by Altinn. Please contact us @ Slack.", HttpStatusCode.BadRequest);
     public static Error StorageProviderNotReady = new Error(21, "Storage provider is not ready yet. Please try again later.", HttpStatusCode.ServiceUnavailable);
-    public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size cannot be set higher than 100GB in production because it has not yet been tested for it. Contact us @ Slack if you need it.", HttpStatusCode.BadRequest);
+    public static Error MaxUploadSizeOverGlobal = new Error(22, "Max file transfer size exceeds the largest transfer Broker can store. Contact us @ Slack if you need more.", HttpStatusCode.BadRequest);
     public static Error NeedServiceCodeForManifestShim = new Error(23, "In order to use manifest file shim you need to provide external service code and edition code", HttpStatusCode.BadRequest);
     public static Error ServiceOwnerHasNotBeenConfigured = new Error(24, "The service owner associated with the resource has not been configured.", HttpStatusCode.BadRequest);
     public static Error ResourceHasNotBeenConfigured = new Error(25, "The resource has not been configured.", HttpStatusCode.BadRequest);
@@ -39,6 +41,30 @@ public static class Errors
     public static Error InvalidRecipient = new Error(31, "One or more recipients are invalid or could not be found.", HttpStatusCode.BadRequest);
     public static Error InvalidParty = new Error(32, "The party must be a valid organization number", HttpStatusCode.BadRequest);
     public static Error AuthorizationUnavailable = new Error(33, "Could not determine which resources you have access to. Please try again later.", HttpStatusCode.ServiceUnavailable);
+    public static Error MissingOnBehalfOf = new Error(34, "Missing on behalf of parameter for IdPorten token", HttpStatusCode.BadRequest);
+    public static Error AuthorizedPartiesUnavailable = new Error(35, "Could not determine which parties you can act on behalf of. Please try again later.", HttpStatusCode.ServiceUnavailable);
+
+    /// <summary>
+    /// Returned when an ID-porten caller lacks publish on the BrokerBox configuration gatekeeper resource.
+    /// </summary>
+    public static Error NoPublishAccessToConfigureResource = new Error(
+        36,
+        $"You must have access according to the access rules for \"{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}\" to edit a service. See: https://tjenesteoversikten.no/resource/{ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId}",
+        HttpStatusCode.Forbidden);
+
+    public static Error PartyIsNotBrokerServiceOwner = new Error(
+        37,
+        "You must be a service owner to update a resource.",
+        HttpStatusCode.Forbidden);
+
+    public static Error ResourceNotOwnedByParty = new Error(
+        38,
+        "You can only configure resources owned by the organization you act on behalf of.",
+        HttpStatusCode.Forbidden);
+
+    public static Error PartialUploadTooLong = new Error(39, "A single upload is too long to be addressed. Split the file transfer into more concatenation partials.", HttpStatusCode.BadRequest);
+    public static Error InvalidProfileLanguage = new Error(40, "Language must be nb, nn, or en.", HttpStatusCode.BadRequest);
+    public static Error ProfileLanguageUnavailable = new Error(41, "Could not read or update the language in your Altinn profile. Please try again later.", HttpStatusCode.ServiceUnavailable);
 }
 
 public static class StatisticsErrors
@@ -56,4 +82,15 @@ public static class ServiceOwnerErrors
     public static Error ServiceOwnerAlreadyExists = new Error(7002, "Service owner already exists", HttpStatusCode.Conflict);
     public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
     public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
+}
+
+public static class NotificationErrors
+{
+    public static Error CustomRecipientWithoutIdentifierNotAllowed = new Error(8001, "Custom recipient without identifier is not allowed", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithMultipleIdentifiersNotAllowed = new Error(8002, "Custom recipient with multiple identifiers is not allowed", HttpStatusCode.BadRequest);
+    public static Error InvalidEmailProvided = new Error(8003, "Invalid email provided for custom recipient.", HttpStatusCode.BadRequest);
+    public static Error InvalidMobileNumberProvided = new Error(8004, "Invalid mobile number provided. Mobile number can contain only '+' and numeric characters, and it must adhere to the E.164 standard.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientWithoutRelatedOrganizationNotAllowed = new Error(8005, "Custom recipient must specify the related organization number of the file transfer recipient it is notified on behalf of.", HttpStatusCode.BadRequest);
+    public static Error CustomRecipientRelatedOrganizationNotARecipient = new Error(8006, "The related organization number of a custom recipient must be one of the file transfer's recipients.", HttpStatusCode.BadRequest);
+    public static Error InvalidOrganizationNumberProvided = new Error(8007, "Invalid organization number provided for custom recipient. It must be a 9-digit organization number, optionally prefixed with '0192:' or 'urn:altinn:organization:identifier-no:'.", HttpStatusCode.BadRequest);
 }

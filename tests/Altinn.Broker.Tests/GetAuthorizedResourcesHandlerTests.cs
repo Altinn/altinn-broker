@@ -19,6 +19,7 @@ namespace Altinn.Broker.Tests;
 public class GetAuthorizedResourcesHandlerTests
 {
     private const string Party = "991825827";
+    private const string OtherOwner = "123456789";
 
     [Theory]
     [InlineData("")]
@@ -28,7 +29,7 @@ public class GetAuthorizedResourcesHandlerTests
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
         var authorizationService = new Mock<IAuthorizationService>(MockBehavior.Strict);
-        var handler = CreateHandler(cache, new Mock<IResourceRepository>(MockBehavior.Strict), authorizationService, new Mock<IAltinnResourceRepository>());
+        var handler = CreateHandler(cache, new Mock<IResourceRepository>(MockBehavior.Strict), authorizationService, CreateAltinnResourceRepository());
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = party }, CreateUser(), CancellationToken.None);
 
@@ -37,10 +38,13 @@ public class GetAuthorizedResourcesHandlerTests
     }
 
     [Fact]
-    public async Task Process_ReturnsOnlyTheResourcesTheUserHasAccessTo()
+    public async Task Process_ReturnsOnlyAccessListMembersWithSendOrReceive()
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
-        var resourceRepository = CreateResourceRepository("resource-a", "resource-b", "resource-c");
+        var resourceRepository = CreateResourceRepository(
+            (Id: "resource-a", Owner: OtherOwner),
+            (Id: "resource-b", Owner: OtherOwner),
+            (Id: "resource-c", Owner: OtherOwner));
         var authorizationService = new Mock<IAuthorizationService>();
         authorizationService
             .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -53,6 +57,9 @@ public class GetAuthorizedResourcesHandlerTests
         var altinnResourceRepository = CreateAltinnResourceRepository(
             ("resource-a", "Røntgenbilder mellom sykehus", "Helsedirektoratet"),
             ("resource-b", "Avviksrapport", "Arbeidstilsynet"));
+        SetupAccessListMembership(altinnResourceRepository, "resource-a", Party, member: true);
+        SetupAccessListMembership(altinnResourceRepository, "resource-b", Party, member: true);
+        SetupAccessListMembership(altinnResourceRepository, "resource-c", Party, member: false);
         var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository);
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
@@ -64,22 +71,80 @@ public class GetAuthorizedResourcesHandlerTests
         var sender = resources.Single(resource => resource.ResourceId == "resource-a");
         Assert.True(sender.CanSend);
         Assert.False(sender.CanReceive);
+        Assert.False(sender.CanPublish);
+        Assert.False(sender.IsOwned);
         Assert.Equal("Røntgenbilder mellom sykehus", sender.Name);
         Assert.Equal("Helsedirektoratet", sender.ServiceOwnerName);
+    }
+
+    [Fact]
+    public async Task Process_ExcludesResourcesWherePartyIsNotOnAccessList()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository((Id: "resource-a", Owner: OtherOwner));
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "resource-a", CanSend = true }]);
+        var altinnResourceRepository = CreateAltinnResourceRepository(
+            ("resource-a", "Røntgenbilder mellom sykehus", "Helsedirektoratet"));
+        SetupAccessListMembership(altinnResourceRepository, "resource-a", Party, member: false);
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Empty(result.AsT0);
+    }
+
+    [Fact]
+    public async Task Process_IncludesOwnedResourcesForServiceOwnerWithoutSendOrReceive()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository((Id: "resource-owned", Owner: Party));
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "resource-owned" }]);
+        var altinnResourceRepository = CreateAltinnResourceRepository(
+            ("resource-owned", "Eid tjeneste", "Digitaliseringsdirektoratet"));
+        var serviceOwnerRepository = new Mock<IServiceOwnerRepository>();
+        serviceOwnerRepository
+            .Setup(repository => repository.GetServiceOwner($"0192:{Party}"))
+            .ReturnsAsync(new ServiceOwnerEntity
+            {
+                Id = $"0192:{Party}",
+                Name = "Test owner",
+                StorageProviders = []
+            });
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository, serviceOwnerRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var resource = Assert.Single(result.AsT0);
+        Assert.Equal("resource-owned", resource.ResourceId);
+        Assert.False(resource.CanSend);
+        Assert.False(resource.CanReceive);
+        Assert.True(resource.IsServiceOwner);
+        Assert.True(resource.IsOwned);
+        Assert.False(resource.CanPublish);
     }
 
     [Fact]
     public async Task Process_ChecksEveryConfiguredResourceWithThePartyWithoutPrefix()
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
-        var resourceRepository = CreateResourceRepository("resource-a", "resource-b");
+        var resourceRepository = CreateResourceRepository(
+            (Id: "resource-a", Owner: OtherOwner),
+            (Id: "resource-b", Owner: OtherOwner));
         var authorizationService = new Mock<IAuthorizationService>();
         IReadOnlyList<string>? checkedResourceIds = null;
         authorizationService
             .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Callback<ClaimsPrincipal?, string, IReadOnlyList<string>, CancellationToken>((_, _, resourceIds, _) => checkedResourceIds = resourceIds)
             .ReturnsAsync([]);
-        var handler = CreateHandler(cache, resourceRepository, authorizationService, new Mock<IAltinnResourceRepository>());
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, CreateAltinnResourceRepository());
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = $"0192:{Party}" }, CreateUser(), CancellationToken.None);
 
@@ -92,15 +157,16 @@ public class GetAuthorizedResourcesHandlerTests
     public async Task Process_WhenResourceRegistryIsUnavailable_ReturnsTheResourceWithoutPresentationMetadata()
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
-        var resourceRepository = CreateResourceRepository("resource-a");
+        var resourceRepository = CreateResourceRepository((Id: "resource-a", Owner: OtherOwner));
         var authorizationService = new Mock<IAuthorizationService>();
         authorizationService
             .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new AuthorizedResource { ResourceId = "resource-a", CanSend = true }]);
-        var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
+        var altinnResourceRepository = CreateAltinnResourceRepository();
         altinnResourceRepository
             .Setup(repository => repository.GetResourceMetadata(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new BadHttpRequestException("Resource Registry is down"));
+        SetupAccessListMembership(altinnResourceRepository, "resource-a", Party, member: true);
         var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository);
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
@@ -117,12 +183,12 @@ public class GetAuthorizedResourcesHandlerTests
     public async Task Process_WhenAuthorizationIsUnavailable_ReturnsError()
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
-        var resourceRepository = CreateResourceRepository("resource-a");
+        var resourceRepository = CreateResourceRepository((Id: "resource-a", Owner: OtherOwner));
         var authorizationService = new Mock<IAuthorizationService>();
         authorizationService
             .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Authorization returned 502 for multi decision request"));
-        var handler = CreateHandler(cache, resourceRepository, authorizationService, new Mock<IAltinnResourceRepository>());
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, CreateAltinnResourceRepository());
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
 
@@ -131,7 +197,7 @@ public class GetAuthorizedResourcesHandlerTests
     }
 
     [Fact]
-    public async Task Process_WithoutConfiguredResources_ReturnsEmptyListWithoutAskingPdp()
+    public async Task Process_WithoutConfiguredOrRegistryResources_ReturnsEmptyListWithoutAskingPdp()
     {
         await using var cache = TestHybridCacheFactory.CreateScope();
         var resourceRepository = new Mock<IResourceRepository>();
@@ -139,7 +205,7 @@ public class GetAuthorizedResourcesHandlerTests
             .Setup(repository => repository.GetResources(It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         var authorizationService = new Mock<IAuthorizationService>(MockBehavior.Strict);
-        var handler = CreateHandler(cache, resourceRepository, authorizationService, new Mock<IAltinnResourceRepository>());
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, CreateAltinnResourceRepository());
 
         var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
 
@@ -147,25 +213,110 @@ public class GetAuthorizedResourcesHandlerTests
         Assert.Empty(result.AsT0);
     }
 
+    [Fact]
+    public async Task Process_IncludesUnconfiguredOwnedBrokerServiceFromRegistry()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository();
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "unconfigured-broker-service" }]);
+        var altinnResourceRepository = CreateAltinnResourceRepository();
+        SetupBrokerServiceSearch(altinnResourceRepository,
+            new AltinnResourceSearchHit
+            {
+                Id = "unconfigured-broker-service",
+                OrganizationNumber = Party,
+                Title = "Ny BrokerService",
+                ServiceOwnerName = "Testdepartementet",
+                ResourceType = AltinnResourceTypes.BrokerService
+            });
+        var serviceOwnerRepository = new Mock<IServiceOwnerRepository>();
+        serviceOwnerRepository
+            .Setup(repository => repository.GetServiceOwner($"0192:{Party}"))
+            .ReturnsAsync(new ServiceOwnerEntity
+            {
+                Id = $"0192:{Party}",
+                Name = "Test owner",
+                StorageProviders = []
+            });
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository, serviceOwnerRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var resource = Assert.Single(result.AsT0);
+        Assert.Equal("unconfigured-broker-service", resource.ResourceId);
+        Assert.Equal("Ny BrokerService", resource.Name);
+        Assert.Equal("Testdepartementet", resource.ServiceOwnerName);
+        Assert.True(resource.IsOwned);
+        Assert.True(resource.IsServiceOwner);
+        Assert.False(resource.CanSend);
+        Assert.False(resource.CanReceive);
+    }
+
+    [Fact]
+    public async Task Process_UnionsRegistryBrokerServicesWithConfiguredResourcesForPdp()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository((Id: "configured-resource", Owner: OtherOwner));
+        var authorizationService = new Mock<IAuthorizationService>();
+        IReadOnlyList<string>? checkedResourceIds = null;
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<ClaimsPrincipal?, string, IReadOnlyList<string>, CancellationToken>((_, _, resourceIds, _) => checkedResourceIds = resourceIds)
+            .ReturnsAsync([]);
+        var altinnResourceRepository = CreateAltinnResourceRepository();
+        SetupBrokerServiceSearch(altinnResourceRepository,
+            new AltinnResourceSearchHit
+            {
+                Id = "registry-broker-service",
+                OrganizationNumber = Party,
+                Title = "Registry service",
+                ResourceType = AltinnResourceTypes.BrokerService
+            });
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.Empty(result.AsT0);
+        Assert.NotNull(checkedResourceIds);
+        Assert.Contains("configured-resource", checkedResourceIds);
+        Assert.Contains("registry-broker-service", checkedResourceIds);
+    }
+
     private static GetAuthorizedResourcesHandler CreateHandler(
         HybridCacheTestScope cache,
         Mock<IResourceRepository> resourceRepository,
         Mock<IAuthorizationService> authorizationService,
-        Mock<IAltinnResourceRepository> altinnResourceRepository)
-        => new(
-            authorizationService.Object,
+        Mock<IAltinnResourceRepository> altinnResourceRepository,
+        Mock<IServiceOwnerRepository>? serviceOwnerRepository = null)
+    {
+        var serviceOwners = serviceOwnerRepository ?? new Mock<IServiceOwnerRepository>();
+        var provisioner = new BrokerResourceProvisioner(
             resourceRepository.Object,
             altinnResourceRepository.Object,
+            serviceOwners.Object,
+            NullLogger<BrokerResourceProvisioner>.Instance);
+        return new(
+            authorizationService.Object,
+            resourceRepository.Object,
+            serviceOwners.Object,
+            altinnResourceRepository.Object,
+            provisioner,
             cache.Cache,
             NullLogger<GetAuthorizedResourcesHandler>.Instance);
+    }
 
-    private static Mock<IResourceRepository> CreateResourceRepository(params string[] resourceIds)
+    private static Mock<IResourceRepository> CreateResourceRepository(params (string Id, string Owner)[] resources)
     {
         var resourceRepository = new Mock<IResourceRepository>();
         resourceRepository
             .Setup(repository => repository.GetResources(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resourceIds
-                .Select(resourceId => new ResourceEntity { Id = resourceId, ServiceOwnerId = $"0192:{Party}" })
+            .ReturnsAsync(resources
+                .Select(resource => new ResourceEntity { Id = resource.Id, ServiceOwnerId = $"0192:{resource.Owner}" })
                 .ToList());
         return resourceRepository;
     }
@@ -173,6 +324,7 @@ public class GetAuthorizedResourcesHandlerTests
     private static Mock<IAltinnResourceRepository> CreateAltinnResourceRepository(params (string ResourceId, string Title, string ServiceOwnerName)[] resources)
     {
         var altinnResourceRepository = new Mock<IAltinnResourceRepository>();
+        SetupBrokerServiceSearch(altinnResourceRepository);
         foreach (var resource in resources)
         {
             altinnResourceRepository
@@ -184,6 +336,26 @@ public class GetAuthorizedResourcesHandlerTests
                 });
         }
         return altinnResourceRepository;
+    }
+
+    private static void SetupBrokerServiceSearch(
+        Mock<IAltinnResourceRepository> altinnResourceRepository,
+        params AltinnResourceSearchHit[] hits)
+    {
+        altinnResourceRepository
+            .Setup(repository => repository.SearchResourcesByType(AltinnResourceTypes.BrokerService, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(hits);
+    }
+
+    private static void SetupAccessListMembership(
+        Mock<IAltinnResourceRepository> altinnResourceRepository,
+        string resourceId,
+        string party,
+        bool member)
+    {
+        altinnResourceRepository
+            .Setup(repository => repository.GetAccessListOfResource(resourceId, party, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(member ? [party] : []);
     }
 
     private static ClaimsPrincipal CreateUser()

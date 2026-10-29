@@ -2,8 +2,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 using Altinn.Broker.API.Configuration;
-using Altinn.Broker.Helpers;
 using Altinn.Broker.API.ValidationAttributes;
+using Altinn.Broker.Enums;
+using Altinn.Broker.Helpers;
 
 namespace Altinn.Broker.Models;
 
@@ -61,15 +62,28 @@ public class FileTransferInitalizeExt
     public Dictionary<string, string> PropertyList { get; set; } = new Dictionary<string, string>();
 
     /// <summary>
-    /// MD5 checksum for file data.
+    /// Checksum for file data. MD5 is 32 lowercase hex characters. SHA256 is 64 lowercase hex characters.
+    /// Leave empty to have Broker calculate it after upload.
     /// </summary>
     [JsonPropertyName("checksum")]
-    [MD5Checksum]
+    [Checksum]
     public string? Checksum { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Algorithm for <see cref="Checksum"/>. Defaults to MD5.
+    /// </summary>
+    [JsonPropertyName("checksumAlgorithm")]
+    public ChecksumAlgorithmExt ChecksumAlgorithm { get; set; } = ChecksumAlgorithmExt.MD5;
 
     /// <summary>
     /// Disable virus scan. Requires special permission in production.
     /// </summary>
     [JsonPropertyName("disableVirusScan")]
     public bool? DisableVirusScan { get; set; } = false;
+
+    /// <summary>
+    /// Optional notification to send to the recipient(s) once the file transfer is published.
+    /// </summary>
+    [JsonPropertyName("notification")]
+    public NotificationRequestExt? Notification { get; set; }
 }

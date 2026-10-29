@@ -1,0 +1,63 @@
+/*
+ * Toasts borrow the designsystemet Alert palette - tinted surface, dark text, severity border -
+ * with the severity's base colour left as the progress bar accent. Sizing follows Altinn Studio's
+ * app-shared/styles/toast.css.
+ */
+:root:root {
+  --toastify-toast-width: 400px;
+  --toastify-toast-padding: var(--ds-size-5) var(--ds-size-5) var(--ds-size-6) var(--ds-size-5);
+  --toastify-toast-bd-radius: var(--ds-border-radius-md);
+}
+
+.Toastify__toast--info {
+  --toastify-color-info: var(--ds-color-info-surface-tinted);
+  --toastify-text-color-info: var(--ds-color-info-text-default);
+  --toast-border-color: var(--ds-color-info-border-default);
+  --toast-icon-color: var(--ds-color-info-text-subtle);
+  --toast-accent-color: var(--ds-color-info-base-default);
+}
+
+.Toastify__toast--success {
+  --toastify-color-success: var(--ds-color-success-surface-tinted);
+  --toastify-text-color-success: var(--ds-color-success-text-default);
+  --toast-border-color: var(--ds-color-success-border-default);
+  --toast-icon-color: var(--ds-color-success-text-subtle);
+  --toast-accent-color: var(--ds-color-success-base-default);
+}
+
+.Toastify__toast--warning {
+  --toastify-color-warning: var(--ds-color-warning-surface-tinted);
+  --toastify-text-color-warning: var(--ds-color-warning-text-default);
+  --toast-border-color: var(--ds-color-warning-border-default);
+  --toast-icon-color: var(--ds-color-warning-text-subtle);
+  --toast-accent-color: var(--ds-color-warning-base-default);
+}
+
+.Toastify__toast--error {
+  --toastify-color-error: var(--ds-color-danger-surface-tinted);
+  --toastify-text-color-error: var(--ds-color-danger-text-default);
+  --toast-border-color: var(--ds-color-danger-border-default);
+  --toast-icon-color: var(--ds-color-danger-text-subtle);
+  --toast-accent-color: var(--ds-color-danger-base-default);
+}
+
+.Toastify__toast {
+  --toastify-color-transparent: var(--toast-accent-color);
+  border: var(--ds-border-width-default) solid var(--toast-border-color);
+  line-height: 1.5rem;
+}
+
+/* Both selectors outrank react-toastify's own, so neither depends on stylesheet order. */
+.Toastify .Toastify__progress-bar {
+  opacity: 1;
+}
+
+/* The Alert draws its icon in the subtle text colour; toastify defaults it to currentColor. */
+.Toastify__toast-icon svg {
+  fill: var(--toast-icon-color);
+}
+
+/* The colored theme paints the close button for a solid brand fill, so it needs the text colour. */
+.Toastify .Toastify__close-button {
+  color: inherit;
+}

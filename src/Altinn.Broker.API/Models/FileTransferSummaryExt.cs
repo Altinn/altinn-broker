@@ -1,0 +1,50 @@
+namespace Altinn.Broker.Models;
+
+/// <summary>
+/// Lean summary of a file transfer, for list views (active or historical)
+/// </summary>
+public class FileTransferSummaryExt
+{
+    public Guid FileTransferId { get; set; }
+
+    /// <summary>
+    /// The Altinn resource ID for the broker service
+    /// </summary>
+    public string ResourceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Sender of the file transfer
+    /// </summary>
+    public string Sender { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True if the calling actor is the sender of this file transfer, false if they are a recipient
+    /// </summary>
+    public bool IsSender { get; set; }
+
+    /// <summary>
+    /// Recipients of the file transfer
+    /// </summary>
+    public List<string> Recipients { get; set; } = new List<string>();
+
+    /// <summary>
+    /// Used by senders and receivers to identify specific file using external identification methods.
+    /// </summary>
+    public string SendersFileTransferReference { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When the file transfer expires. Recipients must download the file before then.
+    /// </summary>
+    public DateTimeOffset ExpirationTime { get; set; }
+
+    /// <summary>
+    /// The file transfer's own status, such as UploadProcessing, Published or AllConfirmedDownloaded.
+    /// </summary>
+    public string? FileTransferStatus { get; set; }
+
+    /// <summary>
+    /// The viewer's own download status as a recipient: Initialized, DownloadStarted or DownloadConfirmed.
+    /// Null when the viewer is not a recipient.
+    /// </summary>
+    public string? ActorDownloadStatus { get; set; }
+}

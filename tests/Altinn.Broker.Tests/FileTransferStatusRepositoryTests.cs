@@ -32,7 +32,7 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var fileTransferId = await CreateFileTransferInDatabase();
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
 
         // Assert
         await using var command = _dataSource.CreateCommand(
@@ -54,7 +54,7 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var detailedStatus = "Custom detailed status message";
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Failed, timestamp: DateTimeOffset.UtcNow, detailedStatus, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Failed, detailedStatus, cancellationToken: default);
 
         // Assert - Check both the status record and denormalized columns
         await using var statusCommand = _dataSource.CreateCommand(
@@ -82,13 +82,10 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
         var fileTransferId = await CreateFileTransferInDatabase();
 
         // Act - Insert multiple statuses in sequence
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
-        await Task.Delay(50); // Small delay to ensure different timestamps
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
-        await Task.Delay(50);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
-        await Task.Delay(50);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Published, timestamp: DateTimeOffset.UtcNow, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Published, cancellationToken: default);
 
         // Assert - Should have the latest status
         await using var command = _dataSource.CreateCommand(
@@ -101,62 +98,77 @@ public class FileTransferStatusRepositoryTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
-    public async Task InsertFileTransferStatus_WithExplicitTimestamp_StoresGivenTimestamp()
+    public async Task InsertFileTransferStatus_SetsTimestampsFromDatabaseInInsertionOrder()
     {
         // Arrange
         var fileTransferId = await CreateFileTransferInDatabase();
-        var explicitTimestamp = new DateTimeOffset(2026, 01, 01, 12, 00, 00, TimeSpan.Zero);
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: explicitTimestamp, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, cancellationToken: default);
 
         // Assert
+        await using var command = _dataSource.CreateCommand(
+            "SELECT file_transfer_status_date FROM broker.file_transfer_status WHERE file_transfer_id_fk = @fileTransferId ORDER BY file_transfer_status_id_pk");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        var statusDates = new List<DateTime>();
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                statusDates.Add(reader.GetDateTime(0));
+            }
+        }
+        Assert.Equal(3, statusDates.Count);
+        Assert.True(statusDates[0] < statusDates[1] && statusDates[1] < statusDates[2]);
+
         var (statusId, statusDate) = await GetLatestDenormalizedStatus(fileTransferId);
-        Assert.Equal((int)FileTransferStatus.UploadStarted, statusId);
-        Assert.Equal(explicitTimestamp, statusDate);
+        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusId);
+        Assert.Equal(statusDates[2], statusDate.UtcDateTime);
     }
 
     [Fact]
-    public async Task InsertFileTransferStatus_WhenOlderStatusInsertedLater_DoesNotOverwriteDenormalizedLatest()
+    public async Task InsertFileTransferStatus_WhenStoredLatestIsNewer_DoesNotOverwriteDenormalizedLatest()
     {
         // Arrange
         var fileTransferId = await CreateFileTransferInDatabase();
-        var newerTimestamp = new DateTimeOffset(2026, 01, 01, 12, 00, 10, TimeSpan.Zero);
-        var olderTimestamp = newerTimestamp.AddSeconds(-10);
+        var futureTimestamp = new DateTimeOffset(2100, 01, 01, 12, 00, 00, TimeSpan.Zero);
+        await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, futureTimestamp);
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: newerTimestamp, cancellationToken: default);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: olderTimestamp, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, cancellationToken: default);
 
         // Assert
         var (statusId, statusDate) = await GetLatestDenormalizedStatus(fileTransferId);
         Assert.Equal((int)FileTransferStatus.UploadProcessing, statusId);
-        Assert.Equal(newerTimestamp, statusDate);
+        Assert.Equal(futureTimestamp, statusDate);
     }
 
     [Fact]
-    public async Task InsertFileTransferStatus_WhenSameTimestamp_UsesStatusIdAsTieBreaker()
+    public async Task GetInitializedFileTransfersWithStartedUploadOlderThanDate_ReturnsOnlyTransfersStuckInInitialized()
     {
         // Arrange
-        var fileTransferId = await CreateFileTransferInDatabase();
-        var sharedTimestamp = new DateTimeOffset(2026, 01, 01, 12, 30, 00, TimeSpan.Zero);
+        var stuckFileTransferId = await CreateFileTransferInDatabase();
+        await _repository.InsertFileTransferStatus(stuckFileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        // Inserted without updating the denormalized columns, leaving the current status at Initialized
+        await _dataHelper.InsertFileTransferStatus(stuckFileTransferId, FileTransferStatus.UploadStarted, DateTimeOffset.UtcNow);
+
+        var notUploadedFileTransferId = await CreateFileTransferInDatabase();
+        await _repository.InsertFileTransferStatus(notUploadedFileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+
+        var uploadingFileTransferId = await CreateFileTransferInDatabase();
+        await _repository.InsertFileTransferStatus(uploadingFileTransferId, FileTransferStatus.Initialized, cancellationToken: default);
+        await _repository.InsertFileTransferStatus(uploadingFileTransferId, FileTransferStatus.UploadStarted, cancellationToken: default);
 
         // Act
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: sharedTimestamp, cancellationToken: default);
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing, timestamp: sharedTimestamp, cancellationToken: default);
+        var result = await _repository.GetInitializedFileTransfersWithStartedUploadOlderThanDate(DateTime.UtcNow.AddHours(1), default);
 
         // Assert
-        var (statusIdAfterHigher, statusDateAfterHigher) = await GetLatestDenormalizedStatus(fileTransferId);
-        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusIdAfterHigher);
-        Assert.Equal(sharedTimestamp, statusDateAfterHigher);
-
-        // Act - lower status with same timestamp should not overwrite
-        await _repository.InsertFileTransferStatus(fileTransferId, FileTransferStatus.UploadStarted, timestamp: sharedTimestamp, cancellationToken: default);
-
-        // Assert
-        var (statusIdAfterLower, statusDateAfterLower) = await GetLatestDenormalizedStatus(fileTransferId);
-        Assert.Equal((int)FileTransferStatus.UploadProcessing, statusIdAfterLower);
-        Assert.Equal(sharedTimestamp, statusDateAfterLower);
+        var fileTransferIds = result.Select(status => status.FileTransferId).ToList();
+        Assert.Contains(stuckFileTransferId, fileTransferIds);
+        Assert.DoesNotContain(notUploadedFileTransferId, fileTransferIds);
+        Assert.DoesNotContain(uploadingFileTransferId, fileTransferIds);
     }
 
     private async Task<(int LatestStatusId, DateTimeOffset LatestStatusDate)> GetLatestDenormalizedStatus(Guid fileTransferId)

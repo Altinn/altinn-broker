@@ -159,7 +159,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_SenderMatch_ReturnsTransferWithAllRecipients()
+	public async Task GetFileTransferSummariesAssociatedWithActor_SenderMatch_ReturnsTransferWithAllRecipients()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -167,18 +167,19 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var recipient1 = NewOrgId();
 		var recipient2 = NewOrgId();
 
-		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "my-reference");
+		var expirationTime = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId, externalReference: "my-reference", expirationTime: expirationTime);
 		await _dataHelper.InsertRecipient(fileTransferId, recipient1);
 		await _dataHelper.InsertRecipient(fileTransferId, recipient2);
 		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
-			Status = FileTransferStatus.Published
+			SenderStatuses = [FileTransferStatus.Published]
 		}, cancellationToken: default);
 
 		// Assert
@@ -186,12 +187,64 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		Assert.Equal(fileTransferId, summary.FileTransferId);
 		Assert.Equal(resourceId, summary.ResourceId);
 		Assert.Equal(senderExternalId, summary.Sender);
+		Assert.True(summary.IsSender);
 		Assert.Equal("my-reference", summary.SendersFileTransferReference);
+		Assert.Equal(expirationTime, summary.ExpirationTime);
 		Assert.Equal(new[] { recipient1, recipient2 }.OrderBy(r => r), summary.Recipients.OrderBy(r => r));
+		Assert.Equal(FileTransferStatus.Published, summary.FileTransferStatus);
+		Assert.Null(summary.ActorDownloadStatus);
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTransfer()
+	public async Task GetFileTransferSummariesAssociatedWithActor_SenderMatch_UploadProcessingIncludedWhenInSenderStatuses()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.UploadProcessing, FileTransferStatus.Published]
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(fileTransferId, summary.FileTransferId);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_RecipientMatch_UploadProcessingExcludedWhenNotInRecipientStatuses()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var recipientExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId);
+		await _dataHelper.InsertRecipient(fileTransferId, recipientExternalId);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.UploadProcessing);
+		var actor = await _dataHelper.GetOrCreateActor(recipientExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			RecipientStatuses = [FileTransferStatus.Published]
+		}, cancellationToken: default);
+
+		// Assert
+		Assert.DoesNotContain(result, summary => summary.FileTransferId == fileTransferId);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTransfer()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -203,20 +256,50 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(recipientExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
-			Status = FileTransferStatus.Published
+			RecipientStatuses = [FileTransferStatus.Published]
 		}, cancellationToken: default);
 
 		// Assert
 		var summary = Assert.Single(result);
 		Assert.Equal(fileTransferId, summary.FileTransferId);
+		Assert.False(summary.IsSender);
+		Assert.Equal(FileTransferStatus.Published, summary.FileTransferStatus);
+		Assert.Equal(ActorFileTransferStatus.Initialized, summary.ActorDownloadStatus);
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesResourceIdsNotRequested()
+	public async Task GetFileTransferSummariesAssociatedWithActor_RecipientMatch_ReturnsTheViewersOwnDownloadStatus()
+	{
+		// Arrange
+		var resourceId = $"active-transfers-{Guid.NewGuid()}";
+		var viewerExternalId = NewOrgId();
+		var otherRecipientExternalId = NewOrgId();
+
+		var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId);
+		await _dataHelper.InsertRecipient(fileTransferId, otherRecipientExternalId, ActorFileTransferStatus.Initialized);
+		await _dataHelper.InsertRecipient(fileTransferId, viewerExternalId, ActorFileTransferStatus.DownloadConfirmed);
+		await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published);
+		var actor = await _dataHelper.GetOrCreateActor(viewerExternalId);
+
+		// Act
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			RecipientStatuses = [FileTransferStatus.Published]
+		}, cancellationToken: default);
+
+		// Assert
+		var summary = Assert.Single(result);
+		Assert.Equal(ActorFileTransferStatus.DownloadConfirmed, summary.ActorDownloadStatus);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesResourceIdsNotRequested()
 	{
 		// Arrange
 		var requestedResourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -228,7 +311,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [requestedResourceId],
@@ -239,7 +322,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_MultipleResourceIds_ReturnsTransfersAcrossAllOfThem()
+	public async Task GetFileTransferSummariesAssociatedWithActor_MultipleResourceIds_ReturnsTransfersAcrossAllOfThem()
 	{
 		// Arrange
 		var resourceId1 = $"active-transfers-{Guid.NewGuid()}";
@@ -251,7 +334,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId1, resourceId2],
@@ -263,7 +346,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesNonMatchingStatus()
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesNonMatchingStatus()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -274,11 +357,11 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = actor,
 			ResourceIds = [resourceId],
-			Status = FileTransferStatus.Published
+			SenderStatuses = [FileTransferStatus.Published]
 		}, cancellationToken: default);
 
 		// Assert
@@ -286,7 +369,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 	}
 
 	[Fact]
-	public async Task GetActiveFileTransferSummariesAssociatedWithActor_ExcludesUnrelatedActor()
+	public async Task GetFileTransferSummariesAssociatedWithActor_ExcludesUnrelatedActor()
 	{
 		// Arrange
 		var resourceId = $"active-transfers-{Guid.NewGuid()}";
@@ -297,7 +380,7 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		var unrelatedActor = await _dataHelper.GetOrCreateActor(unrelatedExternalId);
 
 		// Act
-		var result = await _repository.GetActiveFileTransferSummariesAssociatedWithActor(new ActiveFileTransferSearchEntity
+		var result = await _repository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity
 		{
 			Actor = unrelatedActor,
 			ResourceIds = [resourceId],
@@ -306,6 +389,102 @@ public class FileTransferRepositoryTests : IClassFixture<CustomWebApplicationFac
 		// Assert
 		Assert.DoesNotContain(result, summary => summary.FileTransferId == fileTransferId);
 	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_Cursor_ContinuesWhereThePreviousPageStopped()
+	{
+		// Arrange
+		const int pageSize = 10;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var ordered = await InsertPublishedTransfers(resourceId, senderExternalId, pageSize * 3);
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		FrontendFileTransferSearchEntity Search(FileTransferListCursor? cursor) => new()
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize,
+			Cursor = cursor
+		};
+
+		// Act - walk every page the way the frontend does
+		var seen = new List<Guid>();
+		FileTransferListCursor? cursor = null;
+		for (var page = 0; page < 3; page++)
+		{
+			var result = await _repository.GetFileTransferSummariesAssociatedWithActor(Search(cursor), cancellationToken: default);
+			Assert.Equal(pageSize, result.Count);
+			seen.AddRange(result.Select(summary => summary.FileTransferId));
+			var last = result[^1];
+			cursor = new FileTransferListCursor(last.SortDate, last.FileTransferId);
+		}
+
+		// Assert - every file transfer exactly once, newest first
+		Assert.Equal(ordered.Count, seen.Count);
+		Assert.Equal(seen.Count, seen.Distinct().Count());
+		Assert.Equal(Enumerable.Reverse(ordered), seen);
+	}
+
+	[Fact]
+	public async Task GetFileTransferSummariesAssociatedWithActor_TiedSortDates_StillPagesWithoutSkippingOrRepeating()
+	{
+		// Arrange
+		// The reason the cursor carries the id: a page boundary between transfers sharing a timestamp.
+		const int pageSize = 5;
+		var resourceId = $"paged-transfers-{Guid.NewGuid()}";
+		var senderExternalId = NewOrgId();
+		var sameInstant = StatusDateFor(0);
+		var ids = new List<Guid>();
+		for (var index = 0; index < pageSize * 2; index++)
+		{
+			var fileTransferId = await _dataHelper.InsertFileTransfer(resourceId, senderExternalId: senderExternalId);
+			await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published, sameInstant);
+			ids.Add(fileTransferId);
+		}
+		var actor = await _dataHelper.GetOrCreateActor(senderExternalId);
+
+		FrontendFileTransferSearchEntity Search(FileTransferListCursor? cursor) => new()
+		{
+			Actor = actor,
+			ResourceIds = [resourceId],
+			SenderStatuses = [FileTransferStatus.Published],
+			Limit = pageSize,
+			Cursor = cursor
+		};
+
+		// Act
+		var first = await _repository.GetFileTransferSummariesAssociatedWithActor(Search(null), cancellationToken: default);
+		var lastOfFirst = first[^1];
+		var second = await _repository.GetFileTransferSummariesAssociatedWithActor(
+			Search(new FileTransferListCursor(lastOfFirst.SortDate, lastOfFirst.FileTransferId)), cancellationToken: default);
+
+		// Assert
+		var seen = first.Concat(second).Select(summary => summary.FileTransferId).ToList();
+		Assert.Equal(ids.Count, seen.Count);
+		Assert.Equal(seen.Count, seen.Distinct().Count());
+	}
+
+	/// <summary>Published transfers one minute apart, oldest first, so paging and date windows are deterministic.</summary>
+	private async Task<List<Guid>> InsertPublishedTransfers(string resourceId, string senderExternalId, int count)
+	{
+		var ids = new List<Guid>(count);
+		for (var index = 0; index < count; index++)
+		{
+			var fileTransferId = await _dataHelper.InsertFileTransfer(
+				resourceId,
+				senderExternalId: senderExternalId,
+				externalReference: $"ref-{index}");
+			await _dataHelper.SetLatestFileTransferStatus(fileTransferId, FileTransferStatus.Published, StatusDateFor(index));
+			ids.Add(fileTransferId);
+		}
+		return ids;
+	}
+
+	private static readonly DateTimeOffset PagingEpoch = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+	private static DateTimeOffset StatusDateFor(int index) => PagingEpoch.AddMinutes(index);
 
 	private static string NewOrgId() => $"0192:{Random.Shared.Next(100000000, 999999999)}";
 

@@ -1,12 +1,20 @@
+using Altinn.Broker.Application.CheckNotificationDelivery;
 using Altinn.Broker.Application.ConfigureResource;
+using Altinn.Broker.Application.CreateNotificationOrder;
+using Altinn.Broker.Application.SendNotificationOrder;
 using Altinn.Broker.Application.DownloadFile;
-using Altinn.Broker.Application.GetActiveFileTransfers;
+using Altinn.Broker.Application.GetFileTransferSummaries;
 using Altinn.Broker.Application.PurgeFileTransfer;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
+using Altinn.Broker.Application.GetActiveFileTransferDetails;
+using Altinn.Broker.Application.GetAuthorizedParties;
+using Altinn.Broker.Application.GetProfileLanguage;
+using Altinn.Broker.Application.UpdateProfileLanguage;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.GetPartialUploads;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.InitializeFileTransfer;
@@ -25,6 +33,7 @@ public static class DependencyInjection
 {
     public static void AddApplicationHandlers(this IServiceCollection services)
     {
+        services.AddScoped<BrokerResourceProvisioner>();
         services.AddScoped<InitializeFileTransferHandler>();
         services.AddScoped<UploadFileHandler>();
         services.AddScoped<CompleteFileUploadHandler>();
@@ -38,10 +47,11 @@ public static class DependencyInjection
         services.AddSingleton<ITusFinalizeUploadEnqueuer, TusFinalizeUploadEnqueuer>();
         services.AddScoped<GetFileTransferOverviewHandler>();
         services.AddScoped<GetFileTransferDetailsHandler>();
+        services.AddScoped<GetPartialUploadsHandler>();
         services.AddScoped<DownloadFileHandler>();
         services.AddScoped<ConfirmDownloadHandler>();
         services.AddScoped<GetFileTransfersHandler>();
-        services.AddScoped<GetActiveFileTransfersHandler>();
+        services.AddScoped<GetFileTransferSummariesHandler>();
         services.AddScoped<PurgeFileTransferHandler>();
         services.AddScoped<MalwareScanningResultHandler>();
         services.AddScoped<ConfigureResourceHandler>();
@@ -49,6 +59,9 @@ public static class DependencyInjection
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<GetAllowedRecipientsHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
+        services.AddScoped<GetAuthorizedPartiesHandler>();
+        services.AddScoped<GetProfileLanguageHandler>();
+        services.AddScoped<UpdateProfileLanguageHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();
@@ -57,5 +70,10 @@ public static class DependencyInjection
         services.AddScoped<CleanupUseCaseTestsHandler>();
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
+        services.AddScoped<GetActiveFileTransferDetailsHandler>();
+        services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
+        services.AddScoped<SendNotificationOrderHandler>();
+        services.AddScoped<StuckNotificationOrderHandler>();
+        services.AddScoped<CheckNotificationDeliveryHandler>();
     }
 }

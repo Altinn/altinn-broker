@@ -28,6 +28,10 @@ inputs:
     description: "APIM gateway hostname (e.g. altinn-dev-api.azure-api.net). Front Door forwards /broker/* here. Leave empty for SPA-only Front Door."
     required: false
     default: ""
+  FRONTEND_CUSTOM_DOMAIN:
+    description: "Public hostname of the existing Front Door custom domain (e.g. ab.tt02.altinn.no). Resolved to a resource ID and associated with routes; the domain itself is not created."
+    required: false
+    default: ""
   VITE_API_BASE_URL:
     description: "Broker API origin baked into the SPA at build time. Leave empty when Front Door proxies /broker/* (same-origin cookies)."
     required: false
@@ -72,6 +76,34 @@ runs:
         OBJECT_ID="$(az ad sp show --id "${{ inputs.AZURE_CLIENT_ID }}" --query id -o tsv)"
         echo "DEPLOYMENT_PRINCIPAL_OBJECT_ID=$OBJECT_ID" >> "$GITHUB_ENV"
 
+    - name: Resolve existing Front Door custom domain
+      shell: bash
+      run: |
+        set -euo pipefail
+        HOST_NAME="${{ inputs.FRONTEND_CUSTOM_DOMAIN }}"
+        if [ -z "$HOST_NAME" ]; then
+          echo "FRONTEND_CUSTOM_DOMAIN_ID=" >> "$GITHUB_ENV"
+          echo "No FRONTEND_CUSTOM_DOMAIN set; routes will not associate a custom domain."
+          exit 0
+        fi
+
+        RESOURCE_GROUP="${{ inputs.AZURE_NAME_PREFIX }}-rg"
+        PROFILE_NAME="${{ inputs.AZURE_NAME_PREFIX }}-frontend-fd"
+        DOMAIN_ID="$(az afd custom-domain list \
+          --resource-group "$RESOURCE_GROUP" \
+          --profile-name "$PROFILE_NAME" \
+          --query "[?hostName=='$HOST_NAME'].id | [0]" \
+          -o tsv)"
+
+        if [ -z "$DOMAIN_ID" ] || [ "$DOMAIN_ID" = "None" ]; then
+          echo "No Front Door custom domain with hostName '$HOST_NAME' on profile '$PROFILE_NAME'."
+          echo "The platform team must create the domain first; this deploy only associates it with routes."
+          exit 1
+        fi
+
+        echo "FRONTEND_CUSTOM_DOMAIN_ID=$DOMAIN_ID" >> "$GITHUB_ENV"
+        echo "Associating existing custom domain: $DOMAIN_ID"
+
     - name: Deploy frontend infrastructure
       uses: azure/arm-deploy@v2
       id: deploy
@@ -81,6 +113,7 @@ runs:
         DEPLOYMENT_PRINCIPAL_OBJECT_ID: ${{ env.DEPLOYMENT_PRINCIPAL_OBJECT_ID }}
         FRONTEND_STORAGE_ACCOUNT: ${{ inputs.FRONTEND_STORAGE_ACCOUNT }}
         API_ORIGIN_HOST_NAME: ${{ inputs.API_ORIGIN_HOST_NAME }}
+        FRONTEND_CUSTOM_DOMAIN_ID: ${{ env.FRONTEND_CUSTOM_DOMAIN_ID }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
@@ -134,7 +167,12 @@ runs:
       shell: bash
       run: |
         echo "Frontend deployed to https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}"
-        echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        if [ -n "${{ inputs.FRONTEND_CUSTOM_DOMAIN }}" ]; then
+          echo "Custom domain: https://${{ inputs.FRONTEND_CUSTOM_DOMAIN }}"
+          echo "Verify API routing: curl -sI \"https://${{ inputs.FRONTEND_CUSTOM_DOMAIN }}/broker/api/v1/authentication/me\""
+        else
+          echo "Verify API routing: curl -sI \"https://${{ steps.deploy.outputs.frontDoorEndpointHostName }}/broker/api/v1/authentication/me\""
+        fi
         echo "Expect Content-Type: application/json (not text/html)."
 
     - name: Logout from azure

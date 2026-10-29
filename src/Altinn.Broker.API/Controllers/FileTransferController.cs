@@ -6,6 +6,7 @@ using Altinn.Broker.Application.DownloadFile;
 using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.GetPartialUploads;
 using Altinn.Broker.Application.InitializeFileTransfer;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Core.Domain.Enums;
@@ -250,6 +251,41 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     }
 
     /// <summary>
+    /// Get the TUS partial uploads of a file transfer, to resume an interrupted parallel upload
+    /// </summary>
+    /// <remarks>
+    /// One of the scopes: <br />
+    /// - altinn:broker.write <br/>
+    /// Lists the partial uploads that still exist, in the order they were created.
+    /// Read how far each one got with a TUS <c>HEAD</c> on /broker/api/v1/filetransfer/upload/tus/{fileTransferId}/partial/{partialUploadId}.
+    /// </remarks>
+    /// <response code="200">Returns the partial uploads</response>
+    /// <response code="401">You must use a bearer token that represents a system user with access to the resource in the Resource Rights Registry</response>
+    /// <response code="404">The requested file transfer was not found</response>
+    [HttpGet]
+    [Route("{fileTransferId}/partialuploads")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(PartialUploadsExt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = AuthorizationConstants.Sender)]
+    public async Task<ActionResult<PartialUploadsExt>> GetPartialUploads(
+        Guid fileTransferId,
+        [FromServices] GetPartialUploadsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Getting partial uploads for {fileTransferId}", fileTransferId.ToString());
+        var queryResult = await handler.Process(new GetPartialUploadsRequest()
+        {
+            FileTransferId = fileTransferId
+        }, HttpContext.User, cancellationToken);
+        return queryResult.Match(
+            result => Ok(PartialUploadsExtMapper.MapToExternalModel(result.PartialUploads)),
+            Problem
+        );
+    }
+
+    /// <summary>
     /// Get files that can be accessed by the caller according to specified filters
     /// </summary>
     /// <remarks>
@@ -337,6 +373,7 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     public async Task<ActionResult> DownloadFile(
         Guid fileTransferId,
         [FromServices] DownloadFileHandler handler,
+        [FromQuery] string? onBehalfOf,
          CancellationToken cancellationToken)
     {
         logger.LogInformation("Downloading file for file transfer {fileTransferId}", fileTransferId.ToString());
@@ -344,7 +381,8 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
         var queryResult = await handler.Process(new DownloadFileRequest()
         {
             FileTransferId = fileTransferId,
-            Range = byteRange
+            Range = byteRange,
+            OnBehalfOf = onBehalfOf
         }, HttpContext.User, cancellationToken);
         return queryResult.Match(
             result =>
@@ -394,13 +432,15 @@ public class FileTransferController(ILogger<FileTransferController> logger) : Co
     [Authorize(Policy = AuthorizationConstants.Recipient)]
     public async Task<ActionResult> ConfirmDownload(
         Guid fileTransferId,
+        [FromQuery] string? onBehalfOf,
         [FromServices] ConfirmDownloadHandler handler,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Confirming download for fileTransfer {fileTransferId}", fileTransferId.ToString());
         var requestData = new ConfirmDownloadRequest()
         {
-            FileTransferId = fileTransferId
+            FileTransferId = fileTransferId,
+            OnBehalfOf = onBehalfOf
         };
         var commandResult = await handler.Process(requestData, HttpContext.User, cancellationToken);
         return commandResult.Match(

@@ -19,9 +19,10 @@ public class SlackStuckFileTransferNotifier(
     private string Channel => slackSettings.NotificationChannel;
 
     public async Task<bool> NotifyFileStuckWithStatus(
-        FileTransferStatusEntity fileTransferStatus)
+        FileTransferStatusEntity fileTransferStatus,
+        string? reason = null)
     {
-        var errorMessage = FormatNotificationMessage(fileTransferStatus);
+        var errorMessage = FormatNotificationMessage(fileTransferStatus, reason);
         try
         {
             return await SendSlackNotificationWithMessage(errorMessage);
@@ -35,13 +36,14 @@ public class SlackStuckFileTransferNotifier(
         }
     }
 
-    private string FormatNotificationMessage(FileTransferStatusEntity fileTransferStatus)
+    private string FormatNotificationMessage(FileTransferStatusEntity fileTransferStatus, string? reason)
     {
         return $":warning: *FileTransfer stuck with status*\n" +
                $"*Environment:* {_hostEnvironment.EnvironmentName}\n" +
                $"*System:* Broker\n" +
                $"*File transfer id:* {fileTransferStatus.FileTransferId}\n" +
                $"*Status:* {fileTransferStatus.Status}\n" +
+               (reason is null ? "" : $"*Reason:* {reason}\n") +
                $"*Status start date:* {fileTransferStatus.Date}\n" +
                $"*Stuck duration:* {DateTime.UtcNow - fileTransferStatus.Date}\n" +
                $"*Time:* {DateTime.UtcNow:u}\n";

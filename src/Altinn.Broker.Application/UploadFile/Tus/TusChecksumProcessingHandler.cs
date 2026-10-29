@@ -39,21 +39,21 @@ public class TusChecksumProcessingHandler(
     {
         if (await idempotencyEventRepository.ExistsAsync($"{fileTransferId}{Md5ValidatedIdempotencySuffix}", cancellationToken))
         {
-            logger.LogInformation("MD5 checksum already processed for {fileTransferId}", fileTransferId);
+            logger.LogInformation("Checksum already processed for {fileTransferId}", fileTransferId);
             return;
         }
 
         var fileTransfer = await fileTransferRepository.GetFileTransfer(fileTransferId, cancellationToken);
         if (fileTransfer is null)
         {
-            logger.LogError("File transfer {fileTransferId} not found during MD5 processing", fileTransferId);
+            logger.LogError("File transfer {fileTransferId} not found during checksum processing", fileTransferId);
             return;
         }
 
         if (fileTransfer.FileTransferStatusEntity.Status is FileTransferStatus.Failed or FileTransferStatus.Purged)
         {
             logger.LogInformation(
-                "Skipping MD5 processing for {fileTransferId} because status is {status}",
+                "Skipping checksum processing for {fileTransferId} because status is {status}",
                 fileTransferId,
                 fileTransfer.FileTransferStatusEntity.Status);
             return;
@@ -62,21 +62,21 @@ public class TusChecksumProcessingHandler(
         var resource = await resourceRepository.GetResource(fileTransfer.ResourceId, cancellationToken);
         if (resource is null)
         {
-            logger.LogError("Resource {resourceId} not found during MD5 processing for {fileTransferId}", fileTransfer.ResourceId, fileTransferId);
+            logger.LogError("Resource {resourceId} not found during checksum processing for {fileTransferId}", fileTransfer.ResourceId, fileTransferId);
             return;
         }
 
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(resource.ServiceOwnerId);
         if (serviceOwner is null)
         {
-            logger.LogError("Service owner not found during MD5 processing for {fileTransferId}", fileTransferId);
+            logger.LogError("Service owner not found during checksum processing for {fileTransferId}", fileTransferId);
             return;
         }
 
         var computedChecksum = await brokerStorageService.ComputeFileChecksumAsync(serviceOwner, fileTransfer, cancellationToken);
         if (computedChecksum is null)
         {
-            throw new InvalidOperationException($"Failed to compute MD5 checksum for file transfer {fileTransferId}");
+            throw new InvalidOperationException($"Failed to compute {fileTransfer.ChecksumAlgorithm} checksum for file transfer {fileTransferId}");
         }
 
         var userProvidedChecksum = !string.IsNullOrWhiteSpace(fileTransfer.Checksum);
@@ -93,7 +93,6 @@ public class TusChecksumProcessingHandler(
                 await fileTransferStatusRepository.InsertFileTransferStatus(
                     fileTransferId,
                     FileTransferStatus.Failed,
-                    timestamp: DateTime.UtcNow,
                     detailedFileTransferStatus: "Checksum mismatch",
                     cancellationToken: ct);
                 backgroundJobClient.Enqueue<IBrokerStorageService>(service =>
@@ -146,7 +145,7 @@ public class TusChecksumProcessingHandler(
                 }
 
                 logger.LogInformation(
-                    "MD5 validated for {fileTransferId}; awaiting malware scan before publishing",
+                    "Checksum validated for {fileTransferId}; awaiting malware scan before publishing",
                     fileTransferId);
                 return;
             }
@@ -164,7 +163,7 @@ public class TusChecksumProcessingHandler(
     {
         await TransactionWithRetriesPolicy.Execute(async ct =>
         {
-            await fileTransferPublishService.TryPublishAsync(fileTransfer, DateTime.UtcNow, ct);
+            await fileTransferPublishService.TryPublishAsync(fileTransfer, ct);
             return Task.CompletedTask;
         }, logger, cancellationToken);
     }

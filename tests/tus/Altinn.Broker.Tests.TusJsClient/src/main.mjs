@@ -16,6 +16,16 @@ function readEnv(name, fallback) {
   return value === undefined || value === '' ? fallback : value;
 }
 
+function readChecksumAlgorithm() {
+  const value = readEnv('CHECKSUM_ALGORITHM', 'SHA256');
+  const algorithm = value.toUpperCase();
+  if (algorithm !== 'MD5' && algorithm !== 'SHA256') {
+    throw new Error(`CHECKSUM_ALGORITHM must be MD5 or SHA256. Got: ${value}`);
+  }
+
+  return algorithm;
+}
+
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -123,6 +133,7 @@ async function main() {
     readEnv('TUS_PARALLEL_PARTIAL_UPLOADS', String(DEFAULT_PARALLEL_UPLOADS)),
   );
   const uploadFilePath = readEnv('UPLOAD_FILE_PATH', null);
+  const checksumAlgorithm = readChecksumAlgorithm();
   const chunkSize = chunkSizeMb * 1024 * 1024;
 
   console.log(`BASE_URL: ${baseUrl}`);
@@ -130,6 +141,7 @@ async function main() {
   console.log(`ORG_NO: ${authOptions.orgNumber}`);
   console.log(`CHUNK_SIZE_MB: ${chunkSizeMb}`);
   console.log(`TUS_PARALLEL_PARTIAL_UPLOADS: ${parallelUploads}`);
+  console.log(`CHECKSUM_ALGORITHM: ${checksumAlgorithm}`);
 
   const token = await exchangeAltinnToken(authOptions);
   const fileTransferId = await initializeFileTransfer(
@@ -137,6 +149,7 @@ async function main() {
     token,
     authOptions.orgNumber,
     resourceId,
+    checksumAlgorithm,
   );
   console.log(`File transfer id: ${fileTransferId}`);
 

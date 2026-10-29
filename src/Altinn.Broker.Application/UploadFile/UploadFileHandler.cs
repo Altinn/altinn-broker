@@ -56,19 +56,16 @@ public class UploadFileHandler(
             return Errors.ServiceOwnerNotConfigured;
         }
 
-        var uploadStartedTimestamp = DateTime.UtcNow;
         var uploaderVendor = user?.GetCallerVendorId()?.WithPrefix();
         await fileTransferStatusRepository.InsertFileTransferStatus(
             request.FileTransferId,
             FileTransferStatus.UploadStarted,
-            timestamp: uploadStartedTimestamp,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
 
         try
         {
             var result = await brokerStorageService.UploadFile(serviceOwner, fileTransfer, request.UploadStream, cancellationToken);
-            var finishedUploadTimestamp = DateTime.UtcNow;
             if (result is null)
             {
                 return await TransactionWithRetriesPolicy.Execute(async ct =>
@@ -76,7 +73,6 @@ public class UploadFileHandler(
                     await fileTransferStatusRepository.InsertFileTransferStatus(
                         request.FileTransferId,
                         FileTransferStatus.Failed,
-                        timestamp: DateTime.UtcNow,
                         detailedFileTransferStatus: "File upload failed and was aborted",
                         cancellationToken: ct);
                     backgroundJobClient.Enqueue(() => eventBus.Publish(
@@ -101,6 +97,7 @@ public class UploadFileHandler(
                 storageProvider.Id,
                 request.FileTransferId.ToString(),
                 uploadLength,
+                stripeSizeBytes: null,
                 CancellationToken.None);
             return await completeFileUploadHandler.Process(
                 new CompleteFileUploadRequest
@@ -108,7 +105,6 @@ public class UploadFileHandler(
                     FileTransferId = request.FileTransferId,
                     Checksum = checksum,
                     UploadLength = uploadLength,
-                    UploadFinishedTimestamp = finishedUploadTimestamp,
                 },
                 user,
                 cancellationToken);
@@ -124,7 +120,6 @@ public class UploadFileHandler(
                 await fileTransferStatusRepository.InsertFileTransferStatus(
                     request.FileTransferId,
                     FileTransferStatus.Failed,
-                    timestamp: DateTime.UtcNow,
                     detailedFileTransferStatus: "Error occurred while uploading fileTransfer",
                     cancellationToken: ct);
                 backgroundJobClient.Enqueue(() => eventBus.Publish(

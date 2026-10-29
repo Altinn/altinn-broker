@@ -80,4 +80,13 @@ The TUS endpoint is:
 
 No custom `Upload-Concat` header handling is required in client code — tus-py-client builds the concatenation flow automatically when `parallel_uploads` is greater than 1.
 
+## Important: parallel mode ignores `CHUNK_SIZE_MB`
+
+With `TUS_PARALLEL_PARTIAL_UPLOADS` > 1, [tus-py-client](https://github.com/tus/tus-py-client) splits the file into that many partials and **PATCHes each entire partial in one request**. `CHUNK_SIZE_MB` only applies when `TUS_PARALLEL_PARTIAL_UPLOADS=1`.
+
+**Workarounds for multi‑GiB uploads:**
+
+1. Prefer the [.NET](../Altinn.Broker.Tests.LargeFile/) or [JavaScript](../Altinn.Broker.Tests.TusJsClient/) harness — both chunk inside each partial
+2. Or use Python single-stream: `TUS_PARALLEL_PARTIAL_UPLOADS=1` with `CHUNK_SIZE_MB` 8–32
+
 See [../README.md](../README.md) for shared environment variables and authentication details.

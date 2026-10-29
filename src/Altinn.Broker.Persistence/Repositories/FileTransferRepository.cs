@@ -1,6 +1,6 @@
-using System.Text;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Helpers;
 
@@ -20,15 +20,18 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.file_transfer_id_pk, 
                     f.resource_id, 
                     f.filename, 
-                    f.checksum, 
+                    f.checksum,
+                    f.checksum_algorithm,
                     f.sender_actor_id_fk, 
                     f.external_file_transfer_reference, 
                     f.created, 
                     f.file_location,
                     f.file_transfer_size,
-                    f.expiration_time, 
+                    f.stripe_size_bytes,
+                    f.expiration_time,
                     f.hangfire_job_id,
                     f.use_virus_scan,
+                    f.has_notification,
                     sender.actor_external_id as senderActorExternalReference,
                     fs_latest.file_transfer_status_description_id_fk, 
                     fs_latest.file_transfer_status_date, 
@@ -83,6 +86,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
                     FileName = reader.GetString(reader.GetOrdinal("filename")),
                     Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                    ChecksumAlgorithm = ReadChecksumAlgorithm(reader),
                     SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
                     HangfireJobId = reader.IsDBNull(reader.GetOrdinal("hangfire_job_id")) ? null : reader.GetString(reader.GetOrdinal("hangfire_job_id")),
                     FileTransferStatusEntity = new FileTransferStatusEntity()
@@ -97,6 +101,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
+                    StripeSizeBytes = reader.IsDBNull(reader.GetOrdinal("stripe_size_bytes")) ? null : reader.GetInt64(reader.GetOrdinal("stripe_size_bytes")),
                     Sender = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("sender_actor_id_fk")),
@@ -104,7 +109,8 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     },
                     RecipientCurrentStatuses = await GetLatestRecipientFileTransferStatuses(fileTransferId, ct),
                     PropertyList = await GetMetadata(fileTransferId, ct),
-                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan"))
+                    UseVirusScan = reader.GetBoolean(reader.GetOrdinal("use_virus_scan")),
+                    HasNotification = reader.GetBoolean(reader.GetOrdinal("has_notification"))
                 };
 
                 EnrichLogs(fileTransfer);
@@ -112,6 +118,12 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
             return fileTransfer;
         }, cancellationToken);
+    }
+
+    private static ChecksumAlgorithm ReadChecksumAlgorithm(NpgsqlDataReader reader)
+    {
+        var ordinal = reader.GetOrdinal("checksum_algorithm");
+        return reader.IsDBNull(ordinal) ? ChecksumAlgorithm.MD5 : ChecksumHasher.Parse(reader.GetString(ordinal));
     }
 
     private static void EnrichLogs(FileTransferEntity fileTransferEntity)
@@ -165,7 +177,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, bool useVirusScan, CancellationToken cancellationToken = default)
+    public async Task<Guid> AddFileTransfer(ResourceEntity resource, StorageProviderEntity storageProviderEntity, string fileName, string sendersFileTransferReference, string senderExternalId, List<string> recipientIds, DateTimeOffset expirationTime, Dictionary<string, string> propertyList, string? checksum, ChecksumAlgorithm checksumAlgorithm, bool useVirusScan, long stripeSizeBytes, bool hasNotification, CancellationToken cancellationToken = default)
     {
         long actorId;
         var actor = await actorRepository.GetActorAsync(senderExternalId, cancellationToken);
@@ -183,14 +195,16 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
 
         var fileTransferId = Guid.NewGuid();
         await using NpgsqlCommand command = dataSource.CreateCommand(
-            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, file_transfer_size, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan) " +
-            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @fileTransferSize, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan)");
+            "INSERT INTO broker.file_transfer (file_transfer_id_pk, resource_id, filename, checksum, checksum_algorithm, file_transfer_size, stripe_size_bytes, external_file_transfer_reference, sender_actor_id_fk, created, storage_provider_id_fk, expiration_time, hangfire_job_id, use_virus_scan, has_notification) " +
+            "VALUES (@fileTransferId, @resourceId, @fileName, @checksum, @checksumAlgorithm, @fileTransferSize, @stripeSizeBytes, @externalFileTransferReference, @senderActorId, @created, @storageProviderId, @expirationTime, @hangfireJobId, @useVirusScan, @hasNotification)");
 
         command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
         command.Parameters.AddWithValue("@resourceId", resource.Id);
         command.Parameters.AddWithValue("@fileName", fileName);
         command.Parameters.AddWithValue("@checksum", checksum is null ? DBNull.Value : checksum);
+        command.Parameters.AddWithValue("@checksumAlgorithm", checksumAlgorithm.ToString());
         command.Parameters.AddWithValue("@fileTransferSize", DBNull.Value);
+        command.Parameters.AddWithValue("@stripeSizeBytes", stripeSizeBytes);
         command.Parameters.AddWithValue("@senderActorId", actorId);
         command.Parameters.AddWithValue("@externalFileTransferReference", sendersFileTransferReference);
         command.Parameters.AddWithValue("@created", DateTime.UtcNow);
@@ -198,6 +212,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         command.Parameters.AddWithValue("@hangfireJobId", DBNull.Value);
         command.Parameters.AddWithValue("@expirationTime", expirationTime);
         command.Parameters.AddWithValue("@useVirusScan", useVirusScan);
+        command.Parameters.AddWithValue("@hasNotification", hasNotification);
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
 
@@ -298,21 +313,30 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task<List<FileTransferSummaryEntity>> GetActiveFileTransferSummariesAssociatedWithActor(ActiveFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
+    public async Task<List<FileTransferSummaryEntity>> GetFileTransferSummariesAssociatedWithActor(FrontendFileTransferSearchEntity fileTransferSearch, CancellationToken cancellationToken)
     {
         bool includeSender = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Sender;
         bool includeRecipient = fileTransferSearch.Role == SearchRole.Both || fileTransferSearch.Role == SearchRole.Recipient;
 
+        bool hasSenderStatusFilter = fileTransferSearch.SenderStatuses is { Count: > 0 };
+        bool hasRecipientStatusFilter = fileTransferSearch.RecipientStatuses is { Count: > 0 };
+
         var actorConditions = new List<string>();
-        if (includeSender) actorConditions.Add("f.sender_actor_id_fk = @actorId");
-        if (includeRecipient) actorConditions.Add("EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId)");
+        if (includeSender)
+        {
+            string senderStatusCondition = hasSenderStatusFilter ? " AND f.latest_file_status_id = ANY(@senderStatuses)" : "";
+            actorConditions.Add($"(f.sender_actor_id_fk = @actorId{senderStatusCondition})");
+        }
+        if (includeRecipient)
+        {
+            string recipientStatusCondition = hasRecipientStatusFilter ? " AND f.latest_file_status_id = ANY(@recipientStatuses)" : "";
+            actorConditions.Add($"(EXISTS (SELECT 1 FROM broker.actor_file_transfer_latest_status afls2 WHERE afls2.file_transfer_id_fk = f.file_transfer_id_pk AND afls2.actor_id_fk = @actorId){recipientStatusCondition})");
+        }
         string actorCondition = string.Join(" OR ", actorConditions);
 
-        string statusCondition = fileTransferSearch.Status.HasValue
-            ? "AND f.latest_file_status_id = @fileTransferStatus"
-            : "";
+        bool hasStatusFilter = hasSenderStatusFilter || hasRecipientStatusFilter;
 
-        string timestampColumn = fileTransferSearch.Status.HasValue
+        string timestampColumn = hasStatusFilter
             ? "f.latest_file_status_date"
             : "f.created";
 
@@ -331,6 +355,14 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }
 
         string orderDirection = fileTransferSearch.OrderAscending ?? "DESC";
+        bool ascending = orderDirection.Equals("ASC", StringComparison.OrdinalIgnoreCase);
+
+        // Keyset paging: continue strictly past the last row of the previous page. The id is part
+        // of the comparison because the timestamp is not unique - without it a page boundary that
+        // lands between two file transfers sharing a timestamp skips or repeats one.
+        string cursorCondition = fileTransferSearch.Cursor is null
+            ? ""
+            : $"AND ({timestampColumn}, f.file_transfer_id_pk) {(ascending ? ">" : "<")} (@cursorDate, @cursorId)";
 
         // Cap and sort the matching file transfers first (matching_transfers), then fan out to one
         // row per recipient - doing the LIMIT before the recipient join keeps it "100 file transfers
@@ -342,33 +374,48 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     f.file_transfer_id_pk,
                     f.resource_id,
                     f.external_file_transfer_reference,
+                    f.expiration_time,
+                    f.latest_file_status_id,
                     sender.actor_external_id AS sender_actor_external_id,
                     {timestampColumn} AS sort_date
                 FROM broker.file_transfer f
                 INNER JOIN broker.actor sender ON sender.actor_id_pk = f.sender_actor_id_fk
                 WHERE f.resource_id = ANY(@resourceIds)
                 AND ({actorCondition})
-                {statusCondition}
                 {dateCondition}
-                ORDER BY sort_date {orderDirection}
-                LIMIT 100
+                {cursorCondition}
+                ORDER BY sort_date {orderDirection}, f.file_transfer_id_pk {orderDirection}
+                LIMIT @limit
             )
             SELECT
                 mt.file_transfer_id_pk,
                 mt.resource_id,
                 mt.external_file_transfer_reference,
+                mt.expiration_time,
+                mt.latest_file_status_id,
                 mt.sender_actor_external_id,
-                recipient.actor_external_id AS recipient_actor_external_id
+                mt.sort_date,
+                recipient.actor_external_id AS recipient_actor_external_id,
+                afls.actor_id_fk AS recipient_actor_id,
+                afls.latest_actor_status_id AS recipient_status_id
             FROM matching_transfers mt
             LEFT JOIN broker.actor_file_transfer_latest_status afls ON afls.file_transfer_id_fk = mt.file_transfer_id_pk
             LEFT JOIN broker.actor recipient ON recipient.actor_id_pk = afls.actor_id_fk
-            ORDER BY mt.sort_date {orderDirection}, mt.file_transfer_id_pk;";
+            ORDER BY mt.sort_date {orderDirection}, mt.file_transfer_id_pk {orderDirection};";
 
         await using var command = dataSource.CreateCommand(commandString);
         command.Parameters.AddWithValue("@resourceIds", fileTransferSearch.ResourceIds);
         command.Parameters.AddWithValue("@actorId", fileTransferSearch.Actor.ActorId);
-        if (fileTransferSearch.Status.HasValue)
-            command.Parameters.AddWithValue("@fileTransferStatus", (int)fileTransferSearch.Status);
+        command.Parameters.AddWithValue("@limit", fileTransferSearch.Limit);
+        if (fileTransferSearch.Cursor is { } cursor)
+        {
+            command.Parameters.AddWithValue("@cursorDate", cursor.SortDate.UtcDateTime);
+            command.Parameters.AddWithValue("@cursorId", cursor.FileTransferId);
+        }
+        if (hasSenderStatusFilter)
+            command.Parameters.AddWithValue("@senderStatuses", fileTransferSearch.SenderStatuses!.Select(status => (int)status).ToArray());
+        if (hasRecipientStatusFilter)
+            command.Parameters.AddWithValue("@recipientStatuses", fileTransferSearch.RecipientStatuses!.Select(status => (int)status).ToArray());
         if (fileTransferSearch.From.HasValue)
             command.Parameters.AddWithValue("@from", fileTransferSearch.From);
         if (fileTransferSearch.To.HasValue)
@@ -379,17 +426,31 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             var summaries = new Dictionary<Guid, FileTransferSummaryEntity>();
 
             await using var reader = await command.ExecuteReaderAsync(ct);
+
+            // The columns are `timestamp` holding UTC, so Npgsql hands back Kind=Unspecified.
+            // Left as is, the conversion to DateTimeOffset would read them as local time and
+            // shift them by the machine's offset.
+            DateTimeOffset GetUtcTimestamp(string column)
+                => new(DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal(column)), DateTimeKind.Utc));
+
             while (await reader.ReadAsync(ct))
             {
                 var fileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk"));
                 if (!summaries.TryGetValue(fileTransferId, out var summary))
                 {
+                    var senderActorExternalId = reader.GetString(reader.GetOrdinal("sender_actor_external_id"));
                     summary = new FileTransferSummaryEntity()
                     {
                         FileTransferId = fileTransferId,
                         ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
-                        Sender = reader.GetString(reader.GetOrdinal("sender_actor_external_id")),
+                        Sender = senderActorExternalId,
+                        IsSender = senderActorExternalId == fileTransferSearch.Actor.ActorExternalId,
                         SendersFileTransferReference = reader.GetString(reader.GetOrdinal("external_file_transfer_reference")),
+                        ExpirationTime = GetUtcTimestamp("expiration_time"),
+                        FileTransferStatus = reader.IsDBNull(reader.GetOrdinal("latest_file_status_id"))
+                            ? null
+                            : (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("latest_file_status_id")),
+                        SortDate = GetUtcTimestamp("sort_date"),
                         Recipients = new List<string>()
                     };
                     summaries[fileTransferId] = summary;
@@ -399,6 +460,13 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 if (!reader.IsDBNull(recipientOrdinal))
                 {
                     summary.Recipients.Add(reader.GetString(recipientOrdinal));
+                }
+
+                var recipientActorIdOrdinal = reader.GetOrdinal("recipient_actor_id");
+                if (!reader.IsDBNull(recipientActorIdOrdinal)
+                    && reader.GetInt64(recipientActorIdOrdinal) == fileTransferSearch.Actor.ActorId)
+                {
+                    summary.ActorDownloadStatus = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("recipient_status_id"));
                 }
             }
 
@@ -481,13 +549,14 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
         }, cancellationToken);
     }
 
-    public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, CancellationToken cancellationToken)
+    public async Task SetStorageDetails(Guid fileTransferId, long storageProviderId, string fileLocation, long filesize, long? stripeSizeBytes, CancellationToken cancellationToken)
     {
         await using (var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer " +
             "SET " +
                 "file_location = @fileLocation, " +
                 "file_transfer_size = @filesize, " +
+                "stripe_size_bytes = @stripeSizeBytes, " +
                 "storage_provider_id_fk = @storageProviderId " +
             "WHERE file_transfer_id_pk = @fileTransferId"))
         {
@@ -495,8 +564,20 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
             command.Parameters.AddWithValue("@storageProviderId", storageProviderId);
             command.Parameters.AddWithValue("@fileLocation", fileLocation);
             command.Parameters.AddWithValue("@filesize", filesize);
+            command.Parameters.AddWithValue("@stripeSizeBytes", stripeSizeBytes.HasValue ? stripeSizeBytes.Value : DBNull.Value);
             await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
         }
+    }
+
+    public async Task SetFileTransferSize(Guid fileTransferId, long fileTransferSize, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.file_transfer " +
+            "SET file_transfer_size = @filesize " +
+            "WHERE file_transfer_id_pk = @fileTransferId");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddWithValue("@filesize", fileTransferSize);
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
 
     private async Task<Dictionary<string, string>> GetMetadata(Guid fileTransferId, CancellationToken cancellationToken)
@@ -590,6 +671,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 f.resource_id,
                 f.filename,
                 f.checksum,
+                f.checksum_algorithm,
                 f.sender_actor_id_fk,
                 f.external_file_transfer_reference,
                 f.created,
@@ -641,6 +723,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                         ResourceId = reader.GetString(reader.GetOrdinal("resource_id")),
                         FileName = reader.GetString(reader.GetOrdinal("filename")),
                         Checksum = reader.IsDBNull(reader.GetOrdinal("checksum")) ? null : reader.GetString(reader.GetOrdinal("checksum")),
+                        ChecksumAlgorithm = ReadChecksumAlgorithm(reader),
                         Sender = new ActorEntity
                         {
                             ActorId = senderActorId,

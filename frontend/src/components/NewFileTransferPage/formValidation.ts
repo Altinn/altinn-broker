@@ -1,6 +1,9 @@
 import { formatFileSize } from '../../helpers/fileSizeHelper'
+import { i18n } from '../../i18n/config'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import {
+  toCustomRecipientIdentifier,
+  type CustomRecipientEntry,
   type MetadataEntry,
   type NewFileTransferErrors,
   type NewFileTransferValues,
@@ -25,6 +28,10 @@ export function validate(
     recipients: validateRecipients(values.recipients, rules),
     metadata: validateMetadata(values.metadata),
     file: validateFile(values.file, maxFileSize),
+    checksum: values.checksumEnabled
+      ? validateChecksum(values.checksum, values.checksumAlgorithm)
+      : undefined,
+    customRecipients: validateCustomRecipients(values),
   }
 }
 
@@ -34,10 +41,10 @@ export function hasErrors(errors: NewFileTransferErrors): boolean {
 
 function validateReference(reference: string): string | undefined {
   if (!reference.trim()) {
-    return 'Referanse må fylles ut.'
+    return i18n.t('page.validation.reference_required')
   }
   if (reference.length > MAX_REFERENCE_LENGTH) {
-    return `Referanse kan være maks ${MAX_REFERENCE_LENGTH} tegn.`
+    return i18n.t('page.validation.reference_max', { max: MAX_REFERENCE_LENGTH })
   }
   return undefined
 }
@@ -48,18 +55,18 @@ function validateRecipients(recipients: string[], rules: RecipientRules): string
   if (requiredParty) {
     return recipients.length === 1 && recipients[0] === requiredParty.organizationNumber
       ? undefined
-      : `Tjenesten krever at ${requiredParty.name} er eneste mottaker.`
+      : i18n.t('page.validation.recipient_only', { name: requiredParty.name })
   }
 
   if (recipients.length === 0) {
-    return 'Velg minst én mottaker.'
+    return i18n.t('page.validation.recipient_min')
   }
 
   const outsideAccessList = recipients.find(
     (recipient) => !options.some((option) => option.organizationNumber === recipient),
   )
   return outsideAccessList
-    ? `${formatOrgNumber(outsideAccessList)} står ikke i tilgangslisten for tjenesten.`
+    ? i18n.t('page.validation.recipient_not_allowed', { org: formatOrgNumber(outsideAccessList) })
     : undefined
 }
 
@@ -79,23 +86,23 @@ export function validateMetadataRows(metadata: MetadataEntry[]): MetadataRowErro
 function metadataKeyError(rawKey: string, duplicates: Set<string>): string | undefined {
   const key = rawKey.trim()
   if (!key) {
-    return 'Nøkkel må fylles ut.'
+    return i18n.t('page.validation.metadata_key_required')
   }
   if (key.length > MAX_METADATA_KEY_LENGTH) {
-    return `Nøkkel kan være maks ${MAX_METADATA_KEY_LENGTH} tegn.`
+    return i18n.t('page.validation.metadata_key_max', { max: MAX_METADATA_KEY_LENGTH })
   }
   if (duplicates.has(key)) {
-    return 'To metadata kan ikke ha samme nøkkel.'
+    return i18n.t('page.validation.metadata_key_duplicate')
   }
   return undefined
 }
 
 function metadataValueError(value: string): string | undefined {
   if (!value.trim()) {
-    return 'Verdi må fylles ut.'
+    return i18n.t('page.validation.metadata_value_required')
   }
   if (value.length > MAX_METADATA_VALUE_LENGTH) {
-    return `Verdi kan være maks ${MAX_METADATA_VALUE_LENGTH} tegn.`
+    return i18n.t('page.validation.metadata_value_max', { max: MAX_METADATA_VALUE_LENGTH })
   }
   return undefined
 }
@@ -119,24 +126,124 @@ function duplicateKeys(metadata: MetadataEntry[]): Set<string> {
 /** Summarises the rows for the error summary; the rows themselves carry the message the user acts on. */
 function validateMetadata(metadata: MetadataEntry[]): string | undefined {
   if (metadata.length > MAX_METADATA_ENTRIES) {
-    return `Du kan legge til maks ${MAX_METADATA_ENTRIES} metadata.`
+    return i18n.t('page.validation.metadata_max', { max: MAX_METADATA_ENTRIES })
   }
   const failed = validateMetadataRows(metadata).find((row) => row.key ?? row.value)
   return failed?.key ?? failed?.value
 }
 
+export type CustomRecipientRowError = {
+  identifier?: string
+  relatedOrganization?: string
+}
+
+/** Rows only count while they are switched on and notifications are wanted at all. */
+export function customRecipientsInUse(values: NewFileTransferValues): boolean {
+  return values.notifications && values.customRecipientsEnabled
+}
+
+export function validateCustomRecipientRows(
+  entries: CustomRecipientEntry[],
+  recipients: string[],
+): CustomRecipientRowError[] {
+  const seen = new Set<string>()
+  return entries.map((entry) => {
+    const identifier = customRecipientIdentifierError(entry.identifier)
+    const relatedOrganization = recipients.includes(entry.relatedOrganizationNumber)
+      ? undefined
+      : i18n.t('page.validation.custom_related')
+    if (identifier || relatedOrganization) {
+      return { identifier, relatedOrganization }
+    }
+
+    const key = customRecipientKey(entry)
+    if (seen.has(key)) {
+      return { identifier: duplicateCustomRecipientError(entry.identifier) }
+    }
+    seen.add(key)
+    return {}
+  })
+}
+
+/**
+ * Compared as the API would receive them: mobile numbers in their normalised +… form, and email addresses without
+ * regard to case, since the same address in different case reaches the same inbox.
+ */
+function customRecipientKey(entry: CustomRecipientEntry): string {
+  const recognised = toCustomRecipientIdentifier(entry.identifier)
+  let identifier = entry.identifier.trim()
+  if (recognised && 'emailAddress' in recognised) {
+    identifier = `email:${recognised.emailAddress.toLowerCase()}`
+  } else if (recognised && 'mobileNumber' in recognised) {
+    identifier = `mobile:${recognised.mobileNumber}`
+  }
+  return `${identifier}|${entry.relatedOrganizationNumber}`
+}
+
+function duplicateCustomRecipientError(identifier: string): string {
+  const recognised = toCustomRecipientIdentifier(identifier)
+  return recognised && 'mobileNumber' in recognised
+    ? i18n.t('page.validation.custom_related_number_added')
+    : i18n.t('page.validation.custom_related_email_added')
+  }
+
+function customRecipientIdentifierError(identifier: string): string | undefined {
+  if (!identifier.trim()) {
+    return i18n.t('page.validation.custom_who')
+  }
+  if (!toCustomRecipientIdentifier(identifier)) {
+    return i18n.t('page.validation.custom_contact')
+  }
+  return undefined
+}
+
+/** Summarises the rows for the error summary; the rows themselves carry the message the user acts on. */
+function validateCustomRecipients(values: NewFileTransferValues): string | undefined {
+  if (!customRecipientsInUse(values)) {
+    return undefined
+  }
+  if (values.customRecipients.length === 0) {
+    return i18n.t('page.validation.custom_min')
+  }
+  const failed = validateCustomRecipientRows(values.customRecipients, values.recipients).find(
+    (row) => row.identifier ?? row.relatedOrganization,
+  )
+  return failed?.identifier ?? failed?.relatedOrganization
+}
+
+const CHECKSUM_LENGTH = { MD5: 32, SHA256: 64 } as const
+
+function validateChecksum(checksum: string, algorithm: keyof typeof CHECKSUM_LENGTH): string | undefined {
+  const value = checksum.trim()
+  if (!value) {
+    return undefined
+  }
+
+  const expectedLength = CHECKSUM_LENGTH[algorithm]
+  if (value.length !== expectedLength) {
+    return i18n.t('page.validation.checksum_length', { algorithm, length: expectedLength })
+  }
+  if (value.toLowerCase() !== value) {
+    return i18n.t('page.validation.checksum_lowercase')
+  }
+  return undefined
+}
+
 function validateFile(file: File | null, maxFileSize: number | null): string | undefined {
   if (!file) {
-    return 'Velg en fil.'
+    return i18n.t('page.validation.file_required')
   }
   if (file.size === 0) {
-    return 'Filen er tom.'
+    return i18n.t('page.validation.file_empty')
   }
   if (file.name.length > MAX_FILE_NAME_LENGTH) {
-    return `Filnavnet kan være maks ${MAX_FILE_NAME_LENGTH} tegn.`
+    return i18n.t('page.validation.file_name_max', { max: MAX_FILE_NAME_LENGTH })
   }
   if (maxFileSize !== null && file.size > maxFileSize) {
-    return `Filen er ${formatFileSize(file.size)}. Tjenesten tillater maks ${formatFileSize(maxFileSize)}.`
+    return i18n.t('page.validation.file_too_big', {
+      size: formatFileSize(file.size),
+      max: formatFileSize(maxFileSize),
+    })
   }
   return undefined
 }

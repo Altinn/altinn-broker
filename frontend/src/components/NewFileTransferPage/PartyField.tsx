@@ -1,5 +1,6 @@
 import { Textfield } from '@digdir/designsystemet-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 
 type PartyFieldProps = {
@@ -15,11 +16,12 @@ type PartyFieldProps = {
  * marks the label with a padlock so it is clear the field is fixed rather than merely inactive.
  */
 export function PartyField({ label, description, name, organizationNumber }: PartyFieldProps) {
+  const { t } = useTranslation()
   return (
     <Textfield
       label={label}
       description={description}
-      value={`${name} - Org.nr. ${formatOrgNumber(organizationNumber)}`}
+      value={`${name} - ${t('page.common.org_number', { number: formatOrgNumber(organizationNumber) })}`}
       readOnly
     />
   )

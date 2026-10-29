@@ -12,6 +12,7 @@ using Altinn.Broker.API.Swagger;
 using Altinn.Broker.API.Tus;
 using Altinn.Broker.Application;
 using Altinn.Broker.Core.Options;
+using Altinn.Broker.Core.Services;
 using Altinn.Broker.Helpers;
 using Altinn.Broker.Integrations;
 using Altinn.Broker.Integrations.Azure;
@@ -121,7 +122,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<MaskinportenJwkRotationSettings>(config.GetSection(key: nameof(MaskinportenJwkRotationSettings)));
-    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.AddSingleton<IValidateOptions<AzureStorageOptions>, AzureStorageOptionsValidator>();
+    services.AddOptions<AzureStorageOptions>()
+        .Bind(config.GetSection(key: nameof(AzureStorageOptions)))
+        .ValidateOnStart();
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
@@ -241,10 +245,14 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         .AddIdPortenDirectAuth(config);
 
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
+    services.AddScoped<ITusUploadSessionAuthenticationHelper>(sp =>
+        sp.GetRequiredService<TusUploadSessionAuthenticationHelper>());
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
+    services.AddScoped<IEndUserTokenProvider, EndUserTokenProvider>();
     services.AddTransient<IAuthorizationHandler, EndUserAuthorizationHandler>();
     services.AddTransient<IAuthorizationHandler, EndUserScopeAccessHandler>();
+    services.AddTransient<IAuthorizationHandler, ConfigureResourceAccessHandler>();
     services.AddAuthorization(options =>
     {
         options.AddPolicy(AuthorizationConstants.Sender, policy => policy
@@ -271,6 +279,13 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 AuthorizationConstants.EndUserCookie,
                 AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.ConfigureResource, policy => policy
+            .AddRequirements(new ConfigureResourceAccessRequirement())
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten,
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.AnyBrokerScope, policy => policy
             .AddRequirements(new ScopeAccessRequirement(
                 [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))

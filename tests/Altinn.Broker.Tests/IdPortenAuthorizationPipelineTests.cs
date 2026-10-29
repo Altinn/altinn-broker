@@ -112,6 +112,69 @@ public class IdPortenAuthorizationPipelineTests
         Assert.False(context.HasSucceeded);
     }
 
+    [Theory]
+    [InlineData(AuthorizationConstants.EndUserCookie)]
+    [InlineData(AuthorizationConstants.AltinnPlatformJwtCookie)]
+    public async Task ConfigureResourceAccessHandler_WithAuthenticatedEndUser_Succeeds(
+        string authenticationType)
+    {
+        var requirement = new ConfigureResourceAccessRequirement();
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("urn:altinn:userid", "test-user")
+        ], authenticationType));
+        var context = new AuthorizationHandlerContext([requirement], user, resource: null);
+
+        await new ConfigureResourceAccessHandler().HandleAsync(context);
+
+        Assert.True(context.HasSucceeded);
+    }
+
+    [Fact]
+    public async Task ConfigureResourceAccessHandler_WithServiceOwnerScope_Succeeds()
+    {
+        var requirement = new ConfigureResourceAccessRequirement();
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("scope", AuthorizationConstants.ServiceOwnerScope)
+        ], JwtBearerDefaults.AuthenticationScheme));
+        var context = new AuthorizationHandlerContext([requirement], user, resource: null);
+
+        await new ConfigureResourceAccessHandler().HandleAsync(context);
+
+        Assert.True(context.HasSucceeded);
+    }
+
+    [Fact]
+    public async Task ConfigureResourceAccessHandler_WithoutScopeOrEndUser_DoesNotSucceed()
+    {
+        var requirement = new ConfigureResourceAccessRequirement();
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("scope", AuthorizationConstants.SenderScope)
+        ], JwtBearerDefaults.AuthenticationScheme));
+        var context = new AuthorizationHandlerContext([requirement], user, resource: null);
+
+        await new ConfigureResourceAccessHandler().HandleAsync(context);
+
+        Assert.False(context.HasSucceeded);
+    }
+
+    [Fact]
+    public async Task ConfigureResourcePolicy_IncludesCookieAndBearerSchemes()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var policyProvider = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        var policy = await policyProvider.GetPolicyAsync(AuthorizationConstants.ConfigureResource);
+
+        Assert.NotNull(policy);
+        Assert.Contains(AuthorizationConstants.EndUserCookie, policy.AuthenticationSchemes);
+        Assert.Contains(AuthorizationConstants.AltinnPlatformJwtCookie, policy.AuthenticationSchemes);
+        Assert.Contains(JwtBearerDefaults.AuthenticationScheme, policy.AuthenticationSchemes);
+        Assert.Contains(policy.Requirements, requirement => requirement is ConfigureResourceAccessRequirement);
+    }
+
     [Fact]
     public void CreateIdentity_PreservesOnlyClaimsNeededForIdportenPdpMapping()
     {

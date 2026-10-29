@@ -23,6 +23,7 @@ public class StuckFileTransferHandler(
 {
     private readonly int _stuckInUploadProcessingThresholdMinutes = 15;
     private readonly int _stuckInUploadStartingThresholdMinutes = 60 * 24;
+    private readonly int _stuckInInitializedAfterUploadStartedThresholdMinutes = 15;
     private readonly TimeSpan _recentTusActivityWindow = TimeSpan.FromHours(1);
 
     public async Task CheckForStuckFileTransfers(CancellationToken cancellationToken)
@@ -50,7 +51,7 @@ public class StuckFileTransferHandler(
             await TransactionWithRetriesPolicy.Execute(async (cancellationToken) =>
             {
                 logger.LogError("File transfer {fileTransferId} has been stuck in UploadStarted for more than {thresholdMinutes} minutes. Marking as failed.", fileTransferStatus.FileTransferId, _stuckInUploadStartingThresholdMinutes);
-                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, timestamp: DateTime.UtcNow, detailedFileTransferStatus: "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken: cancellationToken);
+                await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, detailedFileTransferStatus: "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken: cancellationToken);
                 backgroundJobClient.Enqueue<IEventBus>((eventBus) => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender, CancellationToken.None));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
@@ -75,6 +76,20 @@ public class StuckFileTransferHandler(
 
             logger.LogWarning("File transfer {fileTransferId} has been stuck in UploadProcessing for more than {thresholdMinutes} minutes", status.FileTransferId, _stuckInUploadProcessingThresholdMinutes);
             var succesfullNotification = await slackNotifier.NotifyFileStuckWithStatus(status);
+            if (!succesfullNotification)
+            {
+                logger.LogError("Failed to send Slack notification for file transfer {fileTransferId}", status.FileTransferId);
+            }
+        }
+
+        logger.LogInformation("Checking for file transfers stuck in initialized after upload started");
+        var stuckInInitializedAfterUploadStarted = await fileTransferStatusRepository.GetInitializedFileTransfersWithStartedUploadOlderThanDate(
+            DateTime.UtcNow.AddMinutes(-_stuckInInitializedAfterUploadStartedThresholdMinutes),
+            cancellationToken);
+        foreach (FileTransferStatusEntity status in stuckInInitializedAfterUploadStarted)
+        {
+            logger.LogWarning("File transfer {fileTransferId} has been stuck in Initialized for more than {thresholdMinutes} minutes even though an upload was started", status.FileTransferId, _stuckInInitializedAfterUploadStartedThresholdMinutes);
+            var succesfullNotification = await slackNotifier.NotifyFileStuckWithStatus(status, "Upload was started, but the status never moved past Initialized");
             if (!succesfullNotification)
             {
                 logger.LogError("Failed to send Slack notification for file transfer {fileTransferId}", status.FileTransferId);

@@ -7,6 +7,7 @@ using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
@@ -14,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using tusdotnet;
+using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Models.Concatenation;
 using tusdotnet.Models.Configuration;
@@ -57,6 +59,7 @@ public static class TusEndpointExtensions
         return Task.FromResult<DefaultTusConfiguration?>(new DefaultTusConfiguration
         {
             Store = store,
+            FileLockProvider = httpContext.RequestServices.GetRequiredService<ITusFileLockProvider>(),
             Expiration = new SlidingExpiration(tusOptions.UploadExpiration),
             Events = new Events
             {
@@ -185,18 +188,38 @@ public static class TusEndpointExtensions
 
     private static async Task OnBeforeCreateAsync(BeforeCreateContext context)
     {
-        if (context.FileConcatenation is FileConcatFinal)
+        var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+
+        if (context.FileConcatenation is FileConcatFinal finalConcat)
         {
             // TUS concatenation final requests must not include Upload-Length.
-            var (finalResolved, _) = await TryResolveFileTransferIdAsync(
+            var (finalResolved, finalFileTransferId) = await TryResolveFileTransferIdAsync(
                 context.HttpContext,
                 context.FileId,
                 context.CancellationToken);
             if (!finalResolved)
             {
                 context.FailRequest(HttpStatusCode.NotFound, "Missing file transfer id");
+                return;
             }
 
+            // A final concat request carries no Upload-Length, so sum the partials instead.
+            long concatenatedLength = 0;
+            foreach (var partialFile in finalConcat.Files)
+            {
+                var partialId = TusRouteHelper.NormalizePartialFileId(partialFile);
+                if (await partialUploadRegistry.TryGetUploadLengthAsync(partialId, context.CancellationToken) is not long partialLength)
+                {
+                    context.FailRequest(
+                        HttpStatusCode.NotFound,
+                        $"Partial upload {partialId} could not be resolved. It may have expired.");
+                    return;
+                }
+
+                concatenatedLength += partialLength;
+            }
+
+            await ValidateTotalUploadSizeAsync(context, finalFileTransferId, concatenatedLength, singleUploadLength: null);
             return;
         }
 
@@ -216,10 +239,41 @@ public static class TusEndpointExtensions
             return;
         }
 
+        // A partial's Upload-Length covers only its own segment.
+        var precedingBytes = context.FileConcatenation is FileConcatPartial
+            ? await partialUploadRegistry.PeekNextBaseOffsetAsync(fileTransferId, context.CancellationToken)
+            : 0L;
+
+        await ValidateTotalUploadSizeAsync(
+            context,
+            fileTransferId,
+            precedingBytes + context.UploadLength,
+            singleUploadLength: context.UploadLength);
+        if (context.HasFailed || context.FileConcatenation is FileConcatPartial)
+        {
+            return;
+        }
+
+        // A single-stream upload is staged on one blob, so it can never need more than its block budget of full-size chunks.
+        var maxBlocksPerBlob = context.HttpContext.RequestServices.GetRequiredService<IOptions<AzureStorageOptions>>().Value.MaxBlocksPerStripe;
+        var maxChunkSizeBytes = context.HttpContext.RequestServices.GetRequiredService<IOptions<TusOptions>>().Value.MaxChunkSizeBytes;
+        if (context.UploadLength > maxBlocksPerBlob * maxChunkSizeBytes)
+        {
+            context.FailRequest(Errors.PartialUploadTooLong.StatusCode, Errors.PartialUploadTooLong.Message);
+        }
+    }
+
+    private static async Task ValidateTotalUploadSizeAsync(
+        BeforeCreateContext context,
+        Guid fileTransferId,
+        long totalUploadLength,
+        long? singleUploadLength)
+    {
         var validationService = context.HttpContext.RequestServices.GetRequiredService<TusUploadValidationService>();
         var (maxUploadSize, error) = await validationService.ValidateUploadSizeAsync(
             fileTransferId,
-            context.UploadLength,
+            totalUploadLength,
+            singleUploadLength,
             context.CancellationToken);
 
         if (error is not null)
@@ -228,7 +282,7 @@ public static class TusEndpointExtensions
             return;
         }
 
-        if (maxUploadSize is not null && context.UploadLength > maxUploadSize)
+        if (maxUploadSize is not null && totalUploadLength > maxUploadSize)
         {
             context.FailRequest(HttpStatusCode.BadRequest, Errors.FileSizeTooBig.Message);
         }
@@ -282,7 +336,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadStarted,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }
@@ -315,6 +368,31 @@ public static class TusEndpointExtensions
             context.FileId);
 
         var partialUploadRegistry = context.HttpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
+        var isPartial = await partialUploadRegistry.IsPartialAsync(
+            TusRouteHelper.NormalizePartialFileId(context.FileId),
+            context.CancellationToken);
+        if (!isPartial)
+        {
+            // Best-effort, so the details page can show the size immediately. A failure here must not
+            // skip finalization; the finalize job writes the same size later.
+            try
+            {
+                await RecordCompletedUploadLengthAsync(
+                    context.HttpContext,
+                    context.FileId,
+                    fileTransferId,
+                    context.CancellationToken);
+            }
+            catch (Exception ex) when (!context.CancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to record file transfer size for file transfer {FileTransferId}. TusFileId={TusFileId}. Finalization will continue.",
+                    fileTransferId,
+                    context.FileId);
+            }
+        }
+
         if (await partialUploadRegistry.TryGetFinalConcatPartialIdsAsync(context.FileId, context.CancellationToken) is not null)
         {
             await MarkUploadProcessingIfNeededAsync(
@@ -325,6 +403,33 @@ public static class TusEndpointExtensions
 
         var enqueuer = context.HttpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
         await enqueuer.EnqueueConcatenateAsync(fileTransferId, context.FileId, context.CancellationToken);
+    }
+
+    private static async Task RecordCompletedUploadLengthAsync(
+        HttpContext httpContext,
+        string tusFileId,
+        Guid fileTransferId,
+        CancellationToken cancellationToken)
+    {
+        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Altinn.Broker.API.Tus.OnFileComplete");
+        var store = httpContext.RequestServices.GetRequiredService<BrokerTusStore>();
+        var uploadLength = await store.GetUploadLengthAsync(tusFileId, cancellationToken);
+        if (uploadLength is null)
+        {
+            logger.LogWarning(
+                "TUS OnFileComplete could not read upload length for file transfer {FileTransferId}. TusFileId={TusFileId}",
+                fileTransferId,
+                tusFileId);
+            return;
+        }
+
+        var fileTransferRepository = httpContext.RequestServices.GetRequiredService<IFileTransferRepository>();
+        await fileTransferRepository.SetFileTransferSize(fileTransferId, uploadLength.Value, cancellationToken);
+        logger.LogInformation(
+            "Recorded file transfer size {FileTransferSize} for file transfer {FileTransferId} before finalize",
+            uploadLength.Value,
+            fileTransferId);
     }
 
     private static async Task MarkUploadProcessingIfNeededAsync(
@@ -351,7 +456,6 @@ public static class TusEndpointExtensions
         await fileTransferStatusRepository.InsertFileTransferStatus(
             fileTransferId,
             FileTransferStatus.UploadProcessing,
-            timestamp: DateTime.UtcNow,
             vendor: uploaderVendor,
             cancellationToken: cancellationToken);
     }
