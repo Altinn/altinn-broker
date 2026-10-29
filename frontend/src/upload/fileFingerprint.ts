@@ -1,5 +1,4 @@
 import type { FileFingerprint } from '../api/uploadPlan'
-import { reportFingerprintTiming } from './fingerprintTiming'
 
 // Tells whether a file picked again is the one an upload started with, also in another browser or on
 // another machine, where the modified time can't be trusted. Hashing the whole of a large file would
@@ -15,18 +14,8 @@ export async function fingerprintFile(file: Blob): Promise<FileFingerprint> {
   const size = new Uint8Array(8)
   new DataView(size.buffer).setBigUint64(0, BigInt(file.size))
 
-  const started = performance.now()
   const samples = await Promise.all(sampleRanges(file.size).map(([start, end]) => readBytes(file, start, end)))
-  const read = performance.now()
   const digest = await crypto.subtle.digest('SHA-256', concat([size, ...samples]))
-  const hashed = performance.now()
-
-  reportFingerprintTiming({
-    fileSize: file.size,
-    bytesRead: samples.reduce((total, sample) => total + sample.length, 0),
-    readMs: read - started,
-    hashMs: hashed - read,
-  })
 
   return { fingerprint: toBase64(new Uint8Array(digest)), fingerprintVersion: FINGERPRINT_VERSION }
 }
