@@ -25,5 +25,7 @@ RUN addgroup -g 3000 dotnet && adduser -u 1000 -G dotnet -D -s /bin/false dotnet
 
 RUN mkdir -p /mnt/storage
 RUN chown -R dotnet:dotnet /mnt/storage
+# Alpine runtime images omit tzdata. Recurring job registration resolves Europe/Oslo at startup.
+RUN apk add --no-cache tzdata
 USER dotnet
 ENTRYPOINT [ "dotnet", "Altinn.Broker.API.dll" ]
