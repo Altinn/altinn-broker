@@ -22,6 +22,7 @@ public class GetActiveFileTransferDetailsResponse
     public string? Status { get; set; }
     public bool? IsSender { get; set; }
     public string? ActorDownloadStatus { get; set; }
+    public bool? HasNotification { get; set; }
     /// <summary>
     /// The notifications the transfer was sent with. Only for the sender: they hold the sender's own
     /// addresses, and recipients see these details too.

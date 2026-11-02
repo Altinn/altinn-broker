@@ -130,6 +130,7 @@ public class GetActiveFileTransferDetailsHandler(
             Status = fileTransferStatus,
             IsSender = isSender,
             ActorDownloadStatus = callerRecipientStatus?.Status.ToString(),
+            HasNotification = fileTransfer.HasNotification,
             Notification = isSender ? GetNotificationDetails(fileTransfer, notifications) : null
         };
     }

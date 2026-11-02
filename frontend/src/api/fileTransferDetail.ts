@@ -56,6 +56,7 @@ export type FileTransferDetails = {
     isSender?: boolean
     actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
     notification?: NotificationDetails | null
+    hasNotification?: boolean
 }
 
 export type NotificationDetails = {
