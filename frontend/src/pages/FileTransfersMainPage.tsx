@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 import { CardLink } from '../components/CardLink'
 import { useParties } from '../parties/PartiesContext'
 import { OrganizationHeader } from '../components/OrganizationHeader'
-import { IncompleteUploadsBanner } from '../components/FileTransfersPages/IncompleteUploadsBanner'
 import { PageRoutes } from './routes'
 import './pages.css'
 
@@ -14,9 +13,6 @@ export function FileTransfersMainPage() {
   return (
     <div className="page">
       <OrganizationHeader />
-
-      {/* Keyed by actor, so a switch doesn't show the previous actor's drafts. */}
-      {selectedParty && <IncompleteUploadsBanner key={selectedParty.partyUuid} party={selectedParty} />}
 
       <section className="page-section">
         <h2 className="page-heading">{t('page.home.services_heading')}</h2>
