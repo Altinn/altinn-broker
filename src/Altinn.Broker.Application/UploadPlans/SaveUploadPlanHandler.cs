@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Application;
+using Altinn.Broker.Core.Helpers;
 
 using Microsoft.Extensions.Logging;
 
@@ -94,7 +95,7 @@ public class SaveUploadPlanHandler(
                 logger.LogInformation(
                     "Rejected upload plan for file transfer {FileTransferId}: part {UploadId} is not a partial upload of it with length {Length}",
                     request.FileTransferId,
-                    part.UploadId,
+                    part.UploadId.SanitizeForLogs(),
                     part.Length);
                 return false;
             }
