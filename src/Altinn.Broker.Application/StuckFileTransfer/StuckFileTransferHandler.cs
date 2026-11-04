@@ -54,10 +54,17 @@ public class StuckFileTransferHandler(
             {
                 logger.LogError("File transfer {fileTransferId} has been stuck in UploadStarted for more than {thresholdMinutes} minutes. Marking as failed.", fileTransferStatus.FileTransferId, _stuckInUploadStartingThresholdMinutes);
                 await fileTransferStatusRepository.InsertFileTransferStatus(fileTransferStatus.FileTransferId, FileTransferStatus.Failed, detailedFileTransferStatus: "File transfer was stuck in UploadStarted as it failed upload mid-request.", cancellationToken: cancellationToken);
-                await uploadPlanStore.RemoveAsync(fileTransferStatus.FileTransferId, cancellationToken);
                 backgroundJobClient.Enqueue<IEventBus>((eventBus) => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender, CancellationToken.None));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
+            try
+            {
+                await uploadPlanStore.RemoveAsync(fileTransferStatus.FileTransferId, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "Failed to remove upload plan for file transfer {fileTransferId}", fileTransferStatus.FileTransferId);
+            }
         }
 
         logger.LogInformation("Checking for file transfers stuck in upload processing");

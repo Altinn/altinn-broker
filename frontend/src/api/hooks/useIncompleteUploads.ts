@@ -34,7 +34,7 @@ export function useIncompleteUploads(party: SelectedParty) {
     uploads,
     resources: list.resources,
     isLoading: list.isLoading || plans.some((plan) => plan.isPending),
-    isError: list.isError,
+    isError: list.isError || plans.some((plan) => plan.isError),
     hasNextPage: list.hasNextPage,
     isFetchingNextPage: list.isFetchingNextPage,
     fetchNextPage: list.fetchNextPage,

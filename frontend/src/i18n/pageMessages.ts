@@ -91,6 +91,13 @@ const pageNb = {
     historical_loading: 'Laster historiske formidlinger …',
     historical_error: 'Klarte ikke å hente historiske formidlinger.',
     historical_empty: 'Ingen historiske formidlinger funnet.',
+    drafts_heading: 'Utkast',
+    drafts_intro:
+      'Formidlinger der filen ikke er ferdig lastet opp, og som derfor ikke er sendt til mottakerne ennå. Velg en for å fortsette opplastingen der den slapp. Opplastinger som ikke fullføres innen et døgn, avbrytes.',
+    drafts_loading: 'Laster utkast …',
+    drafts_error: 'Klarte ikke å hente utkastene.',
+    drafts_empty: 'Ingen utkast funnet.',
+    drafts_progress: '{{percent}} % av {{size}} lastet opp',
   },
   detail: {
     none_selected: 'Ingen formidling valgt.',
@@ -230,6 +237,11 @@ const pageNb = {
     uploading: 'Laster opp…',
     send: 'Send formidling',
     cancel_upload: 'Avbryt opplastingen',
+    resume_missing:
+      'Opplastingen kan ikke fortsettes. Filen ble ikke lastet opp ferdig, så formidlingen må sendes på nytt.',
+    resume_failed: 'Klarte ikke å hente opplastingen. Prøv igjen senere.',
+    back_to_drafts: 'Tilbake til utkastene',
+    checking_file: 'Sjekker at det er den samme filen …',
   },
   fields: {
     reference: 'Referanse',
@@ -358,6 +370,12 @@ const pageNb = {
     changed: 'Filen er endret eller flyttet etter at du valgte den. Velg filen på nytt.',
     changed_during:
       'Filen er endret eller flyttet etter at opplastingen startet, så den kan ikke fortsette. Avbryt opplastingen, velg filen på nytt og send igjen.',
+    wrong_file:
+      'Dette er ikke filen opplastingen leser. Velg «{{name}}» ({{size}}), eller avbryt opplastingen for å sende noe annet.',
+    content_differs:
+      'Innholdet i «{{name}}» er ikke det samme som i filen opplastingen startet med. Velg den samme filen, eller avbryt opplastingen for å sende noe annet.',
+    read_failed: 'Klarte ikke å lese filen. Velg den på nytt.',
+    plan_not_saved: 'Hvis opplastingen stopper, kan den bare fortsettes fra denne fanen.',
     created_not_uploaded: 'Formidlingen ble opprettet med id {{id}}, men filen ble ikke lastet opp.',
     invalid_org: 'Ugyldig organisasjonsnummer: {{value}}',
     failed_status: 'Formidlingen feilet (HTTP {{status}}).',
@@ -473,6 +491,13 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       historical_loading: 'Lastar historiske formidlingar …',
       historical_error: 'Klarte ikkje å hente historiske formidlingar.',
       historical_empty: 'Fann ingen historiske formidlingar.',
+      drafts_heading: 'Utkast',
+      drafts_intro:
+        'Formidlingar der fila ikkje er ferdig lasta opp, og som difor ikkje er sende til mottakarane enno. Vel ei for å halde fram med opplastinga der ho slapp. Opplastingar som ikkje vert fullførte innan eit døgn, vert avbrotne.',
+      drafts_loading: 'Lastar utkast …',
+      drafts_error: 'Klarte ikkje å hente utkasta.',
+      drafts_empty: 'Fann ingen utkast.',
+      drafts_progress: '{{percent}} % av {{size}} lasta opp',
     },
     detail: {
       none_selected: 'Ingen formidling er vald.',
@@ -612,6 +637,11 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       uploading: 'Lastar opp…',
       send: 'Send formidling',
       cancel_upload: 'Avbryt opplastinga',
+      resume_missing:
+        'Opplastinga kan ikkje halde fram. Fila vart ikkje ferdig lasta opp, så formidlinga må sendast på nytt.',
+      resume_failed: 'Klarte ikkje å hente opplastinga. Prøv igjen seinare.',
+      back_to_drafts: 'Tilbake til utkasta',
+      checking_file: 'Sjekkar at det er den same fila …',
     },
     fields: {
       reference: 'Referanse',
@@ -740,6 +770,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       changed: 'Fila er endra eller flytta etter at du valde ho. Vel fila på nytt.',
       changed_during:
         'Fila er endra eller flytta etter at opplastinga starta, så ho kan ikkje halde fram. Avbryt opplastinga, vel fila på nytt og send igjen.',
+      wrong_file:
+        'Dette er ikkje fila opplastinga les. Vel «{{name}}» ({{size}}), eller avbryt opplastinga for å sende noko anna.',
+      content_differs:
+        'Innhaldet i «{{name}}» er ikkje det same som i fila opplastinga starta med. Vel den same fila, eller avbryt opplastinga for å sende noko anna.',
+      read_failed: 'Klarte ikkje å lese fila. Vel ho på nytt.',
+      plan_not_saved: 'Viss opplastinga stoppar, kan ho berre halde fram frå denne fana.',
       created_not_uploaded: 'Formidlinga vart oppretta med id {{id}}, men fila vart ikkje lasta opp.',
       invalid_org: 'Ugyldig organisasjonsnummer: {{value}}',
       failed_status: 'Formidlinga feila (HTTP {{status}}).',
@@ -850,6 +886,13 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       historical_loading: 'Loading historical file transfers …',
       historical_error: 'Could not load historical file transfers.',
       historical_empty: 'No historical file transfers found.',
+      drafts_heading: 'Drafts',
+      drafts_intro:
+        'File transfers whose file has not finished uploading, and which have therefore not been sent to the recipients yet. Choose one to continue the upload where it left off. Uploads not completed within a day are cancelled.',
+      drafts_loading: 'Loading drafts …',
+      drafts_error: 'Could not load the drafts.',
+      drafts_empty: 'No drafts found.',
+      drafts_progress: '{{percent}} % of {{size}} uploaded',
     },
     detail: {
       none_selected: 'No file transfer selected.',
@@ -989,6 +1032,11 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       uploading: 'Uploading…',
       send: 'Send file transfer',
       cancel_upload: 'Cancel the upload',
+      resume_missing:
+        'The upload cannot be continued. The file did not finish uploading, so the file transfer must be sent again.',
+      resume_failed: 'Could not load the upload. Try again later.',
+      back_to_drafts: 'Back to drafts',
+      checking_file: 'Checking that it is the same file …',
     },
     fields: {
       reference: 'Reference',
@@ -1117,6 +1165,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       changed: 'The file was changed or moved after you chose it. Choose the file again.',
       changed_during:
         'The file was changed or moved after the upload started, so it cannot continue. Cancel the upload, choose the file again, and send it once more.',
+      wrong_file:
+        'This is not the file the upload is reading. Choose “{{name}}” ({{size}}), or cancel the upload to send something else.',
+      content_differs:
+        'The contents of “{{name}}” are not the same as the file the upload started with. Choose the same file, or cancel the upload to send something else.',
+      read_failed: 'Could not read the file. Choose it again.',
+      plan_not_saved: 'If the upload stops, it can only be continued from this tab.',
       created_not_uploaded: 'The file transfer was created with id {{id}}, but the file was not uploaded.',
       invalid_org: 'Invalid organization number: {{value}}',
       failed_status: 'The file transfer failed (HTTP {{status}}).',

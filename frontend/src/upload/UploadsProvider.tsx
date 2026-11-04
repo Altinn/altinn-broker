@@ -253,7 +253,7 @@ async function keepPlan(plan: UploadPlan, fingerprint: Promise<FileFingerprint |
     await saveUploadPlan(plan, taken)
   } catch (error) {
     console.error('Could not save the upload plan', error)
-    toast.warning('Hvis opplastingen stopper, kan den bare fortsettes fra denne fanen.')
+    toast.warning(i18n.t('page.upload_errors.plan_not_saved'))
   }
 }
 

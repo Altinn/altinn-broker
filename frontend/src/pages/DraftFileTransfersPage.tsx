@@ -1,4 +1,5 @@
 import { Button, List } from '@altinn/altinn-components'
+import { useTranslation } from 'react-i18next'
 import { useIncompleteUploads } from '../api/hooks/useIncompleteUploads'
 import { planFileSize } from '../api/uploadPlan'
 import { FileTransferCard } from '../components/FileTransfersPages/FileTransferCard'
@@ -10,10 +11,11 @@ import './pages.css'
 
 /** Transfers the sender started but whose file never finished uploading, so no recipient has them yet. */
 export function DraftFileTransfersPage() {
+  const { t } = useTranslation()
   const { selectedParty } = useParties()
 
   if (!selectedParty) {
-    return <SelectedPartyMessage loadingText="Laster utkast …" />
+    return <SelectedPartyMessage loadingText={t('page.list.drafts_loading')} />
   }
 
   // A fresh list per actor, instead of unpicking which request belonged to whom.
@@ -21,6 +23,7 @@ export function DraftFileTransfersPage() {
 }
 
 function DraftFileTransfers({ party }: { party: SelectedParty }) {
+  const { t } = useTranslation()
   const { uploads, resources, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useIncompleteUploads(party)
 
@@ -29,17 +32,16 @@ function DraftFileTransfers({ party }: { party: SelectedParty }) {
 
   return (
     <div className="page">
-      <h1 className="page-heading">Utkast</h1>
-      <p>
-        Formidlinger der filen ikke er ferdig lastet opp, og som derfor ikke er sendt til mottakerne ennå. Velg en
-        for å fortsette opplastingen der den slapp. Opplastinger som ikke fullføres innen et døgn, avbrytes.
-      </p>
+      <h1 className="page-heading">{t('page.list.drafts_heading')}</h1>
+      <p>{t('page.list.drafts_intro')}</p>
 
-      {isError && <p className="empty-state">Klarte ikke å hente utkastene.</p>}
+      {isError && <p className="empty-state">{t('page.list.drafts_error')}</p>}
 
-      {isLoading && <p className="empty-state">Laster utkast …</p>}
+      {isLoading && <p className="empty-state">{t('page.list.drafts_loading')}</p>}
 
-      {!isLoading && !isError && uploads.length === 0 && <p className="empty-state">Ingen utkast funnet.</p>}
+      {!isLoading && !isError && uploads.length === 0 && (
+        <p className="empty-state">{t('page.list.drafts_empty')}</p>
+      )}
 
       <List className="card-list">
         {uploads.map(({ summary, plan }) => {
@@ -53,8 +55,11 @@ function DraftFileTransfers({ party }: { party: SelectedParty }) {
                 recipients={summary.recipients}
                 currentActorName={party.name}
                 reference={summary.sendersFileTransferReference || summary.fileTransferId}
-                status={{ value: 'requires-attention', label: 'Krever handling' }}
-                extendedStatusLabel={`${Math.floor((plan.uploadedBytes / fileSize) * 100)} % av ${formatFileSize(fileSize)} lastet opp`}
+                status={{ value: 'requires-attention', label: t('page.status.requires_action') }}
+                extendedStatusLabel={t('page.list.drafts_progress', {
+                  percent: Math.floor((plan.uploadedBytes / fileSize) * 100),
+                  size: formatFileSize(fileSize),
+                })}
                 to={resumeUploadPath(summary.resourceId, summary.fileTransferId)}
               />
             </li>
@@ -70,7 +75,7 @@ function DraftFileTransfers({ party }: { party: SelectedParty }) {
             disabled={isFetchingNextPage}
             onClick={() => void fetchNextPage()}
           >
-            {isFetchingNextPage ? 'Henter …' : 'Hent flere'}
+            {isFetchingNextPage ? t('page.list.loading_more') : t('page.list.load_more')}
           </Button>
         </div>
       )}

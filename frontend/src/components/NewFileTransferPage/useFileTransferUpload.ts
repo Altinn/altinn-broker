@@ -140,10 +140,10 @@ function useSameFileCheck(upload: ResumableUpload | null, file: File | null) {
       return
     }
     let current = true
-    const differs = `Innholdet i «${file.name}» er ikke det samme som i filen opplastingen startet med. Velg den samme filen, eller avbryt opplastingen for å sende noe annet.`
+    const differs = i18n.t('page.upload_errors.content_differs', { name: file.name })
     matchesFingerprint(file, upload.plan)
       .then((matches) => current && setChecked({ file, error: matches ? null : differs }))
-      .catch(() => current && setChecked({ file, error: 'Klarte ikke å lese filen. Velg den på nytt.' }))
+      .catch(() => current && setChecked({ file, error: i18n.t('page.upload_errors.read_failed') }))
     return () => {
       current = false
     }
@@ -161,7 +161,10 @@ function useSameFileCheck(upload: ResumableUpload | null, file: File | null) {
 
 function describeMismatch(upload: ResumableUpload, file: File): string | null {
   if (file.name !== upload.fileName || file.size !== upload.fileSize) {
-    return `Dette er ikke filen opplastingen leser. Velg «${upload.fileName}» (${formatFileSize(upload.fileSize)}), eller avbryt opplastingen for å sende noe annet.`
+    return i18n.t('page.upload_errors.wrong_file', {
+      name: upload.fileName,
+      size: formatFileSize(upload.fileSize),
+    })
   }
   return null
 }

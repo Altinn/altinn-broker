@@ -123,12 +123,10 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
     return (
       <div className="page">
         <Alert data-color="warning">
-          {resumable.status === 'missing'
-            ? 'Opplastingen kan ikke fortsettes. Filen ble ikke lastet opp ferdig, så formidlingen må sendes på nytt.'
-            : 'Klarte ikke å hente opplastingen. Prøv igjen senere.'}
+          {resumable.status === 'missing' ? t('page.new.resume_missing') : t('page.new.resume_failed')}
         </Alert>
         <p>
-          <Link to={PageRoutes.drafts}>Tilbake til utkastene</Link>
+          <Link to={PageRoutes.drafts}>{t('page.new.back_to_drafts')}</Link>
         </p>
       </div>
     )
@@ -299,7 +297,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
               error={form.wrongFile ?? errors.file}
               onChange={(file) => setValue('file', file)}
             />
-            {form.checkingFile && <Paragraph data-size="sm">Sjekker at det er den samme filen …</Paragraph>}
+            {form.checkingFile && <Paragraph data-size="sm">{t('page.new.checking_file')}</Paragraph>}
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               {/* Checksum form hidden for now; restore by uncommenting.

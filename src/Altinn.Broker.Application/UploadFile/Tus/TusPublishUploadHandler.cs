@@ -56,7 +56,17 @@ public class TusPublishUploadHandler(
             }
 
             await tusUploadFinalizationService.CleanupCompletedUploadAsync(fileTransferId.ToString(), cancellationToken);
-            await uploadPlanStore.RemoveAsync(fileTransferId, cancellationToken);
+            try
+            {
+                await uploadPlanStore.RemoveAsync(fileTransferId, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to remove upload plan for file transfer {FileTransferId} after successful TUS publish. This is not fatal, but the plan may be left in the store.",
+                    fileTransferId);
+            }
 
             logger.LogInformation(
                 "TUS publish job completed for file transfer {FileTransferId}",
