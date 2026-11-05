@@ -1,18 +1,18 @@
 import { Alert, Heading, Paragraph } from '@digdir/designsystemet-react'
 import { useTranslation } from 'react-i18next'
-import type { FileFingerprint } from '../../upload/uploadSession'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 
 type InterruptedUploadNoticeProps = {
-  file: FileFingerprint
-  /** Bytes the server already holds, or null while that is still being read back. */
-  uploaded: number | null
+  fileName: string
+  fileSize: number
+  /** Bytes the server already holds. */
+  uploaded: number
   ready: boolean
 }
 
-export function InterruptedUploadNotice({ file, uploaded, ready }: InterruptedUploadNoticeProps) {
+export function InterruptedUploadNotice({ fileName, fileSize, uploaded, ready }: InterruptedUploadNoticeProps) {
   const { t } = useTranslation()
-  const percent = uploaded === null ? null : Math.floor((uploaded / file.size) * 100)
+  const percent = uploaded === null ? null : Math.floor((uploaded / fileSize) * 100)
 
   return (
     <Alert data-color="info" className="new-transfer__resume">
@@ -21,8 +21,9 @@ export function InterruptedUploadNotice({ file, uploaded, ready }: InterruptedUp
       </Heading>
       <Paragraph data-size="sm">
         {ready
-          ? t('page.interrupted.ready', { name: file.name })
-          : t('page.interrupted.choose', { name: file.name, size: formatFileSize(file.size) })}
+
+          ? t('page.interrupted.ready', { name: fileName })
+          : t('page.interrupted.choose', { name: fileName, size: formatFileSize(fileSize) })}
       </Paragraph>
       {percent !== null && uploaded !== null && (
         <>
@@ -31,7 +32,7 @@ export function InterruptedUploadNotice({ file, uploaded, ready }: InterruptedUp
             {t('page.interrupted.already', {
               percent,
               uploaded: formatFileSize(uploaded),
-              total: formatFileSize(file.size),
+              total: formatFileSize(fileSize),
             })}
           </Paragraph>
         </>

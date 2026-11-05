@@ -24,6 +24,7 @@ using Altinn.Broker.Application.MaskinportenJwkRotation;
 using Altinn.Broker.Application.SendSlackNotification;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -71,6 +72,9 @@ public static class DependencyInjection
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
         services.AddScoped<GetActiveFileTransferDetailsHandler>();
+        services.AddScoped<UploadPlanAccess>();
+        services.AddScoped<SaveUploadPlanHandler>();
+        services.AddScoped<GetUploadPlanHandler>();
         services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
         services.AddScoped<SendNotificationOrderHandler>();
         services.AddScoped<StuckNotificationOrderHandler>();
