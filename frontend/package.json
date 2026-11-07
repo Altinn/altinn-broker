@@ -14,17 +14,17 @@
     "@digdir/designsystemet-react": "^1.19.1",
     "@navikt/aksel-icons": "^8.16.1",
     "@tanstack/react-query": "^5.104.1",
-    "i18next": "^26.5.11",
+    "i18next": "^27.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-i18next": "^17.1.9",
+    "react-i18next": "^18.0.0",
     "react-router-dom": "^7.18.2",
     "react-toastify": "^11.1.0",
     "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.0.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
@@ -33,7 +33,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
-    "typescript": "~6.0.2",
+    "typescript": "~7.0.0",
     "typescript-eslint": "^8.65.0",
     "vite": "^8.2.0"
   }
