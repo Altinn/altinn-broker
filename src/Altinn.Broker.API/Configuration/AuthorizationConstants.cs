@@ -16,6 +16,8 @@ public static class AuthorizationConstants
     public const string EndUserCookie = BrokerAuthenticationSchemes.EndUserCookie;
     /// <summary>Altinn platform JWT stored in the shared runtime httpOnly cookie.</summary>
     public const string AltinnPlatformJwtCookie = BrokerAuthenticationSchemes.AltinnPlatformJwtCookie;
+    /// <summary>Production Altinn JWTs, accepted on TT02 when <c>ProductionPlatformUrl</c> is set.</summary>
+    public const string ProductionAltinn = BrokerAuthenticationSchemes.ProductionAltinn;
     public const string EndUser = "EndUser";
 
     public const string SenderScope = "altinn:broker.write";

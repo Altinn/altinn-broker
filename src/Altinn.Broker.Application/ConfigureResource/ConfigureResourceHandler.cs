@@ -34,7 +34,8 @@ public class ConfigureResourceHandler(
 
         // End-user cookie sessions (ID-porten exchanged cookie or Altinn platform JWT cookie)
         // must use onBehalfOf + gatekeeper publish. Service-owner bearer tokens use org ownership.
-        var isEndUserCall = (user is not null && user.IsBrokerEndUserCookieAuthenticated())
+        var isEndUserCall = (user is not null
+                && (user.IsBrokerEndUserCookieAuthenticated() || user.IsProductionAltinnEndUser()))
             || await authorizationService.IsIdPortenToken(user);
         if (isEndUserCall)
         {
@@ -180,6 +181,59 @@ public class ConfigureResourceHandler(
         if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
         {
             return Errors.PartyIsNotBrokerServiceOwner;
+        }
+
+        // A production token was already allowed by production Authorization before this
+        // request was forwarded. TT02's own Authorization client cannot call production.
+        if (user?.IsProductionAltinnEndUser() == true)
+        {
+            return null;
+        }
+
+        var hasAccess = await authorizationService.CheckAccessAsPublisher(
+            user,
+            ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+            party,
+            cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoPublishAccessToConfigureResource;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Publish check for a write that will be stored in TT02. Uses this environment's
+    /// Authorization client, which in production is production Authorization.
+    /// Service-owner tokens are left to TT02's organization-ownership check.
+    /// </summary>
+    public async Task<Error?> AuthorizeStagingPublish(
+        string? onBehalfOf,
+        ClaimsPrincipal? user,
+        CancellationToken cancellationToken)
+    {
+        if (user is null)
+        {
+            return Errors.NoPublishAccessToConfigureResource;
+        }
+
+        var isEndUser = user.IsBrokerEndUserCookieAuthenticated()
+            || await authorizationService.IsIdPortenToken(user);
+        if (!isEndUser)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(onBehalfOf))
+        {
+            return Errors.MissingOnBehalfOf;
+        }
+
+        var party = onBehalfOf.WithoutPrefix();
+        if (!party.IsOrganizationNumber())
+        {
+            return Errors.InvalidParty;
         }
 
         var hasAccess = await authorizationService.CheckAccessAsPublisher(

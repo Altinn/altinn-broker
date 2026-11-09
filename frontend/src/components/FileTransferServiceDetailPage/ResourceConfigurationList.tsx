@@ -1,9 +1,10 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
 import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AllowedRecipient } from '../../api/allowedRecipients'
-import type { ResourceConfiguration } from '../../api/resourceConfiguration'
+import { TT02_ENVIRONMENT, type ResourceConfiguration } from '../../api/resourceConfiguration'
+import { useAuth } from '../../auth/AuthContext'
 import { formatDuration } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import {
@@ -75,7 +76,15 @@ export function ResourceConfigurationList({
   accessListCandidates,
 }: ResourceConfigurationListProps) {
   const { t } = useTranslation()
-  const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
+  const { user } = useAuth()
+  const canConfigureStaging = user?.canConfigureStaging === true
+  const [environment, setEnvironment] = useState('')
+  const editor = useResourceConfigurationEditor({
+    resourceId,
+    configuration,
+    onBehalfOf,
+    environment: environment || undefined,
+  })
   const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
   const partyOptions = useMemo(
     () =>
@@ -83,8 +92,26 @@ export function ResourceConfigurationList({
     [sender, accessListCandidates, editor.configuration.requiredParty],
   )
 
+  const configurationBusy = editor.saving || editor.loadingRemote || editor.awaitingRemote
+
   return (
     <div className="resource-configuration">
+      {canConfigureStaging && (
+        <Field className="resource-configuration__environment">
+          <Label htmlFor="configuration-environment">{t('page.config.environment')}</Label>
+          <Field.Description>{t('page.config.environment_description')}</Field.Description>
+          <Select
+            id="configuration-environment"
+            value={environment}
+            onChange={(event) => setEnvironment(event.target.value)}
+            disabled={editor.saving}
+          >
+            <Select.Option value="">{t('page.config.environment_current')}</Select.Option>
+            <Select.Option value={TT02_ENVIRONMENT}>{t('page.config.environment_tt02')}</Select.Option>
+          </Select>
+        </Field>
+      )}
+
       <Field className="resource-configuration__edit-toggle">
         <Switch
           label={t('page.config.edit')}
@@ -96,7 +123,7 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={!canPublish || editor.saving}
+          disabled={!canPublish || configurationBusy || Boolean(editor.loadError)}
         />
         {publishNotice && (
           <Field.Description>
@@ -105,13 +132,21 @@ export function ResourceConfigurationList({
         )}
       </Field>
 
+      {editor.loadError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={editor.loadError} />
+        </Alert>
+      )}
+
       {editor.saveError && (
         <Alert data-color="danger" className="resource-configuration__alert">
           <LocalizedErrorText error={editor.saveError} />
         </Alert>
       )}
 
-      {editor.editing ? (
+      {editor.awaitingRemote || editor.loadingRemote ? (
+        <p>{t('page.config.environment_loading')}</p>
+      ) : editor.loadError ? null : editor.editing ? (
         <ConfigurationForm
           draft={editor.draft}
           errors={editor.errors}

@@ -24,6 +24,11 @@ public class ResourceController : Controller
     /// - Service owner (<c>altinn:serviceowner</c>) that owns the resource <br/>
     /// - End user (ID-porten) acting on behalf of a Broker service owner (<paramref name="onBehalfOf"/>)
     ///   with the <c>publish</c> action on <c>digdir-broker-administrasjon</c> for that party <br/>
+    /// - On TT02, the same end-user or service-owner token issued by production, when
+    ///   <c>AltinnOptions:ProductionPlatformUrl</c> is set <br/>
+    /// Pass <paramref name="environment"/> as <c>tt02</c> in production to store the change in TT02.
+    /// That requires <c>AltinnOptions:StagingBrokerApiUrl</c>. The publish check for that call is
+    /// made here, against this environment's Authorization, before the request is forwarded.
     /// </remarks>
     /// <response code="200">Resource configured successfully</response>
     /// <response code="400"><ul>
@@ -52,9 +57,18 @@ public class ResourceController : Controller
         string resourceId,
         [FromBody] ResourceExt resourceExt,
         [FromQuery] string? onBehalfOf,
+        [FromQuery] string? environment,
         [FromServices] ConfigureResourceHandler handler,
+        [FromServices] StagingResourceConfigurationProxy stagingProxy,
         CancellationToken cancellationToken)
     {
+        var staged = await ForwardToStagingAsync(
+            stagingProxy, environment, resourceId, onBehalfOf, resourceExt, handler, cancellationToken);
+        if (staged is not null)
+        {
+            return staged;
+        }
+
         var result = await handler.Process(new ConfigureResourceRequest()
         {
             ResourceId = resourceId,
@@ -96,8 +110,20 @@ public class ResourceController : Controller
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [Route("{resourceId}")]
-    public async Task<ActionResult> GetResource(string resourceId, [FromServices] GetResourceHandler handler, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetResource(
+        string resourceId,
+        [FromQuery] string? environment,
+        [FromServices] GetResourceHandler handler,
+        [FromServices] StagingResourceConfigurationProxy stagingProxy,
+        CancellationToken cancellationToken)
     {
+        var staged = await ForwardToStagingAsync(
+            stagingProxy, environment, resourceId, onBehalfOf: null, body: null, publishAuthorizer: null, cancellationToken);
+        if (staged is not null)
+        {
+            return staged;
+        }
+
         var result = await handler.Process(resourceId, HttpContext.User, cancellationToken);
 
         return result.Match(
@@ -218,4 +244,66 @@ public class ResourceController : Controller
     }
 
     private ActionResult Problem(Error error) => ProblemDetailsHelper.ToProblemResult(error);
+
+    /// <summary>
+    /// Null when the request targets this environment. Otherwise the TT02 response, or a client error.
+    /// </summary>
+    private async Task<ActionResult?> ForwardToStagingAsync(
+        StagingResourceConfigurationProxy stagingProxy,
+        string? environment,
+        string resourceId,
+        string? onBehalfOf,
+        ResourceExt? body,
+        ConfigureResourceHandler? publishAuthorizer,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(environment))
+        {
+            return null;
+        }
+
+        if (!StagingResourceConfigurationProxy.IsTt02(environment))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Bad Request",
+                Detail = "Unknown configuration environment. Supported value: tt02."
+            });
+        }
+
+        if (!stagingProxy.IsEnabled)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Bad Request",
+                Detail = "TT02 configuration is not enabled in this environment."
+            });
+        }
+
+        if (publishAuthorizer is not null && HttpMethods.IsPut(Request.Method))
+        {
+            var accessError = await publishAuthorizer.AuthorizeStagingPublish(
+                onBehalfOf, HttpContext.User, cancellationToken);
+            if (accessError is not null)
+            {
+                return Problem(accessError);
+            }
+        }
+
+        var accessToken = await stagingProxy.ResolveAccessTokenAsync(HttpContext);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return Unauthorized();
+        }
+
+        return await stagingProxy.ForwardAsync(
+            Request.Method,
+            resourceId,
+            onBehalfOf,
+            body,
+            accessToken,
+            cancellationToken);
+    }
 }

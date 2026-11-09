@@ -9,6 +9,8 @@ param idporten_authority string
 param maskinporten_environment string
 param eventGridIps array
 param maskinportenTokenExchangeEnvironment string
+param production_platform_url string = ''
+param staging_broker_api_url string = ''
 
 @secure()
 param subscription_id string
@@ -101,7 +103,14 @@ var containerAppEnvVars = concat([
 ],
 empty(trim(maskinportenTokenExchangeEnvironment)) ? [] : [
   { name: 'MaskinportenSettings__TokenExchangeEnvironment', value: maskinportenTokenExchangeEnvironment }
-], rotationContainerAppEnvVars)
+],
+empty(trim(production_platform_url)) ? [] : [
+  { name: 'AltinnOptions__ProductionPlatformUrl', value: production_platform_url }
+],
+empty(trim(staging_broker_api_url)) ? [] : [
+  { name: 'AltinnOptions__StagingBrokerApiUrl', value: staging_broker_api_url }
+],
+rotationContainerAppEnvVars)
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
