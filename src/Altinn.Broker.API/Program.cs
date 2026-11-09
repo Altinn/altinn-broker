@@ -254,6 +254,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             options.MetadataAddress = productionOpenIdWellKnown;
             options.TokenValidationParameters = new TokenValidationParameters
             {
+                AuthenticationType = AuthorizationConstants.ProductionAltinn,
                 ValidateIssuerSigningKey = true,
                 ValidateIssuer = true,
                 ValidateAudience = false,
@@ -269,9 +270,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         });
     }
 
+    services.AddScoped<IProductionConfigurationForwardProof, ProductionConfigurationForwardProof>();
     services.AddHttpClient<StagingResourceConfigurationProxy>(client =>
     {
-        if (altinnOptions.HasStagingBrokerApi())
+        if (altinnOptions.HasStagingConfigurationForward())
         {
             client.BaseAddress = new Uri(altinnOptions.StagingBrokerApiUrl.TrimEnd('/') + "/");
         }

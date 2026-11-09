@@ -20,11 +20,24 @@ public class AltinnOptions
     public string StagingBrokerApiUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Shared secret the production Broker sends when it forwards resource configuration to TT02.
+    /// TT02 allows a production end-user token only when the request carries the same value.
+    /// Set the same secret in production and TT02.
+    /// </summary>
+    public string StagingConfigurationForwardKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// True when <see cref="StagingBrokerApiUrl"/> is an absolute https URL the API can call.
     /// </summary>
     public bool HasStagingBrokerApi()
         => Uri.TryCreate(StagingBrokerApiUrl, UriKind.Absolute, out var stagingUri)
             && stagingUri.Scheme == Uri.UriSchemeHttps;
+
+    /// <summary>
+    /// True when production can forward resource configuration and TT02 can verify that forward.
+    /// </summary>
+    public bool HasStagingConfigurationForward()
+        => HasStagingBrokerApi() && !string.IsNullOrWhiteSpace(StagingConfigurationForwardKey);
 
     /// <summary>
     /// OpenID metadata for <see cref="ProductionPlatformUrl"/>, or null when that URL is not configured.

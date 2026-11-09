@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.API.Controllers;
@@ -30,12 +31,13 @@ public class AuthenticationController : ControllerBase
         IAltinnPlatformJwtCookieReader platformJwtCookieReader,
         IOptions<AltinnPlatformAuthSettings> platformAuthSettings,
         IOptions<AltinnOptions> altinnOptions,
+        IHostEnvironment hostEnvironment,
         ILogger<AuthenticationController> logger)
     {
         _platformAuthenticationClient = platformAuthenticationClient;
         _platformJwtCookieReader = platformJwtCookieReader;
         _platformAuthSettings = platformAuthSettings.Value;
-        _canConfigureStaging = altinnOptions.Value.HasStagingBrokerApi();
+        _canConfigureStaging = hostEnvironment.IsProduction() && altinnOptions.Value.HasStagingConfigurationForward();
         _logger = logger;
     }
 

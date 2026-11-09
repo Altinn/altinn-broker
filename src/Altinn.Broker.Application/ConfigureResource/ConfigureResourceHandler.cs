@@ -8,6 +8,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public class ConfigureResourceHandler(
     IAuthorizationService authorizationService,
     IHostEnvironment hostEnvironment,
     IOptions<AzureStorageOptions> azureStorageOptions,
+    IProductionConfigurationForwardProof productionForwardProof,
     ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -183,11 +185,14 @@ public class ConfigureResourceHandler(
             return Errors.PartyIsNotBrokerServiceOwner;
         }
 
-        // A production token was already allowed by production Authorization before this
-        // request was forwarded. TT02's own Authorization client cannot call production.
+        // TT02 cannot call production Authorization. A production end user is accepted only
+        // when the production Broker forwarded the request after its publish check.
+        // The organization in the request is not that proof.
         if (user?.IsProductionAltinnEndUser() == true)
         {
-            return null;
+            return productionForwardProof.IsVerified
+                ? null
+                : Errors.NoPublishAccessToConfigureResource;
         }
 
         var hasAccess = await authorizationService.CheckAccessAsPublisher(

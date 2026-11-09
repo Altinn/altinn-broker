@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Services;
 using Altinn.Broker.Models;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.API.Configuration;
@@ -24,18 +25,23 @@ public sealed class StagingResourceConfigurationProxy
 
     private readonly HttpClient _httpClient;
     private readonly IEndUserTokenProvider _endUserTokenProvider;
+    private readonly string _forwardKey;
     private readonly ILogger<StagingResourceConfigurationProxy> _logger;
 
     public StagingResourceConfigurationProxy(
         HttpClient httpClient,
         IEndUserTokenProvider endUserTokenProvider,
         IOptions<AltinnOptions> altinnOptions,
+        IHostEnvironment hostEnvironment,
         ILogger<StagingResourceConfigurationProxy> logger)
     {
         _httpClient = httpClient;
         _endUserTokenProvider = endUserTokenProvider;
+        _forwardKey = altinnOptions.Value.StagingConfigurationForwardKey.Trim();
         _logger = logger;
-        IsEnabled = _httpClient.BaseAddress is not null && altinnOptions.Value.HasStagingBrokerApi();
+        IsEnabled = hostEnvironment.IsProduction()
+            && _httpClient.BaseAddress is not null
+            && altinnOptions.Value.HasStagingConfigurationForward();
     }
 
     public bool IsEnabled { get; }
@@ -78,6 +84,11 @@ public sealed class StagingResourceConfigurationProxy
 
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        if (_forwardKey.Length > 0)
+        {
+            request.Headers.TryAddWithoutValidation(ProductionConfigurationForwardProof.HeaderName, _forwardKey);
+        }
+
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         if (body is not null)
         {

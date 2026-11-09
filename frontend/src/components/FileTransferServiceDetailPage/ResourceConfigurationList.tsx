@@ -99,14 +99,13 @@ export function ResourceConfigurationList({
       {canConfigureStaging && (
         <Field className="resource-configuration__environment">
           <Label htmlFor="configuration-environment">{t('page.config.environment')}</Label>
-          <Field.Description>{t('page.config.environment_description')}</Field.Description>
           <Select
             id="configuration-environment"
             value={environment}
             onChange={(event) => setEnvironment(event.target.value)}
             disabled={editor.saving}
           >
-            <Select.Option value="">{t('page.config.environment_current')}</Select.Option>
+            <Select.Option value="">{t('page.config.environment_production')}</Select.Option>
             <Select.Option value={TT02_ENVIRONMENT}>{t('page.config.environment_tt02')}</Select.Option>
           </Select>
         </Field>

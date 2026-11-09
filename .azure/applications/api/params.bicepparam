@@ -12,6 +12,7 @@ param apimIp = readEnvironmentVariable('APIM_IP')
 param maskinportenTokenExchangeEnvironment = readEnvironmentVariable('MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT')
 param production_platform_url = readEnvironmentVariable('PRODUCTION_PLATFORM_URL', '')
 param staging_broker_api_url = readEnvironmentVariable('STAGING_BROKER_API_URL', '')
+param staging_configuration_forward_key = readEnvironmentVariable('STAGING_CONFIGURATION_FORWARD_KEY', '')
 
 // secrets
 param sourceKeyVaultName = readEnvironmentVariable('KEY_VAULT_NAME')

@@ -192,8 +192,7 @@ const pageNb = {
   },
   config: {
     environment: 'Miljø',
-    environment_description: 'TT02 er testmiljøet. Endringer der lagres bare i TT02.',
-    environment_current: 'Dette miljøet',
+    environment_production: 'Produksjon',
     environment_tt02: 'TT02',
     environment_loading: 'Henter oppsett fra TT02…',
     load_failed: 'Kunne ikke hente oppsettet fra TT02.',
@@ -576,8 +575,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     config: {
       environment: 'Miljø',
-      environment_description: 'TT02 er testmiljøet. Endringar der vert lagra berre i TT02.',
-      environment_current: 'Dette miljøet',
+      environment_production: 'Produksjon',
       environment_tt02: 'TT02',
       environment_loading: 'Hentar oppsett frå TT02…',
       load_failed: 'Kunne ikkje hente oppsettet frå TT02.',
@@ -955,8 +953,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     config: {
       environment: 'Environment',
-      environment_description: 'TT02 is the test environment. Changes there are saved only in TT02.',
-      environment_current: 'This environment',
+      environment_production: 'Production',
       environment_tt02: 'TT02',
       environment_loading: 'Loading settings from TT02…',
       load_failed: 'Could not load the settings from TT02.',

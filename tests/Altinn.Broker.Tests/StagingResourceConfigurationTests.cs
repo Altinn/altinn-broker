@@ -2,6 +2,8 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 
+using Microsoft.AspNetCore.Http;
+
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.ConfigureResource;
@@ -34,6 +36,7 @@ public class StagingResourceConfigurationTests
             Mock.Of<IAuthorizationService>(),
             Mock.Of<IHostEnvironment>(),
             Options.Create(new AzureStorageOptions()),
+            ForwardProof(verified: false),
             NullLogger<ConfigureResourceHandler>.Instance);
         var user = new ClaimsPrincipal(new ClaimsIdentity(
         [
@@ -73,6 +76,7 @@ public class StagingResourceConfigurationTests
             authorization.Object,
             Mock.Of<IHostEnvironment>(),
             Options.Create(new AzureStorageOptions()),
+            ForwardProof(verified: true),
             NullLogger<ConfigureResourceHandler>.Instance);
         var user = new ClaimsPrincipal(new ClaimsIdentity(
         [
@@ -85,6 +89,46 @@ public class StagingResourceConfigurationTests
             CancellationToken.None);
 
         Assert.True(result.IsT0);
+    }
+
+    [Fact]
+    public async Task ConfigureResource_WithProductionEndUserAndNoForwardProof_ReturnsNoPublishAccess()
+    {
+        var authorization = new Mock<IAuthorizationService>(MockBehavior.Strict);
+        var serviceOwners = new Mock<IServiceOwnerRepository>();
+        serviceOwners
+            .Setup(repository => repository.GetServiceOwner("0192:991825827"))
+            .ReturnsAsync(new ServiceOwnerEntity
+            {
+                Id = "0192:991825827",
+                Name = "Owner",
+                StorageProviders = []
+            });
+        var resources = new Mock<IResourceRepository>();
+        resources
+            .Setup(repository => repository.GetResource("resource", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResourceEntity { Id = "resource", ServiceOwnerId = "0192:991825827" });
+        var handler = new ConfigureResourceHandler(
+            resources.Object,
+            Mock.Of<IAltinnResourceRepository>(),
+            serviceOwners.Object,
+            authorization.Object,
+            Mock.Of<IHostEnvironment>(),
+            Options.Create(new AzureStorageOptions()),
+            ForwardProof(verified: false),
+            NullLogger<ConfigureResourceHandler>.Instance);
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("urn:altinn:userid", "user")
+        ], BrokerAuthenticationSchemes.ProductionAltinn));
+
+        var result = await handler.Process(
+            new ConfigureResourceRequest { ResourceId = "resource", OnBehalfOf = "991825827" },
+            user,
+            CancellationToken.None);
+
+        Assert.True(result.IsT1);
+        Assert.Equal(Errors.NoPublishAccessToConfigureResource, result.AsT1);
     }
 
     [Fact]
@@ -105,6 +149,7 @@ public class StagingResourceConfigurationTests
             authorization.Object,
             Mock.Of<IHostEnvironment>(),
             Options.Create(new AzureStorageOptions()),
+            ForwardProof(verified: false),
             NullLogger<ConfigureResourceHandler>.Instance);
         var user = new ClaimsPrincipal(new ClaimsIdentity(
         [
@@ -139,10 +184,17 @@ public class StagingResourceConfigurationTests
         {
             BaseAddress = new Uri("https://ab.tt02.altinn.no/")
         };
+        var hostEnvironment = new Mock<IHostEnvironment>();
+        hostEnvironment.Setup(environment => environment.EnvironmentName).Returns(Environments.Production);
         var proxy = new StagingResourceConfigurationProxy(
             client,
             Mock.Of<IEndUserTokenProvider>(),
-            Options.Create(new AltinnOptions { StagingBrokerApiUrl = "https://ab.tt02.altinn.no" }),
+            Options.Create(new AltinnOptions
+            {
+                StagingBrokerApiUrl = "https://ab.tt02.altinn.no",
+                StagingConfigurationForwardKey = "forward-key"
+            }),
+            hostEnvironment.Object,
             NullLogger<StagingResourceConfigurationProxy>.Instance);
 
         Assert.True(proxy.IsEnabled);
@@ -161,6 +213,36 @@ public class StagingResourceConfigurationTests
         Assert.Equal("?onBehalfOf=123456789", captured.RequestUri.Query);
         Assert.Equal("Bearer", captured.Headers.Authorization?.Scheme);
         Assert.Equal("production-token", captured.Headers.Authorization?.Parameter);
+        Assert.True(captured.Headers.TryGetValues(ProductionConfigurationForwardProof.HeaderName, out var forwardKeys));
+        Assert.Equal("forward-key", Assert.Single(forwardKeys));
+    }
+
+    [Fact]
+    public void ForwardProof_AcceptsOnlyTheConfiguredKey()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers[ProductionConfigurationForwardProof.HeaderName] = "forward-key";
+        var accessor = new HttpContextAccessor { HttpContext = context };
+
+        var proof = new ProductionConfigurationForwardProof(
+            accessor,
+            Options.Create(new AltinnOptions { StagingConfigurationForwardKey = "forward-key" }));
+        Assert.True(proof.IsVerified);
+
+        context.Request.Headers[ProductionConfigurationForwardProof.HeaderName] = "other-key";
+        Assert.False(proof.IsVerified);
+
+        var unconfigured = new ProductionConfigurationForwardProof(
+            accessor,
+            Options.Create(new AltinnOptions()));
+        Assert.False(unconfigured.IsVerified);
+    }
+
+    private static IProductionConfigurationForwardProof ForwardProof(bool verified)
+    {
+        var proof = new Mock<IProductionConfigurationForwardProof>();
+        proof.SetupGet(item => item.IsVerified).Returns(verified);
+        return proof.Object;
     }
 
     private sealed class RecordingHandler : HttpMessageHandler
