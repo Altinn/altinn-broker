@@ -1,5 +1,5 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
-import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
+import { Alert, Button, Field, Input, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AllowedRecipient } from '../../api/allowedRecipients'
@@ -17,6 +17,7 @@ import {
   type LocalizedApiError,
 } from '../../i18n/apiErrors'
 import { i18n } from '../../i18n/config'
+import { HelpTextPopover, LabelWithHelpText, WithHelpText } from '../HelpTextPopover'
 import {
   useResourceConfigurationEditor,
   virusScanSizeHint,
@@ -125,7 +126,13 @@ export function ResourceConfigurationList({
         <SettingsSection>
           <List size="sm">
             {configurationFields(editor.configuration, partyOptions).map((field) => (
-              <SettingsItem key={field.label} id={field.label} title={field.label} value={field.value} />
+              <SettingsItem
+                key={field.label}
+                id={field.label}
+                title={field.label}
+                value={field.value}
+                controls={field.helpText && <HelpTextPopover helpText={field.helpText} />}
+              />
             ))}
           </List>
         </SettingsSection>
@@ -172,32 +179,47 @@ function ConfigurationForm({
         inputMode="decimal"
         disabled={saving}
       />
-      <Textfield
-        label={t('page.config.lifetime_days')}
-        value={draft.fileTransferTimeToLiveDays}
-        onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
-        error={errors.fileTransferTimeToLiveDays}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Switch
-          label={t('page.config.purge_when_confirmed')}
-          checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
-          onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+        <LabelWithHelpText label={t('page.config.lifetime_days')} helpText={t('page.helptext.lifetime_help_text')} />
+        <Input
+          value={draft.fileTransferTimeToLiveDays}
+          onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
+          aria-invalid={Boolean(errors.fileTransferTimeToLiveDays) || undefined}
+          inputMode="decimal"
           disabled={saving}
         />
+        {errors.fileTransferTimeToLiveDays && (
+          <ValidationMessage>{errors.fileTransferTimeToLiveDays}</ValidationMessage>
+        )}
       </Field>
-      <Textfield
-        label={t('page.config.grace_hours')}
-        value={draft.purgeFileTransferGracePeriodHours}
-        onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
-        error={errors.purgeFileTransferGracePeriodHours}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Label htmlFor="required-party">{t('page.config.required_party')}</Label>
+        <WithHelpText helpText={t('page.helptext.purge_help_text')}>
+          <Switch
+            label={t('page.config.purge_when_confirmed')}
+            checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
+            onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+            disabled={saving}
+          />
+        </WithHelpText>
+      </Field>
+      <Field>
+        <LabelWithHelpText label={t('page.config.grace_hours')} helpText={t('page.helptext.grace_help_text')} />
+        <Input
+          value={draft.purgeFileTransferGracePeriodHours}
+          onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
+          aria-invalid={Boolean(errors.purgeFileTransferGracePeriodHours) || undefined}
+          inputMode="decimal"
+          disabled={saving}
+        />
+        {errors.purgeFileTransferGracePeriodHours && (
+          <ValidationMessage>{errors.purgeFileTransferGracePeriodHours}</ValidationMessage>
+        )}
+      </Field>
+      <Field>
+        <LabelWithHelpText
+          label={t('page.config.required_party')}
+          helpText={t('page.helptext.required_party_help_text')}
+        />
         <Field.Description>{t('page.config.required_party_description')}</Field.Description>
         <Select
           id="required-party"
@@ -265,7 +287,10 @@ function buildRequiredPartyOptions(
   return options
 }
 
-function configurationFields(configuration: ResourceConfiguration, partyOptions: AllowedRecipient[]) {
+function configurationFields(
+  configuration: ResourceConfiguration,
+  partyOptions: AllowedRecipient[],
+): { label: string; value: string; helpText?: string }[] {
   return [
     {
       label: i18n.t('page.config.max_size'),
@@ -277,18 +302,22 @@ function configurationFields(configuration: ResourceConfiguration, partyOptions:
     {
       label: i18n.t('page.config.lifetime'),
       value: formatDuration(configuration.fileTransferTimeToLive),
+      helpText: i18n.t('page.helptext.lifetime_help_text'),
     },
     {
       label: i18n.t('page.config.purge_when_confirmed'),
       value: yesNo(configuration.purgeFileTransferAfterAllRecipientsConfirmed),
+      helpText: i18n.t('page.helptext.purge_help_text'),
     },
     {
       label: i18n.t('page.config.grace'),
       value: formatDuration(configuration.purgeFileTransferGracePeriod),
+      helpText: i18n.t('page.helptext.grace_help_text'),
     },
     {
       label: i18n.t('page.config.required_party'),
       value: requiredPartyDisplay(configuration.requiredParty, partyOptions),
+      helpText: i18n.t('page.helptext.required_party_help_text'),
     },
     {
       label: i18n.t('page.config.virus_required'),
