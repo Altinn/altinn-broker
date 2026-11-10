@@ -146,6 +146,36 @@ public class IdPortenAuthorizationPipelineTests
     }
 
     [Fact]
+    public async Task ConfigureResourceAccessHandler_WithProductionAltinnEndUser_Succeeds()
+    {
+        var requirement = new ConfigureResourceAccessRequirement();
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("urn:altinn:userid", "test-user")
+        ], AuthorizationConstants.ProductionAltinn));
+        var context = new AuthorizationHandlerContext([requirement], user, resource: null);
+
+        await new ConfigureResourceAccessHandler().HandleAsync(context);
+
+        Assert.True(context.HasSucceeded);
+    }
+
+    [Fact]
+    public async Task EndUserScopeAccessHandler_WithProductionAltinnEndUser_SucceedsScopeGate()
+    {
+        var requirement = new ScopeAccessRequirement(AuthorizationConstants.SenderScope);
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("urn:altinn:userid", "test-user")
+        ], AuthorizationConstants.ProductionAltinn));
+        var context = new AuthorizationHandlerContext([requirement], user, resource: null);
+
+        await new EndUserScopeAccessHandler().HandleAsync(context);
+
+        Assert.True(context.HasSucceeded);
+    }
+
+    [Fact]
     public async Task ConfigureResourceAccessHandler_WithoutScopeOrEndUser_DoesNotSucceed()
     {
         var requirement = new ConfigureResourceAccessRequirement();

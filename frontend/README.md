@@ -193,6 +193,9 @@ Token exchange (ID-Porten) and platform refresh (SSO) call Altinn Authentication
 | `PlatformGatewayUrl` | Yes | Altinn platform base URL (e.g. `https://platform.tt02.altinn.no/`) |
 | `OpenIdWellKnown` | Yes | Altinn JWT validation metadata URL |
 | `PlatformSubscriptionKey` | APIM envs | APIM subscription key for platform calls |
+| `StagingBrokerApiUrl` | Production only | Public TT02 Broker URL (e.g. `https://ab.tt02.altinn.no`). When set together with the forward key, the settings screen can target TT02. Env: `AltinnOptions__StagingBrokerApiUrl` |
+| `StagingConfigurationForwardKey` | Production and TT02 | Shared secret. Production sends it when forwarding resource configuration. TT02 accepts a production end-user token only when the header matches. Env: `AltinnOptions__StagingConfigurationForwardKey` |
+| `ProductionPlatformUrl` | TT02 only | Production platform URL (e.g. `https://platform.altinn.no`). ConfigureResource then accepts production Altinn tokens that production forwarded. Env: `AltinnOptions__ProductionPlatformUrl` |
 
 ## Azure / Front Door deployment
 

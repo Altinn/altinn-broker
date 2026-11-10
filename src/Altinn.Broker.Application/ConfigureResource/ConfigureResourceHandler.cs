@@ -8,6 +8,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public class ConfigureResourceHandler(
     IAuthorizationService authorizationService,
     IHostEnvironment hostEnvironment,
     IOptions<AzureStorageOptions> azureStorageOptions,
+    IProductionConfigurationForwardProof productionForwardProof,
     ILogger<ConfigureResourceHandler> logger) : IHandler<ConfigureResourceRequest, Task>
 {
     public async Task<OneOf<Task, Error>> Process(ConfigureResourceRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -34,7 +36,8 @@ public class ConfigureResourceHandler(
 
         // End-user cookie sessions (ID-porten exchanged cookie or Altinn platform JWT cookie)
         // must use onBehalfOf + gatekeeper publish. Service-owner bearer tokens use org ownership.
-        var isEndUserCall = (user is not null && user.IsBrokerEndUserCookieAuthenticated())
+        var isEndUserCall = (user is not null
+                && (user.IsBrokerEndUserCookieAuthenticated() || user.IsProductionAltinnEndUser()))
             || await authorizationService.IsIdPortenToken(user);
         if (isEndUserCall)
         {
@@ -180,6 +183,62 @@ public class ConfigureResourceHandler(
         if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
         {
             return Errors.PartyIsNotBrokerServiceOwner;
+        }
+
+        // TT02 cannot call production Authorization. A production end user is accepted only
+        // when the production Broker forwarded the request after its publish check.
+        // The organization in the request is not that proof.
+        if (user?.IsProductionAltinnEndUser() == true)
+        {
+            return productionForwardProof.IsVerified
+                ? null
+                : Errors.NoPublishAccessToConfigureResource;
+        }
+
+        var hasAccess = await authorizationService.CheckAccessAsPublisher(
+            user,
+            ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+            party,
+            cancellationToken);
+        if (!hasAccess)
+        {
+            return Errors.NoPublishAccessToConfigureResource;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Publish check for a write that will be stored in TT02. Uses this environment's
+    /// Authorization client, which in production is production Authorization.
+    /// Service-owner tokens are left to TT02's organization-ownership check.
+    /// </summary>
+    public async Task<Error?> AuthorizeStagingPublish(
+        string? onBehalfOf,
+        ClaimsPrincipal? user,
+        CancellationToken cancellationToken)
+    {
+        if (user is null)
+        {
+            return Errors.NoPublishAccessToConfigureResource;
+        }
+
+        var isEndUser = user.IsBrokerEndUserCookieAuthenticated()
+            || await authorizationService.IsIdPortenToken(user);
+        if (!isEndUser)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(onBehalfOf))
+        {
+            return Errors.MissingOnBehalfOf;
+        }
+
+        var party = onBehalfOf.WithoutPrefix();
+        if (!party.IsOrganizationNumber())
+        {
+            return Errors.InvalidParty;
         }
 
         var hasAccess = await authorizationService.CheckAccessAsPublisher(
