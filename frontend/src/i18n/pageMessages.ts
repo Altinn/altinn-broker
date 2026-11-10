@@ -371,6 +371,27 @@ const pageNb = {
     c8006: 'En av de andre som skal varsles er knyttet til en organisasjon som ikke er mottaker av formidlingen.',
     c8007: 'En av de andre som skal varsles er knyttet til et ugyldig organisasjonsnummer.',
   },
+  helptext: {
+    open: 'Hjelp',
+    notification_help_text: 'Varsling sendes til mottakerens registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tjenesten.',
+    reference_help_text:
+      'Referansen er din egen identifikator på formidlingen, for eksempel et saksnummer. Mottakeren ser den også, og du kan søke etter den i oversikten over formidlinger.',
+    metadata_help_text:
+      'Metadata er strukturert informasjon som beskriver eller gir kontekst til formidlingen, og som følger med filen til mottakeren. Har filen for eksempel et versjonsnummer, kan du legge det inn med nøkkel «Versjon» og verdi «1.12.7».',
+    checksum_help_text:
+      'Sjekksummen brukes til å kontrollere at filen ikke er endret eller skadet under opplastingen. Oppgir du en sjekksum, feiler formidlingen hvis den ikke stemmer med filen. Velg algoritmen sjekksummen ble beregnet med.',
+    required_party_help_text:
+      'Når en påkrevd part er satt, må den være med i alle formidlinger på tjenesten: enten som avsender, eller som eneste mottaker. Formidlinger som ikke oppfyller dette blir avvist.',
+    lifetime_help_text:
+      'Hvor lenge en formidling er tilgjengelig, regnet fra den ble opprettet. Når tiden er ute, slettes filen, og mottakerne kan ikke lenger laste den ned.',
+    purge_help_text:
+      'Når dette er aktivert, slettes filen når alle mottakere har bekreftet at de har lastet den ned, i stedet for først når levetiden er ute. Hvor lenge filen beholdes etter siste bekreftelse, styres av venteperioden.',
+    grace_help_text:
+      'Hvor lenge filen beholdes etter at siste mottaker har bekreftet nedlastingen, før den slettes. Gjelder bare når «Slettes når alle mottakere har bekreftet» er aktivert.',
+    virus_help_text:
+      'Når dette er aktivert blir filen skannet for virus før den tilgjengeliggjøres for mottaker. En fil som skal virusskannes kan ikke være større enn 50 GB.',
+    
+    }
 }
 
 export type PageMessages = typeof pageNb
@@ -749,6 +770,26 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8006: 'Ein av dei andre som skal varslast, er knytt til ein organisasjon som ikkje er mottakar av formidlinga.',
       c8007: 'Ein av dei andre som skal varslast, er knytt til eit ugyldig organisasjonsnummer.',
     },
+    helptext: {
+      open: 'Hjelp',
+      notification_help_text: 'Varsling vert sendt til mottakaren sin registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tenesta.',
+      reference_help_text:
+        'Referansen er din eigen identifikator på formidlinga, til dømes eit saksnummer eller eit internt løpenummer. Mottakaren ser han også, og du kan søkje etter han i oversikta over formidlingar.',
+      metadata_help_text:
+        'Metadata er strukturert informasjon som skildrar eller gir kontekst til formidlinga, og som følgjer med fila til mottakaren. Har fila til dømes eit versjonsnummer, kan du leggje det inn med nøkkel «Versjon» og verdi «1.12.7».',
+      checksum_help_text:
+        'Sjekksummen vert brukt til å kontrollere at fila ikkje er endra eller skadd under opplastinga. Oppgir du ein sjekksum, feilar formidlinga viss han ikkje stemmer med fila. Vel algoritmen sjekksummen vart rekna ut med.',
+      required_party_help_text:
+        'Når ein påkravd part er sett, må han vere med i alle formidlingar på tenesta: anten som avsendar, eller som einaste mottakar. Formidlingar som ikkje oppfyller dette, vert avviste. Vel ingen påkravd part viss alle med tilgang skal kunne sende fritt.',
+      lifetime_help_text:
+        'Kor lenge ei formidling er tilgjengeleg, rekna frå ho vart oppretta. Når tida er ute, vert fila sletta, og mottakarane kan ikkje lenger laste ho ned.',
+      purge_help_text:
+        'Når dette er aktivert, blir fila sletta når alle mottakarane har stadfesta at dei har lasta ho ned, i staden for først når levetida er ute. Kor lenge fila vert teken vare på etter siste stadfesting, er styrt av venteperioden.',
+      grace_help_text:
+        'Kor lenge fila vert teken vare på etter at siste mottakar har stadfesta nedlastinga, før ho vert sletta. Gjeld berre når «Vert sletta når alle mottakarar har stadfesta» er aktivert.',
+      virus_help_text:
+        'Når dette er aktivert, blir fila skanna for virus før ho blir tilgjengeleg for mottaker. Ei fil som skal virusskannast kan ikkje vere større enn 50 GB.',
+    }
   },
   en: {
     common: {
@@ -1122,5 +1163,25 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8006: 'One of the others to notify is linked to an organization that is not a recipient of the file transfer.',
       c8007: 'One of the others to notify is linked to an invalid organization number.',
     },
+    helptext: {
+      open: 'Help',
+      notification_help_text: 'Notification is sent to the recipient’s registered notification address in Altinn, and any others with a registered notification address for the service.',
+      reference_help_text:
+        'The reference is your own label for the file transfer, such as a case number. The recipient sees it too, and you can search for it in the file transfer lists.',
+      metadata_help_text:
+        'Metadata is structured information that describes or gives context to the file transfer, and goes with the file to the recipient. If the file has a version number, for example, you can add it with the key “Version” and the value “1.12.7”.',
+      checksum_help_text:
+        'The checksum is used to verify that the file was not changed or corrupted during upload. If you enter a checksum, the file transfer fails when it does not match the file. Choose the algorithm the checksum was calculated with.',
+      required_party_help_text:
+        'When a required party is set, it must take part in every file transfer on the service: either as the sender, or as the only recipient. File transfers that do not meet this are rejected. Choose no required party if everyone with access should be able to send freely.',
+      lifetime_help_text:
+        'How long a file transfer is available, counted from when it was created. When the time is up, the file is deleted and the recipients can no longer download it.',
+      purge_help_text:
+        'When this is activated, the file is deleted once all recipients have confirmed they downloaded it, instead of only when its lifetime runs out. How long the file is kept after the last confirmation is set by the waiting period.',
+      grace_help_text:
+        'How long the file is kept after the last recipient has confirmed the download, before it is deleted. Only applies when “Deleted when all recipients have confirmed” is activated.',
+      virus_help_text:
+      'When this is activated, the file is scanned for viruses before it is made available to the recipient. A file that is to be virus scanned cannot be larger than 50 GB.',  
+      }
   },
 }
