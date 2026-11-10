@@ -218,6 +218,52 @@ public class StagingResourceConfigurationTests
     }
 
     [Fact]
+    public async Task ForwardAllowedRecipientsAsync_RequestsTheTt02AccessList()
+    {
+        HttpRequestMessage? captured = null;
+        var httpHandler = new RecordingHandler(request =>
+        {
+            captured = request;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]", Encoding.UTF8, "application/json")
+            };
+        });
+        using var client = new HttpClient(httpHandler)
+        {
+            BaseAddress = new Uri("https://ab.tt02.altinn.no/")
+        };
+        var hostEnvironment = new Mock<IHostEnvironment>();
+        hostEnvironment.Setup(environment => environment.EnvironmentName).Returns(Environments.Production);
+        var proxy = new StagingResourceConfigurationProxy(
+            client,
+            Mock.Of<IEndUserTokenProvider>(),
+            Options.Create(new AltinnOptions
+            {
+                StagingBrokerApiUrl = "https://ab.tt02.altinn.no",
+                StagingConfigurationForwardKey = "forward-key"
+            }),
+            hostEnvironment.Object,
+            NullLogger<StagingResourceConfigurationProxy>.Instance);
+
+        var result = await proxy.ForwardAllowedRecipientsAsync(
+            "my resource",
+            "123456789",
+            ignoreRequiredParty: true,
+            "production-token",
+            CancellationToken.None);
+
+        Assert.Equal(200, result.StatusCode);
+        Assert.NotNull(captured);
+        Assert.Equal(
+            "/broker/api/v1/resource/my%20resource/allowed-recipients",
+            captured!.RequestUri!.AbsolutePath);
+        Assert.Equal("?party=123456789&ignoreRequiredParty=true", captured.RequestUri.Query);
+        Assert.DoesNotContain("environment", captured.RequestUri.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("production-token", captured.Headers.Authorization?.Parameter);
+    }
+
+    [Fact]
     public void ForwardProof_AcceptsOnlyTheConfiguredKey()
     {
         var context = new DefaultHttpContext();

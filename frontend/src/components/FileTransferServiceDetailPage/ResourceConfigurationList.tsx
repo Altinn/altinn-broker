@@ -1,8 +1,9 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
 import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AllowedRecipient } from '../../api/allowedRecipients'
+import { ApiError } from '../../api/client'
+import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import { TT02_ENVIRONMENT, type ResourceConfiguration } from '../../api/resourceConfiguration'
 import { useAuth } from '../../auth/AuthContext'
 import { formatDuration } from '../../helpers/durationHelper'
@@ -14,6 +15,7 @@ import {
 } from '../../helpers/orgIdentifierHelper'
 import {
   configureAccessNotice,
+  localizeApiError,
   messageWithOptionalInlineLink,
   type LocalizedApiError,
 } from '../../i18n/apiErrors'
@@ -27,6 +29,7 @@ import {
 import './fileTransferServiceDetailPage.css'
 
 const NO_REQUIRED_PARTY = ''
+const NO_REMOTE_CANDIDATES: AllowedRecipient[] = []
 
 function LocalizedErrorText({ error }: { error: LocalizedApiError }) {
   const parts = messageWithOptionalInlineLink(error)
@@ -79,6 +82,9 @@ export function ResourceConfigurationList({
   const { user } = useAuth()
   const canConfigureStaging = user?.canConfigureStaging === true
   const [environment, setEnvironment] = useState('')
+  const [remoteCandidates, setRemoteCandidates] = useState<AllowedRecipient[] | null>(null)
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [candidatesError, setCandidatesError] = useState<LocalizedApiError | null>(null)
   const editor = useResourceConfigurationEditor({
     resourceId,
     configuration,
@@ -86,13 +92,50 @@ export function ResourceConfigurationList({
     environment: environment || undefined,
   })
   const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
+
+  useEffect(() => {
+    if (!environment) {
+      setLoadingCandidates(false)
+      setCandidatesError(null)
+      setRemoteCandidates(null)
+      return
+    }
+
+    let cancelled = false
+    setLoadingCandidates(true)
+    setCandidatesError(null)
+
+    getAllowedRecipients(resourceId, onBehalfOf, { ignoreRequiredParty: true, environment })
+      .then((candidates) => {
+        if (!cancelled) {
+          setRemoteCandidates(candidates)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setCandidatesError(describeCandidatesError(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingCandidates(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [environment, onBehalfOf, resourceId])
+
+  const partySource = environment ? (remoteCandidates ?? NO_REMOTE_CANDIDATES) : accessListCandidates
   const partyOptions = useMemo(
-    () =>
-      buildRequiredPartyOptions(sender, accessListCandidates, editor.configuration.requiredParty),
-    [sender, accessListCandidates, editor.configuration.requiredParty],
+    () => buildRequiredPartyOptions(sender, partySource, editor.configuration.requiredParty),
+    [sender, partySource, editor.configuration.requiredParty],
   )
 
-  const configurationBusy = editor.saving || editor.loadingRemote || editor.awaitingRemote
+  const candidatesPending = Boolean(environment) && loadingCandidates && !candidatesError
+  const configurationBusy =
+    editor.saving || editor.loadingRemote || editor.awaitingRemote || candidatesPending
 
   return (
     <div className="resource-configuration">
@@ -137,15 +180,21 @@ export function ResourceConfigurationList({
         </Alert>
       )}
 
+      {candidatesError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={candidatesError} />
+        </Alert>
+      )}
+
       {editor.saveError && (
         <Alert data-color="danger" className="resource-configuration__alert">
           <LocalizedErrorText error={editor.saveError} />
         </Alert>
       )}
 
-      {editor.awaitingRemote || editor.loadingRemote ? (
+      {editor.awaitingRemote || editor.loadingRemote || candidatesPending ? (
         <p>{t('page.config.environment_loading')}</p>
-      ) : editor.loadError ? null : editor.editing ? (
+      ) : editor.loadError || candidatesError ? null : editor.editing ? (
         <ConfigurationForm
           draft={editor.draft}
           errors={editor.errors}
@@ -270,6 +319,16 @@ function ConfigurationForm({
       </div>
     </form>
   )
+}
+
+function describeCandidatesError(error: unknown): LocalizedApiError {
+  if (error instanceof ApiError) {
+    const localized = localizeApiError(error.body)
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
+      return localized
+    }
+  }
+  return { message: i18n.t('page.config.access_list_failed') }
 }
 
 /** Sender first, then access-list candidates; keeps a configured party that is not in either list. */

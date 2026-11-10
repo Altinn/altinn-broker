@@ -68,7 +68,7 @@ public sealed class StagingResourceConfigurationProxy
         return null;
     }
 
-    public async Task<ContentResult> ForwardAsync(
+    public Task<ContentResult> ForwardAsync(
         string method,
         string resourceId,
         string? onBehalfOf,
@@ -82,7 +82,38 @@ public sealed class StagingResourceConfigurationProxy
             path += $"?onBehalfOf={Uri.EscapeDataString(onBehalfOf)}";
         }
 
-        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        return SendAsync(new HttpMethod(method), path, body, accessToken, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads TT02's access-list candidates. The query is not forwarded with
+    /// <c>environment</c>, so TT02 resolves the list locally.
+    /// </summary>
+    public Task<ContentResult> ForwardAllowedRecipientsAsync(
+        string resourceId,
+        string party,
+        bool ignoreRequiredParty,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var path =
+            $"broker/api/v1/resource/{Uri.EscapeDataString(resourceId)}/allowed-recipients?party={Uri.EscapeDataString(party)}";
+        if (ignoreRequiredParty)
+        {
+            path += "&ignoreRequiredParty=true";
+        }
+
+        return SendAsync(HttpMethod.Get, path, body: null, accessToken, cancellationToken);
+    }
+
+    private async Task<ContentResult> SendAsync(
+        HttpMethod method,
+        string path,
+        ResourceExt? body,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         if (_forwardKey.Length > 0)
         {

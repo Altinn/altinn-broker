@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../../api/client'
 import {
@@ -61,13 +61,21 @@ export function useResourceConfigurationEditor({
   const [loadingRemote, setLoadingRemote] = useState(false)
   const [remoteReady, setRemoteReady] = useState(false)
   const [loadError, setLoadError] = useState<LocalizedApiError | null>(null)
+  // The configuration prop is the first production snapshot. A production save updates this
+  // ref, because the prop itself is not refreshed. Returning from TT02 restores the ref.
+  const productionConfiguration = useRef(configuration)
+
+  useEffect(() => {
+    productionConfiguration.current = configuration
+  }, [configuration])
 
   useEffect(() => {
     if (environment) {
       return
     }
-    setDisplayed(configuration)
-    setDraft(toDraft(configuration))
+    const current = productionConfiguration.current
+    setDisplayed(current)
+    setDraft(toDraft(current))
     setEditing(false)
     setErrors({})
     setSaveError(null)
@@ -77,6 +85,7 @@ export function useResourceConfigurationEditor({
 
   useEffect(() => {
     if (!environment) {
+      setLoadingRemote(false)
       return
     }
 
@@ -153,6 +162,9 @@ export function useResourceConfigurationEditor({
     try {
       await configureResource(resourceId, body, onBehalfOf, environment)
       const refreshed = await getResourceConfiguration(resourceId, environment)
+      if (!environment) {
+        productionConfiguration.current = refreshed
+      }
       setDisplayed(refreshed)
       setDraft(toDraft(refreshed))
       setEditing(false)

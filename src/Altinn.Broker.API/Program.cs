@@ -344,6 +344,22 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             policy.RequireAuthenticatedUser();
             policy.AddRequirements(new EndUserRequirement());
         });
+        options.AddPolicy(AuthorizationConstants.AllowedRecipients, policy =>
+        {
+            var schemes = new List<string>
+            {
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie
+            };
+            if (!string.IsNullOrWhiteSpace(productionOpenIdWellKnown))
+            {
+                schemes.Add(AuthorizationConstants.ProductionAltinn);
+            }
+
+            policy.AddAuthenticationSchemes(schemes.ToArray());
+            policy.RequireAuthenticatedUser();
+            policy.AddRequirements(new EndUserRequirement());
+        });
     });
 
     services.Configure<KestrelServerOptions>(options =>
