@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../../api/client'
 import {
@@ -39,26 +39,88 @@ type Options = {
   configuration: ResourceConfiguration
   /** Organization number the end user acts on behalf of (required for ID-porten PDP). */
   onBehalfOf: string
+  /** When set (TT02), load and save against that environment instead of the current one. */
+  environment?: string
 }
 
 /**
  * Edit toggle, draft values, validation and save against ConfigureResource.
  */
-export function useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf }: Options) {
+export function useResourceConfigurationEditor({
+  resourceId,
+  configuration,
+  onBehalfOf,
+  environment,
+}: Options) {
   const [displayed, setDisplayed] = useState(configuration)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<ConfigurationDraft>(() => toDraft(configuration))
   const [errors, setErrors] = useState<ConfigurationDraftErrors>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<LocalizedApiError | null>(null)
+  const [loadingRemote, setLoadingRemote] = useState(false)
+  const [remoteReady, setRemoteReady] = useState(false)
+  const [loadError, setLoadError] = useState<LocalizedApiError | null>(null)
+  // The configuration prop is the first production snapshot. A production save updates this
+  // ref, because the prop itself is not refreshed. Returning from TT02 restores the ref.
+  const productionConfiguration = useRef(configuration)
 
   useEffect(() => {
-    setDisplayed(configuration)
-    setDraft(toDraft(configuration))
+    productionConfiguration.current = configuration
+  }, [configuration])
+
+  useEffect(() => {
+    if (environment) {
+      return
+    }
+    const current = productionConfiguration.current
+    setDisplayed(current)
+    setDraft(toDraft(current))
     setEditing(false)
     setErrors({})
     setSaveError(null)
-  }, [configuration])
+    setLoadError(null)
+    setRemoteReady(false)
+  }, [configuration, environment])
+
+  useEffect(() => {
+    if (!environment) {
+      setLoadingRemote(false)
+      return
+    }
+
+    let cancelled = false
+    setLoadingRemote(true)
+    setRemoteReady(false)
+    setLoadError(null)
+    setEditing(false)
+    setErrors({})
+    setSaveError(null)
+
+    getResourceConfiguration(resourceId, environment)
+      .then((next) => {
+        if (cancelled) {
+          return
+        }
+        setDisplayed(next)
+        setDraft(toDraft(next))
+        setRemoteReady(true)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setLoadError(describeLoadError(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingRemote(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [environment, resourceId])
 
   const setEditingEnabled = useCallback(
     (enabled: boolean) => {
@@ -98,8 +160,11 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     setSaving(true)
     setSaveError(null)
     try {
-      await configureResource(resourceId, body, onBehalfOf)
-      const refreshed = await getResourceConfiguration(resourceId)
+      await configureResource(resourceId, body, onBehalfOf, environment)
+      const refreshed = await getResourceConfiguration(resourceId, environment)
+      if (!environment) {
+        productionConfiguration.current = refreshed
+      }
       setDisplayed(refreshed)
       setDraft(toDraft(refreshed))
       setEditing(false)
@@ -109,7 +174,7 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     } finally {
       setSaving(false)
     }
-  }, [draft, displayed, onBehalfOf, resourceId])
+  }, [draft, displayed, environment, onBehalfOf, resourceId])
 
   return {
     configuration: displayed,
@@ -120,6 +185,9 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     errors,
     saving,
     saveError,
+    loadError,
+    loadingRemote,
+    awaitingRemote: Boolean(environment) && !remoteReady && !loadError,
     save,
     cancel,
   }
@@ -211,6 +279,16 @@ function toConfigureInput(
   }
 
   return input
+}
+
+function describeLoadError(error: unknown): LocalizedApiError {
+  if (error instanceof ApiError) {
+    const localized = localizeApiError(error.body)
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
+      return localized
+    }
+  }
+  return { message: i18n.t('page.config.load_failed') }
 }
 
 function describeSaveError(error: unknown, resourceId: string): LocalizedApiError {

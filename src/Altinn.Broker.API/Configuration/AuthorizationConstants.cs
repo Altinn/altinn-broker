@@ -16,7 +16,14 @@ public static class AuthorizationConstants
     public const string EndUserCookie = BrokerAuthenticationSchemes.EndUserCookie;
     /// <summary>Altinn platform JWT stored in the shared runtime httpOnly cookie.</summary>
     public const string AltinnPlatformJwtCookie = BrokerAuthenticationSchemes.AltinnPlatformJwtCookie;
+    /// <summary>Production Altinn JWTs, accepted on TT02 when <c>ProductionPlatformUrl</c> is set.</summary>
+    public const string ProductionAltinn = BrokerAuthenticationSchemes.ProductionAltinn;
     public const string EndUser = "EndUser";
+    /// <summary>
+    /// End-user cookie session, plus a production Altinn token when TT02 is configured to accept one.
+    /// Used for the allowed-recipients lookup production forwards while configuring TT02.
+    /// </summary>
+    public const string AllowedRecipients = "AllowedRecipients";
 
     public const string SenderScope = "altinn:broker.write";
     public const string RecipientScope = "altinn:broker.read";
