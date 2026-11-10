@@ -199,6 +199,30 @@ public class GetFileTransferSummariesHandlerTests
     }
 
     [Fact]
+    public async Task Process_DraftsView_QueriesOnlyTheSendersUnfinishedTransfers()
+    {
+        var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
+        var actorRepository = CreateActorRepository(actor);
+        var authorizationService = CreateAuthorizationService("resource-a");
+        FrontendFileTransferSearchEntity? search = null;
+        var fileTransferRepository = new Mock<IFileTransferRepository>();
+        fileTransferRepository
+            .Setup(repository => repository.GetFileTransferSummariesAssociatedWithActor(It.IsAny<FrontendFileTransferSearchEntity>(), It.IsAny<CancellationToken>()))
+            .Callback<FrontendFileTransferSearchEntity, CancellationToken>((queried, _) => search = queried)
+            .ReturnsAsync([]);
+        var altinnRegisterService = new Mock<IAltinnRegisterService>(MockBehavior.Strict);
+        var handler = CreateHandler(authorizationService, fileTransferRepository, actorRepository, altinnRegisterService);
+
+        var result = await handler.Process(
+            new GetFileTransferSummariesRequest { ResourceIds = ["resource-a"], OnBehalfOf = OrganizationNumber, View = FileTransferListView.Drafts }, null, CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        Assert.NotNull(search);
+        Assert.Equal(SearchRole.Sender, search.Role);
+        Assert.Equal([FileTransferStatus.Initialized, FileTransferStatus.UploadStarted], search.SenderStatuses);
+    }
+
+    [Fact]
     public async Task Process_HistoricalView_QueriesRepositoryWithTerminalStatusesForBothRoles()
     {
         var actor = new ActorEntity { ActorId = 1, ActorExternalId = $"0192:{OrganizationNumber}" };
