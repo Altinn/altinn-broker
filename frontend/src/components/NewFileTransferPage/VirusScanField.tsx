@@ -20,7 +20,7 @@ export function VirusScanField({ checked, locked, onChange }: VirusScanFieldProp
 
   return (
     <Field>
-      <WithHelpText helpText={t('page.helptext.virus_help_text')}>
+      <WithHelpText label={t('page.virus.label')} helpText={t('page.helptext.virus_help_text')}>
         <Switch
           label={t('page.virus.label')}
           checked={checked}

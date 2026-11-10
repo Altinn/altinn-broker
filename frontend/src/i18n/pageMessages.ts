@@ -372,7 +372,7 @@ const pageNb = {
     c8007: 'En av de andre som skal varsles er knyttet til et ugyldig organisasjonsnummer.',
   },
   helptext: {
-    open: 'Hjelp',
+    open: 'Hjelp for {{label}}',
     notification_help_text: 'Varsling sendes til mottakerens registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tjenesten.',
     reference_help_text:
       'Referansen er din egen identifikator på formidlingen, for eksempel et saksnummer. Mottakeren ser den også, og du kan søke etter den i oversikten over formidlinger.',
@@ -771,7 +771,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8007: 'Ein av dei andre som skal varslast, er knytt til eit ugyldig organisasjonsnummer.',
     },
     helptext: {
-      open: 'Hjelp',
+      open: 'Hjelp for {{label}}',
       notification_help_text: 'Varsling vert sendt til mottakaren sin registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tenesta.',
       reference_help_text:
         'Referansen er din eigen identifikator på formidlinga, til dømes eit saksnummer eller eit internt løpenummer. Mottakaren ser han også, og du kan søkje etter han i oversikta over formidlingar.',
@@ -1164,7 +1164,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8007: 'One of the others to notify is linked to an invalid organization number.',
     },
     helptext: {
-      open: 'Help',
+      open: 'Help for {{label}}',
       notification_help_text: 'Notification is sent to the recipient’s registered notification address in Altinn, and any others with a registered notification address for the service.',
       reference_help_text:
         'The reference is your own label for the file transfer, such as a case number. The recipient sees it too, and you can search for it in the file transfer lists.',

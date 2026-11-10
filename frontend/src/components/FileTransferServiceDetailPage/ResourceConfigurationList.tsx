@@ -131,7 +131,7 @@ export function ResourceConfigurationList({
                 id={field.label}
                 title={field.label}
                 value={field.value}
-                controls={field.helpText && <HelpTextPopover helpText={field.helpText} />}
+                controls={field.helpText && <HelpTextPopover label={field.label} helpText={field.helpText} />}
               />
             ))}
           </List>
@@ -193,7 +193,7 @@ function ConfigurationForm({
         )}
       </Field>
       <Field>
-        <WithHelpText helpText={t('page.helptext.purge_help_text')}>
+        <WithHelpText label={t('page.config.purge_when_confirmed')} helpText={t('page.helptext.purge_help_text')}>
           <Switch
             label={t('page.config.purge_when_confirmed')}
             checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}

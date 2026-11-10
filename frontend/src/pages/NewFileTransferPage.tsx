@@ -223,7 +223,7 @@ function NewFileTransferPageContent() {
                 rowErrors={form.metadataRowErrors}
                 onChange={(metadata) => setValue('metadata', metadata)}
               />
-              <WithHelpText helpText={t('page.helptext.notification_help_text')}>
+              <WithHelpText label={t('page.new.notify')} helpText={t('page.helptext.notification_help_text')}>
                 <Checkbox
                   id={fieldId('notifications')}
                   label={t('page.new.notify')}
@@ -272,7 +272,7 @@ function NewFileTransferPageContent() {
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <Field>
-                <WithHelpText helpText={t('page.helptext.checksum_help_text')}>
+                <WithHelpText label={t('page.new.validate_checksum')} helpText={t('page.helptext.checksum_help_text')}>
                   <Switch
                     id={fieldId('checksumEnabled')}
                     label={t('page.new.validate_checksum')}

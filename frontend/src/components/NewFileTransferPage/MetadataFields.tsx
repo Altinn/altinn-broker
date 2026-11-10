@@ -57,7 +57,9 @@ export function MetadataFields({
   return (
     <Fieldset id={id} tabIndex={-1}>
       <Fieldset.Legend>
-        <WithHelpText helpText={t('page.helptext.metadata_help_text')}>{t('page.metadata.legend')}</WithHelpText>
+        <WithHelpText label={t('page.metadata.legend')} helpText={t('page.helptext.metadata_help_text')}>
+          {t('page.metadata.legend')}
+        </WithHelpText>
       </Fieldset.Legend>
       <Fieldset.Description>
         {t('page.metadata.description', { max: MAX_METADATA_ENTRIES })}
