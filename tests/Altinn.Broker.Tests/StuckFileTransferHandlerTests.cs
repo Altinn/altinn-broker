@@ -1,5 +1,6 @@
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
@@ -31,7 +32,8 @@ public class StuckFileTransferHandlerTests
         SlackStuckFileTransferNotifier slackNotifier,
         Mock<ILogger<StuckFileTransferHandler>> monitorLogger,
         Mock<ITusUploadFinalizationProgressService>? tusProgressService = null,
-        Mock<ITusUploadActivityCache>? tusActivityCache = null)
+        Mock<ITusUploadActivityCache>? tusActivityCache = null,
+        Mock<IUploadPlanStore>? uploadPlanStore = null)
     {
         var tusProgress = tusProgressService?.Object ?? CreateDefaultTusProgressService();
         var activityCache = tusActivityCache?.Object ?? CreateDefaultTusActivityCache();
@@ -44,6 +46,7 @@ public class StuckFileTransferHandlerTests
             fileTransferRepository.Object,
             tusProgress,
             activityCache,
+            (uploadPlanStore ?? new Mock<IUploadPlanStore>()).Object,
             backgroundJobClient.Object,
             slackNotifier,
             monitorLogger.Object);

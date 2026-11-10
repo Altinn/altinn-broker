@@ -1,11 +1,14 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
+using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Models.Enums;
+
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 
@@ -84,9 +87,10 @@ public class GetActiveFileTransferDetailsHandler(
             });
         
         var isSender = fileTransfer.Sender.ActorExternalId == callingActor.ActorExternalId;
-        var notificationsByRecipient = fileTransfer.HasNotification
-            ? await GetNotificationsByRecipient(fileTransfer, isSender, callingActor, cancellationToken)
-            : new Dictionary<string, RecipientNotificationDetails>();
+        var notifications = fileTransfer.HasNotification
+            ? await fileTransferNotificationRepository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, cancellationToken)
+            : [];
+        var notificationsByRecipient = GetNotificationsByRecipient(notifications, fileTransfer, isSender, callingActor);
 
         var recipientDetails = fileTransferActors.SelectMany(actor => actor.Recipients).Distinct().Select(recipientId => new RecipientDetails()
         {
@@ -126,8 +130,53 @@ public class GetActiveFileTransferDetailsHandler(
             Status = fileTransferStatus,
             IsSender = isSender,
             ActorDownloadStatus = callerRecipientStatus?.Status.ToString(),
-            HasNotification = fileTransfer.HasNotification
+            HasNotification = fileTransfer.HasNotification,
+            Notification = isSender ? GetNotificationDetails(fileTransfer, notifications) : null
         };
+    }
+
+    // The notifications are ordered when the transfer is initialized, so the orders are what is left of the
+    // sender's choices: one per recipient and custom recipient, each asking for a reminder or not.
+    private static NotificationDetails GetNotificationDetails(FileTransferEntity fileTransfer, List<BrokerNotificationEntity> notifications)
+    {
+        if (!fileTransfer.HasNotification)
+        {
+            return new NotificationDetails { Enabled = false, SendReminder = false, CustomRecipients = [] };
+        }
+
+        var orders = notifications
+            .Where(notification => !notification.IsReminder)
+            .ToList();
+
+        return new NotificationDetails
+        {
+            Enabled = true,
+            SendReminder = orders.Any(AsksForReminder),
+            CustomRecipients = orders
+                .Where(notification => notification.CustomRecipientIdentifier is not null && notification.CustomRecipientRelatedOrganization is not null)
+                .Select(notification => new CustomRecipientDetails
+                {
+                    Identifier = notification.CustomRecipientIdentifier!,
+                    RelatedOrganizationNumber = notification.CustomRecipientRelatedOrganization!.WithoutPrefix(),
+                })
+                .ToList(),
+        };
+    }
+
+    private static bool AsksForReminder(BrokerNotificationEntity notification)
+    {
+        if (string.IsNullOrEmpty(notification.OrderRequest))
+        {
+            return false;
+        }
+        try
+        {
+            return JsonSerializer.Deserialize<NotificationOrderRequestV2>(notification.OrderRequest)?.Reminders is { Count: > 0 };
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static string FormatTimestamp(DateTimeOffset timestamp) => timestamp.ToString("dd.MM.yyyy HH:mm");
@@ -137,13 +186,12 @@ public class GetActiveFileTransferDetailsHandler(
     /// while a recipient sees only its own. 
     /// Custom recipients are counted on the recipient they are notified on behalf of, without their addresses.
     /// </summary>
-    private async Task<Dictionary<string, RecipientNotificationDetails>> GetNotificationsByRecipient(
+    private static Dictionary<string, RecipientNotificationDetails> GetNotificationsByRecipient(
+        List<BrokerNotificationEntity> notifications,
         FileTransferEntity fileTransfer,
         bool isSender,
-        ActorEntity callingActor,
-        CancellationToken cancellationToken)
+        ActorEntity callingActor)
     {
-        var notifications = await fileTransferNotificationRepository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, cancellationToken);
         var visibleRecipients = fileTransfer.RecipientCurrentStatuses
             .Select(recipientStatus => recipientStatus.Actor)
             .Where(actor => isSender || actor.ActorExternalId == callingActor.ActorExternalId);

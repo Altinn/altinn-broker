@@ -45,7 +45,8 @@ public sealed class EndUserScopeAccessHandler : AuthorizationHandler<ScopeAccess
         var isBrokerEndUserScope = requirement.Scope.Any(scope =>
             scope is AuthorizationConstants.SenderScope or AuthorizationConstants.RecipientScope);
 
-        if (isCookieAuthenticated && hasAltinnEndUserIdentity && isBrokerEndUserScope)
+        if ((isCookieAuthenticated && hasAltinnEndUserIdentity && isBrokerEndUserScope)
+            || (context.User.IsProductionAltinnEndUser() && isBrokerEndUserScope))
         {
             context.Succeed(requirement);
         }
@@ -66,7 +67,9 @@ public sealed class ConfigureResourceAccessHandler : AuthorizationHandler<Config
         AuthorizationHandlerContext context,
         ConfigureResourceAccessRequirement requirement)
     {
-        if (HasServiceOwnerScope(context.User) || IsBrokerEndUser(context.User))
+        if (HasServiceOwnerScope(context.User)
+            || IsBrokerEndUser(context.User)
+            || context.User.IsProductionAltinnEndUser())
         {
             context.Succeed(requirement);
         }

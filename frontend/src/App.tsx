@@ -9,6 +9,7 @@ import { FileTransfersLayout } from './pages/FileTransfersLayout'
 import { FileTransfersMainPage } from './pages/FileTransfersMainPage'
 import { HistoricalFileTransferDetailPage } from './pages/HistoricalFileTransferDetailPage'
 import { HistoricalFileTransfersPage } from './pages/HistoricalFileTransfersPage'
+import { DraftFileTransfersPage } from './pages/DraftFileTransfersPage'
 import { NewFileTransferPage } from './pages/NewFileTransferPage'
 import { PartiesProvider } from './parties/PartiesContext'
 import { PageRoutes } from './pages/routes'
@@ -30,6 +31,7 @@ function App() {
               <Route path={PageRoutes.services} element={<FileTransferServicesPage />} />
               <Route path={PageRoutes.serviceDetail} element={<FileTransferServiceDetailPage />} />
               <Route path={PageRoutes.newFileTransfer} element={<NewFileTransferPage />} />
+              <Route path={PageRoutes.drafts} element={<DraftFileTransfersPage />} />
               <Route path={PageRoutes.active} element={<ActiveFileTransfersPage />} />
               <Route path={PageRoutes.activeDetail} element={<ActiveFileTransferDetailPage />} />
               <Route path={PageRoutes.historical} element={<HistoricalFileTransfersPage />} />
