@@ -1,5 +1,6 @@
 import { Field, Switch } from '@digdir/designsystemet-react'
 import { useTranslation } from 'react-i18next'
+import { WithHelpText } from '../HelpTextPopover'
 
 type VirusScanFieldProps = {
   checked: boolean
@@ -19,11 +20,13 @@ export function VirusScanField({ checked, locked, onChange }: VirusScanFieldProp
 
   return (
     <Field>
-      <Switch
-        label={t('page.virus.label')}
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
+      <WithHelpText label={t('page.virus.label')} helpText={t('page.helptext.virus_help_text')}>
+        <Switch
+          label={t('page.virus.label')}
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+      </WithHelpText>
       <Field.Description>{t('page.virus.description')}</Field.Description>
     </Field>
   )

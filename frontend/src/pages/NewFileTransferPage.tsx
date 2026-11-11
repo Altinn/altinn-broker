@@ -6,10 +6,11 @@ import {
   Heading,
   Paragraph,
   Field,
+  Input,
   Spinner,
   Switch,
-  Textfield,
   Checkbox,
+  ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, type LinkProps, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -40,8 +41,10 @@ import { useFileTransferService } from '../components/FileTransferServiceDetailP
 import { useParties } from '../parties/PartiesContext'
 import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
+import { LabelWithHelpText, WithHelpText } from '../components/HelpTextPopover'
 import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
 import { PageRoutes, RESUME_PARAM, activeTransferPath, newFileTransferPath, servicePath } from './routes'
+
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
@@ -236,15 +239,21 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
                 onChange={(recipients) => setValue('recipients', recipients)}
               />
 
-              <Textfield
-                id={fieldId('reference')}
-                label={t('page.common.reference')}
-                description={t('page.new.reference_description')}
-                value={values.reference}
-                error={errors.reference}
-                maxLength={MAX_REFERENCE_LENGTH}
-                onChange={(event) => setValue('reference', event.target.value)}
-              />
+              <Field>
+                <LabelWithHelpText
+                  label={t('page.common.reference')}
+                  helpText={t('page.helptext.reference_help_text')}
+                />
+                <Field.Description>{t('page.new.reference_description')}</Field.Description>
+                <Input
+                  id={fieldId('reference')}
+                  value={values.reference}
+                  aria-invalid={Boolean(errors.reference) || undefined}
+                  maxLength={MAX_REFERENCE_LENGTH}
+                  onChange={(event) => setValue('reference', event.target.value)}
+                />
+                {errors.reference && <ValidationMessage>{errors.reference}</ValidationMessage>}
+              </Field>
 
               <MetadataFields
                 id={fieldId('metadata')}
@@ -252,12 +261,14 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
                 rowErrors={form.metadataRowErrors}
                 onChange={(metadata) => setValue('metadata', metadata)}
               />
-              <Checkbox
-                id={fieldId('notifications')}
-                label={t('page.new.notify')}
-                checked={values.notifications}
-                onChange={(event) => setValue('notifications', event.target.checked)}
-              />
+              <WithHelpText label={t('page.new.notify')} helpText={t('page.helptext.notification_help_text')}>
+                <Checkbox
+                  id={fieldId('notifications')}
+                  label={t('page.new.notify')}
+                  checked={values.notifications}
+                  onChange={(event) => setValue('notifications', event.target.checked)}
+                />
+              </WithHelpText>
               {values.notifications && (
                 <>
                   <NotificationFields
@@ -301,12 +312,14 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
               <Field>
-                <Switch
-                  id={fieldId('checksumEnabled')}
-                  label={t('page.new.validate_checksum')}
-                  checked={values.checksumEnabled}
-                  onChange={(event) => setValue('checksumEnabled', event.target.checked)}
-                />
+                <WithHelpText label={t('page.new.validate_checksum')} helpText={t('page.helptext.checksum_help_text')}>
+                  <Switch
+                    id={fieldId('checksumEnabled')}
+                    label={t('page.new.validate_checksum')}
+                    checked={values.checksumEnabled}
+                    onChange={(event) => setValue('checksumEnabled', event.target.checked)}
+                  />
+                </WithHelpText>
                 <Field.Description>
                   {t('page.new.checksum_computed')}
                 </Field.Description>
