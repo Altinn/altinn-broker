@@ -26,6 +26,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
   const { t } = useTranslation()
   return (
     <List className="data-list">
+      <DetailField label={t('page.service.title')} value={transferDetails.resourceName} />
       <DetailField label={t('page.detail.file_name')} value={transferDetails.fileName} />
       <DetailField label={t('page.detail.transfer_id')} value={transferDetails.fileTransferId} />
       <DetailField label={t('page.common.reference')} value={transferDetails.sendersFileTransferReference} />
