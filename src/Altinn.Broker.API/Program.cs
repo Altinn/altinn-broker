@@ -360,6 +360,13 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
             policy.RequireAuthenticatedUser();
             policy.AddRequirements(new EndUserRequirement());
         });
+        options.AddPolicy(AuthorizationConstants.EligibleParties, policy =>
+        {
+            policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.EligiblePartiesScope));
+            policy.AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten);                
+        });
     });
 
     services.Configure<KestrelServerOptions>(options =>
