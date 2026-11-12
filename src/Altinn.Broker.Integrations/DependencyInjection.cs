@@ -32,6 +32,7 @@ using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Integrations.Redis;
 
 namespace Altinn.Broker.Integrations;
 public static class DependencyInjection
@@ -150,6 +151,14 @@ public static class DependencyInjection
         services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
         services.AddSingleton<IUploadPlanStore, UploadPlanStore>();
         services.AddSingleton<ITusUploadProgressReader, TusUploadProgressReader>();
+        services.AddSingleton<IEligiblePartyStore>(serviceProvider =>
+        {
+            var multiplexer = serviceProvider.GetService<IConnectionMultiplexer>();
+            var logger = serviceProvider.GetRequiredService<ILogger<RedisEligiblePartyStore>>();
+            return multiplexer is not null
+                ? new RedisEligiblePartyStore(multiplexer, logger)
+                : new InMemoryEligiblePartyStore();
+        });
 
     }
 }
