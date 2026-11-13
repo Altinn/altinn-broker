@@ -10,11 +10,11 @@ import { Link } from 'react-router-dom'
 import './FileTransferCard.css'
 
 type FileTransferCardProps = {
-  resourceName: string
   isSender: boolean
   sender: string
   recipients: string[]
   currentActorName: string
+  /** The sender's own reference. Shown as the card title so transfers can be told apart. */
   reference: string
   status?: DialogStatusProps
   extendedStatusLabel?: string
@@ -23,7 +23,6 @@ type FileTransferCardProps = {
 }
 
 export function FileTransferCard({
-  resourceName,
   isSender,
   sender,
   recipients,
@@ -50,8 +49,8 @@ export function FileTransferCard({
       <Card className="file-transfer-card">
         <div className="file-transfer-card__content">
           <div className="file-transfer-card__heading-row">
-            <Heading level={3} data-size="xs">
-              {resourceName}
+            <Heading level={3} data-size="xs" className="file-transfer-card__title">
+              {reference}
             </Heading>
             <Tag data-color={isSender ? 'accent' : 'neutral'} data-size="sm">
               {isSender ? t('page.common.sender') : t('page.common.recipient')}
@@ -71,9 +70,6 @@ export function FileTransferCard({
                 </span>
               </Tooltip>
             )}
-          </Paragraph>
-          <Paragraph data-size="sm" className="file-transfer-card__reference">
-            {t('page.list.reference_line', { reference })}
           </Paragraph>
           {(status || deadline) && (
             <DialogMetadata

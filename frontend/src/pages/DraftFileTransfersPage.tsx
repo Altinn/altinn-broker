@@ -24,11 +24,8 @@ export function DraftFileTransfersPage() {
 
 function DraftFileTransfers({ party }: { party: SelectedParty }) {
   const { t } = useTranslation()
-  const { uploads, resources, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  const { uploads, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useIncompleteUploads(party)
-
-  const resourceName = (resourceId: string) =>
-    resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
 
   return (
     <div className="page">
@@ -49,7 +46,6 @@ function DraftFileTransfers({ party }: { party: SelectedParty }) {
           return (
             <li key={summary.fileTransferId}>
               <FileTransferCard
-                resourceName={resourceName(summary.resourceId)}
                 isSender={summary.isSender}
                 sender={summary.sender}
                 recipients={summary.recipients}

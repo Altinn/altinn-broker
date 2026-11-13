@@ -56,9 +56,6 @@ export function FileTransferList({
     })
   }, [items, search, resourceFilter])
 
-  const resourceName = (resourceId: string) =>
-    resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
-
   const isFiltered = Boolean(search.trim() || resourceFilter)
 
   return (
@@ -92,7 +89,6 @@ export function FileTransferList({
           return (
             <li key={overview.fileTransferId}>
               <FileTransferCard
-                resourceName={resourceName(overview.resourceId)}
                 isSender={overview.isSender}
                 sender={overview.sender}
                 recipients={overview.recipients}
