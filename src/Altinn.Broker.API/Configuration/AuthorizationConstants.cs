@@ -11,6 +11,7 @@ public static class AuthorizationConstants
     public const string ConfigureResource = "ConfigureResource";
     public const string AnyBrokerScope = "AnyBrokerScope";
     public const string Maintenance = "Maintenance";
+    public const string EligibleParties = "EligibleParties";
     public const string LegacyAndMaskinporten = "LegacyAndMaskinporten";
     public const string TusUploadSession = "TusUploadSession";
     public const string EndUserCookie = BrokerAuthenticationSchemes.EndUserCookie;
@@ -29,4 +30,5 @@ public static class AuthorizationConstants
     public const string RecipientScope = "altinn:broker.read";
     public const string ServiceOwnerScope = "altinn:serviceowner";
     public const string MaintenanceScope = "altinn:broker.maintenance";
+    public const string EligiblePartiesScope = "altinn:broker.eligibleparties";
 }

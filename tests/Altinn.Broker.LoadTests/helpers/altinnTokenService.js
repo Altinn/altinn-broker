@@ -38,3 +38,14 @@ export async function getRecipientAltinnToken() {
         isSender: false
     });
 }
+
+export async function getEligiblePartiesAltinnToken() {
+    return await retrieveAltinnToken({
+        baseUrl: authorizationBaseUrl,
+        clientId: __ENV.mp_client_id,
+        kid: __ENV.mp_kid,
+        pem: __ENV.mp_client_pem,
+        scope: 'altinn:broker.eligibleparties',
+        isSender: false
+    });
+}
