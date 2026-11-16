@@ -25,7 +25,7 @@ public class GetPartyEligibilityHandler(
         {
             return Errors.InvalidParty;
         }
-        bool isEligible = await eligiblePartyStore.IsEligible(orgNumber, cancellationToken);
+        bool isEligible = await eligiblePartyStore.IsEligible(orgNumber.WithoutPrefix(), cancellationToken);
 
         return new GetPartyEligibilityResponse
         {
