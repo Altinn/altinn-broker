@@ -24,7 +24,6 @@ public class EligiblePartyController(ILogger<EligiblePartyController> logger) : 
         CancellationToken cancellationToken
     )
     {
-        logger.LogDebug("Checking if party {organizationNumber} is eligible", organizationNumber);
         var result = await handler.Process(organizationNumber, HttpContext.User, cancellationToken);
 
         return result.Match(
@@ -43,7 +42,6 @@ public class EligiblePartyController(ILogger<EligiblePartyController> logger) : 
         CancellationToken cancellationToken
     )
     {
-        logger.LogInformation("Getting all eligible parties");
         var result = await handler.Process(HttpContext.User, cancellationToken);
 
         return result.Match(
