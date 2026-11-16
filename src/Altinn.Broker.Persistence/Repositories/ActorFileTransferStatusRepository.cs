@@ -23,11 +23,11 @@ internal class ActorFileTransferStatusRepository(IActorRepository actorRepositor
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                fileTransferStatuses.Add(new Core.Domain.ActorFileTransferStatusEntity()
+                fileTransferStatuses.Add(new ActorFileTransferStatusEntity()
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
-                    Status = (Core.Domain.Enums.ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
-                    Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
+                    Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
+                    Date = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")), DateTimeKind.Utc),
                     Actor = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),

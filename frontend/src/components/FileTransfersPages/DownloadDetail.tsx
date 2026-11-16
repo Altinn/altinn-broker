@@ -9,8 +9,8 @@ type DownloadDetailProps = {
 }
 
 /**
- * The "Nedlasting" row of the detail list: how far each recipient the viewer may see - every recipient for the
- * sender, only its own for a recipient - has come with downloading the file, and when it confirmed the download.
+ * The "Nedlasting" row of the detail list: how far each recipient the viewer may see 
+ * has come with downloading the file, and when it confirmed the download.
  */
 export function DownloadDetail({ transferDetails }: DownloadDetailProps) {
   const { t } = useTranslation()
