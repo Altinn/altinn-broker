@@ -5,6 +5,7 @@ using Altinn.Broker.API.Configuration;
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Common;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Options;
@@ -66,7 +67,8 @@ public static class TusEndpointExtensions
                 OnAuthorizeAsync = OnAuthorizeAsync,
                 OnBeforeCreateAsync = OnBeforeCreateAsync,
                 OnCreateCompleteAsync = OnCreateCompleteAsync,
-                OnFileCompleteAsync = OnFileCompleteAsync
+                OnFileCompleteAsync = OnFileCompleteAsync,
+                OnDeleteCompleteAsync = OnDeleteCompleteAsync
             }
         });
     }
@@ -285,6 +287,20 @@ public static class TusEndpointExtensions
         if (maxUploadSize is not null && totalUploadLength > maxUploadSize)
         {
             context.FailRequest(HttpStatusCode.BadRequest, Errors.FileSizeTooBig.Message);
+        }
+    }
+
+    private static async Task OnDeleteCompleteAsync(DeleteCompleteContext context)
+    {
+        // A discarded upload leaves its plan unusable, so continuing it is no longer offered.
+        var (resolved, fileTransferId) = await TryResolveFileTransferIdAsync(
+            context.HttpContext,
+            context.FileId,
+            context.CancellationToken);
+        if (resolved)
+        {
+            var uploadPlanStore = context.HttpContext.RequestServices.GetRequiredService<IUploadPlanStore>();
+            await uploadPlanStore.RemoveAsync(fileTransferId, context.CancellationToken);
         }
     }
 

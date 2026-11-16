@@ -1,9 +1,12 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
-import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
-import { useMemo } from 'react'
+import { Alert, Button, Field, Input, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
+import { useEffect, useMemo, useState } from 'react'
+
 import { useTranslation } from 'react-i18next'
-import type { AllowedRecipient } from '../../api/allowedRecipients'
-import type { ResourceConfiguration } from '../../api/resourceConfiguration'
+import { ApiError } from '../../api/client'
+import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
+import { TT02_ENVIRONMENT, type ResourceConfiguration } from '../../api/resourceConfiguration'
+import { useAuth } from '../../auth/AuthContext'
 import { formatDuration } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import {
@@ -13,10 +16,12 @@ import {
 } from '../../helpers/orgIdentifierHelper'
 import {
   configureAccessNotice,
+  localizeApiError,
   messageWithOptionalInlineLink,
   type LocalizedApiError,
 } from '../../i18n/apiErrors'
 import { i18n } from '../../i18n/config'
+import { HelpTextPopover, LabelWithHelpText, WithHelpText } from '../HelpTextPopover'
 import {
   useResourceConfigurationEditor,
   virusScanSizeHint,
@@ -26,6 +31,7 @@ import {
 import './fileTransferServiceDetailPage.css'
 
 const NO_REQUIRED_PARTY = ''
+const NO_REMOTE_CANDIDATES: AllowedRecipient[] = []
 
 function LocalizedErrorText({ error }: { error: LocalizedApiError }) {
   const parts = messageWithOptionalInlineLink(error)
@@ -75,16 +81,81 @@ export function ResourceConfigurationList({
   accessListCandidates,
 }: ResourceConfigurationListProps) {
   const { t } = useTranslation()
-  const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
+  const { user } = useAuth()
+  const canConfigureStaging = user?.canConfigureStaging === true
+  const [environment, setEnvironment] = useState('')
+  const [remoteCandidates, setRemoteCandidates] = useState<AllowedRecipient[] | null>(null)
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [candidatesError, setCandidatesError] = useState<LocalizedApiError | null>(null)
+  const editor = useResourceConfigurationEditor({
+    resourceId,
+    configuration,
+    onBehalfOf,
+    environment: environment || undefined,
+  })
   const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
+
+  useEffect(() => {
+    if (!environment) {
+      setLoadingCandidates(false)
+      setCandidatesError(null)
+      setRemoteCandidates(null)
+      return
+    }
+
+    let cancelled = false
+    setLoadingCandidates(true)
+    setCandidatesError(null)
+
+    getAllowedRecipients(resourceId, onBehalfOf, { ignoreRequiredParty: true, environment })
+      .then((candidates) => {
+        if (!cancelled) {
+          setRemoteCandidates(candidates)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setCandidatesError(describeCandidatesError(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingCandidates(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [environment, onBehalfOf, resourceId])
+
+  const partySource = environment ? (remoteCandidates ?? NO_REMOTE_CANDIDATES) : accessListCandidates
   const partyOptions = useMemo(
-    () =>
-      buildRequiredPartyOptions(sender, accessListCandidates, editor.configuration.requiredParty),
-    [sender, accessListCandidates, editor.configuration.requiredParty],
+    () => buildRequiredPartyOptions(sender, partySource, editor.configuration.requiredParty),
+    [sender, partySource, editor.configuration.requiredParty],
   )
+
+  const candidatesPending = Boolean(environment) && loadingCandidates && !candidatesError
+  const configurationBusy =
+    editor.saving || editor.loadingRemote || editor.awaitingRemote || candidatesPending
 
   return (
     <div className="resource-configuration">
+      {canConfigureStaging && (
+        <Field className="resource-configuration__environment">
+          <Label htmlFor="configuration-environment">{t('page.config.environment')}</Label>
+          <Select
+            id="configuration-environment"
+            value={environment}
+            onChange={(event) => setEnvironment(event.target.value)}
+            disabled={editor.saving}
+          >
+            <Select.Option value="">{t('page.config.environment_production')}</Select.Option>
+            <Select.Option value={TT02_ENVIRONMENT}>{t('page.config.environment_tt02')}</Select.Option>
+          </Select>
+        </Field>
+      )}
+
       <Field className="resource-configuration__edit-toggle">
         <Switch
           label={t('page.config.edit')}
@@ -96,7 +167,7 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={!canPublish || editor.saving}
+          disabled={!canPublish || configurationBusy || Boolean(editor.loadError)}
         />
         {publishNotice && (
           <Field.Description>
@@ -105,13 +176,27 @@ export function ResourceConfigurationList({
         )}
       </Field>
 
+      {editor.loadError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={editor.loadError} />
+        </Alert>
+      )}
+
+      {candidatesError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={candidatesError} />
+        </Alert>
+      )}
+
       {editor.saveError && (
         <Alert data-color="danger" className="resource-configuration__alert">
           <LocalizedErrorText error={editor.saveError} />
         </Alert>
       )}
 
-      {editor.editing ? (
+      {editor.awaitingRemote || editor.loadingRemote || candidatesPending ? (
+        <p>{t('page.config.environment_loading')}</p>
+      ) : editor.loadError || candidatesError ? null : editor.editing ? (
         <ConfigurationForm
           draft={editor.draft}
           errors={editor.errors}
@@ -125,7 +210,13 @@ export function ResourceConfigurationList({
         <SettingsSection>
           <List size="sm">
             {configurationFields(editor.configuration, partyOptions).map((field) => (
-              <SettingsItem key={field.label} id={field.label} title={field.label} value={field.value} />
+              <SettingsItem
+                key={field.label}
+                id={field.label}
+                title={field.label}
+                value={field.value}
+                controls={field.helpText && <HelpTextPopover label={field.label} helpText={field.helpText} />}
+              />
             ))}
           </List>
         </SettingsSection>
@@ -172,32 +263,47 @@ function ConfigurationForm({
         inputMode="decimal"
         disabled={saving}
       />
-      <Textfield
-        label={t('page.config.lifetime_days')}
-        value={draft.fileTransferTimeToLiveDays}
-        onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
-        error={errors.fileTransferTimeToLiveDays}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Switch
-          label={t('page.config.purge_when_confirmed')}
-          checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
-          onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+        <LabelWithHelpText label={t('page.config.lifetime_days')} helpText={t('page.helptext.lifetime_help_text')} />
+        <Input
+          value={draft.fileTransferTimeToLiveDays}
+          onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
+          aria-invalid={Boolean(errors.fileTransferTimeToLiveDays) || undefined}
+          inputMode="decimal"
           disabled={saving}
         />
+        {errors.fileTransferTimeToLiveDays && (
+          <ValidationMessage>{errors.fileTransferTimeToLiveDays}</ValidationMessage>
+        )}
       </Field>
-      <Textfield
-        label={t('page.config.grace_hours')}
-        value={draft.purgeFileTransferGracePeriodHours}
-        onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
-        error={errors.purgeFileTransferGracePeriodHours}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Label htmlFor="required-party">{t('page.config.required_party')}</Label>
+        <WithHelpText label={t('page.config.purge_when_confirmed')} helpText={t('page.helptext.purge_help_text')}>
+          <Switch
+            label={t('page.config.purge_when_confirmed')}
+            checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
+            onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+            disabled={saving}
+          />
+        </WithHelpText>
+      </Field>
+      <Field>
+        <LabelWithHelpText label={t('page.config.grace_hours')} helpText={t('page.helptext.grace_help_text')} />
+        <Input
+          value={draft.purgeFileTransferGracePeriodHours}
+          onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
+          aria-invalid={Boolean(errors.purgeFileTransferGracePeriodHours) || undefined}
+          inputMode="decimal"
+          disabled={saving}
+        />
+        {errors.purgeFileTransferGracePeriodHours && (
+          <ValidationMessage>{errors.purgeFileTransferGracePeriodHours}</ValidationMessage>
+        )}
+      </Field>
+      <Field>
+        <LabelWithHelpText
+          label={t('page.config.required_party')}
+          helpText={t('page.helptext.required_party_help_text')}
+        />
         <Field.Description>{t('page.config.required_party_description')}</Field.Description>
         <Select
           id="required-party"
@@ -238,6 +344,16 @@ function ConfigurationForm({
   )
 }
 
+function describeCandidatesError(error: unknown): LocalizedApiError {
+  if (error instanceof ApiError) {
+    const localized = localizeApiError(error.body)
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
+      return localized
+    }
+  }
+  return { message: i18n.t('page.config.access_list_failed') }
+}
+
 /** Sender first, then access-list candidates; keeps a configured party that is not in either list. */
 function buildRequiredPartyOptions(
   sender: AllowedRecipient,
@@ -265,7 +381,10 @@ function buildRequiredPartyOptions(
   return options
 }
 
-function configurationFields(configuration: ResourceConfiguration, partyOptions: AllowedRecipient[]) {
+function configurationFields(
+  configuration: ResourceConfiguration,
+  partyOptions: AllowedRecipient[],
+): { label: string; value: string; helpText?: string }[] {
   return [
     {
       label: i18n.t('page.config.max_size'),
@@ -277,18 +396,22 @@ function configurationFields(configuration: ResourceConfiguration, partyOptions:
     {
       label: i18n.t('page.config.lifetime'),
       value: formatDuration(configuration.fileTransferTimeToLive),
+      helpText: i18n.t('page.helptext.lifetime_help_text'),
     },
     {
       label: i18n.t('page.config.purge_when_confirmed'),
       value: yesNo(configuration.purgeFileTransferAfterAllRecipientsConfirmed),
+      helpText: i18n.t('page.helptext.purge_help_text'),
     },
     {
       label: i18n.t('page.config.grace'),
       value: formatDuration(configuration.purgeFileTransferGracePeriod),
+      helpText: i18n.t('page.helptext.grace_help_text'),
     },
     {
       label: i18n.t('page.config.required_party'),
       value: requiredPartyDisplay(configuration.requiredParty, partyOptions),
+      helpText: i18n.t('page.helptext.required_party_help_text'),
     },
     {
       label: i18n.t('page.config.virus_required'),

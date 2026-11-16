@@ -28,6 +28,15 @@ export function FileTransfersMainPage() {
       </section>
 
       <section className="page-section">
+        <h2 className="page-heading">{t('page.home.draft_heading')}</h2>
+        <CardLink
+          to={PageRoutes.drafts}
+          title={t('page.home.draft_title')}
+          description={t('page.home.draft_description')}
+        />
+      </section>
+
+      <section className="page-section">
         <h2 className="page-heading">{t('page.home.active_heading')}</h2>
         <CardLink
           to={PageRoutes.active}

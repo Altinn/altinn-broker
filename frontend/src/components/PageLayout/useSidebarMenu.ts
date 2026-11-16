@@ -2,6 +2,7 @@ import type { MenuItemProps, MenuProps } from '@altinn/altinn-components'
 import {
   ArchiveIcon,
   ArrowRightLeftIcon,
+  DocPencilIcon,
   BellIcon,
   Buildings2Icon,
   ChatExclamationmarkIcon,
@@ -41,6 +42,10 @@ function isRouteSelected(currentRoute: string, targetRoute: string) {
   }
 
   if (targetRoute === PageRoutes.services && currentRoute.startsWith('/file-transfers/services')) {
+    return true
+  }
+
+  if (targetRoute === PageRoutes.drafts && currentRoute.startsWith(PageRoutes.drafts)) {
     return true
   }
 
@@ -105,6 +110,15 @@ export function useSidebarMenu(): { sidebarMenu: MenuProps; desktopMenu: MenuPro
           title: t('menu.services'),
           selected: isRouteSelected(pathname, PageRoutes.services),
           as: createMenuItemComponent({ to: PageRoutes.services }),
+        },
+        {
+          id: 'drafts',
+          size: 'md',
+          groupId: 'file-transfers',
+          icon: DocPencilIcon,
+          title: t('menu.drafts'),
+          selected: isRouteSelected(pathname, PageRoutes.drafts),
+          as: createMenuItemComponent({ to: PageRoutes.drafts }),
         },
         {
           id: 'active',

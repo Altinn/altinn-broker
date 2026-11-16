@@ -21,6 +21,8 @@ export type GetAllowedRecipientsOptions = {
    * currently configured required party. Use for configuration UIs that need to change required party.
    */
   ignoreRequiredParty?: boolean
+  /** When `tt02`, read that environment's access list through the production API. */
+  environment?: string
 }
 
 /**
@@ -34,6 +36,9 @@ export async function getAllowedRecipients(
   const query = new URLSearchParams({ party })
   if (options.ignoreRequiredParty) {
     query.set('ignoreRequiredParty', 'true')
+  }
+  if (options.environment) {
+    query.set('environment', options.environment)
   }
   const path = `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}/allowed-recipients?${query}`
 

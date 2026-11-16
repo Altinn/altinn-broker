@@ -2,10 +2,12 @@ using Altinn.Broker.API.AltinnPlatformAuth;
 using Altinn.Broker.API.AltinnPlatformAuth.Options;
 using Altinn.Broker.API.Configuration;
 using Altinn.Broker.API.IdPortenDirectAuth;
+using Altinn.Broker.Core.Options;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Altinn.Broker.API.Controllers;
@@ -21,17 +23,21 @@ public class AuthenticationController : ControllerBase
     private readonly IAltinnPlatformAuthenticationClient _platformAuthenticationClient;
     private readonly IAltinnPlatformJwtCookieReader _platformJwtCookieReader;
     private readonly AltinnPlatformAuthSettings _platformAuthSettings;
+    private readonly bool _canConfigureStaging;
     private readonly ILogger<AuthenticationController> _logger;
 
     public AuthenticationController(
         IAltinnPlatformAuthenticationClient platformAuthenticationClient,
         IAltinnPlatformJwtCookieReader platformJwtCookieReader,
         IOptions<AltinnPlatformAuthSettings> platformAuthSettings,
+        IOptions<AltinnOptions> altinnOptions,
+        IHostEnvironment hostEnvironment,
         ILogger<AuthenticationController> logger)
     {
         _platformAuthenticationClient = platformAuthenticationClient;
         _platformJwtCookieReader = platformJwtCookieReader;
         _platformAuthSettings = platformAuthSettings.Value;
+        _canConfigureStaging = hostEnvironment.IsProduction() && altinnOptions.Value.HasStagingConfigurationForward();
         _logger = logger;
     }
 
@@ -51,7 +57,7 @@ public class AuthenticationController : ControllerBase
 
         if (principal?.Identity?.IsAuthenticated != true)
         {
-            return Ok(new { authenticated = false, claims = Array.Empty<object>() });
+            return Ok(new { authenticated = false, claims = Array.Empty<object>(), canConfigureStaging = _canConfigureStaging });
         }
 
         // Exclude sensitive identifiers (e.g. pid). SPA only needs display name and Altinn party claims.
@@ -60,7 +66,7 @@ public class AuthenticationController : ControllerBase
                 c.Type.StartsWith("urn:altinn:", StringComparison.Ordinal)
                 || c.Type is "name")
             .Select(c => new { c.Type, c.Value });
-        return Ok(new { authenticated = true, claims });
+        return Ok(new { authenticated = true, claims, canConfigureStaging = _canConfigureStaging });
     }
 
     /// <summary>

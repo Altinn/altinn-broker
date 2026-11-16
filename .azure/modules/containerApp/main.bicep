@@ -9,6 +9,10 @@ param idporten_authority string
 param maskinporten_environment string
 param eventGridIps array
 param maskinportenTokenExchangeEnvironment string
+param production_platform_url string = ''
+param staging_broker_api_url string = ''
+@secure()
+param staging_configuration_forward_key string
 
 @secure()
 param subscription_id string
@@ -101,7 +105,24 @@ var containerAppEnvVars = concat([
 ],
 empty(trim(maskinportenTokenExchangeEnvironment)) ? [] : [
   { name: 'MaskinportenSettings__TokenExchangeEnvironment', value: maskinportenTokenExchangeEnvironment }
-], rotationContainerAppEnvVars)
+],
+empty(trim(production_platform_url)) ? [] : [
+  { name: 'AltinnOptions__ProductionPlatformUrl', value: production_platform_url }
+],
+empty(trim(staging_broker_api_url)) ? [] : [
+  { name: 'AltinnOptions__StagingBrokerApiUrl', value: staging_broker_api_url }
+],
+empty(trim(staging_configuration_forward_key)) ? [] : [
+  { name: 'AltinnOptions__StagingConfigurationForwardKey', secretRef: 'staging-configuration-forward-key' }
+],
+rotationContainerAppEnvVars)
+
+var stagingForwardKeySecret = empty(trim(staging_configuration_forward_key)) ? [] : [
+  {
+    name: 'staging-configuration-forward-key'
+    value: staging_configuration_forward_key
+  }
+]
 
 var EventGridIpRestrictions = map(eventGridIps, (ipRange, index) => {
   name: 'AzureEventGrid'
@@ -151,7 +172,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'Auto'
         ipSecurityRestrictions: ipSecurityRestrictions
       }
-      secrets: concat([
+      secrets: concat(concat([
         {
           identity: principal_id
           keyVaultUrl: '${keyVaultUrl}/secrets/platform-subscription-key'
@@ -212,7 +233,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUrl}/secrets/redis-connection-string'
           name: 'redis-connection-string'
         }
-      ], rotationKeyvaultSecrets)
+      ], rotationKeyvaultSecrets), stagingForwardKeySecret)
     }
 
     environmentId: containerAppEnvId

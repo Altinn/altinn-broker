@@ -31,6 +31,9 @@ const pageNb = {
     services_title: 'Se dine formidlingstjenester',
     services_description: 'Formidlingstjenester du er delaktig i',
     services_description_named: 'Formidlingstjenestene {{name}} er delaktig i',
+    draft_heading: 'Utkast',
+    draft_title: 'Dine utkast',
+    draft_description: 'Formidlinger der filen ikke er ferdig lastet opp',
     active_heading: 'Aktive formidlinger',
     active_title: 'Dine aktive formidlinger',
     active_description: 'Formidlinger som pågår nå',
@@ -77,7 +80,6 @@ const pageNb = {
     loading_more: 'Henter …',
     sender_line: 'Avsender: {{name}}',
     recipient_line: 'Mottaker: {{name}}',
-    reference_line: 'Referanse: {{reference}}',
     other_one: '(+{{count}} annen)',
     other_many: '(+{{count}} andre)',
     active_heading: 'Aktive formidlinger',
@@ -88,6 +90,13 @@ const pageNb = {
     historical_loading: 'Laster historiske formidlinger …',
     historical_error: 'Klarte ikke å hente historiske formidlinger.',
     historical_empty: 'Ingen historiske formidlinger funnet.',
+    drafts_heading: 'Utkast',
+    drafts_intro:
+      'Formidlinger der filen ikke er ferdig lastet opp, og som derfor ikke er sendt til mottakerne ennå. Velg en for å fortsette opplastingen der den slapp. Opplastinger som ikke fullføres innen et døgn, avbrytes.',
+    drafts_loading: 'Laster utkast …',
+    drafts_error: 'Klarte ikke å hente utkastene.',
+    drafts_empty: 'Ingen utkast funnet.',
+    drafts_progress: '{{percent}} % av {{size}} lastet opp',
   },
   detail: {
     none_selected: 'Ingen formidling valgt.',
@@ -195,6 +204,12 @@ const pageNb = {
     save_failed_status: 'Lagring feilet (HTTP {{status}}).',
   },
   config: {
+    environment: 'Miljø',
+    environment_production: 'Produksjon',
+    environment_tt02: 'TT02',
+    environment_loading: 'Henter oppsett fra TT02…',
+    load_failed: 'Kunne ikke hente oppsettet fra TT02.',
+    access_list_failed: 'Kunne ikke hente tilgangslisten fra TT02.',
     edit: 'Rediger oppsett',
     max_size_gb: 'Maks filstørrelse (GB)',
     max_size_description: 'La feltet stå tomt når ingen grense skal endres. {{hint}}',
@@ -220,6 +235,7 @@ const pageNb = {
   },
   new: {
     title: 'Ny formidling',
+    resume_title: 'Fortsett opplastingen',
     sender_description: 'Du formidler på vegne av denne organisasjonen.',
     reference_description: 'Din egen referanse til formidlingen, slik at du kan kjenne den igjen senere.',
     notify: 'Varsle mottakere',
@@ -230,6 +246,11 @@ const pageNb = {
     uploading: 'Laster opp…',
     send: 'Send formidling',
     cancel_upload: 'Avbryt opplastingen',
+    resume_missing:
+      'Opplastingen kan ikke fortsettes. Filen ble ikke lastet opp ferdig, så formidlingen må sendes på nytt.',
+    resume_failed: 'Klarte ikke å hente opplastingen. Prøv igjen senere.',
+    back_to_drafts: 'Tilbake til utkastene',
+    checking_file: 'Sjekker at det er den samme filen …',
   },
   fields: {
     reference: 'Referanse',
@@ -358,6 +379,12 @@ const pageNb = {
     changed: 'Filen er endret eller flyttet etter at du valgte den. Velg filen på nytt.',
     changed_during:
       'Filen er endret eller flyttet etter at opplastingen startet, så den kan ikke fortsette. Avbryt opplastingen, velg filen på nytt og send igjen.',
+    wrong_file:
+      'Dette er ikke filen opplastingen leser. Velg «{{name}}» ({{size}}), eller avbryt opplastingen for å sende noe annet.',
+    content_differs:
+      'Innholdet i «{{name}}» er ikke det samme som i filen opplastingen startet med. Velg den samme filen, eller avbryt opplastingen for å sende noe annet.',
+    read_failed: 'Klarte ikke å lese filen. Velg den på nytt.',
+    plan_not_saved: 'Hvis opplastingen stopper, kan den bare fortsettes fra denne fanen.',
     created_not_uploaded: 'Formidlingen ble opprettet med id {{id}}, men filen ble ikke lastet opp.',
     invalid_org: 'Ugyldig organisasjonsnummer: {{value}}',
     failed_status: 'Formidlingen feilet (HTTP {{status}}).',
@@ -375,6 +402,27 @@ const pageNb = {
     c8006: 'En av de andre som skal varsles er knyttet til en organisasjon som ikke er mottaker av formidlingen.',
     c8007: 'En av de andre som skal varsles er knyttet til et ugyldig organisasjonsnummer.',
   },
+  helptext: {
+    open: 'Hjelp for {{label}}',
+    notification_help_text: 'Varsling sendes til mottakerens registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tjenesten.',
+    reference_help_text:
+      'Referansen er din egen identifikator på formidlingen, for eksempel et saksnummer. Mottakeren ser den også, og du kan søke etter den i oversikten over formidlinger.',
+    metadata_help_text:
+      'Metadata er strukturert informasjon som beskriver eller gir kontekst til formidlingen, og som følger med filen til mottakeren. Har filen for eksempel et versjonsnummer, kan du legge det inn med nøkkel «Versjon» og verdi «1.12.7».',
+    checksum_help_text:
+      'Sjekksummen brukes til å kontrollere at filen ikke er endret eller skadet under opplastingen. Oppgir du en sjekksum, feiler formidlingen hvis den ikke stemmer med filen. Velg algoritmen sjekksummen ble beregnet med.',
+    required_party_help_text:
+      'Når en påkrevd part er satt, må den være med i alle formidlinger på tjenesten: enten som avsender, eller som eneste mottaker. Formidlinger som ikke oppfyller dette blir avvist.',
+    lifetime_help_text:
+      'Hvor lenge en formidling er tilgjengelig, regnet fra den ble opprettet. Når tiden er ute, slettes filen, og mottakerne kan ikke lenger laste den ned.',
+    purge_help_text:
+      'Når dette er aktivert, slettes filen når alle mottakere har bekreftet at de har lastet den ned, i stedet for først når levetiden er ute. Hvor lenge filen beholdes etter siste bekreftelse, styres av venteperioden.',
+    grace_help_text:
+      'Hvor lenge filen beholdes etter at siste mottaker har bekreftet nedlastingen, før den slettes. Gjelder bare når «Slettes når alle mottakere har bekreftet» er aktivert.',
+    virus_help_text:
+      'Når dette er aktivert blir filen skannet for virus før den tilgjengeliggjøres for mottaker. En fil som skal virusskannes kan ikke være større enn 50 GB.',
+    
+    }
 }
 
 export type PageMessages = typeof pageNb
@@ -413,6 +461,9 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       services_title: 'Sjå formidlingstenestene dine',
       services_description: 'Formidlingstenester du er delaktig i',
       services_description_named: 'Formidlingstenestene {{name}} er delaktig i',
+      draft_heading: 'Utkast',
+      draft_title: 'Dine utkast',
+      draft_description: 'Formidlingar der fila ikkje er ferdig lasta opp',
       active_heading: 'Aktive formidlingar',
       active_title: 'Dei aktive formidlingane dine',
       active_description: 'Formidlingar som går føre seg no',
@@ -459,7 +510,6 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       loading_more: 'Hentar …',
       sender_line: 'Avsendar: {{name}}',
       recipient_line: 'Mottakar: {{name}}',
-      reference_line: 'Referanse: {{reference}}',
       other_one: '(+{{count}} annan)',
       other_many: '(+{{count}} andre)',
       active_heading: 'Aktive formidlingar',
@@ -470,6 +520,13 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       historical_loading: 'Lastar historiske formidlingar …',
       historical_error: 'Klarte ikkje å hente historiske formidlingar.',
       historical_empty: 'Fann ingen historiske formidlingar.',
+      drafts_heading: 'Utkast',
+      drafts_intro:
+        'Formidlingar der fila ikkje er ferdig lasta opp, og som difor ikkje er sende til mottakarane enno. Vel ei for å halde fram med opplastinga der ho slapp. Opplastingar som ikkje vert fullførte innan eit døgn, vert avbrotne.',
+      drafts_loading: 'Lastar utkast …',
+      drafts_error: 'Klarte ikkje å hente utkasta.',
+      drafts_empty: 'Fann ingen utkast.',
+      drafts_progress: '{{percent}} % av {{size}} lasta opp',
     },
     detail: {
       none_selected: 'Ingen formidling er vald.',
@@ -577,6 +634,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       save_failed_status: 'Lagring feila (HTTP {{status}}).',
     },
     config: {
+      environment: 'Miljø',
+      environment_production: 'Produksjon',
+      environment_tt02: 'TT02',
+      environment_loading: 'Hentar oppsett frå TT02…',
+      load_failed: 'Kunne ikkje hente oppsettet frå TT02.',
+      access_list_failed: 'Kunne ikkje hente tilgangslista frå TT02.',
       edit: 'Rediger oppsett',
       max_size_gb: 'Maks filstorleik (GB)',
       max_size_description: 'La feltet stå tomt når ingen grense skal endrast. {{hint}}',
@@ -602,6 +665,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     new: {
       title: 'Ny formidling',
+      resume_title: "Fortsett opplastinga",
       sender_description: 'Du formidlar på vegner av denne organisasjonen.',
       reference_description: 'Din eigen referanse til formidlinga, slik at du kan kjenne ho att seinare.',
       notify: 'Varsle mottakarar',
@@ -612,6 +676,11 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       uploading: 'Lastar opp…',
       send: 'Send formidling',
       cancel_upload: 'Avbryt opplastinga',
+      resume_missing:
+        'Opplastinga kan ikkje halde fram. Fila vart ikkje ferdig lasta opp, så formidlinga må sendast på nytt.',
+      resume_failed: 'Klarte ikkje å hente opplastinga. Prøv igjen seinare.',
+      back_to_drafts: 'Tilbake til utkasta',
+      checking_file: 'Sjekkar at det er den same fila …',
     },
     fields: {
       reference: 'Referanse',
@@ -740,6 +809,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       changed: 'Fila er endra eller flytta etter at du valde ho. Vel fila på nytt.',
       changed_during:
         'Fila er endra eller flytta etter at opplastinga starta, så ho kan ikkje halde fram. Avbryt opplastinga, vel fila på nytt og send igjen.',
+      wrong_file:
+        'Dette er ikkje fila opplastinga les. Vel «{{name}}» ({{size}}), eller avbryt opplastinga for å sende noko anna.',
+      content_differs:
+        'Innhaldet i «{{name}}» er ikkje det same som i fila opplastinga starta med. Vel den same fila, eller avbryt opplastinga for å sende noko anna.',
+      read_failed: 'Klarte ikkje å lese fila. Vel ho på nytt.',
+      plan_not_saved: 'Viss opplastinga stoppar, kan ho berre halde fram frå denne fana.',
       created_not_uploaded: 'Formidlinga vart oppretta med id {{id}}, men fila vart ikkje lasta opp.',
       invalid_org: 'Ugyldig organisasjonsnummer: {{value}}',
       failed_status: 'Formidlinga feila (HTTP {{status}}).',
@@ -757,6 +832,26 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8006: 'Ein av dei andre som skal varslast, er knytt til ein organisasjon som ikkje er mottakar av formidlinga.',
       c8007: 'Ein av dei andre som skal varslast, er knytt til eit ugyldig organisasjonsnummer.',
     },
+    helptext: {
+      open: 'Hjelp for {{label}}',
+      notification_help_text: 'Varsling vert sendt til mottakaren sin registrerte varslingsadresse i Altinn, og eventuelle andre med registrert varslingsadresse for tenesta.',
+      reference_help_text:
+        'Referansen er din eigen identifikator på formidlinga, til dømes eit saksnummer eller eit internt løpenummer. Mottakaren ser han også, og du kan søkje etter han i oversikta over formidlingar.',
+      metadata_help_text:
+        'Metadata er strukturert informasjon som skildrar eller gir kontekst til formidlinga, og som følgjer med fila til mottakaren. Har fila til dømes eit versjonsnummer, kan du leggje det inn med nøkkel «Versjon» og verdi «1.12.7».',
+      checksum_help_text:
+        'Sjekksummen vert brukt til å kontrollere at fila ikkje er endra eller skadd under opplastinga. Oppgir du ein sjekksum, feilar formidlinga viss han ikkje stemmer med fila. Vel algoritmen sjekksummen vart rekna ut med.',
+      required_party_help_text:
+        'Når ein påkravd part er sett, må han vere med i alle formidlingar på tenesta: anten som avsendar, eller som einaste mottakar. Formidlingar som ikkje oppfyller dette, vert avviste. Vel ingen påkravd part viss alle med tilgang skal kunne sende fritt.',
+      lifetime_help_text:
+        'Kor lenge ei formidling er tilgjengeleg, rekna frå ho vart oppretta. Når tida er ute, vert fila sletta, og mottakarane kan ikkje lenger laste ho ned.',
+      purge_help_text:
+        'Når dette er aktivert, blir fila sletta når alle mottakarane har stadfesta at dei har lasta ho ned, i staden for først når levetida er ute. Kor lenge fila vert teken vare på etter siste stadfesting, er styrt av venteperioden.',
+      grace_help_text:
+        'Kor lenge fila vert teken vare på etter at siste mottakar har stadfesta nedlastinga, før ho vert sletta. Gjeld berre når «Vert sletta når alle mottakarar har stadfesta» er aktivert.',
+      virus_help_text:
+        'Når dette er aktivert, blir fila skanna for virus før ho blir tilgjengeleg for mottaker. Ei fil som skal virusskannast kan ikkje vere større enn 50 GB.',
+    }
   },
   en: {
     common: {
@@ -790,6 +885,9 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       services_title: 'See your file transfer services',
       services_description: 'File transfer services you take part in',
       services_description_named: 'File transfer services {{name}} takes part in',
+      draft_heading: 'Drafts',
+      draft_title: 'Your drafts',
+      draft_description: 'File transfers where the file is not fully uploaded',
       active_heading: 'Active file transfers',
       active_title: 'Your active file transfers',
       active_description: 'File transfers in progress',
@@ -836,7 +934,6 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       loading_more: 'Loading …',
       sender_line: 'Sender: {{name}}',
       recipient_line: 'Recipient: {{name}}',
-      reference_line: 'Reference: {{reference}}',
       other_one: '(+{{count}} other)',
       other_many: '(+{{count}} others)',
       active_heading: 'Active file transfers',
@@ -847,6 +944,13 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       historical_loading: 'Loading historical file transfers …',
       historical_error: 'Could not load historical file transfers.',
       historical_empty: 'No historical file transfers found.',
+      drafts_heading: 'Drafts',
+      drafts_intro:
+        'File transfers whose file has not finished uploading, and which have therefore not been sent to the recipients yet. Choose one to continue the upload where it left off. Uploads not completed within a day are cancelled.',
+      drafts_loading: 'Loading drafts …',
+      drafts_error: 'Could not load the drafts.',
+      drafts_empty: 'No drafts found.',
+      drafts_progress: '{{percent}} % of {{size}} uploaded',
     },
     detail: {
       none_selected: 'No file transfer selected.',
@@ -954,6 +1058,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       save_failed_status: 'Saving failed (HTTP {{status}}).',
     },
     config: {
+      environment: 'Environment',
+      environment_production: 'Production',
+      environment_tt02: 'TT02',
+      environment_loading: 'Loading settings from TT02…',
+      load_failed: 'Could not load the settings from TT02.',
+      access_list_failed: 'Could not load the access list from TT02.',
       edit: 'Edit settings',
       max_size_gb: 'Maximum file size (GB)',
       max_size_description: 'Leave the field empty when no limit should be changed. {{hint}}',
@@ -979,6 +1089,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
     },
     new: {
       title: 'New file transfer',
+      resume_title: 'Resume upload',
       sender_description: 'You are sending on behalf of this organization.',
       reference_description: 'Your own reference for the file transfer, so you can recognize it later.',
       notify: 'Notify recipients',
@@ -989,6 +1100,11 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       uploading: 'Uploading…',
       send: 'Send file transfer',
       cancel_upload: 'Cancel the upload',
+      resume_missing:
+        'The upload cannot be continued. The file did not finish uploading, so the file transfer must be sent again.',
+      resume_failed: 'Could not load the upload. Try again later.',
+      back_to_drafts: 'Back to drafts',
+      checking_file: 'Checking that it is the same file …',
     },
     fields: {
       reference: 'Reference',
@@ -1117,6 +1233,12 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       changed: 'The file was changed or moved after you chose it. Choose the file again.',
       changed_during:
         'The file was changed or moved after the upload started, so it cannot continue. Cancel the upload, choose the file again, and send it once more.',
+      wrong_file:
+        'This is not the file the upload is reading. Choose “{{name}}” ({{size}}), or cancel the upload to send something else.',
+      content_differs:
+        'The contents of “{{name}}” are not the same as the file the upload started with. Choose the same file, or cancel the upload to send something else.',
+      read_failed: 'Could not read the file. Choose it again.',
+      plan_not_saved: 'If the upload stops, it can only be continued from this tab.',
       created_not_uploaded: 'The file transfer was created with id {{id}}, but the file was not uploaded.',
       invalid_org: 'Invalid organization number: {{value}}',
       failed_status: 'The file transfer failed (HTTP {{status}}).',
@@ -1134,5 +1256,25 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       c8006: 'One of the others to notify is linked to an organization that is not a recipient of the file transfer.',
       c8007: 'One of the others to notify is linked to an invalid organization number.',
     },
+    helptext: {
+      open: 'Help for {{label}}',
+      notification_help_text: 'Notification is sent to the recipient’s registered notification address in Altinn, and any others with a registered notification address for the service.',
+      reference_help_text:
+        'The reference is your own label for the file transfer, such as a case number. The recipient sees it too, and you can search for it in the file transfer lists.',
+      metadata_help_text:
+        'Metadata is structured information that describes or gives context to the file transfer, and goes with the file to the recipient. If the file has a version number, for example, you can add it with the key “Version” and the value “1.12.7”.',
+      checksum_help_text:
+        'The checksum is used to verify that the file was not changed or corrupted during upload. If you enter a checksum, the file transfer fails when it does not match the file. Choose the algorithm the checksum was calculated with.',
+      required_party_help_text:
+        'When a required party is set, it must take part in every file transfer on the service: either as the sender, or as the only recipient. File transfers that do not meet this are rejected. Choose no required party if everyone with access should be able to send freely.',
+      lifetime_help_text:
+        'How long a file transfer is available, counted from when it was created. When the time is up, the file is deleted and the recipients can no longer download it.',
+      purge_help_text:
+        'When this is activated, the file is deleted once all recipients have confirmed they downloaded it, instead of only when its lifetime runs out. How long the file is kept after the last confirmation is set by the waiting period.',
+      grace_help_text:
+        'How long the file is kept after the last recipient has confirmed the download, before it is deleted. Only applies when “Deleted when all recipients have confirmed” is activated.',
+      virus_help_text:
+      'When this is activated, the file is scanned for viruses before it is made available to the recipient. A file that is to be virus scanned cannot be larger than 50 GB.',  
+      }
   },
 }

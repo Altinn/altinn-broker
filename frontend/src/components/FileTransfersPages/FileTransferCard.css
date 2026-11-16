@@ -17,9 +17,15 @@
 
 .file-transfer-card__heading-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.file-transfer-card__title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .file-transfer-card__party {
@@ -30,10 +36,6 @@
   margin-left: 0.25em;
   color: #68707c;
   font-style: italic;
-}
-
-.file-transfer-card__reference {
-  color: #545c7a;
 }
 
 .file-transfer-card__metadata {

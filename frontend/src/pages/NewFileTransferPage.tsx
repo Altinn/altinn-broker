@@ -5,17 +5,18 @@ import {
   ErrorSummary,
   Heading,
   Paragraph,
-  // Field,
+  Field,
+  Input,
   Spinner,
-  // Switch,
-  Textfield,
+  Switch,
   Checkbox,
+  ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
+import { Link, type LinkProps, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
-// import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
+import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
 import { CustomRecipientsFields } from '../components/NewFileTransferPage/CustomRecipientsFields'
@@ -40,15 +41,27 @@ import { useFileTransferService } from '../components/FileTransferServiceDetailP
 import { useParties } from '../parties/PartiesContext'
 import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
-import { activeTransferPath, newFileTransferPath, servicePath } from './routes'
+import { LabelWithHelpText, WithHelpText } from '../components/HelpTextPopover'
+import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
+import { PageRoutes, RESUME_PARAM, activeTransferPath, newFileTransferPath, servicePath } from './routes'
+
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const { selectedParty } = useParties()
-  return <NewFileTransferPageContent key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}`} />
+  const resumeTransferId = searchParams.get(RESUME_PARAM)
+  return (
+    <NewFileTransferPageContent
+      key={`${selectedParty?.organizationNumber ?? ''}:${serviceId}:${resumeTransferId ?? ''}`}
+      resumeTransferId={resumeTransferId}
+    />
+  )
 }
 
-function NewFileTransferPageContent() {
+/** With a transfer whose upload stopped, the form continues that upload instead of sending a new one. */
+function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: string | null }) {
+
   const { t } = useTranslation()
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
@@ -59,7 +72,9 @@ function NewFileTransferPageContent() {
   const [confirmingCancel, setConfirmingCancel] = useState(false)
 
   const { addUploadSuccessListener } = useUploadActions()
-  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber })
+  const resumable = useResumableUpload(resumeTransferId, serviceId, selectedParty)
+  const resume = resumable.status === 'ready' ? resumable.upload : null
+  const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, resume })
 
   useEffect(
     () =>
@@ -107,6 +122,19 @@ function NewFileTransferPageContent() {
     return <p>{t('page.service.missing_short')}</p>
   }
 
+  if (resumable.status === 'missing' || resumable.status === 'failed') {
+    return (
+      <div className="page">
+        <Alert data-color="warning">
+          {resumable.status === 'missing' ? t('page.new.resume_missing') : t('page.new.resume_failed')}
+        </Alert>
+        <p>
+          <Link to={PageRoutes.drafts}>{t('page.new.back_to_drafts')}</Link>
+        </p>
+      </div>
+    )
+  }
+
   const service = serviceState.service.resource
 
   // Reachable by url even when the service detail page withholds the action.
@@ -132,10 +160,22 @@ function NewFileTransferPageContent() {
         ? form.resumeInterrupted
         : null
 
-  // An interrupted upload settled these when it was created, so they are shown but not editable.
-  const detailsLocked = form.interrupted !== null
+  // The transfer settled these when it was sent, so they are shown but not editable.
+  const detailsLocked = resume !== null
 
   const cancellable = (active !== null && active.status !== 'finishing') || form.interrupted !== null
+
+  // A cancelled upload can't be continued, so the form goes back to sending a new transfer.
+  const cancelUpload = () => {
+    if (active) {
+      form.cancel()
+    } else {
+      form.discardInterrupted()
+    }
+    if (resumeTransferId) {
+      navigate(newFileTransferPath(serviceId), { replace: true })
+    }
+  }
   if (confirmingCancel && !cancellable) {
     setConfirmingCancel(false)
   }
@@ -156,12 +196,12 @@ function NewFileTransferPageContent() {
     >
       <header className="new-transfer__header">
         <Heading level={2} data-size="md">
-          {t('page.new.title')}
+          {resumeTransferId ? t('page.new.resume_title') : t('page.new.title')}
         </Heading>
         <Paragraph data-size="sm">{service.name ?? service.resourceId}</Paragraph>
       </header>
 
-      {form.loading ? (
+      {form.loading || resumable.status === 'loading' ? (
         <Spinner aria-label={t('page.service.loading_settings')} />
       ) : (
         <form
@@ -199,15 +239,21 @@ function NewFileTransferPageContent() {
                 onChange={(recipients) => setValue('recipients', recipients)}
               />
 
-              <Textfield
-                id={fieldId('reference')}
-                label={t('page.common.reference')}
-                description={t('page.new.reference_description')}
-                value={values.reference}
-                error={errors.reference}
-                maxLength={MAX_REFERENCE_LENGTH}
-                onChange={(event) => setValue('reference', event.target.value)}
-              />
+              <Field>
+                <LabelWithHelpText
+                  label={t('page.common.reference')}
+                  helpText={t('page.helptext.reference_help_text')}
+                />
+                <Field.Description>{t('page.new.reference_description')}</Field.Description>
+                <Input
+                  id={fieldId('reference')}
+                  value={values.reference}
+                  aria-invalid={Boolean(errors.reference) || undefined}
+                  maxLength={MAX_REFERENCE_LENGTH}
+                  onChange={(event) => setValue('reference', event.target.value)}
+                />
+                {errors.reference && <ValidationMessage>{errors.reference}</ValidationMessage>}
+              </Field>
 
               <MetadataFields
                 id={fieldId('metadata')}
@@ -215,12 +261,14 @@ function NewFileTransferPageContent() {
                 rowErrors={form.metadataRowErrors}
                 onChange={(metadata) => setValue('metadata', metadata)}
               />
-              <Checkbox
-                id={fieldId('notifications')}
-                label={t('page.new.notify')}
-                checked={values.notifications}
-                onChange={(event) => setValue('notifications', event.target.checked)}
-              />
+              <WithHelpText label={t('page.new.notify')} helpText={t('page.helptext.notification_help_text')}>
+                <Checkbox
+                  id={fieldId('notifications')}
+                  label={t('page.new.notify')}
+                  checked={values.notifications}
+                  onChange={(event) => setValue('notifications', event.target.checked)}
+                />
+              </WithHelpText>
               {values.notifications && (
                 <>
                   <NotificationFields
@@ -246,8 +294,9 @@ function NewFileTransferPageContent() {
 
             {form.interrupted && (
               <InterruptedUploadNotice
-                file={form.interrupted.file}
-                uploaded={form.interruptedUploaded}
+                fileName={form.interrupted.fileName}
+                fileSize={form.interrupted.fileSize}
+                uploaded={form.interrupted.plan.uploadedBytes}
                 ready={form.resumeReady}
               />
             )}
@@ -259,16 +308,18 @@ function NewFileTransferPageContent() {
               error={form.wrongFile ?? errors.file}
               onChange={(file) => setValue('file', file)}
             />
+            {form.checkingFile && <Paragraph data-size="sm">{t('page.new.checking_file')}</Paragraph>}
 
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
-              {/* Checksum form hidden for now; restore by uncommenting.
               <Field>
-                <Switch
-                  id={fieldId('checksumEnabled')}
-                  label={t('page.new.validate_checksum')}
-                  checked={values.checksumEnabled}
-                  onChange={(event) => setValue('checksumEnabled', event.target.checked)}
-                />
+                <WithHelpText label={t('page.new.validate_checksum')} helpText={t('page.helptext.checksum_help_text')}>
+                  <Switch
+                    id={fieldId('checksumEnabled')}
+                    label={t('page.new.validate_checksum')}
+                    checked={values.checksumEnabled}
+                    onChange={(event) => setValue('checksumEnabled', event.target.checked)}
+                  />
+                </WithHelpText>
                 <Field.Description>
                   {t('page.new.checksum_computed')}
                 </Field.Description>
@@ -282,7 +333,6 @@ function NewFileTransferPageContent() {
                   onChecksumChange={(checksum) => setValue('checksum', checksum)}
                 />
               )}
-              */}
               <VirusScanField
                 checked={values.virusScan}
                 locked={form.virusScanLocked}
@@ -318,13 +368,13 @@ function NewFileTransferPageContent() {
             <CancelUploadConfirmation
               onConfirm={() => {
                 setConfirmingCancel(false)
-                form.cancel()
+                cancelUpload()
               }}
               onDismiss={() => setConfirmingCancel(false)}
             />
           ) : (
             <div className="new-transfer__actions">
-              {continueUpload || detailsLocked ? (
+              {continueUpload || form.interrupted ? (
                 <Button
                   type="button"
                   onClick={continueUpload ?? undefined}

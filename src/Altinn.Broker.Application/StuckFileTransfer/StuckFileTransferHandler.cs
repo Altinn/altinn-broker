@@ -1,4 +1,5 @@
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Helpers;
@@ -17,6 +18,7 @@ public class StuckFileTransferHandler(
     IFileTransferRepository fileTransferRepository,
     ITusUploadFinalizationProgressService tusUploadFinalizationProgressService,
     ITusUploadActivityCache tusUploadActivityCache,
+    IUploadPlanStore uploadPlanStore,
     IBackgroundJobClient backgroundJobClient,
     SlackStuckFileTransferNotifier slackNotifier,
     ILogger<StuckFileTransferHandler> logger)
@@ -55,6 +57,14 @@ public class StuckFileTransferHandler(
                 backgroundJobClient.Enqueue<IEventBus>((eventBus) => eventBus.Publish(AltinnEventType.UploadFailed, fileTransfer.ResourceId, fileTransfer.FileTransferId.ToString(), fileTransfer.Sender.ActorExternalId, Guid.NewGuid(), AltinnEventSubjectRole.Sender, CancellationToken.None));
                 return Task.CompletedTask;
             }, logger, cancellationToken);
+            try
+            {
+                await uploadPlanStore.RemoveAsync(fileTransferStatus.FileTransferId, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "Failed to remove upload plan for file transfer {fileTransferId}", fileTransferStatus.FileTransferId);
+            }
         }
 
         logger.LogInformation("Checking for file transfers stuck in upload processing");

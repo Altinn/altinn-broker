@@ -52,7 +52,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   sku: {
     name: environment == 'test'
     ? 'Standard_B2s'
-    : environment == 'production' ? 'Standard_E8ds_v5' : 'Standard_D2ds_v5'
+    : environment == 'production' ? 'Standard_E8ads_v5' : 'Standard_D2ds_v5'
     tier: environment == 'test' 
     ? 'Burstable' 
     : environment == 'production' ? 'MemoryOptimized' : 'GeneralPurpose'

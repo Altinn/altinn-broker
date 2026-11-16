@@ -28,6 +28,12 @@ public class GetFileTransferSummariesHandler(
     private static readonly List<FileTransferStatus> ActiveRecipientStatuses = [FileTransferStatus.Published];
 
     /// <summary>
+    /// A draft file transfer is one that has not yet been published, and is still in the sender's control. It is either
+    /// in the Initialized state, or has started uploading but not yet finished.
+    /// </summary>
+    private static readonly List<FileTransferStatus> DraftStatuses = [FileTransferStatus.Initialized, FileTransferStatus.UploadStarted];
+
+    /// <summary>
     /// A file transfer is historical once it has moved past Published into any of these terminal
     /// states - mirrors the terminal-state set used to derive the active-detail page's Status field.
     /// </summary>
@@ -67,12 +73,18 @@ public class GetFileTransferSummariesHandler(
             return FileTransferSummaryPage.Empty();
         }
 
-        var senderStatuses = request.View == FileTransferListView.Active ? ActiveSenderStatuses : HistoricalStatuses;
-        var recipientStatuses = request.View == FileTransferListView.Active ? ActiveRecipientStatuses : HistoricalStatuses;
+        (SearchRole role, List<FileTransferStatus> senderStatuses, List<FileTransferStatus>? recipientStatuses) = request.View switch
+        {
+            FileTransferListView.Active => (SearchRole.Both, ActiveSenderStatuses, ActiveRecipientStatuses),
+            // Only the sender's own: an empty recipient filter would match every status.
+            FileTransferListView.Drafts => (SearchRole.Sender, DraftStatuses, null),
+            _ => (SearchRole.Both, HistoricalStatuses, HistoricalStatuses),
+        };
         var summaries = await fileTransferRepository.GetFileTransferSummariesAssociatedWithActor(new FrontendFileTransferSearchEntity()
         {
             Actor = callingActor,
             ResourceIds = authorizedResourceIds,
+            Role = role,
             SenderStatuses = senderStatuses,
             RecipientStatuses = recipientStatuses,
             // One past the page tells a full page from the last one, without counting the whole set.

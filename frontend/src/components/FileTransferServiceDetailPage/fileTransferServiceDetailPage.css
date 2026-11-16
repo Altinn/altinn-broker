@@ -23,6 +23,7 @@ ul.service-detail__resource li {
   border-radius: 0;
 }
 
+.resource-configuration__environment,
 .resource-configuration__edit-toggle {
   margin-block-end: var(--ds-spacing-4);
 }

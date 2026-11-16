@@ -2,6 +2,7 @@ import { Button, Fieldset, Textfield } from '@digdir/designsystemet-react'
 import { PlusIcon, TrashIcon } from '@navikt/aksel-icons'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { WithHelpText } from '../HelpTextPopover'
 import { createMetadataEntry, metadataInputId, type MetadataEntry } from './formFields'
 import {
   MAX_METADATA_ENTRIES,
@@ -55,7 +56,11 @@ export function MetadataFields({
 
   return (
     <Fieldset id={id} tabIndex={-1}>
-      <Fieldset.Legend>{t('page.metadata.legend')}</Fieldset.Legend>
+      <Fieldset.Legend>
+        <WithHelpText label={t('page.metadata.legend')} helpText={t('page.helptext.metadata_help_text')}>
+          {t('page.metadata.legend')}
+        </WithHelpText>
+      </Fieldset.Legend>
       <Fieldset.Description>
         {t('page.metadata.description', { max: MAX_METADATA_ENTRIES })}
       </Fieldset.Description>
