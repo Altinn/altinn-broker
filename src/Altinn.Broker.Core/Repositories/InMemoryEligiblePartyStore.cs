@@ -26,10 +26,6 @@ public class InMemoryEligiblePartyStore : IEligiblePartyStore
     public Task ReplaceAll(IReadOnlyDictionary<string, string> partyUuidToOrganizationNumber, CancellationToken cancellationToken)
     {
         var organizations = partyUuidToOrganizationNumber.Values.Where(o => !string.IsNullOrEmpty(o)).ToFrozenSet();
-        if (organizations.Count == 0)
-        {
-            return Task.CompletedTask;
-        }
         _snapshot = new Snapshot(organizations, partyUuidToOrganizationNumber.ToFrozenDictionary());
         return Task.CompletedTask;
     }

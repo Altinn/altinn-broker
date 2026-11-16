@@ -23,11 +23,6 @@ public class SyncAccessListsHandler(
     public async Task Process(CancellationToken cancellationToken)
     {
         var partyUuids = await GetAllAccessListPartyUuids(cancellationToken);
-        if (partyUuids.Count == 0)
-        {
-            logger.LogInformation("Access list found no partyUuids to sync, keeping eligible parties");
-            return;
-        }
 
         var known = await eligiblePartyStore.GetKnownPartyMappings(partyUuids, cancellationToken);
 
@@ -46,14 +41,17 @@ public class SyncAccessListsHandler(
             mappings[uuid] = organizationNumber;
         }
 
-        if (mappings.Count == 0)
+        if (partyUuids.Count == 0)
         {
-            // Only reachable when every access list was fetched successfully and none had members
-            logger.LogWarning("Access lists are empty after a successful sync. Clearing eligible parties");
+            logger.LogWarning("Access lists have no members. Clearing eligible parties");
+        }
+        else if (mappings.Count == 0)
+        {
+            logger.LogWarning("None of the {memberCount} access list members have an organization number. Clearing eligible parties", partyUuids.Count);
         }
         
         await eligiblePartyStore.ReplaceAll(mappings, cancellationToken);
-        logger.LogInformation("Synced eligible parties: {partyCount} parties, {lookupCount} looked up in register, {failedCount} failed", mappings.Count, misses.Count, misses.Count - resolved.Count);
+        logger.LogInformation("Synced eligible parties: {partyCount} parties, {lookupCount} looked up in register, {unresolvedCount} not resolved", mappings.Count, misses.Count, misses.Count - resolved.Count);
     }
 
     private async Task<List<string>> GetAllAccessListPartyUuids(CancellationToken cancellationToken)
@@ -66,7 +64,7 @@ public class SyncAccessListsHandler(
             var accessList = await altinnResourceRepository.GetAccessListMembersOfResource(resource.Id, cancellationToken);
             if (accessList is null)
             {
-                logger.LogInformation("Resource {resourceId} is null, skipping", resource.Id.SanitizeForLogs());
+                logger.LogWarning("Resource {resourceId} was not found in Resource Registry, skipping", resource.Id.SanitizeForLogs());
                 continue;
             }
             partyUuids.UnionWith(accessList.PartyUuids);

@@ -5,7 +5,7 @@ import { getEligiblePartiesAltinnToken } from './altinnTokenService.js';
 
 export const baseUrl = __ENV.base_url || 'https://platform.yt01.altinn.cloud';
 
-// Mix of eligible and non-eligible org numbers. Override with -e org_numbers=a,b,c
+// Mix of eligible and non-eligible org numbers.
 const orgNumbers = ('311695657,310630829,314184904,000000000,313798534,311170376').split(',');
 
 const rateLimited = new Counter('rate_limited_429');
@@ -13,7 +13,7 @@ const serverErrors = new Counter('server_errors_5xx');
 
 export async function setupEligibleParties() {
   // -e token=... skips Maskinporten, e.g. when running against localhost with a token from Bruno
-  const token = await getEligiblePartiesAltinnToken();
+  const token = __ENV.token || await getEligiblePartiesAltinnToken();
   if (!check(token, { 'Eligible parties token obtained': (t) => typeof t === 'string' && t.length > 0 })) {
     fail('Could not obtain eligible parties token');
   }

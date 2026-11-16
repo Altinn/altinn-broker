@@ -2,10 +2,11 @@ import { setupEligibleParties, checkEligibility } from './helpers/eligiblePartyR
 
 // Pass/fail check: can we sustain the target rate?
 // Usage: k6 run -e rate=1000 -e duration=10m -e p95_ms=100 -e p99_ms=300 test-eligible-parties-load.js
-const rate = Number(1000);
-const duration = '10m';
-const p95Ms = Number(100);
-const p99Ms = Number(300);
+const rate = Number(__ENV.rate || 1000);
+const duration = __ENV.duration || '10m';
+const p95Ms = Number(__ENV.p95_ms || 100);
+const p99Ms = Number(__ENV.p99_ms || 300);
+
 
 // VUs in use = rate × latency. Size the pool for the p99 limit with 2x margin;
 // beyond that, iterations are dropped and the run fails.

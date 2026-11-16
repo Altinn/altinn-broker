@@ -58,8 +58,8 @@ public class RedisEligiblePartyStore(IConnectionMultiplexer redis, ILogger<Redis
         foreach (var chunk in partyUuids.Chunk(ChunkSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var values = db.HashGetAsync(HashKey, chunk.Select(x => (RedisValue)x).ToArray());
-            foreach (var (uuid, value) in chunk.Zip(values.Result))
+            var values = await db.HashGetAsync(HashKey, chunk.Select(x => (RedisValue)x).ToArray());
+            foreach (var (uuid, value) in chunk.Zip(values))
             {
                 if (!value.IsNull)
                 {
