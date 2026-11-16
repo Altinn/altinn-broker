@@ -10,15 +10,15 @@ public class GetActiveFileTransferDetailsResponse
     public long? FileTransferSize { get; set; }
     public string? Checksum { get; set; }
     public string? ChecksumAlgorithm { get; set; }
-    public string? Created { get; set; }
+    public DateTimeOffset? Created { get; set; }
     public bool? UseVirusScan { get; set; }
-    public string? Published { get; set; }
+    public DateTimeOffset? Published { get; set; }
     public string? Sender { get; set; }
     public string? SenderName { get; set; }
     public  List<RecipientDetails>? Recipients { get; set; }
     public Dictionary<string, string>? PropertyList { get; set; }
     public string? ServiceOwner { get; set; }
-    public string? ExpirationTime { get; set; }
+    public DateTimeOffset? ExpirationTime { get; set; }
     public string? Status { get; set; }
     public bool? IsSender { get; set; }
     public string? ActorDownloadStatus { get; set; }
@@ -35,6 +35,26 @@ public class RecipientDetails
     /// caller who is a recipient, on every recipient but the caller itself.
     /// </summary>
     public RecipientNotificationDetails? Notification { get; set; }
+
+    /// <summary>
+    /// How far this recipient has come with downloading the file. Null on every recipient but the caller itself when
+    /// the caller is a recipient.
+    /// </summary>
+    public RecipientDownloadDetails? Download { get; set; }
+}
+
+public class RecipientDownloadDetails
+{
+    /// <summary>
+    /// The recipient's ActorFileTransferStatus: Initialized, DownloadStarted or DownloadConfirmed. DownloadStarted only
+    /// means a download was attempted, not that the file was received.
+    /// </summary>
+    public required string Status { get; set; }
+
+    /// <summary>
+    /// When the recipient confirmed the download, null if it has not.
+    /// </summary>
+    public DateTimeOffset? ConfirmedAt { get; set; }
 }
 
 public class RecipientNotificationDetails
@@ -48,7 +68,7 @@ public class RecipientNotificationDetails
     /// <summary>
     /// When delivery was confirmed, once it is Sent.
     /// </summary>
-    public string? SentTime { get; set; }
+    public DateTimeOffset? SentTime { get; set; }
 
     /// <summary>
     /// Null when no reminder was ordered, or not yet - the reminder is created once the notification is ordered.
@@ -74,5 +94,5 @@ public class NotificationReminderDetails
     /// <summary>
     /// When it was delivered once Sent, otherwise when it is planned to go out.
     /// </summary>
-    public string? Time { get; set; }
+    public DateTimeOffset? Time { get; set; }
 }
