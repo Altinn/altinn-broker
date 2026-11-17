@@ -27,6 +27,7 @@ public class GetActiveFileTransferDetailsHandler(
     IResourceRepository resourceRepository,
     IAltinnResourceRepository altinnResourceRepository,
     IFileTransferNotificationRepository fileTransferNotificationRepository,
+    IActorFileTransferStatusRepository actorFileTransferStatusRepository,
     ILogger<GetActiveFileTransferDetailsHandler> logger) : IHandler<GetActiveFileTransferDetailsRequest, GetActiveFileTransferDetailsResponse>
 {
     public async Task<OneOf<GetActiveFileTransferDetailsResponse, Error>> Process(GetActiveFileTransferDetailsRequest request, ClaimsPrincipal? user, CancellationToken cancellationToken)
@@ -87,16 +88,21 @@ public class GetActiveFileTransferDetailsHandler(
             });
         
         var isSender = fileTransfer.Sender.ActorExternalId == callingActor.ActorExternalId;
+        var visibleRecipientStatuses = fileTransfer.RecipientCurrentStatuses
+            .Where(recipientStatus => isSender || recipientStatus.Actor.ActorExternalId == callingActor.ActorExternalId)
+            .ToList();
         var notifications = fileTransfer.HasNotification
             ? await fileTransferNotificationRepository.GetNotificationsForFileTransfer(fileTransfer.FileTransferId, cancellationToken)
             : [];
-        var notificationsByRecipient = GetNotificationsByRecipient(notifications, fileTransfer, isSender, callingActor);
+        var notificationsByRecipient = GetNotificationsByRecipient(notifications, visibleRecipientStatuses.Select(recipientStatus => recipientStatus.Actor));
+        var downloadsByRecipient = await GetDownloadsByRecipient(fileTransfer.FileTransferId, visibleRecipientStatuses, cancellationToken);
 
         var recipientDetails = fileTransferActors.SelectMany(actor => actor.Recipients).Distinct().Select(recipientId => new RecipientDetails()
         {
             Recipient = recipientId,
             RecipientName = organizationNameById.GetValueOrDefault(recipientId) ?? recipientId,
             Notification = notificationsByRecipient.GetValueOrDefault(recipientId),
+            Download = downloadsByRecipient.GetValueOrDefault(recipientId),
         }).ToList();
 
         var fileTransferEvents = await fileTransferStatusRepository.GetFileTransferStatusHistory(request.FileTransferId, cancellationToken);
@@ -118,15 +124,15 @@ public class GetActiveFileTransferDetailsHandler(
             FileTransferSize = fileTransfer.FileTransferSize,
             Checksum = string.IsNullOrWhiteSpace(fileTransfer.Checksum) ? null : fileTransfer.Checksum,
             ChecksumAlgorithm = fileTransfer.ChecksumAlgorithm.ToString(),
-            Created = initializedEvent is not null ? FormatTimestamp(initializedEvent.Date) : null,
-            Published = publishedEvent is not null ? FormatTimestamp(publishedEvent.Date) : null,
+            Created = initializedEvent?.Date,
+            Published = publishedEvent?.Date,
             UseVirusScan = fileTransfer.UseVirusScan,
             Sender = senderOrgNumber,
             SenderName = organizationNameById.GetValueOrDefault(fileTransfer.Sender.ActorExternalId) ?? senderOrgNumber,
             Recipients = recipientDetails,
             PropertyList = fileTransfer.PropertyList,
             ServiceOwner = resourceServiceOwner ?? fileTransfer.ResourceId,
-            ExpirationTime = FormatTimestamp(fileTransfer.ExpirationTime),
+            ExpirationTime = fileTransfer.ExpirationTime,
             Status = fileTransferStatus,
             IsSender = isSender,
             ActorDownloadStatus = callerRecipientStatus?.Status.ToString(),
@@ -179,22 +185,15 @@ public class GetActiveFileTransferDetailsHandler(
         }
     }
 
-    private static string FormatTimestamp(DateTimeOffset timestamp) => timestamp.ToString("dd.MM.yyyy HH:mm");
-
     /// <summary>
-    /// Each recipient's notification, keyed by the recipient's actor external id. The sender sees the notification status for every recipient, 
-    /// while a recipient sees only its own. 
+    /// Each visible recipient's notification, keyed by the recipient's actor external id. The sender sees every recipient,
+    /// while a recipient sees only itself.
     /// Custom recipients are counted on the recipient they are notified on behalf of, without their addresses.
     /// </summary>
     private static Dictionary<string, RecipientNotificationDetails> GetNotificationsByRecipient(
         List<BrokerNotificationEntity> notifications,
-        FileTransferEntity fileTransfer,
-        bool isSender,
-        ActorEntity callingActor)
+        IEnumerable<ActorEntity> visibleRecipients)
     {
-        var visibleRecipients = fileTransfer.RecipientCurrentStatuses
-            .Select(recipientStatus => recipientStatus.Actor)
-            .Where(actor => isSender || actor.ActorExternalId == callingActor.ActorExternalId);
 
         var notificationsByRecipient = new Dictionary<string, RecipientNotificationDetails>();
         foreach (var recipient in visibleRecipients)
@@ -213,17 +212,42 @@ public class GetActiveFileTransferDetailsHandler(
             notificationsByRecipient[recipient.ActorExternalId] = new RecipientNotificationDetails
             {
                 Status = main.Status.ToString(),
-                SentTime = main.NotificationSent is null ? null : FormatTimestamp(main.NotificationSent.Value),
+                SentTime = main.NotificationSent,
                 Reminder = reminder is null ? null : new NotificationReminderDetails
                 {
                     Status = reminder.Status.ToString(),
-                    Time = FormatTimestamp(reminder.NotificationSent ?? reminder.RequestedSendTime),
+                    Time = reminder.NotificationSent ?? reminder.RequestedSendTime,
                 },
                 CustomRecipientCount = customRecipients.Count,
                 CustomRecipientsNotifiedCount = customRecipients.Count(n => n.Status == NotificationDeliveryStatus.Sent),
             };
         }
         return notificationsByRecipient;
+    }
+
+    /// <summary>
+    /// Each visible recipient's download status and, once confirmed, when it confirmed, keyed by the recipient's actor
+    /// external id. The confirmation time is looked up in the status history because a recipient can download again
+    /// after confirming, which moves the date on its current status.
+    /// </summary>
+    private async Task<Dictionary<string, RecipientDownloadDetails>> GetDownloadsByRecipient(
+        Guid fileTransferId,
+        List<ActorFileTransferStatusEntity> visibleRecipientStatuses,
+        CancellationToken cancellationToken)
+    {
+        var actorEvents = visibleRecipientStatuses.Any(recipientStatus => recipientStatus.Status == ActorFileTransferStatus.DownloadConfirmed)
+            ? await actorFileTransferStatusRepository.GetActorEvents(fileTransferId, cancellationToken)
+            : [];
+
+        return visibleRecipientStatuses.ToDictionary(
+            recipientStatus => recipientStatus.Actor.ActorExternalId,
+            recipientStatus => new RecipientDownloadDetails
+            {
+                Status = recipientStatus.Status.ToString(),
+                ConfirmedAt = actorEvents
+                    .Where(actorEvent => actorEvent.Actor.ActorId == recipientStatus.Actor.ActorId && actorEvent.Status == ActorFileTransferStatus.DownloadConfirmed)
+                    .Min(actorEvent => (DateTimeOffset?)actorEvent.Date),
+            });
     }
 
 

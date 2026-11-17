@@ -1,12 +1,7 @@
 import type { TFunction } from 'i18next'
 import type { NotificationReminderDetail, RecipientNotificationDetail } from '../api/fileTransferDetail'
-
-export type NotificationTagColor = 'success' | 'danger' | 'warning' | 'info' | 'neutral'
-
-export type NotificationStatusDisplay = {
-  label: string
-  color: NotificationTagColor
-}
+import type { RecipientStatusTag } from '../components/FileTransfersPages/RecipientStatusList'
+import { formatDateTime } from './dateTimeHelper'
 
 /**
  * How far the notification to one recipient has come. A notification is only ordered once the file is published,
@@ -16,7 +11,7 @@ export function getNotificationStatusDisplay(
   notification: RecipientNotificationDetail,
   isPublished: boolean,
   t: TFunction,
-): NotificationStatusDisplay {
+): RecipientStatusTag {
   switch (notification.status) {
     case 'Pending':
       return isPublished
@@ -24,13 +19,13 @@ export function getNotificationStatusDisplay(
         : { label: t('page.detail.notification_pending_unpublished'), color: 'neutral' }
     case 'Ordered':
       return { label: t('page.detail.notification_ordered_not_confirmed'), color: 'info' }
-    case 'Sent':
+    case 'Sent': {
+      const sentTime = formatDateTime(notification.sentTime)
       return {
-        label: notification.sentTime
-          ? t('page.detail.notification_sent_at', { time: notification.sentTime })
-          : t('page.detail.notification_sent'),
+        label: sentTime ? t('page.detail.notification_sent_at', { time: sentTime }) : t('page.detail.notification_sent'),
         color: 'success',
       }
+    }
     case 'Rejected':
     case 'NotDelivered':
       return { label: t('page.detail.notification_rejected'), color: 'danger' }
@@ -42,14 +37,13 @@ export function getNotificationStatusDisplay(
 }
 
 export function formatReminderStatus(reminder: NotificationReminderDetail, t: TFunction): string {
+  const time = formatDateTime(reminder.time)
   switch (reminder.status) {
     case 'Pending':
     case 'Ordered':
-      return reminder.time
-        ? t('page.detail.reminder_scheduled_at', { time: reminder.time })
-        : t('page.detail.reminder_scheduled')
+      return time ? t('page.detail.reminder_scheduled_at', { time }) : t('page.detail.reminder_scheduled')
     case 'Sent':
-      return reminder.time ? t('page.detail.reminder_sent_at', { time: reminder.time }) : t('page.detail.reminder_sent')
+      return time ? t('page.detail.reminder_sent_at', { time }) : t('page.detail.reminder_sent')
     case 'Rejected':
     case 'NotDelivered':
       return t('page.detail.reminder_rejected')

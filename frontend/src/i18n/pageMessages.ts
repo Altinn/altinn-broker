@@ -141,6 +141,10 @@ const pageNb = {
     reminder_condition_not_met: 'Påminnelse ikke sendt',
     reminder_order_unconfirmed: 'Utsendelse av påminnelse kunne ikke bekreftes',
     custom_recipients_notified: 'Andre varslingsmottakere: {{notified}} av {{count}} varslet',
+    download: 'Nedlasting',
+    download_confirmed_at: 'Nedlasting bekreftet {{time}}',
+    download_attempted: 'Nedlasting forsøkt',
+    not_downloaded: 'Ikke lastet ned',
   },
   status: {
     awaiting: 'Til behandling',
@@ -567,6 +571,10 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       reminder_condition_not_met: 'Påminning ikkje sendt',
       reminder_order_unconfirmed: 'Utsending av påminning vart ikkje bekrefta',
       custom_recipients_notified: 'Andre varslingsmottakarar: {{notified}} av {{count}} varsla',
+      download: 'Nedlasting',
+      download_confirmed_at: 'Nedlasting stadfesta {{time}}',
+      download_attempted: 'Nedlasting forsøkt',
+      not_downloaded: 'Ikkje lasta ned',
     },
     status: {
       awaiting: 'Til handsaming',
@@ -987,6 +995,10 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       reminder_condition_not_met: 'Reminder not sent',
       reminder_order_unconfirmed: 'Reminder dispatch could not be confirmed',
       custom_recipients_notified: 'Other notification recipients: {{notified}} of {{count}} notified',
+      download: 'Download',
+      download_confirmed_at: 'Download confirmed {{time}}',
+      download_attempted: 'Download attempted',
+      not_downloaded: 'Not downloaded',
     },
     status: {
       awaiting: 'In progress',

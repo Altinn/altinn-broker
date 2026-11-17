@@ -87,7 +87,7 @@ public class FileTransferStatusRepository(NpgsqlDataSource dataSource, ExecuteDB
                 {
                     FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
                     Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                    Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                    Date = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")), DateTimeKind.Utc),
                     DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
                 });
             }
