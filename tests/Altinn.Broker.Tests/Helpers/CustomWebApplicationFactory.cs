@@ -46,6 +46,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Set environment to Development so exception details are shown
         builder.UseEnvironment("Development");
         builder.UseSetting("DistributedCacheOptions:RedisConnectionString", string.Empty);
+        builder.UseSetting("CorsSettings:AllowedOrigins:0", "https://*.apps.tt02.altinn.no");
 
         // Configure malware scan simulation based on EnableMalwareScanSimulation property
         builder.ConfigureAppConfiguration((context, configBuilder) =>

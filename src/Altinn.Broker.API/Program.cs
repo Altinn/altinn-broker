@@ -35,8 +35,11 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 
 using StackExchange.Redis;
+
+using tusdotnet.Helpers;
 
 BuildAndRun(args);
 
@@ -71,6 +74,9 @@ static void BuildAndRun(string[] args)
 
     // Vite (and other reverse proxies) set X-Forwarded-* so OIDC/cookies see the SPA host.
     app.UseForwardedHeaders();
+
+    // Ahead of the Accept, CSRF and TUS middlewares so preflight requests are answered here.
+    app.UseCors();
 
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -138,6 +144,24 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
     services.AddProblemDetails();
+
+    var corsAllowedOrigins = config.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? [];
+    services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy => policy
+            .WithOrigins(corsAllowedOrigins)
+            .SetIsOriginAllowedToAllowWildcardSubdomains()
+            .AllowCredentials()
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .WithExposedHeaders([
+                .. CorsHelper.GetExposedHeaders(),
+                HeaderNames.ContentDisposition,
+                HeaderNames.ContentRange,
+                HeaderNames.AcceptRanges
+            ])
+            .SetPreflightMaxAge(TimeSpan.FromMinutes(5)));
+    });
 
     services.Configure<ForwardedHeadersOptions>(options =>
     {
