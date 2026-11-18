@@ -410,7 +410,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             ResourceAccessLevel.Read => "read",
             ResourceAccessLevel.Write => "write",
-            ResourceAccessLevel.Publish => "publish",
+            ResourceAccessLevel.Access => "access",
             _ => throw new NotImplementedException()
         };
     }
