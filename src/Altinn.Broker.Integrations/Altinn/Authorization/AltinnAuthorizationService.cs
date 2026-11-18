@@ -47,7 +47,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             resourceId,
             party,
             null,
-            new List<ResourceAccessLevel> { ResourceAccessLevel.Publish },
+            new List<ResourceAccessLevel> { ResourceAccessLevel.Access },
             cancellationToken,
             requireRegisteredResource: false);
 
