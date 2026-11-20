@@ -30,6 +30,7 @@ const nb = {
     active: 'Aktive formidlinger',
     historical: 'Historiske formidlinger',
     details: 'Detaljer',
+    drafts: 'Utkast',
   },
   menu: {
     inbox: 'Innboks',
@@ -96,6 +97,7 @@ export const messages: Record<'nb' | 'nn' | 'en', ShellMessages> = {
       active: 'Aktive formidlingar',
       historical: 'Historiske formidlingar',
       details: 'Detaljar',
+      drafts: 'Utkast',
     },
     menu: {
       inbox: 'Innboks',
@@ -157,6 +159,7 @@ export const messages: Record<'nb' | 'nn' | 'en', ShellMessages> = {
       active: 'Active file transfers',
       historical: 'Historical file transfers',
       details: 'Details',
+      drafts: 'Drafts'
     },
     menu: {
       inbox: 'Inbox',
