@@ -74,6 +74,11 @@ function getBreadcrumbItems(
     if (pathname !== PageRoutes.historical) {
       items.push({ label: label('breadcrumbs.details'), selected: true })
     }
+  } else if (pathname.startsWith('/file-transfers/drafts')) {
+    items.push({
+      label: label('breadcrumbs.drafts'),
+      as: (props: LinkProps) => <Link {...props} to={PageRoutes.drafts} />,
+    })
   }
 
   return items
