@@ -93,12 +93,12 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                     {
                         FileTransferId = reader.GetGuid(reader.GetOrdinal("file_transfer_id_pk")),
                         Status = (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("file_transfer_status_description_id_fk")),
-                        Date = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
+                        Date = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")), DateTimeKind.Utc),
                         DetailedStatus = reader.IsDBNull(reader.GetOrdinal("file_transfer_status_detailed_description")) ? null : reader.GetString(reader.GetOrdinal("file_transfer_status_detailed_description"))
                     },
-                    FileTransferStatusChanged = reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")),
-                    Created = reader.GetDateTime(reader.GetOrdinal("created")),
-                    ExpirationTime = reader.GetDateTime(reader.GetOrdinal("expiration_time")),
+                    FileTransferStatusChanged = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("file_transfer_status_date")), DateTimeKind.Utc),
+                    Created = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("created")), DateTimeKind.Utc),
+                    ExpirationTime = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("expiration_time")), DateTimeKind.Utc),
                     FileLocation = reader.IsDBNull(reader.GetOrdinal("file_location")) ? null : reader.GetString(reader.GetOrdinal("file_location")),
                     FileTransferSize = reader.IsDBNull(reader.GetOrdinal("file_transfer_size")) ? 0 : reader.GetInt64(reader.GetOrdinal("file_transfer_size")),
                     StripeSizeBytes = reader.IsDBNull(reader.GetOrdinal("stripe_size_bytes")) ? null : reader.GetInt64(reader.GetOrdinal("stripe_size_bytes")),
@@ -164,7 +164,7 @@ public class FileTransferRepository(NpgsqlDataSource dataSource, IActorRepositor
                 {
                     FileTransferId = fileTransferId,
                     Status = (ActorFileTransferStatus)reader.GetInt32(reader.GetOrdinal("actor_file_transfer_status_description_id_fk")),
-                    Date = reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")),
+                    Date = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("actor_file_transfer_status_date")), DateTimeKind.Utc),
                     Actor = new ActorEntity()
                     {
                         ActorId = reader.GetInt64(reader.GetOrdinal("actor_id_fk")),

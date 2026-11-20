@@ -6,7 +6,9 @@ import { formatOrganizationDisplay } from '../../helpers/orgIdentifierHelper'
 import { formatFileTransferStatusMessage } from '../../helpers/fileTransferStatusHelper'
 // import { i18n } from '../../i18n/config'
 import type { FileTransferDetails, RecipientDetail } from '../../api/fileTransferDetail'
+import { formatDateTime } from '../../helpers/dateTimeHelper'
 import { NotificationDetail } from './NotificationDetail'
+import { DownloadDetail } from './DownloadDetail'
 
 /** A missing checksum means Broker is still calculating it after upload. */
 // function formatChecksum(checksum: string | null | undefined, algorithm: string | null | undefined): string {
@@ -26,6 +28,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
   const { t } = useTranslation()
   return (
     <List className="data-list">
+      <DetailField label={t('page.service.title')} value={transferDetails.resourceName} />
       <DetailField label={t('page.detail.file_name')} value={transferDetails.fileName} />
       <DetailField label={t('page.detail.transfer_id')} value={transferDetails.fileTransferId} />
       <DetailField label={t('page.common.reference')} value={transferDetails.sendersFileTransferReference} />
@@ -40,9 +43,10 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
           .join(', ')}
       />
       <NotificationDetail transferDetails={transferDetails} />
-      <DetailField label={t('page.detail.created')} value={transferDetails.created} />
-      <DetailField label={t('page.detail.uploaded')} value={transferDetails.published} />
-      <DetailField label={t('page.detail.deadline')} value={transferDetails.expirationTime} />
+      <DownloadDetail transferDetails={transferDetails} />
+      <DetailField label={t('page.detail.created')} value={formatDateTime(transferDetails.created)} />
+      <DetailField label={t('page.detail.uploaded')} value={formatDateTime(transferDetails.published)} />
+      <DetailField label={t('page.detail.deadline')} value={formatDateTime(transferDetails.expirationTime)} />
       <DetailField label={t('page.detail.file_size')} value={formatFileSize(transferDetails.fileTransferSize)} />
       {/* Checksum hidden for now; restore by uncommenting.
       <DetailField label={t('page.detail.checksum')} value={formatChecksum(transferDetails.checksum, transferDetails.checksumAlgorithm)} />

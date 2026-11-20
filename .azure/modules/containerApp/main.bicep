@@ -56,6 +56,16 @@ var rotationContainerAppEnvVars = rotationEnabled ? [
   { name: 'MaskinportenJwkRotationSettings__Enabled', value: string(rotationEnabled) }
 ]
 
+var corsAllowedOriginsByEnvironment = {
+  staging: ['https://*.apps.tt02.altinn.no']
+  production: ['https://*.apps.altinn.no']
+}
+var corsAllowedOrigins = corsAllowedOriginsByEnvironment[?environment] ?? []
+var corsContainerAppEnvVars = map(corsAllowedOrigins, (origin, index) => {
+  name: 'CorsSettings__AllowedOrigins__${index}'
+  value: origin
+})
+
 var containerAppEnvVars = concat([
   { name: 'ASPNETCORE_ENVIRONMENT', value: environment }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'application-insights-connection-string' }
@@ -115,7 +125,8 @@ empty(trim(staging_broker_api_url)) ? [] : [
 empty(trim(staging_configuration_forward_key)) ? [] : [
   { name: 'AltinnOptions__StagingConfigurationForwardKey', secretRef: 'staging-configuration-forward-key' }
 ],
-rotationContainerAppEnvVars)
+rotationContainerAppEnvVars,
+corsContainerAppEnvVars)
 
 var stagingForwardKeySecret = empty(trim(staging_configuration_forward_key)) ? [] : [
   {

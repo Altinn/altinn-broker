@@ -27,11 +27,20 @@ export type RecipientNotificationDetail = {
     customRecipientsNotifiedCount: number
 }
 
+export type ActorDownloadStatus = 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed'
+
+export type RecipientDownloadDetail = {
+    status: ActorDownloadStatus
+    confirmedAt?: string | null
+}
+
 export type RecipientDetail = {
     recipient: string
     recipientName?: string
     // Null when no notification was ordered for the recipient, and - for a recipient viewing - on the other recipients.
     notification?: RecipientNotificationDetail | null
+    // Null on the other recipients when the viewer is a recipient.
+    download?: RecipientDownloadDetail | null
 }
 
 export type FileTransferDetails = {
@@ -54,7 +63,7 @@ export type FileTransferDetails = {
     expirationTime?: string | null
     status?: string
     isSender?: boolean
-    actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
+    actorDownloadStatus?: ActorDownloadStatus | null
     notification?: NotificationDetails | null
     hasNotification?: boolean
 }
