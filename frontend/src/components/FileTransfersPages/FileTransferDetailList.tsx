@@ -54,7 +54,7 @@ export function FileTransferDetailList({ transferDetails }: FileTransferDetailLi
       <DetailField label={t('page.detail.virus_scanned')} value={transferDetails.useVirusScan ? t('page.detail.virus_done') : t('page.detail.virus_not_done')} />
       <DetailField label={t('page.detail.metadata')} value={Object.entries(transferDetails.propertyList ?? {})
         .map(([key, value]) => `${key}: ${value}`)
-        .join(', ')} />
+        .join(', ') || t('page.detail.no_metadata')}/>
       <DetailField
         label={t('page.detail.status')}
         value={formatFileTransferStatusMessage(transferDetails.status, transferDetails.actorDownloadStatus)}

@@ -145,6 +145,7 @@ const pageNb = {
     download_confirmed_at: 'Nedlasting bekreftet {{time}}',
     download_attempted: 'Nedlasting forsøkt',
     not_downloaded: 'Ikke lastet ned',
+    no_metadata: 'Ingen metadata',
   },
   status: {
     awaiting: 'Til behandling',
@@ -579,6 +580,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       download_confirmed_at: 'Nedlasting stadfesta {{time}}',
       download_attempted: 'Nedlasting forsøkt',
       not_downloaded: 'Ikkje lasta ned',
+      no_metadata: "Ingen metadata",
     },
     status: {
       awaiting: 'Til handsaming',
@@ -1007,6 +1009,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       download_confirmed_at: 'Download confirmed {{time}}',
       download_attempted: 'Download attempted',
       not_downloaded: 'Not downloaded',
+      no_metadata: 'No metadata'
     },
     status: {
       awaiting: 'In progress',
