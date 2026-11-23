@@ -88,6 +88,8 @@ export function ServiceDetails({
           onBehalfOf={onBehalfOf}
           canPublish={resource.canPublish}
           isServiceOwner={resource.isServiceOwner}
+          isOwned={resource.isOwned}
+          provisioningStatus={resource.provisioningStatus}
           sender={sender}
           accessListCandidates={accessListCandidates}
         />

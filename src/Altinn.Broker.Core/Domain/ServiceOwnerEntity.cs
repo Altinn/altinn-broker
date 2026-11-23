@@ -8,6 +8,11 @@ public class ServiceOwnerEntity
     public required string Name { get; set; }
     public required List<StorageProviderEntity> StorageProviders { get; set; }
 
+    /// <summary>
+    /// Background storage deployment. Existing rows default to <see cref="ProvisioningPhase.Ready"/>.
+    /// </summary>
+    public ProvisioningPhase ProvisioningPhase { get; set; } = ProvisioningPhase.Ready;
+
     public StorageProviderEntity? GetStorageProvider(bool withVirusScan)
     {
         if (withVirusScan)

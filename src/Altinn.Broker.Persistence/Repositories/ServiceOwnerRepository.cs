@@ -10,7 +10,7 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBComman
     public async Task<ServiceOwnerEntity?> GetServiceOwner(string serviceOwnerId)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT service_owner_id_pk, service_owner_name, " +
+            "SELECT service_owner_id_pk, service_owner_name, provisioning_phase, " +
             "storage_provider_id_pk, created, resource_name, storage_provider_type, active " +
             "FROM broker.service_owner " +
             "LEFT JOIN broker.storage_provider sp on sp.service_owner_id_fk = service_owner_id_pk " +
@@ -32,6 +32,7 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBComman
                     {
                         Id = reader.GetString(reader.GetOrdinal("service_owner_id_pk")),
                         Name = reader.GetString(reader.GetOrdinal("service_owner_name")),
+                        ProvisioningPhase = ParsePhase(reader.GetString(reader.GetOrdinal("provisioning_phase"))),
                         StorageProviders = new List<StorageProviderEntity>()
                     };
                 }
@@ -67,13 +68,63 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBComman
     public async Task InitializeServiceOwner(string sub, string name)
     {
         await using var command = dataSource.CreateCommand(
-            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name) " +
-            "VALUES (@sub, @name)");
+            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, provisioning_phase) " +
+            "VALUES (@sub, @name, @phase)");
         command.Parameters.AddWithValue("@sub", sub);
         command.Parameters.AddWithValue("@name", name);
-        
+        command.Parameters.AddWithValue("@phase", ProvisioningPhase.Queued.ToString());
+
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
     }
+
+    public async Task<bool> TryInitializeServiceOwner(string sub, string name)
+    {
+        await using var command = dataSource.CreateCommand(
+            "INSERT INTO broker.service_owner (service_owner_id_pk, service_owner_name, provisioning_phase) " +
+            "VALUES (@sub, @name, @phase) " +
+            "ON CONFLICT (service_owner_id_pk) DO NOTHING");
+        command.Parameters.AddWithValue("@sub", sub);
+        command.Parameters.AddWithValue("@name", name);
+        command.Parameters.AddWithValue("@phase", ProvisioningPhase.Queued.ToString());
+
+        var inserted = await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
+        return inserted == 1;
+    }
+
+    public async Task SetProvisioningPhase(string serviceOwnerId, ProvisioningPhase phase)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.service_owner SET provisioning_phase = @phase WHERE service_owner_id_pk = @serviceOwnerId");
+        command.Parameters.AddWithValue("@phase", phase.ToString());
+        command.Parameters.AddWithValue("@serviceOwnerId", serviceOwnerId);
+
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
+    }
+
+    public async Task InitializeDevelopmentStorage(string serviceOwnerId)
+    {
+        try
+        {
+            await InitializeStorageProvider(serviceOwnerId, "Dummy value", StorageProviderType.Altinn3Azure);
+            await SetProvisioningPhase(serviceOwnerId, ProvisioningPhase.Ready);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            try
+            {
+                await SetProvisioningPhase(serviceOwnerId, ProvisioningPhase.Failed);
+            }
+            catch (Exception)
+            {
+                // Hangfire should retry the original failure.
+            }
+
+            throw;
+        }
+    }
+
+    private static ProvisioningPhase ParsePhase(string value)
+        => Enum.TryParse<ProvisioningPhase>(value, out var phase) ? phase : ProvisioningPhase.Queued;
 
     public async Task InitializeStorageProvider(string sub, string resourceName, StorageProviderType storageType)
     {

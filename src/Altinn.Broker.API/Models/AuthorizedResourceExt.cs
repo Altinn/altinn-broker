@@ -56,4 +56,28 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("isOwned")]
     public bool IsOwned { get; set; }
+
+    /// <summary>
+    /// The user has publish on <c>digdir-broker-administrasjon</c> for the requested party.
+    /// </summary>
+    [JsonPropertyName("hasConfigureAccess")]
+    public bool HasConfigureAccess { get; set; }
+
+    /// <summary>
+    /// NotRegistered, InProgress, Ready, or Failed for the requested party.
+    /// </summary>
+    [JsonPropertyName("provisioningStatus")]
+    public ServiceOwnerProvisioningStatus ProvisioningStatus { get; set; }
+
+    /// <summary>
+    /// The current deployment step. Null when the party is not registered.
+    /// </summary>
+    [JsonPropertyName("provisioningPhase")]
+    public ProvisioningPhase? ProvisioningPhase { get; set; }
+
+    /// <summary>
+    /// Approximate provisioning completion, from 0 to 100.
+    /// </summary>
+    [JsonPropertyName("provisioningPercent")]
+    public int ProvisioningPercent { get; set; }
 }

@@ -8,6 +8,7 @@ using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
@@ -28,6 +29,7 @@ public class GetAuthorizedResourcesHandler(
     IAltinnResourceRepository altinnResourceRepository,
     BrokerResourceProvisioner resourceProvisioner,
     HybridCache hybridCache,
+    IHostEnvironment hostEnvironment,
     ILogger<GetAuthorizedResourcesHandler> logger) : IHandler<GetAuthorizedResourcesRequest, List<AuthorizedResourceOverview>>
 {
     private static readonly HybridCacheEntryOptions ResourceMetadataCacheOptions = new()
@@ -94,17 +96,32 @@ public class GetAuthorizedResourcesHandler(
             return Errors.AuthorizationUnavailable;
         }
 
-        var isServiceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is not null;
-        var canConfigureForParty = isServiceOwner
-            && await HasGatekeeperPublish(user, party, cancellationToken);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix());
+        var isServiceOwner = serviceOwner is not null;
+        var partyOwnsBrokerResource = serviceOwnerByResourceId.Values.Any(owner => owner == party);
+        var hasGatekeeper = false;
+        if (isServiceOwner || partyOwnsBrokerResource)
+        {
+            hasGatekeeper = await HasGatekeeperPublish(user, party, cancellationToken);
+        }
+
+        var provisioningPhase = serviceOwner is null
+            ? (ProvisioningPhase?)null
+            : ServiceOwnerProvisioning.EffectivePhase(serviceOwner, hostEnvironment.IsDevelopment());
+        var provisioningStatus = serviceOwner is null
+            ? ServiceOwnerProvisioningStatus.NotRegistered
+            : ServiceOwnerProvisioning.StatusFor(provisioningPhase!.Value);
+        var provisioningPercent = ServiceOwnerProvisioning.PercentFor(provisioningPhase);
+        var provisioningReady = provisioningStatus == ServiceOwnerProvisioningStatus.Ready;
 
         // Include when the party owns the resource as a Broker service owner, or when they can
-        // send/receive and are on the resource access list.
+        // send/receive and are on the resource access list. Gatekeeper users also see owned
+        // resources before the organization is registered, so BrokerBox can offer provisioning.
         var accessibility = await Task.WhenAll(authorizedResources.Select(async authorized =>
         {
             var ownedByParty = serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
                 && owner == party;
-            if (isServiceOwner && ownedByParty)
+            if (ownedByParty && (isServiceOwner || hasGatekeeper))
             {
                 return (authorized, include: true);
             }
@@ -142,9 +159,13 @@ public class GetAuthorizedResourcesHandler(
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
-                CanPublish = canConfigureForParty && ownedByParty,
+                CanPublish = provisioningReady && hasGatekeeper && ownedByParty,
                 IsServiceOwner = isServiceOwner,
-                IsOwned = ownedByParty
+                IsOwned = ownedByParty,
+                HasConfigureAccess = hasGatekeeper,
+                ProvisioningStatus = provisioningStatus,
+                ProvisioningPhase = provisioningPhase,
+                ProvisioningPercent = provisioningPercent
             };
         }));
 

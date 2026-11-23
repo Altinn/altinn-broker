@@ -184,7 +184,11 @@ public class ResourceController : Controller
                 CanReceive = resource.CanReceive,
                 CanPublish = resource.CanPublish,
                 IsServiceOwner = resource.IsServiceOwner,
-                IsOwned = resource.IsOwned
+                IsOwned = resource.IsOwned,
+                HasConfigureAccess = resource.HasConfigureAccess,
+                ProvisioningStatus = resource.ProvisioningStatus,
+                ProvisioningPhase = resource.ProvisioningPhase,
+                ProvisioningPercent = resource.ProvisioningPercent
             }).ToList()),
             Problem
         );

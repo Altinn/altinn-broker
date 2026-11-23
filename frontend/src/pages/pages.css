@@ -219,3 +219,59 @@ ul.service-owner-list li.service-owner-list-item {
   background: transparent;
   border-radius: 0;
 }
+
+.provision-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 1.75rem 2rem;
+  border: 2px solid #0062ba;
+  border-radius: 0.5rem;
+  background: #e8f2fb;
+  color: #1e2b36;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.provision-banner:hover:not(:disabled) {
+  background: #d9ebf8;
+}
+
+.provision-banner:disabled {
+  cursor: wait;
+}
+
+.provision-banner--progress {
+  cursor: default;
+}
+
+.provision-banner__title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.provision-banner__text {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.provision-banner__error {
+  color: #8b1e3f;
+  font-weight: 600;
+}
+
+.provision-banner progress {
+  width: 100%;
+  height: 0.85rem;
+  accent-color: #0062ba;
+}
+
+.configure-pending {
+  opacity: 0.55;
+  pointer-events: none;
+}

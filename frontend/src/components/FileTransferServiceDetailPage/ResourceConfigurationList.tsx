@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ApiError } from '../../api/client'
 import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
+import type { ProvisioningStatus } from '../../api/resources'
 import { TT02_ENVIRONMENT, type ResourceConfiguration } from '../../api/resourceConfiguration'
 import { useAuth } from '../../auth/AuthContext'
 import { formatDuration } from '../../helpers/durationHelper'
@@ -63,6 +64,10 @@ type ResourceConfigurationListProps = {
   canPublish: boolean
   /** Used to choose between service-owner vs gatekeeper access notices. */
   isServiceOwner: boolean
+  /** The selected party owns this resource. */
+  isOwned: boolean
+  /** Party-level provisioning. Configuration stays closed until it is Ready. */
+  provisioningStatus: ProvisioningStatus
   sender: AllowedRecipient
   /**
    * Access-list parties (unfiltered by required party). Transfer-time allowed-recipients is too
@@ -77,6 +82,8 @@ export function ResourceConfigurationList({
   onBehalfOf,
   canPublish,
   isServiceOwner,
+  isOwned,
+  provisioningStatus,
   sender,
   accessListCandidates,
 }: ResourceConfigurationListProps) {
@@ -93,7 +100,8 @@ export function ResourceConfigurationList({
     onBehalfOf,
     environment: environment || undefined,
   })
-  const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
+  const awaitingProvisioning = isOwned && provisioningStatus !== 'Ready'
+  const publishNotice = canPublish || awaitingProvisioning ? null : configureAccessNotice(isServiceOwner)
 
   useEffect(() => {
     if (!environment) {
@@ -167,8 +175,11 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={!canPublish || configurationBusy || Boolean(editor.loadError)}
+          disabled={!canPublish || awaitingProvisioning || configurationBusy || Boolean(editor.loadError)}
         />
+        {awaitingProvisioning && (
+          <Field.Description>{t('page.services.provision_pending_settings')}</Field.Description>
+        )}
         {publishNotice && (
           <Field.Description>
             <LocalizedErrorText error={publishNotice} />

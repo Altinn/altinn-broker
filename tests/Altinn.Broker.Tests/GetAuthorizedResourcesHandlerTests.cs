@@ -2,12 +2,14 @@ using System.Security.Claims;
 
 using Altinn.Broker.Application;
 using Altinn.Broker.Application.GetAuthorizedResources;
+using Altinn.Broker.Application.Settings;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Tests.Tus;
 
 using Microsoft.AspNetCore.Http;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
@@ -287,6 +289,133 @@ public class GetAuthorizedResourcesHandlerTests
         Assert.Contains("registry-broker-service", checkedResourceIds);
     }
 
+    [Fact]
+    public async Task Process_IncludesOwnedResourcesWhenGatekeeperCanProvisionUnregisteredOwner()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository();
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "unregistered-service" }]);
+        authorizationService
+            .Setup(service => service.CheckAccessAsPublisher(
+                It.IsAny<ClaimsPrincipal?>(),
+                ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+                Party,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var altinnResourceRepository = CreateAltinnResourceRepository();
+        SetupBrokerServiceSearch(altinnResourceRepository,
+            new AltinnResourceSearchHit
+            {
+                Id = "unregistered-service",
+                OrganizationNumber = Party,
+                Title = "Ny BrokerService",
+                ServiceOwnerName = "Testdepartementet",
+                ResourceType = AltinnResourceTypes.BrokerService
+            });
+        var handler = CreateHandler(cache, resourceRepository, authorizationService, altinnResourceRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var resource = Assert.Single(result.AsT0);
+        Assert.True(resource.IsOwned);
+        Assert.False(resource.IsServiceOwner);
+        Assert.True(resource.HasConfigureAccess);
+        Assert.False(resource.CanPublish);
+        Assert.Equal(ServiceOwnerProvisioningStatus.NotRegistered, resource.ProvisioningStatus);
+        Assert.Null(resource.ProvisioningPhase);
+    }
+
+    [Fact]
+    public async Task Process_WithholdsPublishUntilProvisioningIsReady()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository((Id: "resource-owned", Owner: Party));
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "resource-owned" }]);
+        authorizationService
+            .Setup(service => service.CheckAccessAsPublisher(
+                It.IsAny<ClaimsPrincipal?>(),
+                ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+                Party,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var serviceOwnerRepository = new Mock<IServiceOwnerRepository>();
+        serviceOwnerRepository
+            .Setup(repository => repository.GetServiceOwner($"0192:{Party}"))
+            .ReturnsAsync(new ServiceOwnerEntity
+            {
+                Id = $"0192:{Party}",
+                Name = "Test owner",
+                StorageProviders = [],
+                ProvisioningPhase = ProvisioningPhase.CreatingVirusScanStorage
+            });
+        var handler = CreateHandler(
+            cache,
+            resourceRepository,
+            authorizationService,
+            CreateAltinnResourceRepository(("resource-owned", "Eid tjeneste", "Digitaliseringsdirektoratet")),
+            serviceOwnerRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var resource = Assert.Single(result.AsT0);
+        Assert.True(resource.IsServiceOwner);
+        Assert.True(resource.HasConfigureAccess);
+        Assert.False(resource.CanPublish);
+        Assert.Equal(ServiceOwnerProvisioningStatus.InProgress, resource.ProvisioningStatus);
+        Assert.Equal(ProvisioningPhase.CreatingVirusScanStorage, resource.ProvisioningPhase);
+        Assert.Equal(45, resource.ProvisioningPercent);
+    }
+
+    [Fact]
+    public async Task Process_AllowsPublishWhenProvisioningIsReadyAndGatekeeperAllowsIt()
+    {
+        await using var cache = TestHybridCacheFactory.CreateScope();
+        var resourceRepository = CreateResourceRepository((Id: "resource-owned", Owner: Party));
+        var authorizationService = new Mock<IAuthorizationService>();
+        authorizationService
+            .Setup(service => service.GetAuthorizedResources(It.IsAny<ClaimsPrincipal?>(), Party, It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AuthorizedResource { ResourceId = "resource-owned" }]);
+        authorizationService
+            .Setup(service => service.CheckAccessAsPublisher(
+                It.IsAny<ClaimsPrincipal?>(),
+                ApplicationConstants.BrokerBoxConfigureGatekeeperResourceId,
+                Party,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var serviceOwnerRepository = new Mock<IServiceOwnerRepository>();
+        serviceOwnerRepository
+            .Setup(repository => repository.GetServiceOwner($"0192:{Party}"))
+            .ReturnsAsync(new ServiceOwnerEntity
+            {
+                Id = $"0192:{Party}",
+                Name = "Test owner",
+                StorageProviders = [],
+                ProvisioningPhase = ProvisioningPhase.Ready
+            });
+        var handler = CreateHandler(
+            cache,
+            resourceRepository,
+            authorizationService,
+            CreateAltinnResourceRepository(("resource-owned", "Eid tjeneste", "Digitaliseringsdirektoratet")),
+            serviceOwnerRepository);
+
+        var result = await handler.Process(new GetAuthorizedResourcesRequest { Party = Party }, CreateUser(), CancellationToken.None);
+
+        Assert.True(result.IsT0);
+        var resource = Assert.Single(result.AsT0);
+        Assert.True(resource.CanPublish);
+        Assert.Equal(ServiceOwnerProvisioningStatus.Ready, resource.ProvisioningStatus);
+        Assert.Equal(100, resource.ProvisioningPercent);
+    }
+
     private static GetAuthorizedResourcesHandler CreateHandler(
         HybridCacheTestScope cache,
         Mock<IResourceRepository> resourceRepository,
@@ -307,6 +436,7 @@ public class GetAuthorizedResourcesHandlerTests
             altinnResourceRepository.Object,
             provisioner,
             cache.Cache,
+            Mock.Of<IHostEnvironment>(),
             NullLogger<GetAuthorizedResourcesHandler>.Instance);
     }
 
