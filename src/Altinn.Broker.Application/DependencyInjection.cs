@@ -29,6 +29,8 @@ using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 
 using Microsoft.Extensions.DependencyInjection;
+using Altinn.Broker.Application.GetEligibleParties;
+using Altinn.Broker.Application.SyncAccessLists;
 
 namespace Altinn.Broker.Application;
 public static class DependencyInjection
@@ -82,5 +84,8 @@ public static class DependencyInjection
         services.AddScoped<SendNotificationOrderHandler>();
         services.AddScoped<StuckNotificationOrderHandler>();
         services.AddScoped<CheckNotificationDeliveryHandler>();
+        services.AddScoped<SyncAccessListsHandler>();
+        services.AddScoped<GetEligiblePartiesHandler>();
+        services.AddScoped<GetPartyEligibilityHandler>();
     }
 }
