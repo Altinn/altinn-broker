@@ -147,6 +147,34 @@ public class AltinnAuthorizationServiceIdportenTests
         Assert.False(hasAccess);
     }
 
+    [Fact]
+    public async Task CheckAccessAsPublisher_UsesAuthorizePdpWithoutLocalResource()
+    {
+        var handler = new PdpResponseHandler(CreatePermitResponse(minimumAuthenticationLevel: 3));
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://unit.test/")
+        };
+        var resourceRepository = new Mock<IResourceRepository>(MockBehavior.Strict);
+        var service = new AltinnAuthorizationService(
+            httpClient,
+            Options.Create(new AltinnOptions { PlatformSubscriptionKey = "test-subscription-key" }),
+            resourceRepository.Object,
+            Mock.Of<ILogger<AltinnAuthorizationService>>());
+        var user = CreateIdportenUser(
+            new Claim("pid", "11887766554", ClaimValueTypes.String, IdportenIssuer),
+            new Claim(IdportenXacmlMapper.AuthenticationContextClaim, "idporten-loa-substantial", ClaimValueTypes.String, IdportenIssuer));
+
+        var hasAccess = await service.CheckAccessAsPublisher(user, "digdir-broker-administrasjon", OrganizationNumber);
+
+        Assert.True(hasAccess);
+        Assert.Equal("/authorization/api/v1/authorize", handler.LastPath);
+        Assert.Contains("digdir-broker-administrasjon", handler.LastRequestJson, StringComparison.Ordinal);
+        resourceRepository.Verify(
+            repository => repository.GetResource(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     [Theory]
     [InlineData("https://idporten.no", true)]
     [InlineData("https://test.idporten.no/", true)]
@@ -224,9 +252,12 @@ public class AltinnAuthorizationServiceIdportenTests
 
         public string? LastRequestJson { get; private set; }
 
+        public string? LastPath { get; private set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestCount++;
+            LastPath = request.RequestUri?.AbsolutePath;
             LastRequestJson = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);

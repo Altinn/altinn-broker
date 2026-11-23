@@ -3,6 +3,6 @@ public enum ResourceAccessLevel
 {
     Read,
     Write,
-    /// <summary>Right to configure/publish a broker resource (e.g. resource settings).</summary>
-    Publish
+    /// <summary>Right to configure a broker resource (the <c>access</c> action).</summary>
+    Access
 }

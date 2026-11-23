@@ -41,15 +41,53 @@ public class AltinnAuthorizationService : IAuthorizationService
     public Task<bool> CheckAccessAsSender(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default, bool requireRegisteredResource = true)
         => CheckUserAccess(user, resourceId, party, null, new List<ResourceAccessLevel> { ResourceAccessLevel.Write }, cancellationToken, requireRegisteredResource);
 
-    public Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
-        => CheckUserAccess(
+    /// <summary>
+    /// Access action on a resource-registry resource such as the configuration gatekeeper.
+    /// That resource is not a Broker row, so this calls the authorize PDP without a local lookup.
+    /// </summary>
+    public async Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default)
+    {
+        if (user is null)
+        {
+            throw new InvalidOperationException("This operation cannot be called outside an authenticated HttpContext");
+        }
+
+        bool isMaskinportenToken = user.Claims.Any(c => c.Type == "consumer" && c.Issuer.Contains("maskinporten.no"));
+        bool isIdportenToken = IdportenXacmlMapper.IsIdportenToken(user);
+        XacmlJsonCategory? idportenSubjectCategory = null;
+        if (isIdportenToken && !IdportenXacmlMapper.TryCreateSubjectCategory(user, out idportenSubjectCategory))
+        {
+            _logger.LogWarning("ID-porten token does not contain the required pid claim");
+            return false;
+        }
+
+        XacmlJsonRequestRoot jsonRequest = CreateDecisionRequest(
             user,
+            party.WithoutPrefix(),
+            fileTransferId: null,
+            new List<ResourceAccessLevel> { ResourceAccessLevel.Access },
             resourceId,
-            party,
-            null,
-            new List<ResourceAccessLevel> { ResourceAccessLevel.Publish },
-            cancellationToken,
-            requireRegisteredResource: false);
+            isIdportenToken ? idportenSubjectCategory : null);
+        var response = await _httpClient.PostAsJsonAsync("authorization/api/v1/authorize", jsonRequest, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"Authorization returned {(int)response.StatusCode} for resource registry access",
+                null,
+                response.StatusCode);
+        }
+
+        var responseContent = await response.Content.ReadFromJsonAsync<XacmlJsonResponse>(cancellationToken: cancellationToken);
+        if (responseContent is null)
+        {
+            _logger.LogError("Unexpected null or invalid json response from Authorization.");
+            return false;
+        }
+
+        return isIdportenToken
+            ? IdportenXacmlMapper.ValidateAuthorizationResponse(responseContent, user)
+            : ValidateResult(responseContent, user, isMaskinportenToken);
+    }
 
     public async Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default)
     {
@@ -107,7 +145,7 @@ public class AltinnAuthorizationService : IAuthorizationService
             return [];
         }
 
-        // Only write/read here. Publish for configuration is checked once via CheckAccessAsPublisher
+        // Only write/read here. Access for configuration is checked once via CheckAccessAsPublisher
         // on the gatekeeper resource; bundling it would drop batch size from 200 to 133 resources.
         var sendAction = GetActionId(ResourceAccessLevel.Write);
         var receiveAction = GetActionId(ResourceAccessLevel.Read);
@@ -410,7 +448,7 @@ public class AltinnAuthorizationService : IAuthorizationService
         {
             ResourceAccessLevel.Read => "read",
             ResourceAccessLevel.Write => "write",
-            ResourceAccessLevel.Publish => "publish",
+            ResourceAccessLevel.Access => "access",
             _ => throw new NotImplementedException()
         };
     }
