@@ -228,17 +228,17 @@ ul.service-owner-list li.service-owner-list-item {
   width: 100%;
   margin: 0 0 1rem;
   padding: 1.75rem 2rem;
-  border: 2px solid #0062ba;
+  border: 2px solid var(--ds-color-warning-border-default, #c25e00);
   border-radius: 0.5rem;
-  background: #e8f2fb;
-  color: #1e2b36;
+  background: var(--ds-color-warning-surface-tinted, #fff4d6);
+  color: var(--ds-color-warning-text-default, #3d2a00);
   text-align: left;
   cursor: pointer;
   font: inherit;
 }
 
 .provision-banner:hover:not(:disabled) {
-  background: #d9ebf8;
+  background: var(--ds-color-warning-surface-hover, #ffe8a3);
 }
 
 .provision-banner:disabled {
@@ -268,7 +268,7 @@ ul.service-owner-list li.service-owner-list-item {
 .provision-banner progress {
   width: 100%;
   height: 0.85rem;
-  accent-color: #0062ba;
+  accent-color: var(--ds-color-warning-base-default, #c25e00);
 }
 
 .configure-pending {
