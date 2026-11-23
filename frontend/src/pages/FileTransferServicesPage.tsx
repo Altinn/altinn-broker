@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
 import { ServiceOwnerProvisioningBanner } from '../components/FileTransferServices/ServiceOwnerProvisioningBanner'
+import { ServiceOwnerSetupNotice } from '../components/FileTransferServices/ServiceOwnerSetupNotice'
 import { useServiceOwnerProvisioning } from '../components/FileTransferServices/useServiceOwnerProvisioning'
 import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
@@ -75,10 +76,12 @@ export function FileTransferServicesPage() {
     allowed,
     starting,
     error: provisioningError,
+    accessNotice,
     start,
   } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
   const canProvision = allowed
   const showConfigure =
+    accessNotice != null ||
     (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
     (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
     (allowed && provisioning != null && provisioning.status !== 'Ready')
@@ -199,6 +202,7 @@ export function FileTransferServicesPage() {
           <Heading size="sm" as="h2">
             {t('page.services.can_configure', { name: organizationName })}
           </Heading>
+          {accessNotice && <ServiceOwnerSetupNotice />}
           {provisioning && (
             <ServiceOwnerProvisioningBanner
               organizationName={organizationName}

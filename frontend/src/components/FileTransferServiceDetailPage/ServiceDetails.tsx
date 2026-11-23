@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUndoIcon, PlusIcon } from '@navikt/aksel-icons'
 import { Link, type LinkProps } from 'react-router-dom'
 import type { AllowedRecipient } from '../../api/allowedRecipients'
+import type { AuthorizedResource } from '../../api/resources'
+import { ServiceOwnerSetupNotice } from '../FileTransferServices/ServiceOwnerSetupNotice'
 import { newFileTransferPath, PageRoutes } from '../../pages/routes'
 import type { FileTransferService } from './useFileTransferService'
 import { CannotSendNotice } from './CannotSendNotice'
@@ -100,6 +102,46 @@ export function ServiceDetails({
           accessListCandidates={accessListCandidates}
         />
       </section>
+    </div>
+  )
+}
+
+/** Shown when the resource cannot be stored because its service owner is not set up in Broker. */
+export function ServiceOwnerNotConfigured({ resource }: { resource: AuthorizedResource | null }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="page">
+      <nav className="service-detail__back">
+        <Button size="sm" variant="ghost" as={linkTo(PageRoutes.services)}>
+          <ButtonIcon icon={ArrowUndoIcon} />
+          <ButtonLabel>{t('page.common.back')}</ButtonLabel>
+        </Button>
+      </nav>
+
+      <section className="page-section">
+        <Heading as="h1" size="md" className="service-detail__heading">
+          {t('page.service.title')}
+        </Heading>
+        {resource && (
+          <List className="service-detail__resource">
+            <ResourceListItem
+              id={resource.resourceId}
+              resourceName={resource.name ?? resource.resourceId}
+              ownerName={resource.serviceOwnerName ?? t('page.common.unknown_owner')}
+              description={
+                resource.serviceOwnerName ? t('page.common.owned_by', { name: resource.serviceOwnerName }) : undefined
+              }
+              titleAs="h2"
+              interactive={false}
+              shadow="none"
+              border="none"
+            />
+          </List>
+        )}
+      </section>
+
+      <ServiceOwnerSetupNotice />
     </div>
   )
 }

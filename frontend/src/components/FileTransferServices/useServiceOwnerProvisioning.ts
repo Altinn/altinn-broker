@@ -6,10 +6,19 @@ import {
   provisioningFromOverview,
   type ServiceOwnerProvisioning,
 } from '../../api/serviceOwnerProvisioning'
-import { localizeApiError } from '../../i18n/apiErrors'
+import { localizeApiError, type LocalizedApiError } from '../../i18n/apiErrors'
 import { i18n } from '../../i18n/config'
 
 const POLL_INTERVAL_MS = 3000
+
+/** Publish on the gatekeeper resource is missing. Other 403s stay silent. */
+function gatekeeperNotice(caught: unknown): LocalizedApiError | null {
+  if (!(caught instanceof ApiError) || caught.status !== 403) {
+    return null
+  }
+  const localized = localizeApiError(caught.body)
+  return localized.errorCode === 36 ? localized : null
+}
 
 /**
  * Loads the selected party's service owner and polls GetServiceOwner while storage deployment runs.
@@ -25,6 +34,7 @@ export function useServiceOwnerProvisioning(
   const [loaded, setLoaded] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [accessNotice, setAccessNotice] = useState<LocalizedApiError | null>(null)
   const wasInProgress = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -38,6 +48,7 @@ export function useServiceOwnerProvisioning(
       setAllowed(true)
       setLoaded(true)
       setError(null)
+      setAccessNotice(null)
       if (next.status === 'InProgress') {
         wasInProgress.current = true
       }
@@ -50,8 +61,10 @@ export function useServiceOwnerProvisioning(
       if (caught instanceof ApiError && caught.status === 403) {
         setAllowed(false)
         setProvisioning(null)
+        setAccessNotice(gatekeeperNotice(caught))
         return
       }
+      setAccessNotice(null)
       setError(i18n.t('page.services.provision_poll_failed'))
     }
   }, [onReady, party])
@@ -62,6 +75,7 @@ export function useServiceOwnerProvisioning(
     setLoaded(false)
     setStarting(false)
     setError(null)
+    setAccessNotice(null)
     wasInProgress.current = false
     if (!party) {
       return
@@ -77,6 +91,7 @@ export function useServiceOwnerProvisioning(
         setProvisioning(next)
         setAllowed(true)
         setLoaded(true)
+        setAccessNotice(null)
         if (next.status === 'InProgress') {
           wasInProgress.current = true
         }
@@ -89,8 +104,10 @@ export function useServiceOwnerProvisioning(
         if (caught instanceof ApiError && caught.status === 403) {
           setAllowed(false)
           setProvisioning(null)
+          setAccessNotice(gatekeeperNotice(caught))
           return
         }
+        setAccessNotice(null)
         setError(i18n.t('page.services.provision_poll_failed'))
       })
 
@@ -142,5 +159,5 @@ export function useServiceOwnerProvisioning(
       })
   }, [organizationName, party, refresh, starting])
 
-  return { provisioning, allowed, loaded, starting, error, start }
+  return { provisioning, allowed, loaded, starting, error, accessNotice, start }
 }

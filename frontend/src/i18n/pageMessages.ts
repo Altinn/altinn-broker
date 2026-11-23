@@ -70,6 +70,9 @@ const pageNb = {
     missing_message: '{{name}} har ikke tilgang til denne formidlingstjenesten.',
     load_failed_heading: 'Kunne ikke hente formidlingstjenesten',
     load_failed_short: 'Klarte ikke å hente formidlingstjenesten.',
+    owner_not_configured_heading: 'Formidling må klargjøres',
+    owner_not_configured_message:
+      'Formidling må klargjøres for tjenesteeieren før denne tjenesten kan brukes. Du må ha tilgang i henhold til tilgangsreglene for digdir-broker-administrasjon for å gjøre det.',
     missing_short: 'Fant ikke formidlingstjenesten.',
     loading: 'Henter formidlingstjenesten',
     loading_settings: 'Henter oppsettet for tjenesten',
@@ -511,6 +514,9 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       missing_message: '{{name}} har ikkje tilgang til denne formidlingstenesta.',
       load_failed_heading: 'Klarte ikkje å hente formidlingstenesta',
       load_failed_short: 'Klarte ikkje å hente formidlingstenesta.',
+      owner_not_configured_heading: 'Formidling må klargjerast',
+      owner_not_configured_message:
+        'Formidling må klargjerast for tenesteeigaren før denne tenesta kan brukast. Du må ha tilgang i henhold til tilgangsreglane for digdir-broker-administrasjon for å gjere det.',
       missing_short: 'Fann ikkje formidlingstenesta.',
       loading: 'Hentar formidlingstenesta',
       loading_settings: 'Hentar oppsettet for tenesta',
@@ -946,6 +952,9 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       missing_message: '{{name}} does not have access to this file transfer service.',
       load_failed_heading: 'Could not load the file transfer service',
       load_failed_short: 'Could not load the file transfer service.',
+      owner_not_configured_heading: 'Broker must be set up',
+      owner_not_configured_message:
+        'Broker must be set up for the service owner before this service can be used. You need access according to the access rules for digdir-broker-administrasjon to do that.',
       missing_short: 'File transfer service not found.',
       loading: 'Loading the file transfer service',
       loading_settings: 'Loading the service settings',

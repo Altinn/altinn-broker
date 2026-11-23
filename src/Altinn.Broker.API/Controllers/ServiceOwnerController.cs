@@ -13,6 +13,7 @@ using Altinn.Broker.Models.ServiceOwner;
 using BrokerAuthorizationService = Altinn.Broker.Core.Repositories.IAuthorizationService;
 
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Altinn.Broker.Controllers;
@@ -168,7 +169,7 @@ public class ServiceOwnerController(
 
         if (!await organizationCatalog.IsPossibleServiceOwner(party, cancellationToken))
         {
-            return (null, Problem(Errors.NoPublishAccessToConfigureResource));
+            return (null, StatusCode(StatusCodes.Status403Forbidden));
         }
 
         try
