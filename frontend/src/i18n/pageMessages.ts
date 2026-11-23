@@ -63,6 +63,7 @@ const pageNb = {
     provision_pending_settings: 'Oppsettet kan endres når klargjøringen av tjenesteeieren er ferdig.',
     provision_start_failed: 'Klarte ikke å starte klargjøringen. Prøv igjen.',
     provision_poll_failed: 'Klarte ikke å hente status. Prøver igjen.',
+    provision_retry: 'Prøv igjen',
   },
   service: {
     title: 'Formidlingstjeneste',
@@ -507,6 +508,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       provision_pending_settings: 'Oppsettet kan endrast når klargjeringa av tenesteeigaren er ferdig.',
       provision_start_failed: 'Klarte ikkje å starte klargjeringa. Prøv igjen.',
       provision_poll_failed: 'Klarte ikkje å hente status. Prøver igjen.',
+      provision_retry: 'Prøv igjen',
     },
     service: {
       title: 'Formidlingsteneste',
@@ -945,6 +947,7 @@ export const pageMessages: Record<'nb' | 'nn' | 'en', PageMessages> = {
       provision_pending_settings: 'Settings can be changed when service owner setup has finished.',
       provision_start_failed: 'Could not start setup. Try again.',
       provision_poll_failed: 'Could not load the status. Trying again.',
+      provision_retry: 'Try again',
     },
     service: {
       title: 'File transfer service',

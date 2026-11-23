@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ServiceOwnerProvisioning } from '../../api/serviceOwnerProvisioning'
 
@@ -20,6 +21,7 @@ export function ServiceOwnerProvisioningBanner({
   onStart,
 }: ServiceOwnerProvisioningBannerProps) {
   const { t } = useTranslation()
+  const progressTitleId = useId()
 
   if (provisioning.status === 'Ready') {
     return null
@@ -28,8 +30,10 @@ export function ServiceOwnerProvisioningBanner({
   if (provisioning.status === 'InProgress' || starting) {
     return (
       <div className="provision-banner provision-banner--progress" role="status" aria-live="polite" aria-busy="true">
-        <span className="provision-banner__title">{t('page.services.provision_progress_title', { name: organizationName })}</span>
-        <progress value={provisioning.percent} max={100} />
+        <span id={progressTitleId} className="provision-banner__title">
+          {t('page.services.provision_progress_title', { name: organizationName })}
+        </span>
+        <progress aria-labelledby={progressTitleId} value={provisioning.percent} max={100} />
         <span className="provision-banner__text">
           {starting ? t('page.services.provision_starting') : t(provisioning.messageKey)}
         </span>

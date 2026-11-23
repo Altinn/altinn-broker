@@ -1,4 +1,4 @@
-import { Alert, Heading, List, ResourceListItem } from '@altinn/altinn-components'
+import { Alert, Button, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
@@ -78,6 +78,7 @@ export function FileTransferServicesPage() {
     error: provisioningError,
     accessNotice,
     start,
+    retry,
   } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
   const canProvision = allowed
   const showConfigure =
@@ -85,7 +86,8 @@ export function FileTransferServicesPage() {
     (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
     (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
     (allowed && provisioning != null && provisioning.status !== 'Ready')
-  const configurationLocked = showConfigure && provisioning != null && provisioning.status !== 'Ready'
+  const configurationLocked =
+    showConfigure && (provisioningError != null || (provisioning != null && provisioning.status !== 'Ready'))
 
   const serviceItem = (service: AuthorizedResource) => (
     <ResourceListItem
@@ -161,6 +163,15 @@ export function FileTransferServicesPage() {
             />
           ))}
         </List>
+      )}
+
+      {provisioningError && !provisioning && (
+        <div className="page-section">
+          <Alert variant="danger" heading={provisioningError} message={t('page.common.try_later')} />
+          <Button size="sm" onClick={() => void retry()}>
+            <ButtonLabel>{t('page.services.provision_retry')}</ButtonLabel>
+          </Button>
+        </div>
       )}
 
       {current?.status === 'failed' && (

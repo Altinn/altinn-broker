@@ -63,6 +63,14 @@ public class ServiceOwnerController(
         var existingServiceOwner = await serviceOwnerRepository.GetServiceOwner(serviceOwnerId.Id!);
         if (existingServiceOwner is not null)
         {
+            // Registration can succeed after scheduling fails. A retry with no storage providers
+            // schedules deployment again. An owner that already has providers stays a conflict.
+            if (existingServiceOwner.StorageProviders is not { Count: > 0 })
+            {
+                resourceManager.CreateStorageProviders(existingServiceOwner, cancellationToken);
+                return Ok();
+            }
+
             return Problem(ServiceOwnerErrors.ServiceOwnerAlreadyExists);
         }
 

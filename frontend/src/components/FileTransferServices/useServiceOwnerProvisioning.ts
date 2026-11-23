@@ -36,14 +36,20 @@ export function useServiceOwnerProvisioning(
   const [error, setError] = useState<string | null>(null)
   const [accessNotice, setAccessNotice] = useState<LocalizedApiError | null>(null)
   const wasInProgress = useRef(false)
+  const partyRef = useRef(party)
+  partyRef.current = party
 
   const refresh = useCallback(async () => {
     if (!party) {
       return
     }
+    const requestedParty = party
 
     try {
-      const next = provisioningFromOverview(await fetchServiceOwner(party))
+      const next = provisioningFromOverview(await fetchServiceOwner(requestedParty))
+      if (partyRef.current !== requestedParty) {
+        return
+      }
       setProvisioning(next)
       setAllowed(true)
       setLoaded(true)
@@ -57,10 +63,14 @@ export function useServiceOwnerProvisioning(
         onReady()
       }
     } catch (caught: unknown) {
+      if (partyRef.current !== requestedParty) {
+        return
+      }
       setLoaded(true)
       if (caught instanceof ApiError && caught.status === 403) {
         setAllowed(false)
         setProvisioning(null)
+        setError(null)
         setAccessNotice(gatekeeperNotice(caught))
         return
       }
@@ -117,6 +127,17 @@ export function useServiceOwnerProvisioning(
   }, [party])
 
   useEffect(() => {
+    if (!party || provisioning != null || !error) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, POLL_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [error, party, provisioning, refresh])
+
+  useEffect(() => {
     if (!party || provisioning?.status !== 'InProgress') {
       return
     }
@@ -131,10 +152,11 @@ export function useServiceOwnerProvisioning(
     if (!party || starting) {
       return
     }
+    const requestedParty = party
 
     setStarting(true)
     setError(null)
-    initializeServiceOwner(party, organizationName)
+    initializeServiceOwner(requestedParty, organizationName)
       .catch((caught: unknown) => {
         if (caught instanceof ApiError && caught.status === 409) {
           return
@@ -142,6 +164,9 @@ export function useServiceOwnerProvisioning(
         throw caught
       })
       .then(() => {
+        if (partyRef.current !== requestedParty) {
+          return
+        }
         wasInProgress.current = true
         setProvisioning({
           status: 'InProgress',
@@ -151,13 +176,19 @@ export function useServiceOwnerProvisioning(
         return refresh()
       })
       .catch((caught: unknown) => {
+        if (partyRef.current !== requestedParty) {
+          return
+        }
         const body = caught instanceof ApiError ? caught.body : undefined
         setError(localizeApiError(body).message || i18n.t('page.services.provision_start_failed'))
       })
       .finally(() => {
+        if (partyRef.current !== requestedParty) {
+          return
+        }
         setStarting(false)
       })
   }, [organizationName, party, refresh, starting])
 
-  return { provisioning, allowed, loaded, starting, error, accessNotice, start }
+  return { provisioning, allowed, loaded, starting, error, accessNotice, start, retry: refresh }
 }

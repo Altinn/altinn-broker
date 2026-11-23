@@ -17,7 +17,7 @@ export type AuthorizedResource = {
   isServiceOwner: boolean
   /** The selected party owns this broker resource. */
   isOwned: boolean
-  /** The user has publish on digdir-broker-administrasjon for the selected party. */
+  /** The user has access action on digdir-broker-administrasjon for the selected party. */
   hasConfigureAccess: boolean
 }
 

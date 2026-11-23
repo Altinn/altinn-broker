@@ -1,4 +1,4 @@
-import { Button, ButtonIcon, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
+import { Alert, Button, ButtonIcon, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
 import { useTranslation } from 'react-i18next'
 import { ArrowUndoIcon, PlusIcon } from '@navikt/aksel-icons'
 import { Link, type LinkProps } from 'react-router-dom'
@@ -29,12 +29,18 @@ export function ServiceDetails({
   sender: AllowedRecipient
 }) {
   const { t } = useTranslation()
-  const { provisioning, loaded: provisioningLoaded } = useServiceOwnerProvisioning(onBehalfOf, sender.name, () => {})
+  const {
+    provisioning,
+    loaded: provisioningLoaded,
+    error: provisioningError,
+    retry,
+  } = useServiceOwnerProvisioning(onBehalfOf, sender.name, () => {})
+  const readinessUnknown = provisioningLoaded && provisioning == null && provisioningError != null
   const awaitingProvisioning =
-    resource.isOwned && (!provisioningLoaded || (provisioning != null && provisioning.status !== 'Ready'))
+    resource.isOwned &&
+    (!provisioningLoaded || readinessUnknown || (provisioning != null && provisioning.status !== 'Ready'))
   const canPublish =
-    resource.canPublish ||
-    (provisioning?.status === 'Ready' && resource.isOwned && resource.hasConfigureAccess)
+    provisioning?.status === 'Ready' && resource.isOwned && (resource.canPublish || resource.hasConfigureAccess)
   // Without anyone to send to there is nothing to create, so the action is withheld rather
   // than leading the user into a form they cannot complete.
   const hasRecipients = allowedRecipients.length > 0
@@ -84,6 +90,15 @@ export function ServiceDetails({
       {!resource.canSend && (
         <div className="page-section">
           <CannotSendNotice />
+        </div>
+      )}
+
+      {provisioningError && (
+        <div className="page-section">
+          <Alert variant="danger" heading={provisioningError} message={t('page.common.try_later')} />
+          <Button size="sm" onClick={() => void retry()}>
+            <ButtonLabel>{t('page.services.provision_retry')}</ButtonLabel>
+          </Button>
         </div>
       )}
 
