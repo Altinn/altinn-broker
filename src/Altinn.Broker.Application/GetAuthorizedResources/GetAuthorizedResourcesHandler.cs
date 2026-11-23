@@ -8,7 +8,6 @@ using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
 
 using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using OneOf;
@@ -29,7 +28,6 @@ public class GetAuthorizedResourcesHandler(
     IAltinnResourceRepository altinnResourceRepository,
     BrokerResourceProvisioner resourceProvisioner,
     HybridCache hybridCache,
-    IHostEnvironment hostEnvironment,
     ILogger<GetAuthorizedResourcesHandler> logger) : IHandler<GetAuthorizedResourcesRequest, List<AuthorizedResourceOverview>>
 {
     private static readonly HybridCacheEntryOptions ResourceMetadataCacheOptions = new()
@@ -105,15 +103,6 @@ public class GetAuthorizedResourcesHandler(
             hasGatekeeper = await HasGatekeeperPublish(user, party, cancellationToken);
         }
 
-        var provisioningPhase = serviceOwner is null
-            ? (ProvisioningPhase?)null
-            : ServiceOwnerProvisioning.EffectivePhase(serviceOwner, hostEnvironment.IsDevelopment());
-        var provisioningStatus = serviceOwner is null
-            ? ServiceOwnerProvisioningStatus.NotRegistered
-            : ServiceOwnerProvisioning.StatusFor(provisioningPhase!.Value);
-        var provisioningPercent = ServiceOwnerProvisioning.PercentFor(provisioningPhase);
-        var provisioningReady = provisioningStatus == ServiceOwnerProvisioningStatus.Ready;
-
         // Include when the party owns the resource as a Broker service owner, or when they can
         // send/receive and are on the resource access list. Gatekeeper users also see owned
         // resources before the organization is registered, so BrokerBox can offer provisioning.
@@ -159,13 +148,10 @@ public class GetAuthorizedResourcesHandler(
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
-                CanPublish = provisioningReady && hasGatekeeper && ownedByParty,
+                CanPublish = isServiceOwner && hasGatekeeper && ownedByParty,
                 IsServiceOwner = isServiceOwner,
                 IsOwned = ownedByParty,
-                HasConfigureAccess = hasGatekeeper,
-                ProvisioningStatus = provisioningStatus,
-                ProvisioningPhase = provisioningPhase,
-                ProvisioningPercent = provisioningPercent
+                HasConfigureAccess = hasGatekeeper
             };
         }));
 

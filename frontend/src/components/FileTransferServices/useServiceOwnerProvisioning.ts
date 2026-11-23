@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
-import type { AuthorizedResource } from '../../api/resources'
 import {
-  fetchServiceOwnerProvisioning,
-  startServiceOwnerProvisioning,
+  fetchServiceOwner,
+  initializeServiceOwner,
+  provisioningFromOverview,
   type ServiceOwnerProvisioning,
 } from '../../api/serviceOwnerProvisioning'
 import { localizeApiError } from '../../i18n/apiErrors'
@@ -11,67 +11,104 @@ import { i18n } from '../../i18n/config'
 
 const POLL_INTERVAL_MS = 3000
 
-export function provisioningFromResource(resource: AuthorizedResource): ServiceOwnerProvisioning {
-  return {
-    status: resource.provisioningStatus,
-    phase: resource.provisioningPhase,
-    percent: resource.provisioningPercent,
-  }
-}
-
 /**
- * Tracks service-owner provisioning for the selected party and polls while deployment runs.
+ * Loads the selected party's service owner and polls GetServiceOwner while storage deployment runs.
  * `onReady` runs once when deployment finishes, so the resource list can be loaded again.
  */
 export function useServiceOwnerProvisioning(
   party: string | undefined,
   organizationName: string,
-  snapshot: ServiceOwnerProvisioning | null,
   onReady: () => void,
-  poll: boolean,
 ) {
-  const [state, setState] = useState<ServiceOwnerProvisioning | null>(snapshot)
+  const [provisioning, setProvisioning] = useState<ServiceOwnerProvisioning | null>(null)
+  const [allowed, setAllowed] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const wasInProgress = useRef(false)
+
+  const refresh = useCallback(async () => {
+    if (!party) {
+      return
+    }
+
+    try {
+      const next = provisioningFromOverview(await fetchServiceOwner(party))
+      setProvisioning(next)
+      setAllowed(true)
+      setLoaded(true)
+      setError(null)
+      if (next.status === 'InProgress') {
+        wasInProgress.current = true
+      }
+      if (next.status === 'Ready' && wasInProgress.current) {
+        wasInProgress.current = false
+        onReady()
+      }
+    } catch (caught: unknown) {
+      setLoaded(true)
+      if (caught instanceof ApiError && caught.status === 403) {
+        setAllowed(false)
+        setProvisioning(null)
+        return
+      }
+      setError(i18n.t('page.services.provision_poll_failed'))
+    }
+  }, [onReady, party])
 
   useEffect(() => {
-    setState(snapshot)
+    setProvisioning(null)
+    setAllowed(false)
+    setLoaded(false)
     setStarting(false)
     setError(null)
-  }, [party, snapshot?.status, snapshot?.phase, snapshot?.percent])
-
-  useEffect(() => {
-    if (!party || !poll || state?.status !== 'InProgress') {
+    wasInProgress.current = false
+    if (!party) {
       return
     }
 
     let cancelled = false
-    const refresh = () => {
-      fetchServiceOwnerProvisioning(party)
-        .then((next) => {
-          if (cancelled) {
-            return
-          }
-          setState(next)
-          setError(null)
-          if (next.status === 'Ready') {
-            onReady()
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setError(i18n.t('page.services.provision_poll_failed'))
-          }
-        })
-    }
+    fetchServiceOwner(party)
+      .then((overview) => {
+        if (cancelled) {
+          return
+        }
+        const next = provisioningFromOverview(overview)
+        setProvisioning(next)
+        setAllowed(true)
+        setLoaded(true)
+        if (next.status === 'InProgress') {
+          wasInProgress.current = true
+        }
+      })
+      .catch((caught: unknown) => {
+        if (cancelled) {
+          return
+        }
+        setLoaded(true)
+        if (caught instanceof ApiError && caught.status === 403) {
+          setAllowed(false)
+          setProvisioning(null)
+          return
+        }
+        setError(i18n.t('page.services.provision_poll_failed'))
+      })
 
-    refresh()
-    const timer = window.setInterval(refresh, POLL_INTERVAL_MS)
     return () => {
       cancelled = true
-      window.clearInterval(timer)
     }
-  }, [party, poll, state?.status, onReady])
+  }, [party])
+
+  useEffect(() => {
+    if (!party || provisioning?.status !== 'InProgress') {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, POLL_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [party, provisioning?.status, refresh])
 
   const start = useCallback(() => {
     if (!party || starting) {
@@ -80,12 +117,21 @@ export function useServiceOwnerProvisioning(
 
     setStarting(true)
     setError(null)
-    startServiceOwnerProvisioning(party, organizationName)
-      .then((next) => {
-        setState(next)
-        if (next.status === 'Ready') {
-          onReady()
+    initializeServiceOwner(party, organizationName)
+      .catch((caught: unknown) => {
+        if (caught instanceof ApiError && caught.status === 409) {
+          return
         }
+        throw caught
+      })
+      .then(() => {
+        wasInProgress.current = true
+        setProvisioning({
+          status: 'InProgress',
+          percent: 40,
+          messageKey: 'page.services.provision_phase_waiting',
+        })
+        return refresh()
       })
       .catch((caught: unknown) => {
         const body = caught instanceof ApiError ? caught.body : undefined
@@ -94,7 +140,7 @@ export function useServiceOwnerProvisioning(
       .finally(() => {
         setStarting(false)
       })
-  }, [organizationName, onReady, party, starting])
+  }, [organizationName, party, refresh, starting])
 
-  return { provisioning: state ?? snapshot, starting, error, start }
+  return { provisioning, allowed, loaded, starting, error, start }
 }

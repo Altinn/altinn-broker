@@ -7,6 +7,7 @@ import { newFileTransferPath, PageRoutes } from '../../pages/routes'
 import type { FileTransferService } from './useFileTransferService'
 import { CannotSendNotice } from './CannotSendNotice'
 import { NoRecipientsNotice } from './NoRecipientsNotice'
+import { useServiceOwnerProvisioning } from '../FileTransferServices/useServiceOwnerProvisioning'
 import { ResourceConfigurationList } from './ResourceConfigurationList'
 import './fileTransferServiceDetailPage.css'
 
@@ -26,6 +27,12 @@ export function ServiceDetails({
   sender: AllowedRecipient
 }) {
   const { t } = useTranslation()
+  const { provisioning, loaded: provisioningLoaded } = useServiceOwnerProvisioning(onBehalfOf, sender.name, () => {})
+  const awaitingProvisioning =
+    resource.isOwned && (!provisioningLoaded || (provisioning != null && provisioning.status !== 'Ready'))
+  const canPublish =
+    resource.canPublish ||
+    (provisioning?.status === 'Ready' && resource.isOwned && resource.hasConfigureAccess)
   // Without anyone to send to there is nothing to create, so the action is withheld rather
   // than leading the user into a form they cannot complete.
   const hasRecipients = allowedRecipients.length > 0
@@ -86,10 +93,9 @@ export function ServiceDetails({
           resourceId={resource.resourceId}
           configuration={configuration}
           onBehalfOf={onBehalfOf}
-          canPublish={resource.canPublish}
+          canPublish={canPublish}
           isServiceOwner={resource.isServiceOwner}
-          isOwned={resource.isOwned}
-          provisioningStatus={resource.provisioningStatus}
+          awaitingProvisioning={awaitingProvisioning}
           sender={sender}
           accessListCandidates={accessListCandidates}
         />

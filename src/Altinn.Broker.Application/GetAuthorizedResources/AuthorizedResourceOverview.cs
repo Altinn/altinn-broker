@@ -14,10 +14,4 @@ public class AuthorizedResourceOverview
     public bool IsOwned { get; set; }
     /// <summary>The user has publish on digdir-broker-administrasjon for the requested party.</summary>
     public bool HasConfigureAccess { get; set; }
-    /// <summary>Whether the requested party's Broker storage is registered and deployed.</summary>
-    public ServiceOwnerProvisioningStatus ProvisioningStatus { get; set; }
-    /// <summary>Current deployment step. Null when the party is not registered.</summary>
-    public ProvisioningPhase? ProvisioningPhase { get; set; }
-    /// <summary>Approximate provisioning completion, from 0 to 100.</summary>
-    public int ProvisioningPercent { get; set; }
 }

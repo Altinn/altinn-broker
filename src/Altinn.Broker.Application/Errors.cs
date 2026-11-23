@@ -68,7 +68,6 @@ public static class Errors
     public static Error ProfileLanguageUnavailable = new Error(41, "Could not read or update the language in your Altinn profile. Please try again later.", HttpStatusCode.ServiceUnavailable);
     public static Error InvalidUploadPlan = new Error(42, "The upload plan does not match the file transfer or its uploads.", HttpStatusCode.BadRequest);
     public static Error UploadPlanNotFound = new Error(43, "The file transfer has no upload that can be continued.", HttpStatusCode.NotFound);
-    public static Error ServiceOwnerProvisioningIncomplete = new Error(44, "The service owner is still being provisioned. Configuration is available when storage deployment has finished.", HttpStatusCode.Conflict);
 }
 
 public static class StatisticsErrors
@@ -86,7 +85,6 @@ public static class ServiceOwnerErrors
     public static Error ServiceOwnerAlreadyExists = new Error(7002, "Service owner already exists", HttpStatusCode.Conflict);
     public static Error ServiceOwnerInitializationFailed = new Error(7003, "Service owner could not be initialized", HttpStatusCode.InternalServerError);
     public static Error ServiceOwnerNotFound = new Error(7004, "Service owner not found", HttpStatusCode.NotFound);
-    public static Error ServiceOwnerNameMissing = new Error(7006, "A service owner name is required and must be at most 500 characters.", HttpStatusCode.BadRequest);
 }
 
 public static class NotificationErrors

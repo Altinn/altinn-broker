@@ -3,12 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
-import { fetchServiceOwnerProvisioning, type ServiceOwnerProvisioning } from '../api/serviceOwnerProvisioning'
 import { ServiceOwnerProvisioningBanner } from '../components/FileTransferServices/ServiceOwnerProvisioningBanner'
-import {
-  provisioningFromResource,
-  useServiceOwnerProvisioning,
-} from '../components/FileTransferServices/useServiceOwnerProvisioning'
+import { useServiceOwnerProvisioning } from '../components/FileTransferServices/useServiceOwnerProvisioning'
 import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
@@ -21,17 +17,11 @@ type ResourcesState =
   | { party: string; status: 'loaded'; services: AuthorizedResource[] }
   | { party: string; status: 'failed' }
 
-/** Gatekeeper access when the resource list itself does not reveal it. */
-type ProvisioningProbe =
-  | { party: string; access: 'no' }
-  | { party: string; access: 'yes'; provisioning: ServiceOwnerProvisioning }
-
 export function FileTransferServicesPage() {
   const { t } = useTranslation()
   const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
   const [resources, setResources] = useState<ResourcesState | null>(null)
-  const [probe, setProbe] = useState<ProvisioningProbe | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
   const reloadResources = useCallback(() => setReloadToken((token) => token + 1), [])
 
@@ -67,32 +57,6 @@ export function FileTransferServicesPage() {
     [current],
   )
   const isLoading = partiesStatus === 'loading' || (Boolean(party) && current === null)
-  const listRevealsConfigureAccess = services.some(
-    (service) => service.hasConfigureAccess || (service.isServiceOwner && service.isOwned),
-  )
-
-  useEffect(() => {
-    if (!party || current?.status !== 'loaded' || listRevealsConfigureAccess) {
-      return
-    }
-
-    let active = true
-    fetchServiceOwnerProvisioning(party)
-      .then((provisioning) => {
-        if (active) {
-          setProbe({ party, access: 'yes', provisioning })
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setProbe({ party, access: 'no' })
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [party, current, listRevealsConfigureAccess, reloadToken])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -106,23 +70,18 @@ export function FileTransferServicesPage() {
   const owned = services.filter((service) => service.isOwned)
   const isServiceOwner = services.some((service) => service.isServiceOwner)
   const hasConfigureAccess = services.some((service) => service.hasConfigureAccess)
-  const probed = probe !== null && probe.party === party && probe.access === 'yes' ? probe.provisioning : null
-  const provisioningSnapshot = useMemo(() => {
-    const ownedResource = services.find((service) => service.isOwned && (service.isServiceOwner || service.hasConfigureAccess))
-    return ownedResource ? provisioningFromResource(ownedResource) : null
-  }, [services])
-  const snapshotForHook = provisioningSnapshot ?? (probed && probed.status !== 'Ready' ? probed : null)
-  const canProvision = hasConfigureAccess || probed !== null
   const {
     provisioning,
+    allowed,
     starting,
     error: provisioningError,
     start,
-  } = useServiceOwnerProvisioning(party, organizationName, snapshotForHook, reloadResources, canProvision)
+  } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
+  const canProvision = allowed
   const showConfigure =
-    (owned.length > 0 && (isServiceOwner || hasConfigureAccess)) ||
-    (snapshotForHook != null && provisioning?.status !== 'Ready')
-  const configurationLocked = showConfigure && provisioning?.status !== 'Ready'
+    (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
+    (allowed && provisioning != null && provisioning.status !== 'Ready')
+  const configurationLocked = showConfigure && provisioning != null && provisioning.status !== 'Ready'
 
   const serviceItem = (service: AuthorizedResource) => (
     <ResourceListItem
@@ -208,7 +167,7 @@ export function FileTransferServicesPage() {
         />
       )}
 
-      {current?.status === 'loaded' && services.length === 0 && (
+      {current?.status === 'loaded' && services.length === 0 && !showConfigure && (
         <Alert
           variant="info"
           heading={t('page.services.empty_heading')}

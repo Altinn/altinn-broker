@@ -186,13 +186,6 @@ public class ConfigureResourceHandler(
             return Errors.PartyIsNotBrokerServiceOwner;
         }
 
-        // Maskinporten service-owner tokens are not end-user calls and are unchanged.
-        // BrokerBox must wait until storage deployment has finished.
-        if (ServiceOwnerProvisioning.EffectivePhase(serviceOwner, hostEnvironment.IsDevelopment()) != ProvisioningPhase.Ready)
-        {
-            return Errors.ServiceOwnerProvisioningIncomplete;
-        }
-
         // TT02 cannot call production Authorization. A production end user is accepted only
         // when the production Broker forwarded the request after its publish check.
         // The organization in the request is not that proof.

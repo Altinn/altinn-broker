@@ -185,10 +185,7 @@ public class ResourceController : Controller
                 CanPublish = resource.CanPublish,
                 IsServiceOwner = resource.IsServiceOwner,
                 IsOwned = resource.IsOwned,
-                HasConfigureAccess = resource.HasConfigureAccess,
-                ProvisioningStatus = resource.ProvisioningStatus,
-                ProvisioningPhase = resource.ProvisioningPhase,
-                ProvisioningPercent = resource.ProvisioningPercent
+                HasConfigureAccess = resource.HasConfigureAccess
             }).ToList()),
             Problem
         );

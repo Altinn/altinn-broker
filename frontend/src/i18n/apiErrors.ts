@@ -11,8 +11,6 @@ const errorMessageKey: Record<number, string> = {
   36: 'page.errors.gatekeeper',
   37: 'page.errors.must_be_owner',
   38: 'page.errors.wrong_party',
-  44: 'page.errors.provisioning',
-  7006: 'page.errors.service_owner_name',
 }
 
 export type ApiErrorMessageContext = {

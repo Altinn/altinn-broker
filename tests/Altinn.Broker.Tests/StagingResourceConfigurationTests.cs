@@ -92,46 +92,6 @@ public class StagingResourceConfigurationTests
     }
 
     [Fact]
-    public async Task ConfigureResource_WhileProvisioning_ReturnsProvisioningIncomplete()
-    {
-        var serviceOwners = new Mock<IServiceOwnerRepository>();
-        serviceOwners
-            .Setup(repository => repository.GetServiceOwner("0192:991825827"))
-            .ReturnsAsync(new ServiceOwnerEntity
-            {
-                Id = "0192:991825827",
-                Name = "Owner",
-                StorageProviders = [],
-                ProvisioningPhase = ProvisioningPhase.CreatingStorage
-            });
-        var resources = new Mock<IResourceRepository>();
-        resources
-            .Setup(repository => repository.GetResource("resource", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ResourceEntity { Id = "resource", ServiceOwnerId = "0192:991825827" });
-        var handler = new ConfigureResourceHandler(
-            resources.Object,
-            Mock.Of<IAltinnResourceRepository>(),
-            serviceOwners.Object,
-            new Mock<IAuthorizationService>(MockBehavior.Strict).Object,
-            Mock.Of<IHostEnvironment>(),
-            Options.Create(new AzureStorageOptions()),
-            ForwardProof(verified: true),
-            NullLogger<ConfigureResourceHandler>.Instance);
-        var user = new ClaimsPrincipal(new ClaimsIdentity(
-        [
-            new Claim("urn:altinn:userid", "user")
-        ], BrokerAuthenticationSchemes.ProductionAltinn));
-
-        var result = await handler.Process(
-            new ConfigureResourceRequest { ResourceId = "resource", OnBehalfOf = "991825827" },
-            user,
-            CancellationToken.None);
-
-        Assert.True(result.IsT1);
-        Assert.Equal(Errors.ServiceOwnerProvisioningIncomplete, result.AsT1);
-    }
-
-    [Fact]
     public async Task ConfigureResource_WithProductionEndUserAndNoForwardProof_ReturnsNoPublishAccess()
     {
         var authorization = new Mock<IAuthorizationService>(MockBehavior.Strict);

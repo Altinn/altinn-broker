@@ -12,7 +12,6 @@ using Altinn.Broker.Application.GetAuthorizedParties;
 using Altinn.Broker.Application.GetProfileLanguage;
 using Altinn.Broker.Application.UpdateProfileLanguage;
 using Altinn.Broker.Application.GetAuthorizedResources;
-using Altinn.Broker.Application.ProvisionServiceOwner;
 using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
 using Altinn.Broker.Application.GetPartialUploads;
@@ -63,8 +62,6 @@ public static class DependencyInjection
         services.AddScoped<GetResourceHandler>();
         services.AddScoped<GetAllowedRecipientsHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
-        services.AddScoped<GetServiceOwnerProvisioningHandler>();
-        services.AddScoped<StartServiceOwnerProvisioningHandler>();
         services.AddScoped<GetAuthorizedPartiesHandler>();
         services.AddScoped<GetProfileLanguageHandler>();
         services.AddScoped<UpdateProfileLanguageHandler>();
