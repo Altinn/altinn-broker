@@ -8,7 +8,7 @@ public class AuthorizedResourceOverview
     public bool CanSend { get; set; }
     public bool CanReceive { get; set; }
     public bool CanPublish { get; set; }
-    /// <summary>Whether the requested party is configured as a Broker service owner.</summary>
+    /// <summary>Whether the requested party is an organization in the Altinn service-owner catalog.</summary>
     public bool IsServiceOwner { get; set; }
     /// <summary>Whether the requested party owns this broker resource.</summary>
     public bool IsOwned { get; set; }

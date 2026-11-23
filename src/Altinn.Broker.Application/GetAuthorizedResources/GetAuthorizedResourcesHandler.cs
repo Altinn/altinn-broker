@@ -6,6 +6,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public class GetAuthorizedResourcesHandler(
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAltinnResourceRepository altinnResourceRepository,
+    IAltinnOrganizationCatalog organizationCatalog,
     BrokerResourceProvisioner resourceProvisioner,
     HybridCache hybridCache,
     ILogger<GetAuthorizedResourcesHandler> logger) : IHandler<GetAuthorizedResourcesRequest, List<AuthorizedResourceOverview>>
@@ -95,10 +97,13 @@ public class GetAuthorizedResourcesHandler(
         }
 
         var serviceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix());
-        var isServiceOwner = serviceOwner is not null;
+        var isRegisteredServiceOwner = serviceOwner is not null;
+        // A Broker row is created by provisioning. Altinn service owners are the organizations
+        // in the Altinn org catalog, so the banner can be offered before that row exists.
+        var isServiceOwner = await organizationCatalog.IsPossibleServiceOwner(party, cancellationToken);
         var partyOwnsBrokerResource = serviceOwnerByResourceId.Values.Any(owner => owner == party);
         var hasGatekeeper = false;
-        if (isServiceOwner || partyOwnsBrokerResource)
+        if (isServiceOwner || isRegisteredServiceOwner || partyOwnsBrokerResource)
         {
             hasGatekeeper = await HasGatekeeperPublish(user, party, cancellationToken);
         }
@@ -110,7 +115,7 @@ public class GetAuthorizedResourcesHandler(
         {
             var ownedByParty = serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
                 && owner == party;
-            if (ownedByParty && (isServiceOwner || hasGatekeeper))
+            if (ownedByParty && (isRegisteredServiceOwner || hasGatekeeper))
             {
                 return (authorized, include: true);
             }
@@ -148,7 +153,7 @@ public class GetAuthorizedResourcesHandler(
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
-                CanPublish = isServiceOwner && hasGatekeeper && ownedByParty,
+                CanPublish = isRegisteredServiceOwner && hasGatekeeper && ownedByParty,
                 IsServiceOwner = isServiceOwner,
                 IsOwned = ownedByParty,
                 HasConfigureAccess = hasGatekeeper

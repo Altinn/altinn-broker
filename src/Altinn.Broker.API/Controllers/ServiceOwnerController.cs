@@ -24,7 +24,8 @@ public class ServiceOwnerController(
     IServiceOwnerRepository serviceOwnerRepository,
     IHostEnvironment hostEnvironment,
     IResourceManager resourceManager,
-    BrokerAuthorizationService authorizationService) : Controller
+    BrokerAuthorizationService authorizationService,
+    IAltinnOrganizationCatalog organizationCatalog) : Controller
 {
     /// <summary>
     /// Initializes the service owner for the calling organization within the brokerservice.
@@ -163,6 +164,11 @@ public class ServiceOwnerController(
         if (!party.IsOrganizationNumber())
         {
             return (null, Problem(Errors.InvalidParty));
+        }
+
+        if (!await organizationCatalog.IsPossibleServiceOwner(party, cancellationToken))
+        {
+            return (null, Problem(Errors.NoPublishAccessToConfigureResource));
         }
 
         try

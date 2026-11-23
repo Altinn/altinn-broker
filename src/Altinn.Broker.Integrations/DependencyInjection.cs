@@ -7,6 +7,7 @@ using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Altinn.AccessManagement;
+using Altinn.Broker.Integrations.Altinn.Organizations;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Notifications;
@@ -91,6 +92,8 @@ public static class DependencyInjection
         services.AddHttpClient<IAltinnAccessManagementService, AltinnAccessManagementService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
             .AddStandardRetryPolicy();
         services.AddHttpClient<IAltinnProfileService, AltinnProfileService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
+        services.AddHttpClient<IAltinnOrganizationCatalog, AltinnOrganizationCatalog>()
             .AddStandardRetryPolicy();
 
         var generalSettings = new GeneralSettings();

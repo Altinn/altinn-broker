@@ -80,6 +80,7 @@ export function FileTransferServicesPage() {
   const canProvision = allowed
   const showConfigure =
     (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
+    (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
     (allowed && provisioning != null && provisioning.status !== 'Ready')
   const configurationLocked = showConfigure && provisioning != null && provisioning.status !== 'Ready'
 
