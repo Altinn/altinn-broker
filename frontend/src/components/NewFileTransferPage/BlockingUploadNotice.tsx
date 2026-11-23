@@ -17,8 +17,8 @@ export function BlockingUploadNotice({ upload, onContinue, onCancel }: BlockingU
   const [confirming, setConfirming] = useState(false)
   const percent = useUploadProgress()?.percent ?? null
 
-  // While finishing, the server may already have accepted the join, which a cancel can't undo.
-  const cancellable = upload.status !== 'finishing'
+  // While finishing or processing, the server already has (or is joining) the file, which a cancel can't undo.
+  const cancellable = upload.status !== 'finishing' && upload.status !== 'processing'
   if (confirming && !cancellable) {
     setConfirming(false)
   }

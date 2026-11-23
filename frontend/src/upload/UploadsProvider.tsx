@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../api/client'
 import { i18n } from '../i18n/config'
-import { hasReceivedFile } from '../api/fileTransferStatus'
+import { getFileTransferStatus, hasReceivedFile } from '../api/fileTransferStatus'
 import { initializeFileTransfer } from '../api/initializeFileTransfer'
 import {
   FileChangedError,
@@ -25,6 +25,7 @@ import {
   UploadProgressContext,
   type ActiveUpload,
   type PlannedUpload,
+  type ProcessingOutcome,
   type StartUploadInput,
   type UploadActions,
   type UploadStatus,
@@ -35,12 +36,13 @@ import {
 
 type Initializing = { phase: 'initializing'; controller: AbortController; paused: boolean }
 type Running = { phase: 'running'; upload: PlannedUpload; run: UploadRun }
+type Processing = { phase: 'processing'; upload: PlannedUpload; controller: AbortController }
 type Failed = { phase: 'failed'; upload: PlannedUpload; loaded: number }
 
 export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
-  const sessionRef = useRef<Initializing | Running | Failed | null>(null)
+  const sessionRef = useRef<Initializing | Running | Processing | Failed | null>(null)
   const listenersRef = useRef(new Set<UploadSuccessListener>())
 
   const show = useCallback((upload: ActiveUpload | null) => {
@@ -52,13 +54,54 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     setActive((current) => current && { ...current, ...changes })
   }, [])
 
-  const markReceived = useCallback<UploadActions['markReceived']>(({ resourceId, sender, plan }) => {
+  const markReceived = useCallback<UploadActions['markReceived']>(({ resourceId, sender, plan }, outcome) => {
     clearDraft(draftKey(resourceId, sender))
-    toast.success(i18n.t('page.upload_errors.sent'))
+    switch (outcome) {
+      case 'published':
+        toast.success(i18n.t('page.upload_errors.sent'))
+        break
+      case 'failed':
+        toast.error(i18n.t('page.upload_errors.processing_failed'))
+        break
+      case 'timeout':
+        toast.info(i18n.t('page.upload_errors.still_processing'))
+        break
+    }
     for (const listener of listenersRef.current) {
       listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
     }
   }, [])
+
+  // The file is on the server; wait until Broker has processed and published it before redirecting,
+  // so the details page shows the transfer as published.
+  const awaitProcessed = useCallback(
+    async (upload: PlannedUpload) => {
+      const session: Processing = { phase: 'processing', upload, controller: new AbortController() }
+      sessionRef.current = session
+      update({ status: 'processing' })
+      // Already uploaded, so a reload must not offer to upload it again.
+      clearDraft(draftKey(upload.resourceId, upload.sender))
+
+      let outcome: ProcessingOutcome
+      try {
+        outcome = await waitUntilProcessed(upload.plan.fileTransferId, session.controller.signal)
+      } catch (error) {
+        // Leaving the page stops the waiting; nothing more to do.
+        if (isAbortError(error)) {
+          return
+        }
+        throw error
+      }
+
+      if (sessionRef.current !== session) {
+        return
+      }
+      sessionRef.current = null
+      show(null)
+      markReceived(upload, outcome)
+    },
+    [markReceived, show, update],
+  )
 
   const run = useCallback(
     async (upload: PlannedUpload, alreadySent: number, paused = false) => {
@@ -104,11 +147,9 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       if (sessionRef.current !== session) {
         return
       }
-      sessionRef.current = null
-      show(null)
-      markReceived(upload)
+      await awaitProcessed(upload)
     },
-    [markReceived, show, update],
+    [awaitProcessed, show, update],
   )
 
   const start = useCallback(
@@ -167,14 +208,20 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   )
 
   // Holds the upload rather than stopping it: aborting leaves the server holding uploads locked.
+  // Called when the upload page is left. Once the file is uploaded and only processing is awaited,
+  // the waiting is simply stopped: no toast and no redirect.
   const pause = useCallback(() => {
     const session = sessionRef.current
-    if (session?.phase === 'running') {
+    if (session?.phase === 'processing') {
+      sessionRef.current = null
+      session.controller.abort()
+      show(null)
+    } else if (session?.phase === 'running') {
       session.run.pause()
     } else if (session?.phase === 'initializing') {
       session.paused = true
     }
-  }, [])
+  }, [show])
 
   // A paused upload carries on where it was; only a failed one has to start over.
   const resume = useCallback(() => {
@@ -193,6 +240,11 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     sessionRef.current = null
     show(null)
     if (session?.phase === 'initializing') {
+      session.controller.abort()
+      return
+    }
+    // The file is already uploaded, so there is nothing to discard; only the waiting stops.
+    if (session?.phase === 'processing') {
       session.controller.abort()
       return
     }
@@ -270,6 +322,53 @@ function newActiveUpload(
     status,
     error: '',
   }
+}
+
+// Statuses that mean the file is published.
+const PUBLISHED_STATUSES = ['Published', 'AllConfirmedDownloaded']
+const MAX_PROCESSING_WAIT_MS = 10 * 60_000
+
+/**
+ * Polls the transfer's status until Broker has published it or given up on it.
+ */
+async function waitUntilProcessed(fileTransferId: string, signal: AbortSignal): Promise<ProcessingOutcome> {
+  const deadline = Date.now() + MAX_PROCESSING_WAIT_MS
+  for (let attempt = 0; Date.now() < deadline; attempt++) {
+    try {
+      const status = await getFileTransferStatus(fileTransferId, signal)
+      if (status && PUBLISHED_STATUSES.includes(status)) {
+        return 'published'
+      }
+      if (status === 'Failed' || status === 'Cancelled') {
+        return 'failed'
+      }
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw error
+      }
+      console.warn('Could not read the file transfer status while waiting for it to be published', error)
+    }
+    await sleep(attempt < 10 ? 1_000 : 5_000, signal)
+  }
+  return 'timeout'
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer)
+        reject(signal.reason)
+      },
+      { once: true },
+    )
+  })
 }
 
 function isAbortError(error: unknown): boolean {
