@@ -63,6 +63,8 @@ type ResourceConfigurationListProps = {
   canPublish: boolean
   /** Used to choose between service-owner vs gatekeeper access notices. */
   isServiceOwner: boolean
+  /** Storage deployment is still running, so configuration stays closed. */
+  awaitingProvisioning: boolean
   sender: AllowedRecipient
   /**
    * Access-list parties (unfiltered by required party). Transfer-time allowed-recipients is too
@@ -77,6 +79,7 @@ export function ResourceConfigurationList({
   onBehalfOf,
   canPublish,
   isServiceOwner,
+  awaitingProvisioning,
   sender,
   accessListCandidates,
 }: ResourceConfigurationListProps) {
@@ -93,7 +96,7 @@ export function ResourceConfigurationList({
     onBehalfOf,
     environment: environment || undefined,
   })
-  const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
+  const publishNotice = canPublish || awaitingProvisioning ? null : configureAccessNotice(isServiceOwner)
 
   useEffect(() => {
     if (!environment) {
@@ -167,8 +170,11 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={!canPublish || configurationBusy || Boolean(editor.loadError)}
+          disabled={!canPublish || awaitingProvisioning || configurationBusy || Boolean(editor.loadError)}
         />
+        {awaitingProvisioning && (
+          <Field.Description>{t('page.services.provision_pending_settings')}</Field.Description>
+        )}
         {publishNotice && (
           <Field.Description>
             <LocalizedErrorText error={publishNotice} />

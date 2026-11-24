@@ -14,7 +14,8 @@ public interface IAuthorizationService
     Task<bool> CheckAccessForSearch(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default);
     Task<bool> CheckAccessAsRecipient(ClaimsPrincipal? user, FileTransferEntity fileTransfer, CancellationToken cancellationToken = default);
     /// <summary>
-    /// PDP check for the <c>publish</c> action on the resource for the given party (used when configuring a resource).
+    /// Access check for a resource-registry resource, such as the configuration gatekeeper.
+    /// Does not require a row in Broker. Calls the authorize PDP directly.
     /// </summary>
     Task<bool> CheckAccessAsPublisher(ClaimsPrincipal? user, string resourceId, string party, CancellationToken cancellationToken = default);
     Task<bool> IsIdPortenToken(ClaimsPrincipal? user);

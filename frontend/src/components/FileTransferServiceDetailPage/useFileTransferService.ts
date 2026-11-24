@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
+import { ApiError } from '../../api/client'
 import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
 import { getResourceConfiguration, type ResourceConfiguration } from '../../api/resourceConfiguration'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../../api/resources'
+import { localizeApiError } from '../../i18n/apiErrors'
+
+/** GetResource when the resource's service owner has no Broker row yet. */
+const SERVICE_OWNER_NOT_CONFIGURED = 24
 
 export type FileTransferService = {
   resource: AuthorizedResource
@@ -19,6 +24,7 @@ export type FileTransferServiceState =
   | { status: 'loaded'; service: FileTransferService }
   | { status: 'missing' }
   | { status: 'failed' }
+  | { status: 'ownerNotConfigured'; resource: AuthorizedResource | null }
 
 /**
  * The resource as the party sees it, together with its broker configuration.
@@ -51,23 +57,37 @@ export function useFileTransferService(
   return loaded?.key === key ? loaded.state : null
 }
 
+function isServiceOwnerNotConfigured(error: unknown): boolean {
+  return error instanceof ApiError && localizeApiError(error.body).errorCode === SERVICE_OWNER_NOT_CONFIGURED
+}
+
 async function loadService(resourceId: string, party: string): Promise<FileTransferServiceState> {
+  let resources: AuthorizedResource[]
   try {
-    const [resources, configuration, allowedRecipients, accessListCandidates] = await Promise.all([
-      fetchAuthorizedResources(party),
+    resources = await fetchAuthorizedResources(party)
+  } catch {
+    return { status: 'failed' }
+  }
+
+  const resource = resources.find((candidate) => candidate.resourceId === resourceId) ?? null
+
+  try {
+    const [configuration, allowedRecipients, accessListCandidates] = await Promise.all([
       getResourceConfiguration(resourceId),
       getAllowedRecipients(resourceId, party),
       getAllowedRecipients(resourceId, party, { ignoreRequiredParty: true }),
     ])
 
-    const resource = resources.find((candidate) => candidate.resourceId === resourceId)
     return resource
       ? {
           status: 'loaded',
           service: { resource, configuration, allowedRecipients, accessListCandidates },
         }
       : { status: 'missing' }
-  } catch {
+  } catch (error) {
+    if (isServiceOwnerNotConfigured(error)) {
+      return { status: 'ownerNotConfigured', resource }
+    }
     return { status: 'failed' }
   }
 }
