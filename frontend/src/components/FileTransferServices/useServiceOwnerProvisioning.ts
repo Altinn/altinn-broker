@@ -37,6 +37,7 @@ export function useServiceOwnerProvisioning(
   const [accessNotice, setAccessNotice] = useState<LocalizedApiError | null>(null)
   const wasInProgress = useRef(false)
   const partyRef = useRef(party)
+  const requestId = useRef(0)
   partyRef.current = party
 
   const refresh = useCallback(async () => {
@@ -44,10 +45,11 @@ export function useServiceOwnerProvisioning(
       return
     }
     const requestedParty = party
+    const id = ++requestId.current
 
     try {
       const next = provisioningFromOverview(await fetchServiceOwner(requestedParty))
-      if (partyRef.current !== requestedParty) {
+      if (partyRef.current !== requestedParty || requestId.current !== id) {
         return
       }
       setProvisioning(next)
@@ -63,7 +65,7 @@ export function useServiceOwnerProvisioning(
         onReady()
       }
     } catch (caught: unknown) {
-      if (partyRef.current !== requestedParty) {
+      if (partyRef.current !== requestedParty || requestId.current !== id) {
         return
       }
       setLoaded(true)
@@ -92,9 +94,11 @@ export function useServiceOwnerProvisioning(
     }
 
     let cancelled = false
-    fetchServiceOwner(party)
+    const requestedParty = party
+    const id = ++requestId.current
+    fetchServiceOwner(requestedParty)
       .then((overview) => {
-        if (cancelled) {
+        if (cancelled || requestId.current !== id) {
           return
         }
         const next = provisioningFromOverview(overview)
@@ -107,7 +111,7 @@ export function useServiceOwnerProvisioning(
         }
       })
       .catch((caught: unknown) => {
-        if (cancelled) {
+        if (cancelled || requestId.current !== id) {
           return
         }
         setLoaded(true)
