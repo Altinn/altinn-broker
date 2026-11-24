@@ -44,6 +44,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const sessionRef = useRef<Initializing | Running | Processing | Failed | null>(null)
   const listenersRef = useRef(new Set<UploadSuccessListener>())
+  // Whether the page showing the upload is open; set through enterPage.
+  const onPageRef = useRef(false)
 
   const show = useCallback((upload: ActiveUpload | null) => {
     setActive(upload)
@@ -147,6 +149,12 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       if (sessionRef.current !== session) {
         return
       }
+      if (!onPageRef.current) {
+        sessionRef.current = null
+        clearDraft(draftKey(upload.resourceId, upload.sender))
+        show(null)
+        return
+      }
       await awaitProcessed(upload)
     },
     [awaitProcessed, show, update],
@@ -223,6 +231,23 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     }
   }, [show])
 
+
+// Leaving the page pauses the upload, or stops waiting for processing once the file is in.
+  const enterPage = useCallback(() => {
+    onPageRef.current = true
+    return () => {
+      onPageRef.current = false
+      const session = sessionRef.current
+      if (session?.phase === 'processing') {
+        sessionRef.current = null
+        session.controller.abort()
+        show(null)
+      } else {
+        pause()
+      }
+    }
+  }, [pause, show])
+
   // A paused upload carries on where it was; only a failed one has to start over.
   const resume = useCallback(() => {
     const session = sessionRef.current
@@ -264,8 +289,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const actions = useMemo<UploadActions>(
-    () => ({ start, resumeStored, pause, resume, cancel, markReceived, addUploadSuccessListener }),
-    [start, resumeStored, pause, resume, cancel, markReceived, addUploadSuccessListener],
+    () => ({ start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener }),
+    [start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener],
   )
 
   return (

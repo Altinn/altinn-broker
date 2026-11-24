@@ -43,6 +43,8 @@ export type UploadActions = {
   pause: () => void
   resume: () => void
   cancel: () => void
+  /** Call when the page showing the upload mounts; the returned function, called when it leaves, pauses the upload or stops waiting for processing. */
+  enterPage: () => () => void
   /** Call when the server is done with the file: clears the draft, shows the outcome and tells the listeners, which redirect. */
   markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>, outcome: ProcessingOutcome) => void
   /** Returns the function that removes the listener again. */

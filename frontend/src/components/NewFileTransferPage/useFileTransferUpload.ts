@@ -39,10 +39,11 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
   const active = isOwn ? live : null
   const blockedBy = isOwn ? null : live
 
-  // Leaving the page pauses rather than aborts, so nothing is left locked on the server.
-  const { pause } = uploads
+  // Leaving the page pauses rather than aborts, so nothing is left locked on the server. Waiting for
+  // Broker to process a file that is already in is just stopped.
+  const { enterPage, pause } = uploads
   const hasActive = active !== null
-  useEffect(() => (hasActive ? pause : undefined), [hasActive, pause])
+  useEffect(() => (hasActive ? enterPage() : undefined), [hasActive, enterPage])
 
   const submit = useCallback(async () => {
     setSubmitAttempts((attempts) => attempts + 1)
