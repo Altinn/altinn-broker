@@ -352,6 +352,8 @@ function newActiveUpload(
 // Statuses that mean the file is published.
 const PUBLISHED_STATUSES = ['Published', 'AllConfirmedDownloaded']
 const MAX_PROCESSING_WAIT_MS = 10 * 60_000
+// A status read that hangs must not hold the polling past its deadline.
+const STATUS_REQUEST_TIMEOUT_MS = 15_000
 
 /**
  * Polls the transfer's status until Broker has published it or given up on it.
@@ -360,7 +362,8 @@ async function waitUntilProcessed(fileTransferId: string, signal: AbortSignal): 
   const deadline = Date.now() + MAX_PROCESSING_WAIT_MS
   for (let attempt = 0; Date.now() < deadline; attempt++) {
     try {
-      const status = await getFileTransferStatus(fileTransferId, signal)
+      const timeout = AbortSignal.timeout(Math.min(STATUS_REQUEST_TIMEOUT_MS, deadline - Date.now()))
+      const status = await getFileTransferStatus(fileTransferId, AbortSignal.any([signal, timeout]))
       if (status && PUBLISHED_STATUSES.includes(status)) {
         return 'published'
       }
@@ -368,7 +371,8 @@ async function waitUntilProcessed(fileTransferId: string, signal: AbortSignal): 
         return 'failed'
       }
     } catch (error) {
-      if (isAbortError(error)) {
+      // Only leaving the page stops the waiting. A read that timed out is tried again until the deadline.
+      if (signal.aborted) {
         throw error
       }
       console.warn('Could not read the file transfer status while waiting for it to be published', error)
