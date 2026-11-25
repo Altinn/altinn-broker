@@ -13,10 +13,12 @@ export type AuthorizedResource = {
   canReceive: boolean
   /** Party is a Broker service owner and the user has publish on digdir-broker-administrasjon for that party. */
   canPublish: boolean
-  /** The selected party is configured as a Broker service owner. */
+  /** The selected party is an organization in the Altinn service-owner catalog. */
   isServiceOwner: boolean
   /** The selected party owns this broker resource. */
   isOwned: boolean
+  /** The user has access action on digdir-broker-administrasjon for the selected party. */
+  hasConfigureAccess: boolean
 }
 
 export function fetchAuthorizedResources(party: string): Promise<AuthorizedResource[]> {

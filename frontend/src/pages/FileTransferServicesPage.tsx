@@ -1,8 +1,11 @@
-import { Alert, Heading, List, ResourceListItem } from '@altinn/altinn-components'
-import { useEffect, useMemo, useState } from 'react'
+import { Alert, Button, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
+import { ServiceOwnerProvisioningBanner } from '../components/FileTransferServices/ServiceOwnerProvisioningBanner'
+import { ServiceOwnerSetupNotice } from '../components/FileTransferServices/ServiceOwnerSetupNotice'
+import { useServiceOwnerProvisioning } from '../components/FileTransferServices/useServiceOwnerProvisioning'
 import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
@@ -20,6 +23,8 @@ export function FileTransferServicesPage() {
   const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
   const [resources, setResources] = useState<ResourcesState | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+  const reloadResources = useCallback(() => setReloadToken((token) => token + 1), [])
 
   const party = selectedParty?.organizationNumber
   const organizationName = selectedParty?.name ?? ''
@@ -45,7 +50,7 @@ export function FileTransferServicesPage() {
     return () => {
       active = false
     }
-  }, [party])
+  }, [party, reloadToken])
 
   const current = resources?.party === party ? resources : null
   const services = useMemo(
@@ -63,7 +68,26 @@ export function FileTransferServicesPage() {
   const receivable = filtered.filter((service) => service.canReceive)
   const receivableNotSendable = receivable.filter((service) => !service.canSend)
   const configurable = filtered.filter((service) => service.isOwned)
+  const owned = services.filter((service) => service.isOwned)
   const isServiceOwner = services.some((service) => service.isServiceOwner)
+  const hasConfigureAccess = services.some((service) => service.hasConfigureAccess)
+  const {
+    provisioning,
+    allowed,
+    starting,
+    error: provisioningError,
+    accessNotice,
+    start,
+    retry,
+  } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
+  const canProvision = allowed
+  const showConfigure =
+    accessNotice != null ||
+    (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
+    (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
+    (allowed && provisioning != null && provisioning.status !== 'Ready')
+  const configurationLocked =
+    showConfigure && (provisioningError != null || (provisioning != null && provisioning.status !== 'Ready'))
 
   const serviceItem = (service: AuthorizedResource) => (
     <ResourceListItem
@@ -75,6 +99,18 @@ export function FileTransferServicesPage() {
       variant="default"
       interactive
       as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
+    />
+  )
+
+  const lockedServiceItem = (service: AuthorizedResource) => (
+    <ResourceListItem
+      key={service.resourceId}
+      id={service.resourceId}
+      resourceName={serviceName(service)}
+      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
+      description={t('page.services.provision_pending_resource')}
+      variant="subtle"
+      interactive={false}
     />
   )
 
@@ -129,6 +165,15 @@ export function FileTransferServicesPage() {
         </List>
       )}
 
+      {provisioningError && !provisioning && (
+        <div className="page-section">
+          <Alert variant="danger" heading={provisioningError} message={t('page.common.try_later')} />
+          <Button size="sm" onClick={() => void retry()}>
+            <ButtonLabel>{t('page.services.provision_retry')}</ButtonLabel>
+          </Button>
+        </div>
+      )}
+
       {current?.status === 'failed' && (
         <Alert
           variant="danger"
@@ -137,7 +182,7 @@ export function FileTransferServicesPage() {
         />
       )}
 
-      {current?.status === 'loaded' && services.length === 0 && (
+      {current?.status === 'loaded' && services.length === 0 && !showConfigure && (
         <Alert
           variant="info"
           heading={t('page.services.empty_heading')}
@@ -163,12 +208,27 @@ export function FileTransferServicesPage() {
         </section>
       )}
 
-      {isServiceOwner && configurable.length > 0 && (
+      {showConfigure && (
         <section className="page-section">
           <Heading size="sm" as="h2">
             {t('page.services.can_configure', { name: organizationName })}
           </Heading>
-          <List spacing="sm">{configurable.map(serviceItem)}</List>
+          {accessNotice && <ServiceOwnerSetupNotice />}
+          {provisioning && (
+            <ServiceOwnerProvisioningBanner
+              organizationName={organizationName}
+              provisioning={provisioning}
+              canStart={canProvision}
+              starting={starting}
+              error={provisioningError}
+              onStart={start}
+            />
+          )}
+          {configurable.length > 0 && (
+            <List className={configurationLocked ? 'configure-pending' : undefined} spacing="sm">
+              {configurable.map((service) => (configurationLocked ? lockedServiceItem(service) : serviceItem(service)))}
+            </List>
+          )}
         </section>
       )}
     </div>

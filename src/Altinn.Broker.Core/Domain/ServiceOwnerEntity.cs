@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
-
-namespace Altinn.Broker.Core.Domain;
+﻿namespace Altinn.Broker.Core.Domain;
 
 public class ServiceOwnerEntity
 {

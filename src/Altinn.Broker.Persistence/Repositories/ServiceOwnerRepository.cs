@@ -71,7 +71,7 @@ public class ServiceOwnerRepository(NpgsqlDataSource dataSource, ExecuteDBComman
             "VALUES (@sub, @name)");
         command.Parameters.AddWithValue("@sub", sub);
         command.Parameters.AddWithValue("@name", name);
-        
+
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync);
     }
 

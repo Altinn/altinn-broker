@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import {
   LoadingServiceDetails,
   ServiceDetails,
+  ServiceOwnerNotConfigured,
 } from '../components/FileTransferServiceDetailPage/ServiceDetails'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
@@ -27,6 +28,8 @@ export function FileTransferServiceDetailPage() {
           }}
         />
       )
+    case 'ownerNotConfigured':
+      return <ServiceOwnerNotConfigured resource={state.resource} />
     case 'missing':
       return (
         <div className="page">

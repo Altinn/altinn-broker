@@ -180,7 +180,8 @@ public class ConfigureResourceHandler(
             return Errors.InvalidParty;
         }
 
-        if (await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is null)
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix());
+        if (serviceOwner is null)
         {
             return Errors.PartyIsNotBrokerServiceOwner;
         }

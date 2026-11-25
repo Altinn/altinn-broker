@@ -15,6 +15,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Link, type LinkProps, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ServiceOwnerNotConfigured } from '../components/FileTransferServiceDetailPage/ServiceDetails'
 import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
 import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
@@ -120,6 +121,10 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
 
   if (serviceState.status === 'missing') {
     return <p>{t('page.service.missing_short')}</p>
+  }
+
+  if (serviceState.status === 'ownerNotConfigured') {
+    return <ServiceOwnerNotConfigured resource={serviceState.resource} />
   }
 
   if (resumable.status === 'missing' || resumable.status === 'failed') {
