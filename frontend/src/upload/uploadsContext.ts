@@ -5,7 +5,10 @@ import type { UploadPlan, UploadProgress, UploadRunStatus } from '../api/tus/tus
 // Three contexts, so that what changes several times a second re-renders only what shows it:
 // the actions never change, the active upload changes with its status, and the progress all the time.
 
-export type UploadStatus = 'initializing' | UploadRunStatus | 'failed'
+export type UploadStatus = 'initializing' | UploadRunStatus | 'processing' | 'failed'
+
+/** How the server's processing of an uploaded file ended, as far as the upload page waited for it. */
+export type ProcessingOutcome = 'published' | 'failed' | 'timeout'
 
 export type ActiveUpload = {
   resourceId: string
@@ -40,8 +43,10 @@ export type UploadActions = {
   pause: () => void
   resume: () => void
   cancel: () => void
-  /** Call when the server has the file: this clears the saved upload and draft, and shows that the file was sent. */
-  markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>) => void
+  /** Call when the page showing the upload mounts; the returned function, called when it leaves, pauses the upload or stops waiting for processing. */
+  enterPage: () => () => void
+  /** Call when the server is done with the file: clears the draft, shows the outcome and tells the listeners, which redirect. */
+  markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>, outcome: ProcessingOutcome) => void
   /** Returns the function that removes the listener again. */
   addUploadSuccessListener: (listener: UploadSuccessListener) => () => void
 }

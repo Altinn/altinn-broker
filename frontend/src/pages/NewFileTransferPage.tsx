@@ -168,7 +168,8 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   // The transfer settled these when it was sent, so they are shown but not editable.
   const detailsLocked = resume !== null
 
-  const cancellable = (active !== null && active.status !== 'finishing') || form.interrupted !== null
+  const cancellable =
+    (active !== null && active.status !== 'finishing' && active.status !== 'processing') || form.interrupted !== null
 
   // A cancelled upload can't be continued, so the form goes back to sending a new transfer.
   const cancelUpload = () => {

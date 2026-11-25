@@ -62,6 +62,8 @@ function statusText(status: UploadStatus, progress: Progress | null): string {
       return i18n.t('page.upload.paused_at', { progress: sent })
     case 'pausing':
       return i18n.t('page.upload.pausing_at', { progress: sent })
+    case 'processing':
+      return i18n.t('page.upload.processing')
     case 'finishing':
       return i18n.t('page.upload.assembling')
     default:
@@ -86,6 +88,8 @@ function screenReaderStatusText(status: UploadStatus, progress: Progress | null)
       return i18n.t('page.upload.sr_paused', { percent: tenths })
     case 'pausing':
       return i18n.t('page.upload.sr_pausing')
+    case 'processing':
+      return i18n.t('page.upload.processing_plain')
     case 'finishing':
       return i18n.t('page.upload.assembling_plain')
     default:
