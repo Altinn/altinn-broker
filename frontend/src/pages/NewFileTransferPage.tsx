@@ -13,10 +13,9 @@ import {
   ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, type LinkProps, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, type LinkProps, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ServiceOwnerNotConfigured } from '../components/FileTransferServiceDetailPage/ServiceDetails'
-import { BlockingUploadNotice } from '../components/NewFileTransferPage/BlockingUploadNotice'
 import { ChecksumFields } from '../components/NewFileTransferPage/ChecksumFields'
 import { CancelUploadConfirmation } from '../components/NewFileTransferPage/CancelUploadConfirmation'
 import { InterruptedUploadNotice } from '../components/NewFileTransferPage/InterruptedUploadNotice'
@@ -40,12 +39,20 @@ import '../components/NewFileTransferPage/newFileTransferPage.css'
 import { NoRecipientsNotice } from '../components/FileTransferServiceDetailPage/NoRecipientsNotice'
 import { useFileTransferService } from '../components/FileTransferServiceDetailPage/useFileTransferService'
 import { useParties } from '../parties/PartiesContext'
-import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
 import { LabelWithHelpText, WithHelpText } from '../components/HelpTextPopover'
-import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
-import { PageRoutes, RESUME_PARAM, activeTransferPath, newFileTransferPath, servicePath } from './routes'
 
+
+import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
+import {
+  PageRoutes,
+  RESUME_PARAM,
+  activeTransferPath,
+  isFromDrafts,
+  newFileTransferPath,
+  resumeUploadPath,
+  servicePath,
+} from './routes'
 
 export function NewFileTransferPage() {
   const { serviceId = '' } = useParams()
@@ -66,7 +73,8 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const { t } = useTranslation()
   const { serviceId = '' } = useParams()
   const navigate = useNavigate()
-  const { status: partiesStatus, parties, selectedParty, selectParty } = useParties()
+  const openedFromDrafts = isFromDrafts(useLocation().state)
+  const { status: partiesStatus, selectedParty } = useParties()
   const senderOrgNumber = selectedParty?.organizationNumber ?? ''
   const serviceState = useFileTransferService(serviceId, selectedParty?.organizationNumber)
   const errorSummaryRef = useRef<HTMLDivElement>(null)
@@ -77,24 +85,28 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const resume = resumable.status === 'ready' ? resumable.upload : null
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, resume })
 
+  const ownTransferId = form.active?.fileTransferId ?? resumeTransferId
   useEffect(
     () =>
-      addUploadSuccessListener(({ fileTransferId, resourceId, sender }) => {
-        if (resourceId === serviceId && sender === senderOrgNumber) {
+      addUploadSuccessListener(({ fileTransferId }) => {
+        if (fileTransferId === ownTransferId) {
           navigate(activeTransferPath(fileTransferId), { replace: true })
         }
       }),
-    [navigate, senderOrgNumber, serviceId, addUploadSuccessListener],
+    [navigate, ownTransferId, addUploadSuccessListener],
   )
 
-  // The upload is only shown as the form's own while acting for the organisation that sends it.
-  const goToUpload = (upload: { resourceId: string; sender: string }) => {
-    const owner = flattenParties(parties).find((party) => party.organizationNumber === upload.sender)
-    if (owner && upload.sender !== senderOrgNumber) {
-      selectParty(owner.partyUuid)
+  // Once the transfer can be continued, a reload should land on continuing it rather than on the form.
+  // Until its plan is stored there is nothing to continue, so the address is left alone.
+  // Only the address changes.
+  const storedTransferId = form.active?.planKept ? form.active.fileTransferId : null
+  useEffect(() => {
+    if (resumeTransferId || !storedTransferId) {
+      return
     }
-    navigate(newFileTransferPath(upload.resourceId))
-  }
+    window.history.replaceState(window.history.state, '', resumeUploadPath(serviceId, storedTransferId))
+  }, [storedTransferId, resumeTransferId, serviceId])
+
   const { errors, setValue, submitAttempts, values } = form
 
   useEffect(() => {
@@ -153,7 +165,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
 
   const failedFields = newFileTransferFields.filter((field) => errors[field])
 
-  const { active, blockedBy } = form
+  const { active } = form
   const status = active?.status ?? null
 
   // An upload that can be carried on takes the primary action over, so there is only one to press.
@@ -161,7 +173,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const continueUpload =
     status === 'paused' || status === 'failed'
       ? form.resume
-      : form.resumeReady && !blockedBy
+      : form.resumeReady
         ? form.resumeInterrupted
         : null
 
@@ -171,16 +183,16 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const cancellable =
     (active !== null && active.status !== 'finishing' && active.status !== 'processing') || form.interrupted !== null
 
-  // A cancelled upload can't be continued, so the form goes back to sending a new transfer.
+
+  // A cancelled upload can't be continued. A draft opened from the drafts list goes back there; any
+  // other goes to an empty form, which also takes the cancelled transfer's id out of the address.
   const cancelUpload = () => {
     if (active) {
       form.cancel()
     } else {
       form.discardInterrupted()
     }
-    if (resumeTransferId) {
-      navigate(newFileTransferPath(serviceId), { replace: true })
-    }
+    navigate(openedFromDrafts ? PageRoutes.drafts : newFileTransferPath(serviceId), { replace: true })
   }
   if (confirmingCancel && !cancellable) {
     setConfirmingCancel(false)
@@ -219,14 +231,6 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
           }}
         >
           {form.loadError && <Alert data-color="warning">{form.loadError}</Alert>}
-
-          {blockedBy && (
-            <BlockingUploadNotice
-              upload={blockedBy}
-              onContinue={() => goToUpload(blockedBy)}
-              onCancel={form.cancelBlocking}
-            />
-          )}
 
           <fieldset className="new-transfer__fields" disabled={active !== null}>
             <fieldset className="new-transfer__fields" disabled={detailsLocked}>
@@ -392,7 +396,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
                 <Button
                   type="submit"
                   loading={active !== null}
-                  disabled={active !== null || blockedBy !== null}
+                  disabled={active !== null}
                 >
                   {active ? t('page.new.uploading') : t('page.new.send')}
                 </Button>

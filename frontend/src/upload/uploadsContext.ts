@@ -15,6 +15,8 @@ export type ActiveUpload = {
   sender: string
   /** Null until the transfer has been created. */
   fileTransferId: string | null
+  /** Whether the server holds the upload's plan, so it can be continued after a reload or from elsewhere. */
+  planKept: boolean
   fileName: string
   fileSize: number
   status: UploadStatus
