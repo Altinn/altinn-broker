@@ -81,10 +81,9 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
     () =>
       addUploadFinishedListener(({ fileTransferId, resourceId, sender, outcome }) => {
         if (resourceId === serviceId && sender === senderOrgNumber) {
-          navigate(activeTransferPath(fileTransferId), { replace: true })
+          const path = outcome === 'failed' ? historicalTransferPath(fileTransferId) : activeTransferPath(fileTransferId)
+          navigate(path, { replace: true})
         }
-        const path = outcome === 'failed' ? historicalTransferPath(fileTransferId) : activeTransferPath(fileTransferId)
-        navigate(path, { replace: true})
       }),
     [navigate, senderOrgNumber, serviceId, addUploadFinishedListener],
   )
