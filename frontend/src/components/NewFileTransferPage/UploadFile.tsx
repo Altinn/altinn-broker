@@ -6,7 +6,6 @@ import {
   ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { FileIcon, TrashIcon } from '@navikt/aksel-icons'
-import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 

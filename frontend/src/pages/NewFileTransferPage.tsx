@@ -44,7 +44,7 @@ import { flattenParties } from '../parties/mapAuthorizedParty'
 import { useUploadActions } from '../upload/uploadsContext'
 import { LabelWithHelpText, WithHelpText } from '../components/HelpTextPopover'
 import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
-import { PageRoutes, RESUME_PARAM, activeTransferPath, newFileTransferPath, servicePath } from './routes'
+import { PageRoutes, RESUME_PARAM, activeTransferPath, historicalTransferPath, newFileTransferPath, servicePath } from './routes'
 
 
 export function NewFileTransferPage() {
@@ -72,19 +72,20 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const errorSummaryRef = useRef<HTMLDivElement>(null)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
 
-  const { addUploadSuccessListener } = useUploadActions()
+  const { addUploadFinishedListener } = useUploadActions()
   const resumable = useResumableUpload(resumeTransferId, serviceId, selectedParty)
   const resume = resumable.status === 'ready' ? resumable.upload : null
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, resume })
 
   useEffect(
     () =>
-      addUploadSuccessListener(({ fileTransferId, resourceId, sender }) => {
+      addUploadFinishedListener(({ fileTransferId, resourceId, sender, outcome }) => {
         if (resourceId === serviceId && sender === senderOrgNumber) {
-          navigate(activeTransferPath(fileTransferId), { replace: true })
+          const path = outcome === 'failed' ? historicalTransferPath(fileTransferId) : activeTransferPath(fileTransferId)
+          navigate(path, { replace: true})
         }
       }),
-    [navigate, senderOrgNumber, serviceId, addUploadSuccessListener],
+    [navigate, senderOrgNumber, serviceId, addUploadFinishedListener],
   )
 
   // The upload is only shown as the form's own while acting for the organisation that sends it.
