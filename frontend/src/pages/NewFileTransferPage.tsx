@@ -192,7 +192,12 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
     } else {
       form.discardInterrupted()
     }
-    navigate(openedFromDrafts ? PageRoutes.drafts : newFileTransferPath(serviceId), { replace: true })
+    if (openedFromDrafts){
+      navigate(PageRoutes.drafts, { replace: true })
+      return
+    }
+    form.preFillNextForm()
+    navigate(newFileTransferPath(serviceId), { replace: true })
   }
   if (confirmingCancel && !cancellable) {
     setConfirmingCancel(false)

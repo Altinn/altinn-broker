@@ -160,6 +160,10 @@ function useFormValues(
     values.virusScan,
   )
 
+  const preFillNextForm = useCallback(() => {
+    writeDraft(key, locked ? { ...locked, file: draft.file } : draft)
+  }, [key, locked, draft])
+
   const setValue = useCallback(
     <K extends keyof NewFileTransferValues>(key: K, value: NewFileTransferValues[K]) => {
       setDraft((current) => ({ ...current, [key]: value }))
@@ -197,6 +201,7 @@ function useFormValues(
     virusScanLocked,
     values,
     setValue,
+    preFillNextForm,
     errors,
     metadataRowErrors,
     metadataErrorInputId,
