@@ -29,6 +29,15 @@ export function resumeUploadPath(serviceId: string, transferId: string) {
   return `${newFileTransferPath(serviceId)}?${RESUME_PARAM}=${encodeURIComponent(transferId)}`
 }
 
+/**
+ * Router state for a draft opened from the drafts list, so cancelling it goes back there.
+ */
+export const FROM_DRAFTS_STATE = { fromDrafts: true } as const
+
+export function isFromDrafts(state: unknown): boolean {
+  return typeof state === 'object' && state !== null && (state as { fromDrafts?: unknown }).fromDrafts === true
+}
+
 export function historicalTransferPath(transferId: string) {
   return `/file-transfers/historical/${transferId}`
 }

@@ -6,7 +6,7 @@ import { FileTransferCard } from '../components/FileTransfersPages/FileTransferC
 import { formatFileSize } from '../helpers/fileSizeHelper'
 import { useParties, type SelectedParty } from '../parties/PartiesContext'
 import { SelectedPartyMessage } from '../parties/SelectedPartyMessage'
-import { resumeUploadPath } from './routes'
+import { FROM_DRAFTS_STATE, resumeUploadPath } from './routes'
 import './pages.css'
 
 /** Transfers the sender started but whose file never finished uploading, so no recipient has them yet. */
@@ -57,6 +57,7 @@ function DraftFileTransfers({ party }: { party: SelectedParty }) {
                   size: formatFileSize(fileSize),
                 })}
                 to={resumeUploadPath(summary.resourceId, summary.fileTransferId)}
+                linkState={FROM_DRAFTS_STATE}
               />
             </li>
           )
