@@ -27,9 +27,11 @@ public class CheckNotificationDeliveryHandler(
     36 * 60 * 60, 
     48 * 60 * 60, 
     72 * 60 * 60];
-    public static readonly int MaxAttempts = PollBackoffSeconds.Length + 1;
+
+    private static readonly int MaxAttempts = PollBackoffSeconds.Length + 1;
     private const string OrderSendConditionNotMet = "Order_SendConditionNotMet";
     private static readonly string[] FinalOrderStatuses = ["Order_Completed", OrderSendConditionNotMet, "Order_Cancelled"];
+
 
     public async Task Process(Guid notificationId, CancellationToken cancellationToken, int attempt = 1)
     {
@@ -72,6 +74,7 @@ public class CheckNotificationDeliveryHandler(
                 TimeSpan.FromSeconds(delaySeconds));
             return;
         }
+
 
         if (statusResponse.Status == OrderSendConditionNotMet)
         {

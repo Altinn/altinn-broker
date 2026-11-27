@@ -360,6 +360,7 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))
             .AddAuthenticationSchemes(resourceSchemes.ToArray()));
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        options.AddPolicy(AuthorizationConstants.NotificationCheck, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.NotificationCheckScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.EndUser, policy =>
         {
             policy.AddAuthenticationSchemes(
