@@ -42,12 +42,12 @@ import { useParties } from '../parties/PartiesContext'
 import { useUploadActions } from '../upload/uploadsContext'
 import { LabelWithHelpText, WithHelpText } from '../components/HelpTextPopover'
 
-
 import { useResumableUpload } from '../components/NewFileTransferPage/useResumableUpload'
 import {
   PageRoutes,
   RESUME_PARAM,
   activeTransferPath,
+  historicalTransferPath,
   isFromDrafts,
   newFileTransferPath,
   resumeUploadPath,
@@ -80,7 +80,7 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const errorSummaryRef = useRef<HTMLDivElement>(null)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
 
-  const { addUploadSuccessListener } = useUploadActions()
+  const { addUploadFinishedListener } = useUploadActions()
   const resumable = useResumableUpload(resumeTransferId, serviceId, selectedParty)
   const resume = resumable.status === 'ready' ? resumable.upload : null
   const form = useNewFileTransferForm({ resourceId: serviceId, senderOrgNumber, resume })
@@ -88,12 +88,13 @@ function NewFileTransferPageContent({ resumeTransferId }: { resumeTransferId: st
   const ownTransferId = form.active?.fileTransferId ?? resumeTransferId
   useEffect(
     () =>
-      addUploadSuccessListener(({ fileTransferId }) => {
+      addUploadFinishedListener(({ fileTransferId, outcome }) => {
         if (fileTransferId === ownTransferId) {
-          navigate(activeTransferPath(fileTransferId), { replace: true })
+          const path = outcome === 'failed' ? historicalTransferPath(fileTransferId) : activeTransferPath(fileTransferId)
+          navigate(path, { replace: true})
         }
       }),
-    [navigate, ownTransferId, addUploadSuccessListener],
+    [navigate, ownTransferId, addUploadFinishedListener],
   )
 
   // Once the transfer can be continued, a reload should land on continuing it rather than on the form.

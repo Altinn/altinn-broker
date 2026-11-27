@@ -29,7 +29,7 @@ import {
   type StartUploadInput,
   type UploadActions,
   type UploadStatus,
-  type UploadSuccessListener,
+  type UploadFinishedListener,
 } from './uploadsContext'
 
 // Owns the single in-flight upload, for as long as the user stays within this app's routes.
@@ -43,9 +43,9 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const sessionRef = useRef<Initializing | Running | Processing | Failed | null>(null)
-  const listenersRef = useRef(new Set<UploadSuccessListener>())
   // Per transfer, whether the server holds its plan, which is what lets it be continued as a draft.
   const plansKeptRef = useRef(new Map<string, Promise<boolean>>())
+  const listenersRef = useRef(new Set<UploadFinishedListener>())
   // Whether the page showing the upload is open; set through enterPage.
   const onPageRef = useRef(false)
 
@@ -72,7 +72,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         break
     }
     for (const listener of listenersRef.current) {
-      listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
+      listener({ fileTransferId: plan.fileTransferId, resourceId, sender, outcome })
     }
   }, [])
 
@@ -334,7 +334,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     }
   }, [show])
 
-  const addUploadSuccessListener = useCallback((listener: UploadSuccessListener) => {
+  const addUploadFinishedListener = useCallback((listener: UploadFinishedListener) => {
     listenersRef.current.add(listener)
     return () => {
       listenersRef.current.delete(listener)
@@ -342,8 +342,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const actions = useMemo<UploadActions>(
-    () => ({ start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener }),
-    [start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener],
+    () => ({ start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadFinishedListener }),
+    [start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadFinishedListener],
   )
 
   return (
