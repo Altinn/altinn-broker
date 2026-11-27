@@ -1,0 +1,23 @@
+/* Up to three tags: on a narrow screen they move below the title instead of squeezing it. */
+.file-transfer-service-card .file-transfer-card__heading-row {
+  flex-wrap: wrap;
+}
+
+.file-transfer-service-card .file-transfer-card__title {
+  flex-basis: 16rem;
+}
+
+.file-transfer-service-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.file-transfer-service-card--locked {
+  opacity: 0.55;
+}
+
+/* Hidden rather than left out, so the tags stay in line with those on the cards that open. */
+.file-transfer-service-card--locked .file-transfer-card__chevron {
+  visibility: hidden;
+}

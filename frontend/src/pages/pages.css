@@ -270,8 +270,3 @@ ul.service-owner-list li.service-owner-list-item {
   height: 0.85rem;
   accent-color: var(--ds-color-warning-base-default, #c25e00);
 }
-
-.configure-pending {
-  opacity: 0.55;
-  pointer-events: none;
-}
