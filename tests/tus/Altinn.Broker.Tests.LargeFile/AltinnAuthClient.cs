@@ -56,10 +56,11 @@ public static class AltinnAuthClient
         CancellationToken cancellationToken)
     {
         var tokenUrl = ResolveMaskinportenTokenUrl(options);
-        var assertion = CreateMaskinportenClientAssertion(options);
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            // A new assertion per attempt: Maskinporten consumes each grant once.
+            var assertion = CreateMaskinportenClientAssertion(options);
             using var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl)
             {
                 Content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -150,6 +151,12 @@ public static class AltinnAuthClient
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var handler = new JsonWebTokenHandler();
+        // The default factory caches signature providers by key id. This RSA is
+        // disposed when the method returns, so a later token refresh would sign
+        // with the disposed key.
+        var signingKey = new RsaSecurityKey(rsa) { KeyId = options.ClientKid };
+        signingKey.CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false };
+
         return handler.CreateToken(new SecurityTokenDescriptor
         {
             Claims = new Dictionary<string, object>
@@ -159,6 +166,9 @@ public static class AltinnAuthClient
                 ["iss"] = options.ClientId,
                 ["iat"] = now,
                 ["exp"] = now + 120,
+                // Required. Without a unique jti, jobs started in the same second
+                // produce the same signed grant and Maskinporten rejects the rest.
+                ["jti"] = Guid.NewGuid().ToString(),
                 ["authorization_details"] = new object[]
                 {
                     new Dictionary<string, object>
@@ -172,9 +182,7 @@ public static class AltinnAuthClient
                     },
                 },
             },
-            SigningCredentials = new SigningCredentials(
-                new RsaSecurityKey(rsa) { KeyId = options.ClientKid },
-                SecurityAlgorithms.RsaSha256),
+            SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256),
         });
     }
 

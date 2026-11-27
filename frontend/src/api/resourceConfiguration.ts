@@ -62,12 +62,19 @@ export type ConfigureResourceInput = {
   approvedForDisabledVirusScan?: boolean
 }
 
+/** TT02, reached through the production API when staging configuration is enabled. */
+export const TT02_ENVIRONMENT = 'tt02'
+
 /**
  * Reads the broker configuration for a resource.
+ * Pass `tt02` to read the staging resource instead of the current environment.
  */
-export async function getResourceConfiguration(resourceId: string): Promise<ResourceConfiguration> {
+export async function getResourceConfiguration(
+  resourceId: string,
+  environment?: string,
+): Promise<ResourceConfiguration> {
   const body = await apiFetch<ResourceConfigurationBody>(
-    `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}`,
+    resourcePath(resourceId, environment),
     { redirectOnUnauthorized: false },
   )
 
@@ -92,13 +99,9 @@ export async function configureResource(
   resourceId: string,
   input: ConfigureResourceInput,
   onBehalfOf?: string,
+  environment?: string,
 ): Promise<void> {
-  const params = new URLSearchParams()
-  if (onBehalfOf) {
-    params.set('onBehalfOf', onBehalfOf)
-  }
-  const query = params.toString()
-  const path = `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}${query ? `?${query}` : ''}`
+  const path = resourcePath(resourceId, environment, onBehalfOf)
 
   await apiFetch<void>(path, {
     method: 'PUT',
@@ -106,4 +109,16 @@ export async function configureResource(
     body: JSON.stringify(input),
     redirectOnUnauthorized: false,
   })
+}
+
+function resourcePath(resourceId: string, environment?: string, onBehalfOf?: string): string {
+  const params = new URLSearchParams()
+  if (onBehalfOf) {
+    params.set('onBehalfOf', onBehalfOf)
+  }
+  if (environment) {
+    params.set('environment', environment)
+  }
+  const query = params.toString()
+  return `${RESOURCE_PATH}/${encodeURIComponent(resourceId)}${query ? `?${query}` : ''}`
 }

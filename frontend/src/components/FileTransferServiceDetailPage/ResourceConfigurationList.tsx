@@ -1,8 +1,12 @@
 import { List, SettingsItem, SettingsSection } from '@altinn/altinn-components'
-import { Alert, Button, Field, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
-import { useMemo } from 'react'
-import type { AllowedRecipient } from '../../api/allowedRecipients'
-import type { ResourceConfiguration } from '../../api/resourceConfiguration'
+import { Alert, Button, Field, Input, Label, Select, Switch, Textfield, ValidationMessage } from '@digdir/designsystemet-react'
+import { useEffect, useMemo, useState } from 'react'
+
+import { useTranslation } from 'react-i18next'
+import { ApiError } from '../../api/client'
+import { getAllowedRecipients, type AllowedRecipient } from '../../api/allowedRecipients'
+import { TT02_ENVIRONMENT, type ResourceConfiguration } from '../../api/resourceConfiguration'
+import { useAuth } from '../../auth/AuthContext'
 import { formatDuration } from '../../helpers/durationHelper'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 import {
@@ -12,20 +16,22 @@ import {
 } from '../../helpers/orgIdentifierHelper'
 import {
   configureAccessNotice,
+  localizeApiError,
   messageWithOptionalInlineLink,
   type LocalizedApiError,
 } from '../../i18n/apiErrors'
+import { i18n } from '../../i18n/config'
+import { HelpTextPopover, LabelWithHelpText, WithHelpText } from '../HelpTextPopover'
 import {
   useResourceConfigurationEditor,
-  VIRUS_SCAN_SIZE_HINT,
+  virusScanSizeHint,
   type ConfigurationDraft,
   type ConfigurationDraftErrors,
 } from './useResourceConfigurationEditor'
 import './fileTransferServiceDetailPage.css'
 
-const NOT_SET = '–'
-const NO_LIMIT = 'Ingen grense satt'
 const NO_REQUIRED_PARTY = ''
+const NO_REMOTE_CANDIDATES: AllowedRecipient[] = []
 
 function LocalizedErrorText({ error }: { error: LocalizedApiError }) {
   const parts = messageWithOptionalInlineLink(error)
@@ -57,6 +63,8 @@ type ResourceConfigurationListProps = {
   canPublish: boolean
   /** Used to choose between service-owner vs gatekeeper access notices. */
   isServiceOwner: boolean
+  /** Storage deployment is still running, so configuration stays closed. */
+  awaitingProvisioning: boolean
   sender: AllowedRecipient
   /**
    * Access-list parties (unfiltered by required party). Transfer-time allowed-recipients is too
@@ -71,22 +79,89 @@ export function ResourceConfigurationList({
   onBehalfOf,
   canPublish,
   isServiceOwner,
+  awaitingProvisioning,
   sender,
   accessListCandidates,
 }: ResourceConfigurationListProps) {
-  const editor = useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf })
-  const publishNotice = canPublish ? null : configureAccessNotice(isServiceOwner)
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const canConfigureStaging = user?.canConfigureStaging === true
+  const [environment, setEnvironment] = useState('')
+  const [remoteCandidates, setRemoteCandidates] = useState<AllowedRecipient[] | null>(null)
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [candidatesError, setCandidatesError] = useState<LocalizedApiError | null>(null)
+  const editor = useResourceConfigurationEditor({
+    resourceId,
+    configuration,
+    onBehalfOf,
+    environment: environment || undefined,
+  })
+  const publishNotice = canPublish || awaitingProvisioning ? null : configureAccessNotice(isServiceOwner)
+
+  useEffect(() => {
+    if (!environment) {
+      setLoadingCandidates(false)
+      setCandidatesError(null)
+      setRemoteCandidates(null)
+      return
+    }
+
+    let cancelled = false
+    setLoadingCandidates(true)
+    setCandidatesError(null)
+
+    getAllowedRecipients(resourceId, onBehalfOf, { ignoreRequiredParty: true, environment })
+      .then((candidates) => {
+        if (!cancelled) {
+          setRemoteCandidates(candidates)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setCandidatesError(describeCandidatesError(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingCandidates(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [environment, onBehalfOf, resourceId])
+
+  const partySource = environment ? (remoteCandidates ?? NO_REMOTE_CANDIDATES) : accessListCandidates
   const partyOptions = useMemo(
-    () =>
-      buildRequiredPartyOptions(sender, accessListCandidates, editor.configuration.requiredParty),
-    [sender, accessListCandidates, editor.configuration.requiredParty],
+    () => buildRequiredPartyOptions(sender, partySource, editor.configuration.requiredParty),
+    [sender, partySource, editor.configuration.requiredParty],
   )
+
+  const candidatesPending = Boolean(environment) && loadingCandidates && !candidatesError
+  const configurationBusy =
+    editor.saving || editor.loadingRemote || editor.awaitingRemote || candidatesPending
 
   return (
     <div className="resource-configuration">
+      {canConfigureStaging && (
+        <Field className="resource-configuration__environment">
+          <Label htmlFor="configuration-environment">{t('page.config.environment')}</Label>
+          <Select
+            id="configuration-environment"
+            value={environment}
+            onChange={(event) => setEnvironment(event.target.value)}
+            disabled={editor.saving}
+          >
+            <Select.Option value="">{t('page.config.environment_production')}</Select.Option>
+            <Select.Option value={TT02_ENVIRONMENT}>{t('page.config.environment_tt02')}</Select.Option>
+          </Select>
+        </Field>
+      )}
+
       <Field className="resource-configuration__edit-toggle">
         <Switch
-          label="Rediger oppsett"
+          label={t('page.config.edit')}
           checked={editor.editing}
           onChange={(event) => {
             if (event.target.checked) {
@@ -95,8 +170,11 @@ export function ResourceConfigurationList({
               editor.cancel()
             }
           }}
-          disabled={!canPublish || editor.saving}
+          disabled={!canPublish || awaitingProvisioning || configurationBusy || Boolean(editor.loadError)}
         />
+        {awaitingProvisioning && (
+          <Field.Description>{t('page.services.provision_pending_settings')}</Field.Description>
+        )}
         {publishNotice && (
           <Field.Description>
             <LocalizedErrorText error={publishNotice} />
@@ -104,13 +182,27 @@ export function ResourceConfigurationList({
         )}
       </Field>
 
+      {editor.loadError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={editor.loadError} />
+        </Alert>
+      )}
+
+      {candidatesError && (
+        <Alert data-color="danger" className="resource-configuration__alert">
+          <LocalizedErrorText error={candidatesError} />
+        </Alert>
+      )}
+
       {editor.saveError && (
         <Alert data-color="danger" className="resource-configuration__alert">
           <LocalizedErrorText error={editor.saveError} />
         </Alert>
       )}
 
-      {editor.editing ? (
+      {editor.awaitingRemote || editor.loadingRemote || candidatesPending ? (
+        <p>{t('page.config.environment_loading')}</p>
+      ) : editor.loadError || candidatesError ? null : editor.editing ? (
         <ConfigurationForm
           draft={editor.draft}
           errors={editor.errors}
@@ -124,7 +216,13 @@ export function ResourceConfigurationList({
         <SettingsSection>
           <List size="sm">
             {configurationFields(editor.configuration, partyOptions).map((field) => (
-              <SettingsItem key={field.label} id={field.label} title={field.label} value={field.value} />
+              <SettingsItem
+                key={field.label}
+                id={field.label}
+                title={field.label}
+                value={field.value}
+                controls={field.helpText && <HelpTextPopover label={field.label} helpText={field.helpText} />}
+              />
             ))}
           </List>
         </SettingsSection>
@@ -152,6 +250,8 @@ function ConfigurationForm({
   onSave,
   onCancel,
 }: ConfigurationFormProps) {
+  const { t } = useTranslation()
+  const hint = virusScanSizeHint()
   return (
     <form
       className="resource-configuration__form"
@@ -161,43 +261,56 @@ function ConfigurationForm({
       }}
     >
       <Textfield
-        label="Maks filstørrelse (GB)"
-        description={`La feltet stå tomt når ingen grense skal endres. ${VIRUS_SCAN_SIZE_HINT}`}
+        label={t('page.config.max_size_gb')}
+        description={t('page.config.max_size_description', { hint })}
         value={draft.maxFileTransferSizeGb}
         onChange={(event) => onChange('maxFileTransferSizeGb', event.target.value)}
         error={errors.maxFileTransferSizeGb}
         inputMode="decimal"
         disabled={saving}
       />
-      <Textfield
-        label="Levetid for formidling (dager)"
-        value={draft.fileTransferTimeToLiveDays}
-        onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
-        error={errors.fileTransferTimeToLiveDays}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Switch
-          label="Slettes når alle mottakere har bekreftet"
-          checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
-          onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+        <LabelWithHelpText label={t('page.config.lifetime_days')} helpText={t('page.helptext.lifetime_help_text')} />
+        <Input
+          value={draft.fileTransferTimeToLiveDays}
+          onChange={(event) => onChange('fileTransferTimeToLiveDays', event.target.value)}
+          aria-invalid={Boolean(errors.fileTransferTimeToLiveDays) || undefined}
+          inputMode="decimal"
           disabled={saving}
         />
+        {errors.fileTransferTimeToLiveDays && (
+          <ValidationMessage>{errors.fileTransferTimeToLiveDays}</ValidationMessage>
+        )}
       </Field>
-      <Textfield
-        label="Venteperiode før sletting (timer)"
-        value={draft.purgeFileTransferGracePeriodHours}
-        onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
-        error={errors.purgeFileTransferGracePeriodHours}
-        inputMode="decimal"
-        disabled={saving}
-      />
       <Field>
-        <Label htmlFor="required-party">Påkrevd part</Label>
-        <Field.Description>
-          Velg avsender eller en part fra tilgangslisten. La stå uten valg for ingen påkrevd part.
-        </Field.Description>
+        <WithHelpText label={t('page.config.purge_when_confirmed')} helpText={t('page.helptext.purge_help_text')}>
+          <Switch
+            label={t('page.config.purge_when_confirmed')}
+            checked={draft.purgeFileTransferAfterAllRecipientsConfirmed}
+            onChange={(event) => onChange('purgeFileTransferAfterAllRecipientsConfirmed', event.target.checked)}
+            disabled={saving}
+          />
+        </WithHelpText>
+      </Field>
+      <Field>
+        <LabelWithHelpText label={t('page.config.grace_hours')} helpText={t('page.helptext.grace_help_text')} />
+        <Input
+          value={draft.purgeFileTransferGracePeriodHours}
+          onChange={(event) => onChange('purgeFileTransferGracePeriodHours', event.target.value)}
+          aria-invalid={Boolean(errors.purgeFileTransferGracePeriodHours) || undefined}
+          inputMode="decimal"
+          disabled={saving}
+        />
+        {errors.purgeFileTransferGracePeriodHours && (
+          <ValidationMessage>{errors.purgeFileTransferGracePeriodHours}</ValidationMessage>
+        )}
+      </Field>
+      <Field>
+        <LabelWithHelpText
+          label={t('page.config.required_party')}
+          helpText={t('page.helptext.required_party_help_text')}
+        />
+        <Field.Description>{t('page.config.required_party_description')}</Field.Description>
         <Select
           id="required-party"
           value={draft.requiredParty}
@@ -205,7 +318,7 @@ function ConfigurationForm({
           disabled={saving}
           aria-invalid={errors.requiredParty ? true : undefined}
         >
-          <Select.Option value={NO_REQUIRED_PARTY}>Ingen påkrevd part</Select.Option>
+          <Select.Option value={NO_REQUIRED_PARTY}>{t('page.config.no_required_party')}</Select.Option>
           {partyOptions.map((party) => (
             <Select.Option key={party.organizationNumber} value={party.organizationNumber}>
               {formatOrganizationDisplay(party.name, party.organizationNumber)}
@@ -216,25 +329,35 @@ function ConfigurationForm({
       </Field>
       <Field>
         <Switch
-          label="Virusskanning påkrevd"
+          label={t('page.config.virus_required')}
           checked={draft.virusScanRequired}
           onChange={(event) => onChange('virusScanRequired', event.target.checked)}
           disabled={saving}
           aria-invalid={errors.virusScanRequired ? true : undefined}
         />
-        <Field.Description>{VIRUS_SCAN_SIZE_HINT}</Field.Description>
+        <Field.Description>{hint}</Field.Description>
         {errors.virusScanRequired && <ValidationMessage>{errors.virusScanRequired}</ValidationMessage>}
       </Field>
       <div className="resource-configuration__actions">
         <Button type="submit" disabled={saving}>
-          {saving ? 'Lagrer…' : 'Lagre'}
+          {saving ? t('page.common.saving') : t('page.common.save')}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>
-          Avbryt
+          {t('page.common.cancel')}
         </Button>
       </div>
     </form>
   )
+}
+
+function describeCandidatesError(error: unknown): LocalizedApiError {
+  if (error instanceof ApiError) {
+    const localized = localizeApiError(error.body)
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
+      return localized
+    }
+  }
+  return { message: i18n.t('page.config.access_list_failed') }
 }
 
 /** Sender first, then access-list candidates; keeps a configured party that is not in either list. */
@@ -264,45 +387,52 @@ function buildRequiredPartyOptions(
   return options
 }
 
-function configurationFields(configuration: ResourceConfiguration, partyOptions: AllowedRecipient[]) {
+function configurationFields(
+  configuration: ResourceConfiguration,
+  partyOptions: AllowedRecipient[],
+): { label: string; value: string; helpText?: string }[] {
   return [
     {
-      label: 'Maks filstørrelse',
+      label: i18n.t('page.config.max_size'),
       value:
         configuration.maxFileTransferSize === null
-          ? NO_LIMIT
+          ? i18n.t('page.config.no_limit')
           : formatFileSize(configuration.maxFileTransferSize),
     },
     {
-      label: 'Levetid for formidling',
+      label: i18n.t('page.config.lifetime'),
       value: formatDuration(configuration.fileTransferTimeToLive),
+      helpText: i18n.t('page.helptext.lifetime_help_text'),
     },
     {
-      label: 'Slettes når alle mottakere har bekreftet',
+      label: i18n.t('page.config.purge_when_confirmed'),
       value: yesNo(configuration.purgeFileTransferAfterAllRecipientsConfirmed),
+      helpText: i18n.t('page.helptext.purge_help_text'),
     },
     {
-      label: 'Venteperiode før sletting',
+      label: i18n.t('page.config.grace'),
       value: formatDuration(configuration.purgeFileTransferGracePeriod),
+      helpText: i18n.t('page.helptext.grace_help_text'),
     },
     {
-      label: 'Påkrevd part',
+      label: i18n.t('page.config.required_party'),
       value: requiredPartyDisplay(configuration.requiredParty, partyOptions),
+      helpText: i18n.t('page.helptext.required_party_help_text'),
     },
     {
-      label: 'Virusskanning påkrevd',
+      label: i18n.t('page.config.virus_required'),
       value: yesNo(!configuration.approvedForDisabledVirusScan),
     },
   ]
 }
 
 function yesNo(value: boolean): string {
-  return value ? 'Ja' : 'Nei'
+  return value ? i18n.t('page.common.yes') : i18n.t('page.common.no')
 }
 
 function requiredPartyDisplay(identifier: string | null, partyOptions: AllowedRecipient[]): string {
   if (!identifier) {
-    return NOT_SET
+    return i18n.t('page.common.not_set')
   }
 
   const digits = toOrgNumber(identifier)

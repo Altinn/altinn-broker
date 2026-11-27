@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps, useNavigate, useParams } from 'react-router-dom'
 import { Button, List, ListItem } from '@altinn/altinn-components'
 import { useEffect, useRef, useState } from 'react'
@@ -16,6 +17,7 @@ type FileTransferDetailPageProps = {
 }
 
 export function FileTransferDetailPage({ backPath, showActions = false }: FileTransferDetailPageProps) {
+  const { t } = useTranslation()
   const { transferId = '' } = useParams()
   const { selectedParty } = useParties()
   const navigate = useNavigate()
@@ -63,25 +65,25 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
   }, [transferId, selectedParty, backPath, navigate])
 
   if (!transferId) {
-    return <p>Ingen formidling valgt.</p>
+    return <p>{t('page.detail.none_selected')}</p>
   }
 
   if (!selectedParty) {
-    return <SelectedPartyMessage loadingText="Laster formidlingen …" />
+    return <SelectedPartyMessage loadingText={t('page.detail.loading_transfer')} />
   }
 
   if (loadError === 'missing') {
-    return <p className="empty-state">Fant ikke formidlingen.</p>
+    return <p className="empty-state">{t('page.detail.missing')}</p>
   }
 
   if (loadError === 'failed') {
     return (
-      <p className="empty-state">Klarte ikke å hente formidlingen. Prøv igjen senere.</p>
+      <p className="empty-state">{t('page.detail.failed')}</p>
     )
   }
 
   if (!transferDetails) {
-    return <p>Laster …</p>
+    return <p>{t('page.detail.loading')}</p>
   }
 
   return (
@@ -89,12 +91,12 @@ export function FileTransferDetailPage({ backPath, showActions = false }: FileTr
       <div className="page-actions">
         <Button as={(props: LinkProps) => <Link {...props} to={backPath} />} variant="secondary" size="sm">
           <ArrowUndoIcon aria-hidden />
-          Tilbake
+          {t('page.common.back')}
         </Button>
       </div>
 
       <section className="page-section">
-        <div>Navn og eier</div>
+        <div>{t('page.detail.name_and_owner')}</div>
         <List className="service-owner-list">
           <ListItem
             className="service-owner-list-item"

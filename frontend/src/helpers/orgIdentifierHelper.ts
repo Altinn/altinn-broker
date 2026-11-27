@@ -1,3 +1,5 @@
+import { i18n } from '../i18n/config'
+
 const NORWEGIAN_ORG_CODE = '0192'
 
 const IDENTIFIER_PREFIXES = ['urn:altinn:organization:identifier-no:', `${NORWEGIAN_ORG_CODE}:`]
@@ -45,7 +47,7 @@ export function formatOrgNumber(orgNumber: string): string {
 
 /** Joins a resolved organization name and number into one display string, e.g. "Sender AS - Org.nr. 912 345 678". */
 export function formatOrganizationDisplay(name: string, orgNumber: string): string {
-  return `${name} - Org.nr. ${formatOrgNumber(orgNumber)}`
+  return `${name} - ${i18n.t('page.common.org_number', { number: formatOrgNumber(orgNumber) })}`
 }
 
 export class InvalidOrgNumberError extends Error {

@@ -1,3 +1,5 @@
+using Altinn.Broker.Application.UploadPlans;
+
 using Hangfire;
 using Hangfire.Server;
 
@@ -9,6 +11,7 @@ public class TusPublishUploadHandler(
     ITusUploadFinalizationService tusUploadFinalizationService,
     TusUploadCompleteHandler tusUploadCompleteHandler,
     ITusConcatJobCoordinator concatJobCoordinator,
+    IUploadPlanStore uploadPlanStore,
     ILogger<TusPublishUploadHandler> logger)
 {
     private const int RetryAttempts = 3;
@@ -53,6 +56,17 @@ public class TusPublishUploadHandler(
             }
 
             await tusUploadFinalizationService.CleanupCompletedUploadAsync(fileTransferId.ToString(), cancellationToken);
+            try
+            {
+                await uploadPlanStore.RemoveAsync(fileTransferId, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to remove upload plan for file transfer {FileTransferId} after successful TUS publish. This is not fatal, but the plan may be left in the store.",
+                    fileTransferId);
+            }
 
             logger.LogInformation(
                 "TUS publish job completed for file transfer {FileTransferId}",

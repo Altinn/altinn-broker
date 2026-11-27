@@ -3,8 +3,6 @@ using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Integrations.Tus;
 
-using Microsoft.Extensions.Logging;
-
 namespace Altinn.Broker.API.Tus;
 
 internal static class TusFinalizeRecovery
@@ -33,7 +31,6 @@ internal static class TusFinalizeRecovery
         var finalizationService = httpContext.RequestServices.GetRequiredService<ITusUploadFinalizationService>();
         var partialUploadRegistry = httpContext.RequestServices.GetRequiredService<ITusPartialUploadRegistry>();
         var concatJobCoordinator = httpContext.RequestServices.GetRequiredService<ITusConcatJobCoordinator>();
-        var storageResolver = httpContext.RequestServices.GetRequiredService<ITusStorageResolver>();
         var enqueuer = httpContext.RequestServices.GetRequiredService<ITusFinalizeUploadEnqueuer>();
         var isPartial = await finalizationService.IsPartialUploadAsync(tusFileId, cancellationToken);
         var currentStatus = fileTransfer.FileTransferStatusEntity.Status;
@@ -48,7 +45,7 @@ internal static class TusFinalizeRecovery
             return;
         }
 
-        if (await storageResolver.DestinationBlobExistsAsync(tusFileId, cancellationToken))
+        if (await finalizationService.IsStagingBlobCommittedAsync(tusFileId, cancellationToken))
         {
             return;
         }

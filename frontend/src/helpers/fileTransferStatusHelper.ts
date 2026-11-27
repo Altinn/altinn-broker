@@ -1,5 +1,6 @@
 import type { DialogStatusProps } from '@altinn/altinn-components'
 import type { FileTransferSummary } from '../api/fileTransferSummary'
+import { i18n } from '../i18n/config'
 
 export type FileTransferListStatus = {
   status: DialogStatusProps
@@ -16,17 +17,17 @@ export function getFileTransferListStatus(
 ): FileTransferListStatus | undefined {
   switch (summary.fileTransferStatus) {
     case 'UploadProcessing':
-      return { status: { value: 'awaiting', label: 'Til behandling' }, extendedStatusLabel: 'Filen behandles' }
+      return { status: { value: 'awaiting', label: i18n.t('page.status.awaiting') }, extendedStatusLabel: i18n.t('page.status.processing') }
     case 'Published':
       return getPublishedListStatus(summary.actorDownloadStatus)
     case 'AllConfirmedDownloaded':
-      return getEndedListStatus('Alle mottakere har lastet ned')
+      return getEndedListStatus(i18n.t('page.status.all_downloaded'))
     case 'Cancelled':
-      return getEndedListStatus('Kansellert')
+      return getEndedListStatus(i18n.t('page.status.cancelled'))
     case 'Purged':
-      return getEndedListStatus('Filen er slettet')
+      return getEndedListStatus(i18n.t('page.status.deleted'))
     case 'Failed':
-      return getEndedListStatus('Feilet')
+      return getEndedListStatus(i18n.t('page.status.failed'))
     default:
       return undefined
   }
@@ -35,18 +36,18 @@ export function getFileTransferListStatus(
 function getPublishedListStatus(actorDownloadStatus: FileTransferSummary['actorDownloadStatus']): FileTransferListStatus {
   switch (actorDownloadStatus) {
     case 'Initialized':
-      return { status: { value: 'requires-attention', label: 'Krever handling' }, extendedStatusLabel: 'Last ned filen' }
+      return { status: { value: 'requires-attention', label: i18n.t('page.status.requires_action') }, extendedStatusLabel: i18n.t('page.status.download') }
     case 'DownloadStarted':
-      return { status: { value: 'requires-attention', label: 'Krever handling' }, extendedStatusLabel: 'Bekreft nedlasting' }
+      return { status: { value: 'requires-attention', label: i18n.t('page.status.requires_action') }, extendedStatusLabel: i18n.t('page.status.confirm') }
     case 'DownloadConfirmed':
-      return { status: { value: 'completed', label: 'Lastet ned' }, extendedStatusLabel: 'Venter på andre mottakere' }
+      return { status: { value: 'completed', label: i18n.t('page.status.downloaded') }, extendedStatusLabel: i18n.t('page.status.waiting_others') }
     default:
-      return { status: { value: 'awaiting', label: 'Sendt' }, extendedStatusLabel: 'Venter på at mottaker laster ned' }
+      return { status: { value: 'awaiting', label: i18n.t('page.status.sent') }, extendedStatusLabel: i18n.t('page.status.waiting_recipient') }
   }
 }
 
 function getEndedListStatus(extendedStatusLabel: string): FileTransferListStatus {
-  return { status: { value: 'completed', label: 'Avsluttet' }, extendedStatusLabel }
+  return { status: { value: 'completed', label: i18n.t('page.status.ended') }, extendedStatusLabel }
 }
 
 /** Maps the backend's `status` field to the message shown in the transfer's status detail row. */
@@ -57,20 +58,20 @@ export function formatFileTransferStatusMessage(
   switch (status) {
     case 'AwaitingDownloadByCurrentActor':
       return actorDownloadStatus === 'DownloadStarted'
-        ? 'Nedlasting startet. Bekreft nedlasting for sluttstatus.'
-        : 'Venter på nedlasting.'
+        ? i18n.t('page.status.awaiting_download_started')
+        : i18n.t('page.status.awaiting_download')
     case 'AwaitingOtherRecipients':
-      return 'Venter på nedlasting av resterende mottakere.'
+      return i18n.t('page.status.awaiting_remaining')
     case 'AwaitingRecipients':
-      return 'Venter på at mottaker laster ned filen.'
+      return i18n.t('page.status.awaiting_recipients')
     case 'AllDownloaded':
-      return 'Alle mottakere har lastet ned filen.'
+      return i18n.t('page.status.all_downloaded_file')
     case 'Cancelled':
-      return 'Formidlingen er kansellert.'
+      return i18n.t('page.status.transfer_cancelled')
     case 'Purged':
-      return 'Filen er slettet.'
+      return i18n.t('page.status.file_deleted')
     case 'Failed':
-      return 'Formidlingen feilet.'
+      return i18n.t('page.status.transfer_failed')
     default:
       return status ?? ''
   }

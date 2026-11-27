@@ -52,5 +52,13 @@ public class BrokerNotificationEntity
 
     public string? NotificationAddress { get; set; }
 
+    public NotificationDeliveryStatus Status { get; set; } = NotificationDeliveryStatus.Pending;
+
+    /// <summary>
+    /// Why the notification was <see cref="NotificationDeliveryStatus.Rejected"/> or
+    /// <see cref="NotificationDeliveryStatus.NotDelivered"/>, as Altinn Notifications explained it.
+    /// </summary>
+    public string? StatusReason { get; set; }
+
     public string? OrderRequest { get; set; }
 }

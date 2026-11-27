@@ -45,6 +45,18 @@ inputs:
   MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT:
     description: "Environment for maskinporten token exchange"
     required: true
+  PRODUCTION_PLATFORM_URL:
+    description: "Production Altinn platform URL. Set only for TT02 so ConfigureResource accepts production tokens."
+    required: false
+    default: ""
+  STAGING_BROKER_API_URL:
+    description: "Public TT02 Broker API URL. Set only in production so users can configure TT02 resources."
+    required: false
+    default: ""
+  STAGING_CONFIGURATION_FORWARD_KEY:
+    description: "Shared secret production sends when forwarding resource configuration to TT02. Set the same value in production and TT02."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -78,6 +90,9 @@ runs:
         MASKINPORTEN_ENVIRONMENT: ${{ inputs.MASKINPORTEN_ENVIRONMENT }}
         APIM_IP: ${{ inputs.APIM_IP }}
         MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT: ${{ inputs.MASKINPORTEN_TOKEN_EXCHANGE_ENVIRONMENT }}
+        PRODUCTION_PLATFORM_URL: ${{ inputs.PRODUCTION_PLATFORM_URL }}
+        STAGING_BROKER_API_URL: ${{ inputs.STAGING_BROKER_API_URL }}
+        STAGING_CONFIGURATION_FORWARD_KEY: ${{ inputs.STAGING_CONFIGURATION_FORWARD_KEY }}
       with:
         scope: subscription
         subscriptionId: ${{ inputs.AZURE_SUBSCRIPTION_ID }}

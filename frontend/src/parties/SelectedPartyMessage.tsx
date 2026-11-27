@@ -1,4 +1,5 @@
 import { Alert } from '@altinn/altinn-components'
+import { useTranslation } from 'react-i18next'
 import { useParties } from './PartiesContext'
 
 type SelectedPartyMessageProps = {
@@ -12,6 +13,7 @@ type SelectedPartyMessageProps = {
  * differently to the user, so they are kept apart.
  */
 export function SelectedPartyMessage({ loadingText }: SelectedPartyMessageProps) {
+  const { t } = useTranslation()
   const { status } = useParties()
 
   if (status === 'failed') {
@@ -19,8 +21,8 @@ export function SelectedPartyMessage({ loadingText }: SelectedPartyMessageProps)
       <div className="page">
         <Alert
           variant="danger"
-          heading="Kunne ikke hente aktører"
-          message="Vi fikk ikke hentet hvilke virksomheter du kan representere. Prøv igjen senere."
+          heading={t('page.parties.load_failed_heading')}
+          message={t('page.parties.load_failed_message')}
         />
       </div>
     )
@@ -34,8 +36,8 @@ export function SelectedPartyMessage({ loadingText }: SelectedPartyMessageProps)
     <div className="page">
       <Alert
         variant="info"
-        heading="Ingen virksomheter"
-        message="Du kan ikke representere noen virksomheter i BrokerBox."
+        heading={t('page.parties.none_heading')}
+        message={t('page.parties.none_message')}
       />
     </div>
   )

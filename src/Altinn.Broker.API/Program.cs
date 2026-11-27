@@ -35,8 +35,11 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 
 using StackExchange.Redis;
+
+using tusdotnet.Helpers;
 
 BuildAndRun(args);
 
@@ -71,6 +74,9 @@ static void BuildAndRun(string[] args)
 
     // Vite (and other reverse proxies) set X-Forwarded-* so OIDC/cookies see the SPA host.
     app.UseForwardedHeaders();
+
+    // Ahead of the Accept, CSRF and TUS middlewares so preflight requests are answered here.
+    app.UseCors();
 
     app.UseMiddleware<TusPartialPathRewriteMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -122,7 +128,10 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
     services.Configure<AltinnOptions>(config.GetSection(key: nameof(AltinnOptions)));
     services.Configure<MaskinportenSettings>(config.GetSection(key: nameof(MaskinportenSettings)));
     services.Configure<MaskinportenJwkRotationSettings>(config.GetSection(key: nameof(MaskinportenJwkRotationSettings)));
-    services.Configure<AzureStorageOptions>(config.GetSection(key: nameof(AzureStorageOptions)));
+    services.AddSingleton<IValidateOptions<AzureStorageOptions>, AzureStorageOptionsValidator>();
+    services.AddOptions<AzureStorageOptions>()
+        .Bind(config.GetSection(key: nameof(AzureStorageOptions)))
+        .ValidateOnStart();
     services.Configure<ReportStorageOptions>(config.GetSection(key: nameof(ReportStorageOptions)));
     services.Configure<ReportFilterOptions>(config);
     services.Configure<GeneralSettings>(config.GetSection(key: nameof(GeneralSettings)));
@@ -135,6 +144,24 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddHttpClient();
     services.AddProblemDetails();
+
+    var corsAllowedOrigins = config.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? [];
+    services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy => policy
+            .WithOrigins(corsAllowedOrigins)
+            .SetIsOriginAllowedToAllowWildcardSubdomains()
+            .AllowCredentials()
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .WithExposedHeaders([
+                .. CorsHelper.GetExposedHeaders(),
+                HeaderNames.ContentDisposition,
+                HeaderNames.ContentRange,
+                HeaderNames.AcceptRanges
+            ])
+            .SetPreflightMaxAge(TimeSpan.FromMinutes(5)));
+    });
 
     services.Configure<ForwardedHeadersOptions>(options =>
     {
@@ -187,14 +214,16 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
 
     services.AddAltinnPlatformAuth(config);
 
-    services.AddAuthentication()
+    var altinnOptions = new AltinnOptions();
+    config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
+    var productionOpenIdWellKnown = altinnOptions.ProductionOpenIdWellKnown();
+
+    var authentication = services.AddAuthentication()
         .AddScheme<AuthenticationSchemeOptions, TusUploadSessionAuthenticationHandler>(
             AuthorizationConstants.TusUploadSession,
             _ => { })
         .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
-            var altinnOptions = new AltinnOptions();
-            config.GetSection(nameof(AltinnOptions)).Bind(altinnOptions);
             options.SaveToken = true;
             options.MetadataAddress = altinnOptions.OpenIdWellKnown;
             options.TokenValidationParameters = new TokenValidationParameters
@@ -241,6 +270,41 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         .AddAltinnPlatformJwtCookie()
         .AddIdPortenDirectAuth(config);
 
+    if (!string.IsNullOrWhiteSpace(productionOpenIdWellKnown))
+    {
+        authentication.AddJwtBearer(AuthorizationConstants.ProductionAltinn, options =>
+        {
+            options.SaveToken = true;
+            options.MetadataAddress = productionOpenIdWellKnown;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                AuthenticationType = AuthorizationConstants.ProductionAltinn,
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                RequireExpirationTime = true,
+                ValidateLifetime = !hostEnvironment.IsDevelopment(),
+                ClockSkew = TimeSpan.Zero
+            };
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = AltinnTokenEventsHelper.OnAuthenticationFailed,
+                OnChallenge = AltinnTokenEventsHelper.OnChallenge
+            };
+        });
+    }
+
+    services.AddScoped<IProductionConfigurationForwardProof, ProductionConfigurationForwardProof>();
+    services.AddHttpClient<StagingResourceConfigurationProxy>(client =>
+    {
+        if (altinnOptions.HasStagingConfigurationForward())
+        {
+            client.BaseAddress = new Uri(altinnOptions.StagingBrokerApiUrl.TrimEnd('/') + "/");
+        }
+
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+
     services.AddScoped<TusUploadSessionAuthenticationHelper>();
     services.AddScoped<ITusUploadSessionAuthenticationHelper>(sp =>
         sp.GetRequiredService<TusUploadSessionAuthenticationHelper>());
@@ -276,21 +340,25 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 AuthorizationConstants.EndUserCookie,
                 AuthorizationConstants.AltinnPlatformJwtCookie));
         options.AddPolicy(AuthorizationConstants.ServiceOwner, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.ServiceOwnerScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
+        var resourceSchemes = new List<string>
+        {
+            JwtBearerDefaults.AuthenticationScheme,
+            AuthorizationConstants.LegacyAndMaskinporten,
+            AuthorizationConstants.EndUserCookie,
+            AuthorizationConstants.AltinnPlatformJwtCookie
+        };
+        if (!string.IsNullOrWhiteSpace(productionOpenIdWellKnown))
+        {
+            resourceSchemes.Add(AuthorizationConstants.ProductionAltinn);
+        }
+
         options.AddPolicy(AuthorizationConstants.ConfigureResource, policy => policy
             .AddRequirements(new ConfigureResourceAccessRequirement())
-            .AddAuthenticationSchemes(
-                JwtBearerDefaults.AuthenticationScheme,
-                AuthorizationConstants.LegacyAndMaskinporten,
-                AuthorizationConstants.EndUserCookie,
-                AuthorizationConstants.AltinnPlatformJwtCookie));
+            .AddAuthenticationSchemes(resourceSchemes.ToArray()));
         options.AddPolicy(AuthorizationConstants.AnyBrokerScope, policy => policy
             .AddRequirements(new ScopeAccessRequirement(
                 [AuthorizationConstants.ServiceOwnerScope, AuthorizationConstants.SenderScope, AuthorizationConstants.RecipientScope]))
-            .AddAuthenticationSchemes(
-                JwtBearerDefaults.AuthenticationScheme,
-                AuthorizationConstants.LegacyAndMaskinporten,
-                AuthorizationConstants.EndUserCookie,
-                AuthorizationConstants.AltinnPlatformJwtCookie));
+            .AddAuthenticationSchemes(resourceSchemes.ToArray()));
         options.AddPolicy(AuthorizationConstants.Maintenance, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.MaintenanceScope)).AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.NotificationCheck, policy => policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.NotificationCheckScope)).AddAuthenticationSchemes(AuthorizationConstants.LegacyAndMaskinporten));
         options.AddPolicy(AuthorizationConstants.EndUser, policy =>
@@ -300,6 +368,29 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
                 AuthorizationConstants.AltinnPlatformJwtCookie);
             policy.RequireAuthenticatedUser();
             policy.AddRequirements(new EndUserRequirement());
+        });
+        options.AddPolicy(AuthorizationConstants.AllowedRecipients, policy =>
+        {
+            var schemes = new List<string>
+            {
+                AuthorizationConstants.EndUserCookie,
+                AuthorizationConstants.AltinnPlatformJwtCookie
+            };
+            if (!string.IsNullOrWhiteSpace(productionOpenIdWellKnown))
+            {
+                schemes.Add(AuthorizationConstants.ProductionAltinn);
+            }
+
+            policy.AddAuthenticationSchemes(schemes.ToArray());
+            policy.RequireAuthenticatedUser();
+            policy.AddRequirements(new EndUserRequirement());
+        });
+        options.AddPolicy(AuthorizationConstants.EligibleParties, policy =>
+        {
+            policy.AddRequirements(new ScopeAccessRequirement(AuthorizationConstants.EligiblePartiesScope));
+            policy.AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                AuthorizationConstants.LegacyAndMaskinporten);                
         });
     });
 

@@ -145,7 +145,7 @@ public class CheckNotificationDeliveryHandlerTests
             .Setup(s => s.GetNotificationDetailsV2(notification.ShipmentId!.Value.ToString(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateStatusResponse("Order_Processing", []));
 
-        await handler.Process(notification.Id, CancellationToken.None, attempt: 10);
+        await handler.Process(notification.Id, CancellationToken.None, attempt: CheckNotificationDeliveryHandler.MaxAttempts);
 
         var slackJob = Assert.Single(capturedJobs);
         Assert.Equal(typeof(SendSlackNotificationHandler), slackJob.Job.Type);
@@ -199,14 +199,15 @@ public class CheckNotificationDeliveryHandlerTests
     }
 
     [Fact]
-    public async Task Process_WhenFinalStatusWithNoSentRecipients_DoesNotUpdateNotificationSent()
+    public async Task Process_WhenFinalStatusWithNoSentRecipients_MarksNotDeliveredWithFailedStatusesAsReason()
     {
         var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
         var notification = CreateNotification();
         repository.Setup(r => r.GetNotificationById(notification.Id, It.IsAny<CancellationToken>())).ReturnsAsync(notification);
         var statusResponse = CreateStatusResponse("Order_Completed",
         [
-            CreateRecipient(NotificationType.Email, NotificationStatusV2.Email_Failed, "failed@example.com", DateTimeOffset.UtcNow)
+            CreateRecipient(NotificationType.Email, NotificationStatusV2.Email_Failed, "failed@example.com", DateTimeOffset.UtcNow),
+            CreateRecipient(NotificationType.Email, NotificationStatusV2.Email_Failed, "other@example.com", DateTimeOffset.UtcNow)
         ]);
         notificationService
             .Setup(s => s.GetNotificationDetailsV2(notification.ShipmentId!.Value.ToString(), It.IsAny<CancellationToken>()))
@@ -214,6 +215,24 @@ public class CheckNotificationDeliveryHandlerTests
 
         await handler.Process(notification.Id, CancellationToken.None);
 
+        repository.Verify(r => r.UpdateNotificationSent(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.UpdateStatus(notification.Id, NotificationDeliveryStatus.NotDelivered, "Email_Failed", It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Empty(capturedJobs);
+    }
+
+    [Fact]
+    public async Task Process_WhenSendConditionNotMet_MarksConditionNotMet()
+    {
+        var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
+        var notification = CreateNotification();
+        repository.Setup(r => r.GetNotificationById(notification.Id, It.IsAny<CancellationToken>())).ReturnsAsync(notification);
+        notificationService
+            .Setup(s => s.GetNotificationDetailsV2(notification.ShipmentId!.Value.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateStatusResponse("Order_SendConditionNotMet", []));
+
+        await handler.Process(notification.Id, CancellationToken.None);
+
+        repository.Verify(r => r.UpdateStatus(notification.Id, NotificationDeliveryStatus.ConditionNotMet, null, It.IsAny<CancellationToken>()), Times.Once);
         repository.Verify(r => r.UpdateNotificationSent(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Empty(capturedJobs);
     }

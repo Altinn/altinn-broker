@@ -6,6 +6,7 @@ using Altinn.Broker.Core.Application;
 using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Helpers;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public class GetAuthorizedResourcesHandler(
     IResourceRepository resourceRepository,
     IServiceOwnerRepository serviceOwnerRepository,
     IAltinnResourceRepository altinnResourceRepository,
+    IAltinnOrganizationCatalog organizationCatalog,
     BrokerResourceProvisioner resourceProvisioner,
     HybridCache hybridCache,
     ILogger<GetAuthorizedResourcesHandler> logger) : IHandler<GetAuthorizedResourcesRequest, List<AuthorizedResourceOverview>>
@@ -94,17 +96,26 @@ public class GetAuthorizedResourcesHandler(
             return Errors.AuthorizationUnavailable;
         }
 
-        var isServiceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix()) is not null;
-        var canConfigureForParty = isServiceOwner
-            && await HasGatekeeperPublish(user, party, cancellationToken);
+        var serviceOwner = await serviceOwnerRepository.GetServiceOwner(party.WithPrefix());
+        var isRegisteredServiceOwner = serviceOwner is not null;
+        // A Broker row is created by provisioning. Altinn service owners are the organizations
+        // in the Altinn org catalog, so the banner can be offered before that row exists.
+        var isServiceOwner = await organizationCatalog.IsPossibleServiceOwner(party, cancellationToken);
+        var partyOwnsBrokerResource = serviceOwnerByResourceId.Values.Any(owner => owner == party);
+        var hasGatekeeper = false;
+        if (isServiceOwner || isRegisteredServiceOwner || partyOwnsBrokerResource)
+        {
+            hasGatekeeper = await HasGatekeeperPublish(user, party, cancellationToken);
+        }
 
         // Include when the party owns the resource as a Broker service owner, or when they can
-        // send/receive and are on the resource access list.
+        // send/receive and are on the resource access list. Gatekeeper users also see owned
+        // resources before the organization is registered, so BrokerBox can offer provisioning.
         var accessibility = await Task.WhenAll(authorizedResources.Select(async authorized =>
         {
             var ownedByParty = serviceOwnerByResourceId.TryGetValue(authorized.ResourceId, out var owner)
                 && owner == party;
-            if (isServiceOwner && ownedByParty)
+            if (ownedByParty && (isRegisteredServiceOwner || hasGatekeeper))
             {
                 return (authorized, include: true);
             }
@@ -142,9 +153,10 @@ public class GetAuthorizedResourcesHandler(
                 ServiceOwnerName = metadata?.ServiceOwnerName,
                 CanSend = authorized.CanSend,
                 CanReceive = authorized.CanReceive,
-                CanPublish = canConfigureForParty && ownedByParty,
+                CanPublish = isRegisteredServiceOwner && hasGatekeeper && ownedByParty,
                 IsServiceOwner = isServiceOwner,
-                IsOwned = ownedByParty
+                IsOwned = ownedByParty,
+                HasConfigureAccess = hasGatekeeper
             };
         }));
 

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from './AuthContext'
 
 type RequireAuthProps = {
@@ -10,6 +11,7 @@ type RequireAuthProps = {
  * Unauthenticated users are sent to /broker/api/v1/authentication/login.
  */
 export function RequireAuth({ children }: RequireAuthProps) {
+  const { t } = useTranslation()
   const { status, login } = useAuth()
 
   useEffect(() => {
@@ -21,11 +23,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
   if (status === 'api_unreachable') {
     return (
       <main id="main-content" style={{ padding: '2rem' }}>
-        <p>
-          Broker API er ikke tilgjengelig på denne adressen. Front Door ruter ikke{' '}
-          <code>/broker</code> til APIM (fikk HTML i stedet for JSON fra{' '}
-          <code>/broker/api/v1/authentication/me</code>).
-        </p>
+        <p>{t('page.auth.unreachable')}</p>
       </main>
     )
   }
@@ -33,7 +31,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
   if (status === 'loading' || status === 'unauthenticated') {
     return (
       <main id="main-content" style={{ padding: '2rem' }}>
-        <p>{status === 'loading' ? 'Laster innlogging…' : 'Omdirigerer til innlogging…'}</p>
+        <p>{status === 'loading' ? t('page.auth.loading') : t('page.auth.redirecting')}</p>
       </main>
     )
   }

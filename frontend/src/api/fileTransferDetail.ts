@@ -4,9 +4,43 @@ import { BROKER_API_PREFIX } from './config'
 
 const ACTIVE_FILETRANSFER_DETAILS_PATH = `${BROKER_API_PREFIX}/frontend/file-transfer-details/{fileTransferId}`
 
+export type NotificationDeliveryStatus =
+    | 'Pending'
+    | 'Ordered'
+    | 'Rejected'
+    | 'Sent'
+    | 'NotDelivered'
+    | 'ConditionNotMet'
+    | 'OrderUnconfirmed'
+
+export type NotificationReminderDetail = {
+    status: NotificationDeliveryStatus
+    time?: string | null
+}
+
+export type RecipientNotificationDetail = {
+    status: NotificationDeliveryStatus
+    sentTime?: string | null
+    statusReason?: string | null
+    reminder?: NotificationReminderDetail | null
+    customRecipientCount: number
+    customRecipientsNotifiedCount: number
+}
+
+export type ActorDownloadStatus = 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed'
+
+export type RecipientDownloadDetail = {
+    status: ActorDownloadStatus
+    confirmedAt?: string | null
+}
+
 export type RecipientDetail = {
     recipient: string
     recipientName?: string
+    // Null when no notification was ordered for the recipient, and - for a recipient viewing - on the other recipients.
+    notification?: RecipientNotificationDetail | null
+    // Null on the other recipients when the viewer is a recipient.
+    download?: RecipientDownloadDetail | null
 }
 
 export type FileTransferDetails = {
@@ -29,7 +63,16 @@ export type FileTransferDetails = {
     expirationTime?: string | null
     status?: string
     isSender?: boolean
-    actorDownloadStatus?: 'Initialized' | 'DownloadStarted' | 'DownloadConfirmed' | null
+    actorDownloadStatus?: ActorDownloadStatus | null
+    notification?: NotificationDetails | null
+    hasNotification?: boolean
+}
+
+export type NotificationDetails = {
+    enabled: boolean
+    sendReminder: boolean
+    customRecipients: { identifier: string; relatedOrganizationNumber: string }[]
+
 }
 
 export function getFileTransferDetails(

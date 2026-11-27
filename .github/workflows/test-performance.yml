@@ -22,8 +22,10 @@ on:
           - load
           - rate-limit
           - range-download
+          - eligible-parties-load
+          - eligible-parties-stress
       vus:
-        description: 'Number of virtual users (load test only)'
+        description: 'Number of virtual users (load test), or requests/second (eligible-parties-load)'
         required: false
         default: '20'
         type: string
@@ -39,12 +41,12 @@ on:
         required: true
         type: string
       test:
-        description: 'Load test to run (load | rate-limit | range-download)'
+        description: 'Load test to run (load | rate-limit | range-download | eligible-parties-load | eligible-parties-stress)'
         required: false
         default: 'load'
         type: string
       vus:
-        description: 'Number of virtual users (load test only)'
+        description: 'Number of virtual users (load test), or requests/second (eligible-parties-load)'
         required: false
         default: '20'
         type: string
@@ -81,8 +83,16 @@ jobs:
             echo "filename=tests/Altinn.Broker.LoadTests/test-range-download.js" >> "$GITHUB_OUTPUT"
             echo "flags=" >> "$GITHUB_OUTPUT"
             ;;
+          eligible-parties-load)
+            echo "filename=tests/Altinn.Broker.LoadTests/test-eligible-parties-load.js" >> "$GITHUB_OUTPUT"
+            echo "flags=-e rate=${VUS} -e duration=${DURATION}" >> "$GITHUB_OUTPUT"
+            ;;
+          eligible-parties-stress)
+            echo "filename=tests/Altinn.Broker.LoadTests/test-eligible-parties-stress.js" >> "$GITHUB_OUTPUT"
+            echo "flags=" >> "$GITHUB_OUTPUT"
+            ;;
           *)
-            echo "Unknown test '${TEST}'. Expected load, rate-limit, or range-download." >&2
+            echo "Unknown test '${TEST}'. Expected load, rate-limit, range-download, eligible-parties-load or eligible-parties-stress." >&2
             exit 1
             ;;
         esac

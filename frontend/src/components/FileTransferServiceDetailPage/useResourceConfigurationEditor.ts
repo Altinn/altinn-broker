@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ApiError } from '../../api/client'
 import {
@@ -11,13 +11,16 @@ import {
 import { daysToIso8601, hoursToIso8601, timeSpanToDays, timeSpanToHours } from '../../helpers/durationHelper'
 import { bytesToGb, gbToBytes } from '../../helpers/fileSizeHelper'
 import { toOrgIdentifier, toOrgNumber } from '../../helpers/orgIdentifierHelper'
+import { i18n } from '../../i18n/config'
 import { localizeApiError, type LocalizedApiError } from '../../i18n/apiErrors'
 
 const MAX_TTL_DAYS = 365
 const MAX_GRACE_HOURS = 24
 const VIRUS_SCAN_MAX_GB = bytesToGb(VIRUS_SCAN_MAX_SIZE_BYTES)
-const VIRUS_SCAN_SIZE_HINT =
-  `Filstørrelse over ${VIRUS_SCAN_MAX_GB} GB krever at virusskanning er slått av.`
+
+export function virusScanSizeHint(): string {
+  return i18n.t('page.config.virus_hint', { maxGb: VIRUS_SCAN_MAX_GB })
+}
 
 export type ConfigurationDraft = {
   maxFileTransferSizeGb: string
@@ -36,26 +39,88 @@ type Options = {
   configuration: ResourceConfiguration
   /** Organization number the end user acts on behalf of (required for ID-porten PDP). */
   onBehalfOf: string
+  /** When set (TT02), load and save against that environment instead of the current one. */
+  environment?: string
 }
 
 /**
  * Edit toggle, draft values, validation and save against ConfigureResource.
  */
-export function useResourceConfigurationEditor({ resourceId, configuration, onBehalfOf }: Options) {
+export function useResourceConfigurationEditor({
+  resourceId,
+  configuration,
+  onBehalfOf,
+  environment,
+}: Options) {
   const [displayed, setDisplayed] = useState(configuration)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<ConfigurationDraft>(() => toDraft(configuration))
   const [errors, setErrors] = useState<ConfigurationDraftErrors>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<LocalizedApiError | null>(null)
+  const [loadingRemote, setLoadingRemote] = useState(false)
+  const [remoteReady, setRemoteReady] = useState(false)
+  const [loadError, setLoadError] = useState<LocalizedApiError | null>(null)
+  // The configuration prop is the first production snapshot. A production save updates this
+  // ref, because the prop itself is not refreshed. Returning from TT02 restores the ref.
+  const productionConfiguration = useRef(configuration)
 
   useEffect(() => {
-    setDisplayed(configuration)
-    setDraft(toDraft(configuration))
+    productionConfiguration.current = configuration
+  }, [configuration])
+
+  useEffect(() => {
+    if (environment) {
+      return
+    }
+    const current = productionConfiguration.current
+    setDisplayed(current)
+    setDraft(toDraft(current))
     setEditing(false)
     setErrors({})
     setSaveError(null)
-  }, [configuration])
+    setLoadError(null)
+    setRemoteReady(false)
+  }, [configuration, environment])
+
+  useEffect(() => {
+    if (!environment) {
+      setLoadingRemote(false)
+      return
+    }
+
+    let cancelled = false
+    setLoadingRemote(true)
+    setRemoteReady(false)
+    setLoadError(null)
+    setEditing(false)
+    setErrors({})
+    setSaveError(null)
+
+    getResourceConfiguration(resourceId, environment)
+      .then((next) => {
+        if (cancelled) {
+          return
+        }
+        setDisplayed(next)
+        setDraft(toDraft(next))
+        setRemoteReady(true)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setLoadError(describeLoadError(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingRemote(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [environment, resourceId])
 
   const setEditingEnabled = useCallback(
     (enabled: boolean) => {
@@ -95,18 +160,21 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     setSaving(true)
     setSaveError(null)
     try {
-      await configureResource(resourceId, body, onBehalfOf)
-      const refreshed = await getResourceConfiguration(resourceId)
+      await configureResource(resourceId, body, onBehalfOf, environment)
+      const refreshed = await getResourceConfiguration(resourceId, environment)
+      if (!environment) {
+        productionConfiguration.current = refreshed
+      }
       setDisplayed(refreshed)
       setDraft(toDraft(refreshed))
       setEditing(false)
-      toast.success('Oppsettet er lagret.')
+      toast.success(i18n.t('page.config.saved'))
     } catch (error) {
       setSaveError(describeSaveError(error, resourceId))
     } finally {
       setSaving(false)
     }
-  }, [draft, displayed, onBehalfOf, resourceId])
+  }, [draft, displayed, environment, onBehalfOf, resourceId])
 
   return {
     configuration: displayed,
@@ -117,6 +185,9 @@ export function useResourceConfigurationEditor({ resourceId, configuration, onBe
     errors,
     saving,
     saveError,
+    loadError,
+    loadingRemote,
+    awaitingRemote: Boolean(environment) && !remoteReady && !loadError,
     save,
     cancel,
   }
@@ -139,8 +210,6 @@ function toDraft(configuration: ResourceConfiguration): ConfigurationDraft {
   }
 }
 
-export { VIRUS_SCAN_SIZE_HINT }
-
 function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   const errors: ConfigurationDraftErrors = {}
 
@@ -148,30 +217,31 @@ function validateDraft(draft: ConfigurationDraft): ConfigurationDraftErrors {
   if (maxSize !== '') {
     const gb = Number(maxSize.replace(',', '.'))
     if (!Number.isFinite(gb) || gb <= 0) {
-      errors.maxFileTransferSizeGb = 'Oppgi en filstørrelse større enn 0 GB.'
+      errors.maxFileTransferSizeGb = i18n.t('page.config.size_positive')
     } else if (draft.virusScanRequired && gb > VIRUS_SCAN_MAX_GB) {
-      errors.maxFileTransferSizeGb = VIRUS_SCAN_SIZE_HINT
-      errors.virusScanRequired = VIRUS_SCAN_SIZE_HINT
+      const hint = virusScanSizeHint()
+      errors.maxFileTransferSizeGb = hint
+      errors.virusScanRequired = hint
     }
   }
 
   const ttl = Number(draft.fileTransferTimeToLiveDays.replace(',', '.'))
   if (!Number.isFinite(ttl) || ttl <= 0) {
-    errors.fileTransferTimeToLiveDays = 'Oppgi levetid som et positivt antall dager.'
+    errors.fileTransferTimeToLiveDays = i18n.t('page.config.lifetime_positive')
   } else if (ttl > MAX_TTL_DAYS) {
-    errors.fileTransferTimeToLiveDays = `Levetiden kan ikke overstige ${MAX_TTL_DAYS} dager.`
+    errors.fileTransferTimeToLiveDays = i18n.t('page.config.lifetime_max', { max: MAX_TTL_DAYS })
   }
 
   const grace = Number(draft.purgeFileTransferGracePeriodHours.replace(',', '.'))
   if (!Number.isFinite(grace) || grace < 0) {
-    errors.purgeFileTransferGracePeriodHours = 'Oppgi venteperioden som et ikke-negativt antall timer.'
+    errors.purgeFileTransferGracePeriodHours = i18n.t('page.config.grace_non_negative')
   } else if (grace > MAX_GRACE_HOURS) {
-    errors.purgeFileTransferGracePeriodHours = `Venteperioden kan ikke overstige ${MAX_GRACE_HOURS} timer.`
+    errors.purgeFileTransferGracePeriodHours = i18n.t('page.config.grace_max', { max: MAX_GRACE_HOURS })
   }
 
   const party = draft.requiredParty.trim()
   if (party !== '' && !toOrgNumber(party)) {
-    errors.requiredParty = 'Velg en gyldig part fra listen.'
+    errors.requiredParty = i18n.t('page.config.party_invalid')
   }
 
   return errors
@@ -211,15 +281,25 @@ function toConfigureInput(
   return input
 }
 
+function describeLoadError(error: unknown): LocalizedApiError {
+  if (error instanceof ApiError) {
+    const localized = localizeApiError(error.body)
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
+      return localized
+    }
+  }
+  return { message: i18n.t('page.config.load_failed') }
+}
+
 function describeSaveError(error: unknown, resourceId: string): LocalizedApiError {
   if (error instanceof ApiError) {
     const localized = localizeApiError(error.body, { resourceId })
-    if (localized.errorCode !== undefined || localized.message !== 'Noe gikk galt. Prøv igjen.') {
+    if (localized.errorCode !== undefined || localized.message !== i18n.t('page.errors.generic')) {
       return localized
     }
-    return { message: `Lagring feilet (HTTP ${error.status}).` }
+    return { message: i18n.t('page.errors.save_failed_status', { status: error.status }) }
   }
-  return { message: 'Lagring feilet. Prøv igjen.' }
+  return { message: i18n.t('page.errors.save_failed') }
 }
 
 function formatGbInput(bytes: number): string {

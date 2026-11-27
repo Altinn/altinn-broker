@@ -1,3 +1,4 @@
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Tus;
 
 namespace Altinn.Broker.Tests.Helpers;
@@ -27,6 +28,7 @@ internal sealed class FailingTusStorageResolverDecorator(
 
     public Task<long> StageTusBlockOnDestinationAsync(
         string fileId,
+        int stripeIndex,
         string blockId,
         Stream blockData,
         CancellationToken cancellationToken)
@@ -37,7 +39,7 @@ internal sealed class FailingTusStorageResolverDecorator(
                 $"Injected TUS destination staging failure for file id {fileId}, block {blockId}.");
         }
 
-        return inner.StageTusBlockOnDestinationAsync(fileId, blockId, blockData, cancellationToken);
+        return inner.StageTusBlockOnDestinationAsync(fileId, stripeIndex, blockId, blockData, cancellationToken);
     }
 
     public Task CommitTusBlocksAsync(
@@ -46,11 +48,31 @@ internal sealed class FailingTusStorageResolverDecorator(
         CancellationToken cancellationToken)
         => inner.CommitTusBlocksAsync(fileId, blockIds, cancellationToken);
 
-    public Task CommitBlocksToDestinationAsync(
+    public Task CommitStripeBlocksAsync(
         string fileId,
+        int stripeIndex,
         IReadOnlyList<string> blockIds,
+        IReadOnlyDictionary<string, string>? metadata,
         CancellationToken cancellationToken)
-        => inner.CommitBlocksToDestinationAsync(fileId, blockIds, cancellationToken);
+        => inner.CommitStripeBlocksAsync(fileId, stripeIndex, blockIds, metadata, cancellationToken);
+
+    public Task<TusStagedBlocksSnapshot?> TryGetStripeStagedBlocksSnapshotAsync(
+        string fileId,
+        int stripeIndex,
+        CancellationToken cancellationToken)
+        => inner.TryGetStripeStagedBlocksSnapshotAsync(fileId, stripeIndex, cancellationToken);
+
+    public Task<long> GetStripeBlobLengthAsync(string fileId, int stripeIndex, CancellationToken cancellationToken)
+        => inner.GetStripeBlobLengthAsync(fileId, stripeIndex, cancellationToken);
+
+    public Task<CommittedStripes> GetCommittedStripesAsync(string fileId, CancellationToken cancellationToken)
+        => inner.GetCommittedStripesAsync(fileId, cancellationToken);
+
+    public Task DeleteAllStripesAsync(string fileId, CancellationToken cancellationToken)
+        => inner.DeleteAllStripesAsync(fileId, cancellationToken);
+
+    public Task<long> GetStripeSizeAsync(string fileId, CancellationToken cancellationToken)
+        => inner.GetStripeSizeAsync(fileId, cancellationToken);
 
     public Task<byte[]> ComputeCommittedStagingMd5Async(string fileId, CancellationToken cancellationToken)
         => inner.ComputeCommittedStagingMd5Async(fileId, cancellationToken);
@@ -75,15 +97,11 @@ internal sealed class FailingTusStorageResolverDecorator(
         CancellationToken cancellationToken)
         => inner.TryGetStagedBlocksSnapshotAsync(fileId, cancellationToken);
 
-    public Task<TusStagedBlocksSnapshot?> TryGetDestinationStagedBlocksSnapshotAsync(
-        string fileId,
-        CancellationToken cancellationToken)
-        => inner.TryGetDestinationStagedBlocksSnapshotAsync(fileId, cancellationToken);
-
     public Task<long> GetDestinationUncommittedBlocksLengthAsync(
         string fileId,
+        int stripeIndex,
         CancellationToken cancellationToken)
-        => inner.GetDestinationUncommittedBlocksLengthAsync(fileId, cancellationToken);
+        => inner.GetDestinationUncommittedBlocksLengthAsync(fileId, stripeIndex, cancellationToken);
 
     public Task<long?> TryGetStagingUploadLengthAsync(string fileId, CancellationToken cancellationToken)
         => inner.TryGetStagingUploadLengthAsync(fileId, cancellationToken);
@@ -108,10 +126,4 @@ internal sealed class FailingTusStorageResolverDecorator(
 
     public Task DeleteStagingBlobAsync(string fileId, CancellationToken cancellationToken)
         => inner.DeleteStagingBlobAsync(fileId, cancellationToken);
-
-    public Task<bool> DestinationBlobExistsAsync(string fileId, CancellationToken cancellationToken)
-        => inner.DestinationBlobExistsAsync(fileId, cancellationToken);
-
-    public Task<long> GetDestinationBlobLengthAsync(string fileId, CancellationToken cancellationToken)
-        => inner.GetDestinationBlobLengthAsync(fileId, cancellationToken);
 }

@@ -1,9 +1,11 @@
+import { i18n } from '../i18n/config'
+
 const UNITS = [
-  { seconds: 86400, singular: 'dag', plural: 'dager' },
-  { seconds: 3600, singular: 'time', plural: 'timer' },
-  { seconds: 60, singular: 'minutt', plural: 'minutter' },
-  { seconds: 1, singular: 'sekund', plural: 'sekunder' },
-]
+  { seconds: 86400, key: 'day' },
+  { seconds: 3600, key: 'hour' },
+  { seconds: 60, key: 'minute' },
+  { seconds: 1, key: 'second' },
+] as const
 
 const SECONDS_PER_DAY = 86400
 const SECONDS_PER_HOUR = 3600
@@ -22,7 +24,7 @@ export function formatDuration(timeSpan: string): string {
   }
 
   const unit = UNITS.find((candidate) => seconds >= candidate.seconds && seconds % candidate.seconds === 0)
-  return unit ? countOf(seconds, unit) : '0 sekunder'
+  return unit ? countOf(seconds, unit) : countOf(0, UNITS[3])
 }
 
 /** Days covered by a .NET TimeSpan (may be fractional), or null when unreadable. */
@@ -97,7 +99,7 @@ function toSeconds(timeSpan: string): number | null {
 
 function countOf(seconds: number, unit: (typeof UNITS)[number]): string {
   const count = seconds / unit.seconds
-  return `${count} ${count === 1 ? unit.singular : unit.plural}`
+  return i18n.t(`page.duration.${unit.key}`, { count })
 }
 
 /**
@@ -106,7 +108,7 @@ function countOf(seconds: number, unit: (typeof UNITS)[number]): string {
  */
 export function formatRemainingTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 60) {
-    return 'under ett minutt'
+    return i18n.t('page.duration.under_a_minute')
   }
 
   const roughUnit = unitFor(seconds)

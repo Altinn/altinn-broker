@@ -5,6 +5,7 @@ import {
   ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import { PartyField } from './PartyField'
 import type { RecipientRules } from './recipientRules'
@@ -26,6 +27,7 @@ export function RecipientsField({
   disabled,
   onChange,
 }: RecipientsFieldProps) {
+  const { t } = useTranslation()
   const selectedItems = useMemo(
     () =>
       selected.map((organizationNumber) => ({
@@ -40,8 +42,8 @@ export function RecipientsField({
   if (rules.requiredParty) {
     return (
       <PartyField
-        label="Mottaker"
-        description={`Tjenesten krever at ${rules.requiredParty.name} er part i formidlingen, så du kan ikke sende til andre.`}
+        label={t('page.common.recipient')}
+        description={t('page.recipients.required', { name: rules.requiredParty.name })}
         name={rules.requiredParty.name}
         organizationNumber={rules.requiredParty.organizationNumber}
       />
@@ -50,19 +52,17 @@ export function RecipientsField({
 
   return (
     <Field>
-      <Label htmlFor={id}>Mottakere</Label>
-      <Field.Description>
-        Du kan bare sende til organisasjoner som står i tilgangslisten for tjenesten.
-      </Field.Description>
+      <Label htmlFor={id}>{t('page.common.recipients')}</Label>
+      <Field.Description>{t('page.recipients.description')}</Field.Description>
       <Suggestion
         multiple
         selected={selectedItems}
         onSelectedChange={(items) => onChange(items.map((item) => item.value))}
       >
         <Suggestion.Input id={id} disabled={disabled} aria-invalid={error ? true : undefined} />
-        <Suggestion.Clear aria-label="Fjern alle mottakere" />
+        <Suggestion.Clear aria-label={t('page.recipients.clear')} />
         <Suggestion.List>
-          <Suggestion.Empty>Ingen mottakere passer søket</Suggestion.Empty>
+          <Suggestion.Empty>{t('page.recipients.empty')}</Suggestion.Empty>
           {rules.options.map((option) => (
             <Suggestion.Option key={option.organizationNumber} value={option.organizationNumber}>
               {option.name} — {formatOrgNumber(option.organizationNumber)}

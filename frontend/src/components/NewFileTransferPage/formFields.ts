@@ -1,3 +1,4 @@
+import { i18n } from '../../i18n/config'
 import type {
   ChecksumAlgorithm,
   CustomRecipientInput,
@@ -50,15 +51,19 @@ export type NewFileTransferField =
 
 export type NewFileTransferErrors = Partial<Record<NewFileTransferField, string>>
 
-export const fieldLabels: Record<NewFileTransferField, string> = {
-  reference: 'Referanse',
-  recipients: 'Mottakere',
-  metadata: 'Metadata',
-  file: 'Fil',
-  checksumEnabled: 'Sjekksum',
-  checksum: 'Sjekksum',
-  notifications: 'Varslinger',
-  customRecipients: 'Andre som skal varsles',
+export const newFileTransferFields: NewFileTransferField[] = [
+  'reference',
+  'recipients',
+  'metadata',
+  'file',
+  'checksumEnabled',
+  'checksum',
+  'notifications',
+  'customRecipients',
+]
+
+export function fieldLabel(field: NewFileTransferField): string {
+  return i18n.t(`page.fields.${field}`)
 }
 
 /** Namespaced so the error summary can link to the control that failed. */

@@ -193,7 +193,9 @@ public sealed class TusUploadDocumentFilter : IDocumentFilter
         Summary = "Get current partial upload offset",
         Description = BuildDescription(
             "Returns the current byte offset for a concatenation partial upload via the <c>Upload-Offset</c> response header. " +
-            "Use the <c>Location</c> URL returned when creating the partial upload."),
+            "Use the <c>Location</c> URL returned when creating the partial upload. " +
+            "Without it, for example after a client restart, list the partial uploads with " +
+            "<c>GET /broker/api/v1/filetransfer/{fileTransferId}/partialuploads</c>."),
         OperationId = "TusPartialUploadHead",
         Parameters =
         [

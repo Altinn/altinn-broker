@@ -6,7 +6,7 @@ import {
   ValidationMessage,
 } from '@digdir/designsystemet-react'
 import { FileIcon, TrashIcon } from '@navikt/aksel-icons'
-import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatFileSize } from '../../helpers/fileSizeHelper'
 
 type UploadFileProps = {
@@ -20,47 +20,39 @@ type UploadFileProps = {
 }
 
 export function UploadFile({ id, file, maxFileSize, error, disabled, onChange }: UploadFileProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const clear = () => {
-    // The input keeps its own value, so picking the same file again is ignored unless it is reset.
-    if (inputRef.current) {
-      inputRef.current.value = ''
-    }
-    onChange(null)
-  }
-
+  const { t } = useTranslation()
+ 
   return (
     <Field>
-      <Label htmlFor={id}>Fil</Label>
-      <FileUpload>
-        <Field.Description>Dra filen hit, eller velg den fra maskinen</Field.Description>
-        {maxFileSize !== null && (
-          <Field.Description>Maks {formatFileSize(maxFileSize)}</Field.Description>
-        )}
-        <Button asChild variant="secondary">
-          <span>Velg fil</span>
-        </Button>
-        <input
-          ref={inputRef}
-          id={id}
-          type="file"
-          disabled={disabled}
-          aria-invalid={error ? true : undefined}
-          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-        />
-      </FileUpload>
+      <Label htmlFor={file ? undefined : id}>{t('page.upload.file')}</Label>
 
-      {file && (
+      {file ? (
         <div className="new-transfer__file">
           <FileIcon aria-hidden fontSize="1.5rem" />
           <span className="new-transfer__file-name">{file.name}</span>
           <span className="new-transfer__file-size">{formatFileSize(file.size)}</span>
-          <Button variant="tertiary" data-color="danger" onClick={clear} disabled={disabled}>
+          <Button variant="tertiary" data-color="danger" onClick={() => onChange(null)} disabled={disabled}>
             <TrashIcon aria-hidden />
-            Fjern
+            {t('page.upload.remove')}
           </Button>
         </div>
+      ) : (
+        <FileUpload>
+          <Field.Description>{t('page.upload.drop')}</Field.Description>
+          {maxFileSize !== null && (
+            <Field.Description>{t('page.upload.max', { size: formatFileSize(maxFileSize) })}</Field.Description>
+          )}
+          <Button asChild variant="secondary">
+            <span>{t('page.upload.choose')}</span>
+          </Button>
+          <input
+            id={id}
+            type="file"
+            disabled={disabled}
+            aria-invalid={error ? true : undefined}
+            onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+          />
+        </FileUpload>
       )}
 
       {error && <ValidationMessage>{error}</ValidationMessage>}

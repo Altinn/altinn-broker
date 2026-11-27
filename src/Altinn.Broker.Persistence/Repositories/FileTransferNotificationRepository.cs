@@ -1,4 +1,5 @@
 using Altinn.Broker.Core.Domain;
+using Altinn.Broker.Core.Domain.Enums;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Persistence.Helpers;
@@ -26,6 +27,8 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 is_reminder,
                 notification_order_id,
                 shipment_id,
+                status,
+                status_reason,
                 order_request
             )
             VALUES (
@@ -42,6 +45,8 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 @isReminder,
                 @notificationOrderId,
                 @shipmentId,
+                @status,
+                @statusReason,
                 @orderRequest
             );";
 
@@ -59,6 +64,8 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
         command.Parameters.AddWithValue("@isReminder", notification.IsReminder);
         command.Parameters.AddWithValue("@notificationOrderId", (object?)notification.NotificationOrderId ?? DBNull.Value);
         command.Parameters.AddWithValue("@shipmentId", (object?)notification.ShipmentId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@status", (short)notification.Status);
+        command.Parameters.AddWithValue("@statusReason", (object?)notification.StatusReason ?? DBNull.Value);
         command.Parameters.AddWithValue("@orderRequest", (object?)notification.OrderRequest ?? DBNull.Value);
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
@@ -93,6 +100,8 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                     NotificationAddress = reader.IsDBNull(reader.GetOrdinal("notification_address")) ? null : reader.GetString(reader.GetOrdinal("notification_address")),
                     NotificationOrderId = reader.IsDBNull(reader.GetOrdinal("notification_order_id")) ? null : reader.GetGuid(reader.GetOrdinal("notification_order_id")),
                     ShipmentId = reader.IsDBNull(reader.GetOrdinal("shipment_id")) ? null : reader.GetGuid(reader.GetOrdinal("shipment_id")),
+                    Status = (NotificationDeliveryStatus)reader.GetInt16(reader.GetOrdinal("status")),
+                    StatusReason = reader.IsDBNull(reader.GetOrdinal("status_reason")) ? null : reader.GetString(reader.GetOrdinal("status_reason")),
                     OrderRequest = reader.IsDBNull(reader.GetOrdinal("order_request")) ? null : reader.GetString(reader.GetOrdinal("order_request"))
                 });
             }
@@ -104,11 +113,12 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
     {
         await using var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer_notification " +
-            "SET notification_order_id = @notificationOrderId, shipment_id = @shipmentId " +
+            "SET notification_order_id = @notificationOrderId, shipment_id = @shipmentId, status = @status " +
             "WHERE file_transfer_notification_id_pk = @id");
         command.Parameters.AddWithValue("@id", notificationId);
         command.Parameters.AddWithValue("@notificationOrderId", notificationOrderId);
         command.Parameters.AddWithValue("@shipmentId", shipmentId);
+        command.Parameters.AddWithValue("@status", (short)NotificationDeliveryStatus.Ordered);
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }
@@ -143,6 +153,8 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
                 NotificationAddress = reader.IsDBNull(reader.GetOrdinal("notification_address")) ? null : reader.GetString(reader.GetOrdinal("notification_address")),
                 NotificationOrderId = reader.IsDBNull(reader.GetOrdinal("notification_order_id")) ? null : reader.GetGuid(reader.GetOrdinal("notification_order_id")),
                 ShipmentId = reader.IsDBNull(reader.GetOrdinal("shipment_id")) ? null : reader.GetGuid(reader.GetOrdinal("shipment_id")),
+                Status = (NotificationDeliveryStatus)reader.GetInt16(reader.GetOrdinal("status")),
+                StatusReason = reader.IsDBNull(reader.GetOrdinal("status_reason")) ? null : reader.GetString(reader.GetOrdinal("status_reason")),
                 OrderRequest = reader.IsDBNull(reader.GetOrdinal("order_request")) ? null : reader.GetString(reader.GetOrdinal("order_request"))
             };
         }, cancellationToken);
@@ -152,11 +164,72 @@ public class FileTransferNotificationRepository(NpgsqlDataSource dataSource, Exe
     {
         await using var command = dataSource.CreateCommand(
             "UPDATE broker.file_transfer_notification " +
-            "SET notification_sent = @notificationSent, notification_address = @notificationAddress " +
+            "SET notification_sent = @notificationSent, notification_address = @notificationAddress, status = @status " +
             "WHERE file_transfer_notification_id_pk = @id");
         command.Parameters.AddWithValue("@id", notificationId);
         command.Parameters.AddWithValue("@notificationSent", sentTime);
         command.Parameters.AddWithValue("@notificationAddress", notificationAddress);
+        command.Parameters.AddWithValue("@status", (short)NotificationDeliveryStatus.Sent);
+
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+    }
+
+    public async Task UpdateStatus(Guid notificationId, NotificationDeliveryStatus status, string? statusReason, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.file_transfer_notification " +
+            "SET status = @status, status_reason = @statusReason " +
+            "WHERE file_transfer_notification_id_pk = @id");
+        command.Parameters.AddWithValue("@id", notificationId);
+        command.Parameters.AddWithValue("@status", (short)status);
+        command.Parameters.AddWithValue("@statusReason", (object?)statusReason ?? DBNull.Value);
+
+        await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
+    }
+
+    public async Task<List<FileTransferWithPendingNotifications>> GetFileTransfersWithPendingNotifications(DateTimeOffset publishedBefore, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(@"
+            SELECT n.file_transfer_id_fk,
+                   f.latest_file_status_id,
+                   MIN(s.file_transfer_status_date) AS published_at
+            FROM broker.file_transfer_notification n
+            JOIN broker.file_transfer f ON f.file_transfer_id_pk = n.file_transfer_id_fk
+            JOIN broker.file_transfer_status s
+                ON s.file_transfer_id_fk = n.file_transfer_id_fk
+                AND s.file_transfer_status_description_id_fk = @publishedStatus
+            WHERE n.status = @pendingStatus
+            GROUP BY n.file_transfer_id_fk, f.latest_file_status_id
+            HAVING MIN(s.file_transfer_status_date) < @publishedBefore");
+        command.Parameters.AddWithValue("@publishedStatus", (int)FileTransferStatus.Published);
+        command.Parameters.AddWithValue("@pendingStatus", (short)NotificationDeliveryStatus.Pending);
+        command.Parameters.AddWithValue("@publishedBefore", publishedBefore.UtcDateTime);
+
+        return await commandExecutor.ExecuteWithRetry(async (ct) =>
+        {
+            var fileTransfers = new List<FileTransferWithPendingNotifications>();
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                fileTransfers.Add(new FileTransferWithPendingNotifications(
+                    reader.GetGuid(reader.GetOrdinal("file_transfer_id_fk")),
+                    DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("published_at")), DateTimeKind.Utc),
+                    reader.IsDBNull(reader.GetOrdinal("latest_file_status_id")) ? null : (FileTransferStatus)reader.GetInt32(reader.GetOrdinal("latest_file_status_id"))));
+            }
+            return fileTransfers;
+        }, cancellationToken);
+    }
+
+    public async Task UpdatePendingStatusesForFileTransfer(Guid fileTransferId, NotificationDeliveryStatus status, string? statusReason, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "UPDATE broker.file_transfer_notification " +
+            "SET status = @status, status_reason = @statusReason " +
+            "WHERE file_transfer_id_fk = @fileTransferId AND status = @pendingStatus");
+        command.Parameters.AddWithValue("@fileTransferId", fileTransferId);
+        command.Parameters.AddWithValue("@status", (short)status);
+        command.Parameters.AddWithValue("@statusReason", (object?)statusReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("@pendingStatus", (short)NotificationDeliveryStatus.Pending);
 
         await commandExecutor.ExecuteWithRetry(command.ExecuteNonQueryAsync, cancellationToken);
     }

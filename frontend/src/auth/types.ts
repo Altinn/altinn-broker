@@ -6,11 +6,14 @@ export type AuthClaim = {
 export type MeResponse = {
   authenticated: boolean
   claims: AuthClaim[]
+  /** True when this API can forward resource configuration to TT02. */
+  canConfigureStaging?: boolean
 }
 
 export type AuthUser = {
   authenticated: true
   claims: AuthClaim[]
+  canConfigureStaging: boolean
 }
 
 export type AuthState =

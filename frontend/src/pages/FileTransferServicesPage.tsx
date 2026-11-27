@@ -1,7 +1,11 @@
-import { Alert, Heading, List, ResourceListItem } from '@altinn/altinn-components'
-import { useEffect, useMemo, useState } from 'react'
+import { Alert, Button, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
+import { ServiceOwnerProvisioningBanner } from '../components/FileTransferServices/ServiceOwnerProvisioningBanner'
+import { ServiceOwnerSetupNotice } from '../components/FileTransferServices/ServiceOwnerSetupNotice'
+import { useServiceOwnerProvisioning } from '../components/FileTransferServices/useServiceOwnerProvisioning'
 import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
 import { servicePath } from './routes'
@@ -15,9 +19,12 @@ type ResourcesState =
   | { party: string; status: 'failed' }
 
 export function FileTransferServicesPage() {
+  const { t } = useTranslation()
   const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
   const [resources, setResources] = useState<ResourcesState | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+  const reloadResources = useCallback(() => setReloadToken((token) => token + 1), [])
 
   const party = selectedParty?.organizationNumber
   const organizationName = selectedParty?.name ?? ''
@@ -43,7 +50,7 @@ export function FileTransferServicesPage() {
     return () => {
       active = false
     }
-  }, [party])
+  }, [party, reloadToken])
 
   const current = resources?.party === party ? resources : null
   const services = useMemo(
@@ -61,18 +68,49 @@ export function FileTransferServicesPage() {
   const receivable = filtered.filter((service) => service.canReceive)
   const receivableNotSendable = receivable.filter((service) => !service.canSend)
   const configurable = filtered.filter((service) => service.isOwned)
+  const owned = services.filter((service) => service.isOwned)
   const isServiceOwner = services.some((service) => service.isServiceOwner)
+  const hasConfigureAccess = services.some((service) => service.hasConfigureAccess)
+  const {
+    provisioning,
+    allowed,
+    starting,
+    error: provisioningError,
+    accessNotice,
+    start,
+    retry,
+  } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
+  const canProvision = allowed
+  const showConfigure =
+    accessNotice != null ||
+    (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
+    (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
+    (allowed && provisioning != null && provisioning.status !== 'Ready')
+  const configurationLocked =
+    showConfigure && (provisioningError != null || (provisioning != null && provisioning.status !== 'Ready'))
 
   const serviceItem = (service: AuthorizedResource) => (
     <ResourceListItem
       key={service.resourceId}
       id={service.resourceId}
       resourceName={serviceName(service)}
-      ownerName={service.serviceOwnerName ?? 'Ukjent eier'}
-      description={service.serviceOwnerName ? `Eid av ${service.serviceOwnerName}` : undefined}
+      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
+      description={service.serviceOwnerName ? t('page.common.owned_by', { name: service.serviceOwnerName }) : undefined}
       variant="default"
       interactive
       as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
+    />
+  )
+
+  const lockedServiceItem = (service: AuthorizedResource) => (
+    <ResourceListItem
+      key={service.resourceId}
+      id={service.resourceId}
+      resourceName={serviceName(service)}
+      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
+      description={t('page.services.provision_pending_resource')}
+      variant="subtle"
+      interactive={false}
     />
   )
 
@@ -81,8 +119,8 @@ export function FileTransferServicesPage() {
       <div className="page">
         <Alert
           variant="danger"
-          heading="Kunne ikke hente aktører"
-          message="Vi fikk ikke hentet hvilke virksomheter du kan representere. Prøv igjen senere."
+          heading={t('page.parties.load_failed_heading')}
+          message={t('page.parties.load_failed_message')}
         />
       </div>
     )
@@ -93,8 +131,8 @@ export function FileTransferServicesPage() {
       <div className="page">
         <Alert
           variant="info"
-          heading="Ingen virksomheter"
-          message="Du kan ikke representere noen virksomheter i BrokerBox."
+          heading={t('page.parties.none_heading')}
+          message={t('page.parties.none_message')}
         />
       </div>
     )
@@ -102,12 +140,12 @@ export function FileTransferServicesPage() {
 
   return (
     <div className="page">
-      <h1 className="page-heading">Dine formidlingstjenester</h1>
+      <h1 className="page-heading">{t('page.services.title')}</h1>
 
       <div className="filter-row">
         <SearchField
           id="service-search"
-          label="Søk etter formidlingstjenester"
+          label={t('page.services.search')}
           value={search}
           onChange={setSearch}
         />
@@ -119,34 +157,43 @@ export function FileTransferServicesPage() {
             <ResourceListItem
               key={placeholder}
               id={`placeholder-${placeholder}`}
-              resourceName="Laster formidlingstjeneste"
-              ownerName="Laster eier"
+              resourceName={t('page.services.loading_name')}
+              ownerName={t('page.services.loading_owner')}
               loading
             />
           ))}
         </List>
       )}
 
+      {provisioningError && !provisioning && (
+        <div className="page-section">
+          <Alert variant="danger" heading={provisioningError} message={t('page.common.try_later')} />
+          <Button size="sm" onClick={() => void retry()}>
+            <ButtonLabel>{t('page.services.provision_retry')}</ButtonLabel>
+          </Button>
+        </div>
+      )}
+
       {current?.status === 'failed' && (
         <Alert
           variant="danger"
-          heading="Kunne ikke hente formidlingstjenester"
-          message="Prøv igjen senere."
+          heading={t('page.services.load_failed_heading')}
+          message={t('page.common.try_later')}
         />
       )}
 
-      {current?.status === 'loaded' && services.length === 0 && (
+      {current?.status === 'loaded' && services.length === 0 && !showConfigure && (
         <Alert
           variant="info"
-          heading="Ingen formidlingstjenester"
-          message={`${organizationName} har ikke tilgang til noen formidlingstjenester.`}
+          heading={t('page.services.empty_heading')}
+          message={t('page.services.empty_message', { name: organizationName })}
         />
       )}
 
       {sendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan sende med
+            {t('page.services.can_send', { name: organizationName })}
           </Heading>
           <List spacing="sm">{sendable.map(serviceItem)}</List>
         </section>
@@ -155,18 +202,33 @@ export function FileTransferServicesPage() {
       {receivableNotSendable.length > 0 && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Andre formidlingstjenester {organizationName} er delaktig i
+            {t('page.services.involved', { name: organizationName })}
           </Heading>
           <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
         </section>
       )}
 
-      {isServiceOwner && configurable.length > 0 && (
+      {showConfigure && (
         <section className="page-section">
           <Heading size="sm" as="h2">
-            Formidlingstjenester {organizationName} kan konfigurere
+            {t('page.services.can_configure', { name: organizationName })}
           </Heading>
-          <List spacing="sm">{configurable.map(serviceItem)}</List>
+          {accessNotice && <ServiceOwnerSetupNotice />}
+          {provisioning && (
+            <ServiceOwnerProvisioningBanner
+              organizationName={organizationName}
+              provisioning={provisioning}
+              canStart={canProvision}
+              starting={starting}
+              error={provisioningError}
+              onStart={start}
+            />
+          )}
+          {configurable.length > 0 && (
+            <List className={configurationLocked ? 'configure-pending' : undefined} spacing="sm">
+              {configurable.map((service) => (configurationLocked ? lockedServiceItem(service) : serviceItem(service)))}
+            </List>
+          )}
         </section>
       )}
     </div>

@@ -25,6 +25,10 @@ param namePrefix string
 @minLength(3)
 param apimIp string
 param maskinportenTokenExchangeEnvironment string
+param production_platform_url string = ''
+param staging_broker_api_url string = ''
+@secure()
+param staging_configuration_forward_key string
 
 var image = 'ghcr.io/altinn/altinn-broker:${imageTag}'
 var containerAppName = '${namePrefix}-app'
@@ -138,6 +142,9 @@ module containerApp '../../modules/containerApp/main.bicep' = {
     userIdentityClientId: appIdentityClientId
     containerAppEnvId: keyvault.getSecret('container-app-env-id')
     maskinportenTokenExchangeEnvironment: maskinportenTokenExchangeEnvironment
+    production_platform_url: production_platform_url
+    staging_broker_api_url: staging_broker_api_url
+    staging_configuration_forward_key: staging_configuration_forward_key
   }
 }
 

@@ -39,7 +39,11 @@ async function fetchCurrentUser(): Promise<AuthUser | null | 'unavailable'> {
     if (!me?.authenticated) {
       return null
     }
-    return { authenticated: true, claims: me.claims ?? [] }
+    return {
+      authenticated: true,
+      claims: me.claims ?? [],
+      canConfigureStaging: me.canConfigureStaging === true,
+    }
   } catch {
     // Network failures and non-401 API errors — treat as unavailable, not logged-out.
     return 'unavailable'

@@ -10,9 +10,12 @@ using Altinn.Broker.Application.GetFileTransferDetails;
 using Altinn.Broker.Application.GetFileTransferOverview;
 using Altinn.Broker.Application.GetActiveFileTransferDetails;
 using Altinn.Broker.Application.GetAuthorizedParties;
+using Altinn.Broker.Application.GetProfileLanguage;
+using Altinn.Broker.Application.UpdateProfileLanguage;
 using Altinn.Broker.Application.GetAuthorizedResources;
 using Altinn.Broker.Application.GetAllowedRecipients;
 using Altinn.Broker.Application.GetFileTransfers;
+using Altinn.Broker.Application.GetPartialUploads;
 using Altinn.Broker.Application.GetResource;
 using Altinn.Broker.Application.GenerateReport;
 using Altinn.Broker.Application.InitializeFileTransfer;
@@ -22,9 +25,12 @@ using Altinn.Broker.Application.MaskinportenJwkRotation;
 using Altinn.Broker.Application.SendSlackNotification;
 using Altinn.Broker.Application.UploadFile;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Application.CleanupUseCaseTests;
 
 using Microsoft.Extensions.DependencyInjection;
+using Altinn.Broker.Application.GetEligibleParties;
+using Altinn.Broker.Application.SyncAccessLists;
 
 namespace Altinn.Broker.Application;
 public static class DependencyInjection
@@ -45,6 +51,7 @@ public static class DependencyInjection
         services.AddSingleton<ITusFinalizeUploadEnqueuer, TusFinalizeUploadEnqueuer>();
         services.AddScoped<GetFileTransferOverviewHandler>();
         services.AddScoped<GetFileTransferDetailsHandler>();
+        services.AddScoped<GetPartialUploadsHandler>();
         services.AddScoped<DownloadFileHandler>();
         services.AddScoped<ConfirmDownloadHandler>();
         services.AddScoped<GetFileTransfersHandler>();
@@ -57,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<GetAllowedRecipientsHandler>();
         services.AddScoped<GetAuthorizedResourcesHandler>();
         services.AddScoped<GetAuthorizedPartiesHandler>();
+        services.AddScoped<GetProfileLanguageHandler>();
+        services.AddScoped<UpdateProfileLanguageHandler>();
         services.AddScoped<StuckFileTransferHandler>();
         services.AddScoped<SlackStuckFileTransferNotifier>();
         services.AddScoped<GenerateDailySummaryReportHandler>();
@@ -66,9 +75,16 @@ public static class DependencyInjection
         services.AddScoped<MaskinportenJwkRotationHandler>();
         services.AddScoped<SendSlackNotificationHandler>();
         services.AddScoped<GetActiveFileTransferDetailsHandler>();
+        services.AddScoped<UploadPlanAccess>();
+        services.AddScoped<SaveUploadPlanHandler>();
+        services.AddScoped<GetUploadPlanHandler>();
         services.AddScoped<ICreateNotificationOrderHandler, CreateNotificationOrderHandler>();
         services.AddScoped<SendNotificationOrderHandler>();
+        services.AddScoped<StuckNotificationOrderHandler>();
         services.AddScoped<CheckNotificationDeliveryHandler>();
         services.AddScoped<CheckNotificationConditionHandler>();
+        services.AddScoped<SyncAccessListsHandler>();
+        services.AddScoped<GetEligiblePartiesHandler>();
+        services.AddScoped<GetPartyEligibilityHandler>();
     }
 }

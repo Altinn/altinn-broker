@@ -1,4 +1,6 @@
 import { Field, Switch } from '@digdir/designsystemet-react'
+import { useTranslation } from 'react-i18next'
+import { WithHelpText } from '../HelpTextPopover'
 
 type VirusScanFieldProps = {
   checked: boolean
@@ -11,20 +13,21 @@ type VirusScanFieldProps = {
  * Renders nothing on a resource that is not approved for disabled virus scanning.
  */
 export function VirusScanField({ checked, locked, onChange }: VirusScanFieldProps) {
+  const { t } = useTranslation()
   if (locked) {
     return null
   }
 
   return (
     <Field>
-      <Switch
-        label="Virusskann filen"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <Field.Description>
-        Mottakeren kan først laste ned filen etter at den er skannet.
-      </Field.Description>
+      <WithHelpText label={t('page.virus.label')} helpText={t('page.helptext.virus_help_text')}>
+        <Switch
+          label={t('page.virus.label')}
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+      </WithHelpText>
+      <Field.Description>{t('page.virus.description')}</Field.Description>
     </Field>
   )
 }

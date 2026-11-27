@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, List } from '@altinn/altinn-components'
 import { useFileTransferList, type FetchFileTransferPage } from '../../api/hooks/useFileTransferList'
 import { FileTransferCard } from './FileTransferCard'
@@ -37,6 +38,7 @@ export function FileTransferList({
   toPath,
   showDeadline = false,
 }: FileTransferListProps) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
 
@@ -53,9 +55,6 @@ export function FileTransferList({
       return matchesSearch && matchesResource
     })
   }, [items, search, resourceFilter])
-
-  const resourceName = (resourceId: string) =>
-    resources.find((resource) => resource.resourceId === resourceId)?.name ?? resourceId
 
   const isFiltered = Boolean(search.trim() || resourceFilter)
 
@@ -78,7 +77,7 @@ export function FileTransferList({
       {!isLoading && !isError && filtered.length === 0 && (
         <p className="empty-state">
           {isFiltered && hasNextPage
-            ? 'Ingen treff blant formidlingene som er lastet. Hent flere for å søke lenger tilbake.'
+            ? t('page.list.no_matches')
             : emptyStateText}
         </p>
       )}
@@ -90,7 +89,6 @@ export function FileTransferList({
           return (
             <li key={overview.fileTransferId}>
               <FileTransferCard
-                resourceName={resourceName(overview.resourceId)}
                 isSender={overview.isSender}
                 sender={overview.sender}
                 recipients={overview.recipients}
@@ -114,7 +112,7 @@ export function FileTransferList({
             disabled={isFetchingNextPage}
             onClick={() => void fetchNextPage()}
           >
-            {isFetchingNextPage ? 'Henter …' : 'Hent flere'}
+            {isFetchingNextPage ? t('page.list.loading_more') : t('page.list.load_more')}
           </Button>
         </div>
       )}

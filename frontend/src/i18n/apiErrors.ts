@@ -2,15 +2,15 @@
  * Localized messages for Broker API error codes shown in the SPA.
  * Keys match the numeric `errorCode` extension on ProblemDetails responses.
  */
+import { i18n } from './config'
+
 export const BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID = 'digdir-broker-administrasjon'
 
-const nbMessages: Record<number, (context: ApiErrorMessageContext) => string> = {
-  13: () =>
-    'Maks filstørrelse kan ikke være over 50 GB når virusskanning er påkrevd. Slå av virusskanning for å tillate større filer.',
-  36: () =>
-    `Du må ha tilgang i henhold til tilgangsreglene for ${BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID} for å redigere en tjeneste.`,
-  37: () => 'Du må være tjeneste-eier for å oppdatere ressurs',
-  38: () => 'Du kan bare endre oppsett for tjenester som eies av virksomheten du representerer.',
+const errorMessageKey: Record<number, string> = {
+  13: 'page.errors.max_size_with_virus',
+  36: 'page.errors.gatekeeper',
+  37: 'page.errors.must_be_owner',
+  38: 'page.errors.wrong_party',
 }
 
 export type ApiErrorMessageContext = {
@@ -45,13 +45,13 @@ export function configureAccessNotice(isServiceOwner: boolean): LocalizedApiErro
   if (!isServiceOwner) {
     return {
       errorCode: 37,
-      message: nbMessages[37]({}),
+      message: i18n.t(errorMessageKey[37]),
     }
   }
 
   return {
     errorCode: 36,
-    message: nbMessages[36]({}),
+    message: i18n.t(errorMessageKey[36]),
     linkHref: tjenesteoversiktenResourceUrl(BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID),
     linkLabel: BROKERBOX_CONFIGURE_GATEKEEPER_RESOURCE_ID,
     linkInMessage: true,
@@ -70,11 +70,9 @@ export function publishAccessNotice(_resourceId?: string): LocalizedApiError {
 export function localizeApiError(
   body: unknown,
   context: ApiErrorMessageContext = {},
-  locale: 'nb' = 'nb',
 ): LocalizedApiError {
   const errorCode = readErrorCode(body)
   const detail = readDetail(body)
-  const messages = locale === 'nb' ? nbMessages : nbMessages
 
   if (errorCode === 36) {
     return configureAccessNotice(true)
@@ -84,16 +82,17 @@ export function localizeApiError(
     return configureAccessNotice(false)
   }
 
-  if (errorCode !== undefined && messages[errorCode]) {
+  const messageKey = errorCode !== undefined ? errorMessageKey[errorCode] : undefined
+  if (messageKey) {
     return {
       errorCode,
-      message: messages[errorCode](context),
+      message: i18n.t(messageKey, context),
     }
   }
 
   return {
     errorCode,
-    message: detail ?? 'Noe gikk galt. Prøv igjen.',
+    message: detail ?? i18n.t('page.errors.generic'),
   }
 }
 

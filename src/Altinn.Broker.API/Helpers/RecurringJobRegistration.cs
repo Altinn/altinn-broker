@@ -3,6 +3,8 @@ using Altinn.Broker.Application.CleanupUseCaseTests;
 using Altinn.Broker.Application.IpSecurityRestrictionsUpdater;
 using Altinn.Broker.Application.MaskinportenJwkRotation;
 using Altinn.Broker.Application.MonthlyStatistics;
+using Altinn.Broker.Application.SendNotificationOrder;
+using Altinn.Broker.Application.SyncAccessLists;
 using Altinn.Broker.Core.Options;
 using Hangfire;
 
@@ -38,10 +40,23 @@ public static class RecurringJobRegistration
             handler => handler.RefreshPreviousMonthRollup(CancellationToken.None),
             "0 4 2 * *");
 
+        recurringJobManager.AddOrUpdate<StuckNotificationOrderHandler>(
+            "Order notifications still pending after publish",
+            handler => handler.Process(CancellationToken.None),
+            Cron.Daily(8),
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Oslo") });
+
         recurringJobManager.AddOrUpdate<CleanupUseCaseTestsHandler>(
             "Cleanup use case test data older than 1 day",
             handler => handler.Process(new CleanupUseCaseTestsRequest { MinAgeDays = 1 }, null, CancellationToken.None),
             Cron.Daily());
+
+        recurringJobManager.AddOrUpdate<SyncAccessListsHandler>(
+            "Sync access lists",
+            handler => handler.Process(CancellationToken.None),
+            "*/10 * * * *"
+        );
+        recurringJobManager.Trigger("Sync access lists");
 
         var settings = configuration.GetSection(nameof(MaskinportenJwkRotationSettings)).Get<MaskinportenJwkRotationSettings>()
             ?? new MaskinportenJwkRotationSettings();

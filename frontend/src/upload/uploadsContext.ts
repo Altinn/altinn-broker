@@ -5,11 +5,18 @@ import type { UploadPlan, UploadProgress, UploadRunStatus } from '../api/tus/tus
 // Three contexts, so that what changes several times a second re-renders only what shows it:
 // the actions never change, the active upload changes with its status, and the progress all the time.
 
-export type UploadStatus = 'initializing' | UploadRunStatus | 'failed'
+export type UploadStatus = 'initializing' | UploadRunStatus | 'processing' | 'failed'
+
+/** How the server's processing of an uploaded file ended, as far as the upload page waited for it. */
+export type ProcessingOutcome = 'published' | 'failed' | 'timeout'
 
 export type ActiveUpload = {
   resourceId: string
   sender: string
+  /** Null until the transfer has been created. */
+  fileTransferId: string | null
+  /** Whether the server holds the upload's plan, so it can be continued after a reload or from elsewhere. */
+  planKept: boolean
   fileName: string
   fileSize: number
   status: UploadStatus
@@ -26,10 +33,11 @@ export type PlannedUpload = {
   file: File
 }
 
-export type UploadSuccessListener = (upload: {
+export type UploadFinishedListener = (upload: {
   fileTransferId: string
   resourceId: string
   sender: string
+  outcome: ProcessingOutcome
 }) => void
 
 export type UploadActions = {
@@ -38,10 +46,12 @@ export type UploadActions = {
   pause: () => void
   resume: () => void
   cancel: () => void
-  /** Call when the server has the file: this clears the saved upload and draft, and shows that the file was sent. */
-  markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>) => void
+  /** Call when the page showing the upload mounts; the returned function, called when it leaves, pauses the upload or stops waiting for processing. */
+  enterPage: () => () => void
+  /** Call when the server is done with the file: clears the draft, shows the outcome and tells the listeners, which redirect. */
+  markReceived: (upload: Pick<PlannedUpload, 'resourceId' | 'sender' | 'plan'>, outcome: ProcessingOutcome) => void
   /** Returns the function that removes the listener again. */
-  addUploadSuccessListener: (listener: UploadSuccessListener) => () => void
+  addUploadFinishedListener: (listener: UploadFinishedListener) => () => void
 }
 
 /** The transfer was created, but the upload of its file could not be prepared. */

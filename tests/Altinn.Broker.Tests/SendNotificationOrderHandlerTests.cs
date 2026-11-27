@@ -6,6 +6,7 @@ using Altinn.Broker.Core.Domain;
 using Altinn.Broker.Core.Models.Enums;
 using Altinn.Broker.Core.Models.Notifications;
 using Altinn.Broker.Core.Repositories;
+using Altinn.Broker.Core.Services;
 
 using Hangfire;
 using Hangfire.Common;
@@ -145,7 +146,7 @@ public class SendNotificationOrderHandlerTests
         notificationService
             .Setup(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()))
             .Callback<NotificationOrderRequestV2, CancellationToken>((req, _) => capturedRequest = req)
-            .ReturnsAsync((NotificationOrderResponseV2?)null);
+            .ThrowsAsync(new NotificationOrderRejectedException("rejected"));
 
         await handler.Process(fileTransferId, CancellationToken.None);
 
@@ -154,20 +155,83 @@ public class SendNotificationOrderHandlerTests
     }
 
     [Fact]
-    public async Task Process_WhenNotificationServiceReturnsNull_DoesNotUpdateOrScheduleDeliveryCheck()
+    public async Task Process_WhenNotificationsRejectsTheOrder_MarksItRejectedWithReason_AndDoesNotOrderOrScheduleDeliveryCheck()
     {
         var (repository, notificationService, _, capturedJobs, handler) = CreateHandler();
         var fileTransferId = Guid.NewGuid();
-        var order = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        var order = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest(reminders: [new ReminderV2 { DelayDays = 7 }])));
         repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([order]);
         notificationService
             .Setup(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((NotificationOrderResponseV2?)null);
+            .ThrowsAsync(new NotificationOrderRejectedException("Recipient has no contact information"));
 
         await handler.Process(fileTransferId, CancellationToken.None);
 
+        repository.Verify(r => r.UpdateStatus(order.Id, NotificationDeliveryStatus.Rejected, "Recipient has no contact information", It.IsAny<CancellationToken>()), Times.Once);
         repository.Verify(r => r.UpdateOrderResponseData(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.AddNotification(It.IsAny<BrokerNotificationEntity>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Empty(capturedJobs);
+    }
+
+    [Fact]
+    public async Task Process_WhenOneRecipientFails_StillOrdersTheOthers_ThenThrowsSoHangfireRetries()
+    {
+        var (repository, notificationService, _, _, handler) = CreateHandler();
+        var fileTransferId = Guid.NewGuid();
+        var failing = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        var succeeding = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([failing, succeeding]);
+        notificationService
+            .SetupSequence(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("500 Internal Server Error"))
+            .ReturnsAsync(new NotificationOrderResponseV2
+            {
+                NotificationOrderId = Guid.NewGuid(),
+                Notification = new NotificationResponseV2 { ShipmentId = Guid.NewGuid(), SendersReference = "ref" }
+            });
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => handler.Process(fileTransferId, CancellationToken.None));
+
+        Assert.IsType<HttpRequestException>(Assert.Single(exception.InnerExceptions));
+        repository.Verify(r => r.UpdateOrderResponseData(succeeding.Id, It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.UpdateOrderResponseData(failing.Id, It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Process_SkipsNotificationsAlreadyRejected()
+    {
+        var (repository, notificationService, _, _, handler) = CreateHandler();
+        var fileTransferId = Guid.NewGuid();
+        var rejected = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        rejected.Status = NotificationDeliveryStatus.Rejected;
+        repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([rejected]);
+
+        await handler.Process(fileTransferId, CancellationToken.None);
+
+        notificationService.Verify(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Process_WhenOneRecipientIsRejected_StillSendsTheOthers()
+    {
+        var (repository, notificationService, _, _, handler) = CreateHandler();
+        var fileTransferId = Guid.NewGuid();
+        var rejected = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        var accepted = CreateOrder(fileTransferId: fileTransferId, orderRequest: JsonSerializer.Serialize(CreateOrderRequest()));
+        repository.Setup(r => r.GetNotificationsForFileTransfer(fileTransferId, It.IsAny<CancellationToken>())).ReturnsAsync([rejected, accepted]);
+        notificationService
+            .SetupSequence(s => s.CreateNotificationV2(It.IsAny<NotificationOrderRequestV2>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new NotificationOrderRejectedException("rejected"))
+            .ReturnsAsync(new NotificationOrderResponseV2
+            {
+                NotificationOrderId = Guid.NewGuid(),
+                Notification = new NotificationResponseV2 { ShipmentId = Guid.NewGuid(), SendersReference = "ref" }
+            });
+
+        await handler.Process(fileTransferId, CancellationToken.None);
+
+        repository.Verify(r => r.UpdateStatus(rejected.Id, NotificationDeliveryStatus.Rejected, "rejected", It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.UpdateOrderResponseData(accepted.Id, It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -238,6 +302,7 @@ public class SendNotificationOrderHandlerTests
         Assert.Equal(99, persistedReminder.ActorId);
         Assert.Equal(notificationOrderId, persistedReminder.NotificationOrderId);
         Assert.Equal(reminderShipmentId, persistedReminder.ShipmentId);
+        Assert.Equal(NotificationDeliveryStatus.Ordered, persistedReminder.Status);
         Assert.Equal(mainRequestedSendTime.AddDays(7), persistedReminder.RequestedSendTime);
 
         // One scheduled check for the main order, one for the reminder.

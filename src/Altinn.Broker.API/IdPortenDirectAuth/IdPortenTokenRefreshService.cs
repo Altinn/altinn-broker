@@ -34,9 +34,10 @@ public sealed class IdPortenTokenRefreshService : IIdPortenTokenRefreshService
     private static readonly TimeSpan ResultCacheLifetime = TimeSpan.FromMinutes(10);
 
     /// <summary>
-    /// Must cover a full ID-Porten round-trip on the winning replica (HTTP client timeout is 10s).
+    /// How long a replica waits for another replica to publish a refresh result. The token
+    /// endpoint typically answers in under 100ms; this bounds a slow round trip.
     /// </summary>
-    private static readonly TimeSpan DefaultConcurrentRefreshWait = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan DefaultConcurrentRefreshWait = TimeSpan.FromSeconds(2);
 
     private static readonly TimeSpan DefaultConcurrentRefreshPollInterval = TimeSpan.FromMilliseconds(50);
 

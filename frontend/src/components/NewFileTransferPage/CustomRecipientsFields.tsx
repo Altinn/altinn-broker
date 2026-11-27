@@ -10,6 +10,7 @@ import {
 } from '@digdir/designsystemet-react'
 import { PlusIcon, TrashIcon } from '@navikt/aksel-icons'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatOrgNumber } from '../../helpers/orgIdentifierHelper'
 import { createCustomRecipientEntry, customRecipientInputId, type CustomRecipientEntry } from './formFields'
 import type { CustomRecipientRowError } from './formValidation'
@@ -42,6 +43,7 @@ export function CustomRecipientsFields({
   onEnabledChange,
   onChange,
 }: CustomRecipientsFieldsProps) {
+  const { t } = useTranslation()
   const identifierInputs = useRef(new Map<string, HTMLInputElement>())
   const pendingFocus = useRef<string | null>(null)
   const enabledSwitch = useRef<HTMLInputElement>(null)
@@ -84,7 +86,7 @@ export function CustomRecipientsFields({
       <Field>
         <Switch
           ref={enabledSwitch}
-          label="Varsle andre i tillegg"
+          label={t('page.custom.label')}
           checked={enabled}
           disabled={disabled}
           onChange={(event) => {
@@ -94,18 +96,13 @@ export function CustomRecipientsFields({
             }
           }}
         />
-        <Field.Description>
-          For eksempel en kontaktperson, som varsles på vegne av en av mottakerne.
-        </Field.Description>
+        <Field.Description>{t('page.custom.description')}</Field.Description>
       </Field>
 
       {enabled && (
         <Fieldset id={id} tabIndex={-1}>
-          <Fieldset.Legend>Varsle valgfrie mottakere</Fieldset.Legend>
-          <Fieldset.Description>
-            Oppgi e-postadresse eller mobilnummer, og på vegne av hvilken mottaker
-            varselet gjelder.
-          </Fieldset.Description>
+          <Fieldset.Legend>{t('page.custom.legend')}</Fieldset.Legend>
+          <Fieldset.Description>{t('page.custom.legend_description')}</Fieldset.Description>
           {error && entries.length === 0 && <ValidationMessage>{error}</ValidationMessage>}
 
           {entries.map((entry, index) => {
@@ -124,14 +121,14 @@ export function CustomRecipientsFields({
                     }
                   }}
                   id={customRecipientInputId(entry.id, 'identifier')}
-                  label="Hvem skal varsles"
+                  label={t('page.custom.who')}
                   value={entry.identifier}
                   error={rowErrors[index]?.identifier}
                   disabled={disabled}
                   onChange={(event) => update(entry.id, { identifier: event.target.value })}
                 />
                 <Field>
-                  <Label htmlFor={selectId}>På vegne av mottaker</Label>
+                  <Label htmlFor={selectId}>{t('page.custom.on_behalf')}</Label>
                   <Select
                     id={selectId}
                     value={relatedOrganizationNumber}
@@ -140,7 +137,9 @@ export function CustomRecipientsFields({
                     onChange={(event) => update(entry.id, { relatedOrganizationNumber: event.target.value })}
                   >
                     <Select.Option value="" disabled>
-                      {relatedOrganizations.length === 0 ? 'Velg mottakere først' : 'Velg mottaker'}
+                      {relatedOrganizations.length === 0
+                        ? t('page.custom.choose_recipients_first')
+                        : t('page.custom.choose_recipient')}
                     </Select.Option>
                     {relatedOrganizations.map((option) => (
                       <Select.Option key={option.organizationNumber} value={option.organizationNumber}>
@@ -159,7 +158,7 @@ export function CustomRecipientsFields({
                   onClick={() => remove(entry.id)}
                 >
                   <TrashIcon aria-hidden />
-                  <span className="sr-only">Fjern {index + 1}. som skal varsles</span>
+                  <span className="sr-only">{t('page.custom.remove', { index: index + 1 })}</span>
                 </Button>
               </div>
             )
@@ -167,7 +166,7 @@ export function CustomRecipientsFields({
 
           <Button variant="secondary" className="new-transfer__add-metadata" disabled={disabled} onClick={add}>
             <PlusIcon aria-hidden />
-            Legg til
+            {t('page.custom.add')}
           </Button>
         </Fieldset>
       )}

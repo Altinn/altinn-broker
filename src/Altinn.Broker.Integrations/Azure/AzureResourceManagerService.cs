@@ -74,12 +74,10 @@ public class AzureResourceManagerService : IResourceManager
         if (_hostEnvironment.IsDevelopment())
         {
             _backgroundJobClient.Enqueue<IServiceOwnerRepository>(service => service.InitializeStorageProvider(serviceOwnerEntity.Id, "Dummy value", StorageProviderType.Altinn3Azure));
-        } 
-        else
-        {
-            var virusScanStorageProviderJob = _backgroundJobClient.Enqueue<IResourceManager>(service => service.Deploy(serviceOwnerEntity, true, cancellationToken));
-            _backgroundJobClient.ContinueJobWith<IResourceManager>(virusScanStorageProviderJob, service => service.Deploy(serviceOwnerEntity, false, cancellationToken));
+            return;
         }
+        var virusScanStorageProviderJob = _backgroundJobClient.Enqueue<IResourceManager>(service => service.Deploy(serviceOwnerEntity, true, cancellationToken));
+        _backgroundJobClient.ContinueJobWith<IResourceManager>(virusScanStorageProviderJob, service => service.Deploy(serviceOwnerEntity, false, cancellationToken));
     }
 
     public async Task Deploy(ServiceOwnerEntity serviceOwnerEntity, bool virusScan, CancellationToken cancellationToken)
@@ -88,42 +86,43 @@ public class AzureResourceManagerService : IResourceManager
         _logger.LogInformation($"Using app identity for deploying Azure resources"); // TODO remove
         var resourceGroupName = GetResourceGroupName(serviceOwnerEntity.Id);
 
-        var storageAccountName = GenerateStorageAccountName();
-        _logger.LogInformation($"Resource group: {resourceGroupName}");
-        _logger.LogInformation($"Storage account: {storageAccountName}");
+            var storageAccountName = GenerateStorageAccountName();
+            _logger.LogInformation($"Resource group: {resourceGroupName}");
+            _logger.LogInformation($"Storage account: {storageAccountName}");
 
-        // Create or get the resource group
-        var subscription = GetSubscription();
-        var resourceGroupCollection = subscription.GetResourceGroups();
-        var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
-        foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
-        {
-            resourceGroupData.Tags[tag.Key] = tag.Value;
-        }
-        var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
+            // Create or get the resource group
+            var subscription = GetSubscription();
+            var resourceGroupCollection = subscription.GetResourceGroups();
+            var resourceGroupData = new ResourceGroupData(_resourceManagerOptions.Location);
+            foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
+            {
+                resourceGroupData.Tags[tag.Key] = tag.Value;
+            }
+            var resourceGroup = await resourceGroupCollection.CreateOrUpdateAsync(WaitUntil.Completed, resourceGroupName, resourceGroupData, cancellationToken);
 
-        // Create or get the storage account
-        var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardZrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
-        storageAccountData.MinimumTlsVersion = "TLS1_2";
-        storageAccountData.AllowSharedKeyAccess = false;
-        foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
-        {
-            storageAccountData.Tags[tag.Key] = tag.Value;
-        }
-        var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
-        var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
-        if (virusScan) { 
-            await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
-        }
-        var blobService = storageAccount.Value.GetBlobService();
-        string containerName = "brokerfiles";
-        if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
-        {
-            await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, containerName, new BlobContainerData(), cancellationToken);
-        }
+            // Create or get the storage account
+            var storageAccountData = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardZrs), StorageKind.StorageV2, new AzureLocation(_resourceManagerOptions.Location));
+            storageAccountData.MinimumTlsVersion = "TLS1_2";
+            storageAccountData.AllowSharedKeyAccess = false;
+            foreach (var tag in GetServiceOwnerResourceGroupTags(serviceOwnerEntity))
+            {
+                storageAccountData.Tags[tag.Key] = tag.Value;
+            }
+            var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();
+            var storageAccount = await storageAccountCollection.CreateOrUpdateAsync(WaitUntil.Completed, storageAccountName, storageAccountData, cancellationToken);
+            if (virusScan)
+            {
+                await EnableMicrosoftDefender(resourceGroupName, storageAccountName, cancellationToken);
+            }
+            var blobService = storageAccount.Value.GetBlobService();
+            string containerName = "brokerfiles";
+            if (!blobService.GetBlobContainers().Any(container => container.Data.Name == containerName))
+            {
+                await blobService.GetBlobContainers().CreateOrUpdateAsync(WaitUntil.Completed, containerName, new BlobContainerData(), cancellationToken);
+            }
 
-        await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, virusScan ? StorageProviderType.Altinn3Azure : StorageProviderType.Altinn3AzureWithoutVirusScan);
-        _logger.LogInformation($"Storage account {storageAccountName} created");
+            await _serviceOwnerRepository.InitializeStorageProvider(serviceOwnerEntity.Id, storageAccountName, virusScan ? StorageProviderType.Altinn3Azure : StorageProviderType.Altinn3AzureWithoutVirusScan);
+            _logger.LogInformation($"Storage account {storageAccountName} created");
     }
 
     private async Task EnableMicrosoftDefender(string resourceGroupName, string storageAccountName, CancellationToken cancellationToken)

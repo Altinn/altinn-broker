@@ -13,15 +13,19 @@ export async function retrieveMaskinportenToken({ clientId, kid, pem, scope, isS
     const body = Object.entries({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt })
         .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
     let res = http.post(url, body, { headers });
-    if (res.status === 503) {
-        // Retry once after 1 second
+    if (isTransientMaskinportenFailure(res)) {
+        console.warn(`Maskinporten token request failed (status=${res.status}, error=${res.error || 'none'}). Retrying once.`);
         sleep(1);
         res = http.post(url, body, { headers });
     }
     if (res.status !== 200) {
-        throw new Error(`Maskinporten token failed: status=${res.status} body=${res.body}`);
+        throw new Error(`Maskinporten token failed: status=${res.status} error=${res.error || 'none'} body=${res.body}`);
     }
     return res.json('access_token');
+}
+
+function isTransientMaskinportenFailure(res) {
+    return res.status === 0 || res.status >= 500;
 }
 
 export async function getMaintenanceMaskinportenToken() {

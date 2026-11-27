@@ -14,6 +14,11 @@ public static class BrokerAuthenticationSchemes
     public const string EndUserCookie = "EndUserCookie";
     /// <summary>Altinn platform JWT stored in the shared runtime httpOnly cookie.</summary>
     public const string AltinnPlatformJwtCookie = "AltinnPlatformJwtCookie";
+    /// <summary>
+    /// Bearer tokens issued by the production Altinn platform. Registered only when
+    /// <c>AltinnOptions:ProductionPlatformUrl</c> is set (TT02).
+    /// </summary>
+    public const string ProductionAltinn = "ProductionAltinn";
 }
 
 public static class ClaimsPrincipalExtensions
@@ -28,6 +33,31 @@ public static class ClaimsPrincipalExtensions
             identity.IsAuthenticated
             && identity.AuthenticationType is BrokerAuthenticationSchemes.EndUserCookie
                 or BrokerAuthenticationSchemes.AltinnPlatformJwtCookie);
+
+    /// <summary>
+    /// A production Altinn end-user token accepted by TT02. Service-owner tokens stay on the
+    /// organization-ownership path even when they were issued by production.
+    /// </summary>
+    public static bool IsProductionAltinnEndUser(this ClaimsPrincipal user)
+    {
+        var identity = user.Identities.FirstOrDefault(candidate =>
+            candidate.IsAuthenticated
+            && candidate.AuthenticationType == BrokerAuthenticationSchemes.ProductionAltinn);
+        if (identity is null || HasServiceOwnerScope(identity))
+        {
+            return false;
+        }
+
+        return identity.HasClaim(claim => claim.Type is "urn:altinn:userid" or "urn:altinn:partyid");
+    }
+
+    private static bool HasServiceOwnerScope(ClaimsIdentity identity)
+    {
+        return identity.Claims.Any(claim =>
+            (claim.Type is "scope" or "scp" or "urn:altinn:scope")
+            && claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Contains("altinn:serviceowner", StringComparer.Ordinal));
+    }
 
     public static string? GetCallerOrganizationId(this ClaimsPrincipal user)
     {

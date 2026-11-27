@@ -2,13 +2,16 @@
 using Altinn.ApiClients.Maskinporten.Extensions;
 using Altinn.ApiClients.Maskinporten.Services;
 using Altinn.Broker.Application.UploadFile.Tus;
+using Altinn.Broker.Application.UploadPlans;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Repositories;
 using Altinn.Broker.Core.Services;
 using Altinn.Broker.Integrations.Altinn.AccessManagement;
+using Altinn.Broker.Integrations.Altinn.Organizations;
 using Altinn.Broker.Integrations.Altinn.Authorization;
 using Altinn.Broker.Integrations.Altinn.Events;
 using Altinn.Broker.Integrations.Altinn.Notifications;
+using Altinn.Broker.Integrations.Altinn.Profile;
 using Altinn.Broker.Integrations.Altinn.Register;
 using Altinn.Broker.Integrations.Altinn.ResourceRegistry;
 using Altinn.Broker.Integrations.Azure;
@@ -30,6 +33,7 @@ using Xtensible.TusDotNet.Azure;
 using Altinn.Broker.Integrations.Slack;
 using Slack.Webhooks;
 using Altinn.Broker.Core.Helpers;
+using Altinn.Broker.Integrations.Redis;
 
 namespace Altinn.Broker.Integrations;
 public static class DependencyInjection
@@ -87,6 +91,10 @@ public static class DependencyInjection
         // Calls on behalf of the logged in end user, so it carries their Altinn token instead of a Maskinporten token.
         services.AddHttpClient<IAltinnAccessManagementService, AltinnAccessManagementService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
             .AddStandardRetryPolicy();
+        services.AddHttpClient<IAltinnProfileService, AltinnProfileService>((client) => client.BaseAddress = new Uri(altinnOptions.PlatformGatewayUrl))
+            .AddStandardRetryPolicy();
+        services.AddHttpClient<IAltinnOrganizationCatalog, AltinnOrganizationCatalog>()
+            .AddStandardRetryPolicy();
 
         var generalSettings = new GeneralSettings();
         configuration.GetSection(nameof(GeneralSettings)).Bind(generalSettings);
@@ -143,5 +151,17 @@ public static class DependencyInjection
         services.AddScoped<ITusUploadFinalizationService, TusUploadFinalizationService>();
         services.AddScoped<ITusUploadFinalizationProgressService, TusUploadFinalizationProgressService>();
         services.AddSingleton<ITusUploadKindResolver, TusUploadKindResolver>();
+        services.AddSingleton<ITusPartialUploadLookup, TusPartialUploadLookup>();
+        services.AddSingleton<IUploadPlanStore, UploadPlanStore>();
+        services.AddSingleton<ITusUploadProgressReader, TusUploadProgressReader>();
+        services.AddSingleton<IEligiblePartyStore>(serviceProvider =>
+        {
+            var multiplexer = serviceProvider.GetService<IConnectionMultiplexer>();
+            var logger = serviceProvider.GetRequiredService<ILogger<RedisEligiblePartyStore>>();
+            return multiplexer is not null
+                ? new RedisEligiblePartyStore(multiplexer, logger)
+                : new InMemoryEligiblePartyStore();
+        });
+
     }
 }

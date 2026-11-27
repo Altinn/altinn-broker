@@ -1,6 +1,7 @@
 using Altinn.Broker.Application.UploadFile.Tus;
 using Altinn.Broker.Core.Options;
 using Altinn.Broker.Core.Services;
+using Altinn.Broker.Integrations.Azure;
 using Altinn.Broker.Integrations.Tus;
 
 using Microsoft.AspNetCore.Http;
@@ -48,16 +49,16 @@ public class BrokerTusStoreResumeTests
             .Setup(x => x.GetStagedBlocksLengthAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _storageResolver
-            .Setup(x => x.GetDestinationUncommittedBlocksLengthAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetDestinationUncommittedBlocksLengthAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _storageResolver
-            .Setup(x => x.GetDestinationBlobLengthAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .Setup(x => x.GetCommittedStripesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommittedStripes(0, 0, []));
         _storageResolver
             .Setup(x => x.TryGetStagedBlocksSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((TusStagedBlocksSnapshot?)null);
         _storageResolver
-            .Setup(x => x.TryGetDestinationStagedBlocksSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.TryGetStripeStagedBlocksSnapshotAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((TusStagedBlocksSnapshot?)null);
 
         _activityCache
@@ -92,9 +93,6 @@ public class BrokerTusStoreResumeTests
         _storageResolver
             .Setup(x => x.StagingBlobExistsAsync(fileId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        _storageResolver
-            .Setup(x => x.DestinationBlobExistsAsync(fileId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         _httpContext.Request.ContentLength = 64L * 1024 * 1024;
         var store = CreateStore();
@@ -104,7 +102,7 @@ public class BrokerTusStoreResumeTests
 
         Assert.Equal(0, written);
         _progressCache.Verify(
-            x => x.TryAcceptChunkAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            x => x.TryAcceptChunkAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

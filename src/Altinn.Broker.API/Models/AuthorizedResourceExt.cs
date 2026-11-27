@@ -46,7 +46,7 @@ public class AuthorizedResourceExt
     public bool CanPublish { get; set; }
 
     /// <summary>
-    /// Whether the requested party is configured as a Broker service owner.
+    /// Whether the requested party is an organization in the Altinn service-owner catalog.
     /// </summary>
     [JsonPropertyName("isServiceOwner")]
     public bool IsServiceOwner { get; set; }
@@ -56,4 +56,10 @@ public class AuthorizedResourceExt
     /// </summary>
     [JsonPropertyName("isOwned")]
     public bool IsOwned { get; set; }
+
+    /// <summary>
+    /// The user has publish on <c>digdir-broker-administrasjon</c> for the requested party.
+    /// </summary>
+    [JsonPropertyName("hasConfigureAccess")]
+    public bool HasConfigureAccess { get; set; }
 }
