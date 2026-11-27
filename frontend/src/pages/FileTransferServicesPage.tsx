@@ -1,17 +1,20 @@
-import { Alert, Button, ButtonLabel, Heading, List, ResourceListItem } from '@altinn/altinn-components'
+import { Alert, Button, ButtonLabel, List, ResourceListItem } from '@altinn/altinn-components'
+import { Select } from '@digdir/designsystemet-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, type LinkProps } from 'react-router-dom'
 import { fetchAuthorizedResources, type AuthorizedResource } from '../api/resources'
+import { FileTransferServiceCard } from '../components/FileTransferServices/FileTransferServiceCard'
 import { ServiceOwnerProvisioningBanner } from '../components/FileTransferServices/ServiceOwnerProvisioningBanner'
 import { ServiceOwnerSetupNotice } from '../components/FileTransferServices/ServiceOwnerSetupNotice'
 import { useServiceOwnerProvisioning } from '../components/FileTransferServices/useServiceOwnerProvisioning'
 import { SearchField } from '../components/SearchField'
 import { useParties } from '../parties/PartiesContext'
-import { servicePath } from './routes'
 import './pages.css'
 
 const serviceName = (service: AuthorizedResource) => service.name ?? service.resourceId
+
+/** The access the list is narrowed to. Empty shows every service. */
+type AccessFilter = '' | 'canSend' | 'canReceive' | 'isOwned'
 
 /** The resources of one party. Anything for another party is stale after an actor switch. */
 type ResourcesState =
@@ -22,6 +25,7 @@ export function FileTransferServicesPage() {
   const { t } = useTranslation()
   const { status: partiesStatus, selectedParty } = useParties()
   const [search, setSearch] = useState('')
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>('')
   const [resources, setResources] = useState<ResourcesState | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
   const reloadResources = useCallback(() => setReloadToken((token) => token + 1), [])
@@ -61,16 +65,13 @@ export function FileTransferServicesPage() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return services.filter((service) => serviceName(service).toLowerCase().includes(query))
-  }, [services, search])
+    return services.filter((service) => {
+      const matchesSearch = serviceName(service).toLowerCase().includes(query)
+      const matchesAccess = !accessFilter || service[accessFilter]
+      return matchesSearch && matchesAccess
+    })
+  }, [services, search, accessFilter])
 
-  const sendable = filtered.filter((service) => service.canSend)
-  const receivable = filtered.filter((service) => service.canReceive)
-  const receivableNotSendable = receivable.filter((service) => !service.canSend)
-  const configurable = filtered.filter((service) => service.isOwned)
-  const owned = services.filter((service) => service.isOwned)
-  const isServiceOwner = services.some((service) => service.isServiceOwner)
-  const hasConfigureAccess = services.some((service) => service.hasConfigureAccess)
   const {
     provisioning,
     allowed,
@@ -81,38 +82,14 @@ export function FileTransferServicesPage() {
     retry,
   } = useServiceOwnerProvisioning(party, organizationName, reloadResources)
   const canProvision = allowed
-  const showConfigure =
-    accessNotice != null ||
-    (owned.length > 0 && (isServiceOwner || hasConfigureAccess || allowed)) ||
-    (isServiceOwner && hasConfigureAccess && provisioning != null && provisioning.status !== 'Ready') ||
-    (allowed && provisioning != null && provisioning.status !== 'Ready')
-  const configurationLocked =
-    showConfigure && (provisioningError != null || (provisioning != null && provisioning.status !== 'Ready'))
-
-  const serviceItem = (service: AuthorizedResource) => (
-    <ResourceListItem
-      key={service.resourceId}
-      id={service.resourceId}
-      resourceName={serviceName(service)}
-      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
-      description={service.serviceOwnerName ? t('page.common.owned_by', { name: service.serviceOwnerName }) : undefined}
-      variant="default"
-      interactive
-      as={(props: LinkProps) => <Link {...props} to={servicePath(service.resourceId)} />}
-    />
-  )
-
-  const lockedServiceItem = (service: AuthorizedResource) => (
-    <ResourceListItem
-      key={service.resourceId}
-      id={service.resourceId}
-      resourceName={serviceName(service)}
-      ownerName={service.serviceOwnerName ?? t('page.common.unknown_owner')}
-      description={t('page.services.provision_pending_resource')}
-      variant="subtle"
-      interactive={false}
-    />
-  )
+  const provisioningPending = provisioning != null && provisioning.status !== 'Ready'
+  // The notice and the banner say what is missing, so they also explain an empty list.
+  const showOwnerSetup = accessNotice != null || provisioningPending
+  const configurationLocked = provisioningError != null || provisioningPending
+  // A service the party can send or receive on stays open while the service owner is being
+  // provisioned. One the party only owns has nothing to offer until then.
+  const isLocked = (service: AuthorizedResource) =>
+    configurationLocked && service.isOwned && !service.canSend && !service.canReceive
 
   if (partiesStatus === 'failed') {
     return (
@@ -149,21 +126,24 @@ export function FileTransferServicesPage() {
           value={search}
           onChange={setSearch}
         />
-      </div>
 
-      {isLoading && (
-        <List spacing="sm">
-          {[1, 2, 3].map((placeholder) => (
-            <ResourceListItem
-              key={placeholder}
-              id={`placeholder-${placeholder}`}
-              resourceName={t('page.services.loading_name')}
-              ownerName={t('page.services.loading_owner')}
-              loading
-            />
-          ))}
-        </List>
-      )}
+        <div className="field">
+          <label className="page-subheading" htmlFor="access-filter">
+            {t('page.services.filter')}
+          </label>
+          <Select
+            id="access-filter"
+            aria-label={t('page.services.filter')}
+            value={accessFilter}
+            onChange={(e) => setAccessFilter(e.target.value as AccessFilter)}
+          >
+            <Select.Option value="">{t('page.services.filter_all')}</Select.Option>
+            <Select.Option value="canSend">{t('page.services.can_send')}</Select.Option>
+            <Select.Option value="canReceive">{t('page.services.can_receive')}</Select.Option>
+            <Select.Option value="isOwned">{t('page.services.service_owner')}</Select.Option>
+          </Select>
+        </div>
+      </div>
 
       {provisioningError && !provisioning && (
         <div className="page-section">
@@ -182,7 +162,7 @@ export function FileTransferServicesPage() {
         />
       )}
 
-      {current?.status === 'loaded' && services.length === 0 && !showConfigure && (
+      {current?.status === 'loaded' && services.length === 0 && !showOwnerSetup && (
         <Alert
           variant="info"
           heading={t('page.services.empty_heading')}
@@ -190,46 +170,51 @@ export function FileTransferServicesPage() {
         />
       )}
 
-      {sendable.length > 0 && (
-        <section className="page-section">
-          <Heading size="sm" as="h2">
-            {t('page.services.can_send', { name: organizationName })}
-          </Heading>
-          <List spacing="sm">{sendable.map(serviceItem)}</List>
-        </section>
+      {provisioningPending && (
+        <div className="page-section">
+          <ServiceOwnerProvisioningBanner
+            organizationName={organizationName}
+            provisioning={provisioning}
+            canStart={canProvision}
+            starting={starting}
+            error={provisioningError}
+            onStart={start}
+          />
+        </div>
       )}
 
-      {receivableNotSendable.length > 0 && (
-        <section className="page-section">
-          <Heading size="sm" as="h2">
-            {t('page.services.involved', { name: organizationName })}
-          </Heading>
-          <List spacing="sm">{receivableNotSendable.map(serviceItem)}</List>
-        </section>
-      )}
+      <div className="page-section">
+        {isLoading && (
+          <List spacing="sm">
+            {[1, 2, 3].map((placeholder) => (
+              <ResourceListItem
+                key={placeholder}
+                id={`placeholder-${placeholder}`}
+                resourceName={t('page.services.loading_name')}
+                ownerName={t('page.services.loading_owner')}
+                loading
+              />
+            ))}
+          </List>
+        )}
 
-      {showConfigure && (
-        <section className="page-section">
-          <Heading size="sm" as="h2">
-            {t('page.services.can_configure', { name: organizationName })}
-          </Heading>
-          {accessNotice && <ServiceOwnerSetupNotice />}
-          {provisioning && (
-            <ServiceOwnerProvisioningBanner
-              organizationName={organizationName}
-              provisioning={provisioning}
-              canStart={canProvision}
-              starting={starting}
-              error={provisioningError}
-              onStart={start}
-            />
-          )}
-          {configurable.length > 0 && (
-            <List className={configurationLocked ? 'configure-pending' : undefined} spacing="sm">
-              {configurable.map((service) => (configurationLocked ? lockedServiceItem(service) : serviceItem(service)))}
-            </List>
-          )}
-        </section>
+        {services.length > 0 && filtered.length === 0 && (
+          <p className="empty-state">{t('page.services.no_matches')}</p>
+        )}
+
+        <List className="card-list">
+          {filtered.map((service) => (
+            <li key={service.resourceId}>
+              <FileTransferServiceCard service={service} locked={isLocked(service)} />
+            </li>
+          ))}
+        </List>
+      </div>
+
+      {accessNotice && (
+        <div className="page-section">
+          <ServiceOwnerSetupNotice />
+        </div>
       )}
     </div>
   )
