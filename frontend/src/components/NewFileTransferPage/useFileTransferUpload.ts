@@ -34,10 +34,17 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
   const live = useActiveUpload()
   const [submitAttempts, setSubmitAttempts] = useState(0)
   const [submitError, setSubmitError] = useState('')
+  const [startedHere, setStartedHere] = useState(false)
 
-  const isOwn = live?.resourceId === resourceId && live.sender === senderOrgNumber
+  // The tab's upload is this form's own only when the form started it, or continues that transfer. Any
+  // other upload, even for the same service, isn't shown here, so a new transfer always opens as an empty
+  // form; sending one sets the other aside as a draft.
+  const isOwn =
+    live !== null &&
+    (resume
+      ? live.fileTransferId === resume.fileTransferId
+      : startedHere && live.resourceId === resourceId && live.sender === senderOrgNumber)
   const active = isOwn ? live : null
-  const blockedBy = isOwn ? null : live
 
   // Leaving the page pauses rather than aborts, so nothing is left locked on the server. Waiting for
   // Broker to process a file that is already in is just stopped.
@@ -59,6 +66,7 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
       return
     }
 
+    setStartedHere(true)
     try {
       await uploads.start({
         resourceId,
@@ -113,7 +121,6 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
   return {
     submitAttempts,
     active,
-    blockedBy,
     submitError: submitError || active?.error || '',
     interrupted,
     checkingFile: interrupted !== null && values.file !== null && fileCheck === null,
@@ -125,7 +132,6 @@ export function useFileTransferUpload({ resourceId, senderOrgNumber, values, err
     pause,
     resume: resumeActive,
     cancel: uploads.cancel,
-    cancelBlocking: uploads.cancel,
   }
 }
 

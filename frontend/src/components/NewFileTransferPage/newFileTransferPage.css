@@ -122,8 +122,7 @@
   font-size: var(--ds-body-sm-font-size);
 }
 
-.new-transfer__resume,
-.new-transfer__notice {
+.new-transfer__resume {
   display: flex;
   flex-direction: column;
   gap: var(--ds-size-2);

@@ -29,7 +29,7 @@ import {
   type StartUploadInput,
   type UploadActions,
   type UploadStatus,
-  type UploadSuccessListener,
+  type UploadFinishedListener,
 } from './uploadsContext'
 
 // Owns the single in-flight upload, for as long as the user stays within this app's routes.
@@ -43,7 +43,9 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveUpload | null>(null)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const sessionRef = useRef<Initializing | Running | Processing | Failed | null>(null)
-  const listenersRef = useRef(new Set<UploadSuccessListener>())
+  // Per transfer, whether the server holds its plan, which is what lets it be continued as a draft.
+  const plansKeptRef = useRef(new Map<string, Promise<boolean>>())
+  const listenersRef = useRef(new Set<UploadFinishedListener>())
   // Whether the page showing the upload is open; set through enterPage.
   const onPageRef = useRef(false)
 
@@ -70,7 +72,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         break
     }
     for (const listener of listenersRef.current) {
-      listener({ fileTransferId: plan.fileTransferId, resourceId, sender })
+      listener({ fileTransferId: plan.fileTransferId, resourceId, sender, outcome })
     }
   }, [])
 
@@ -110,19 +112,29 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
       update({ error: '', fileTransferId: upload.plan.fileTransferId })
 
       let loaded = alreadySent
-      const session: Running = {
-        phase: 'running',
-        upload,
-        run: startUpload(upload.plan, upload.file, {
-          onProgress: (progress) => {
-            loaded = progress.loaded
+      // Callbacks from an upload that has been set aside can still arrive while it stops; they must not
+      // update the upload that has taken its place. The first status report can arrive during startUpload,
+      // before this upload is the session, and that one is let through since it belongs to this upload.
+
+      const started: { session?: Running } = {}
+      const isCurrent = () => started.session === undefined || sessionRef.current === started.session
+      const uploadRun = startUpload(upload.plan, upload.file, {
+        onProgress: (progress) => {
+          loaded = progress.loaded
+          if (isCurrent()) {
             setProgress(progress)
-          },
-          onStatus: (status) => update({ status }),
-          alreadySent,
-          paused,
-        }),
-      }
+          }
+        },
+        onStatus: (status) => {
+          if (isCurrent()) {
+            update({ status })
+          }
+        },
+        alreadySent,
+        paused,
+      })
+      const session: Running = { phase: 'running', upload, run: uploadRun }
+      started.session = session
       sessionRef.current = session
 
       try {
@@ -160,12 +172,39 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     [awaitProcessed, show, update],
   )
 
+  // The tab holds one upload. Another one taking its place stops it without discarding it: its plan is on
+  // the server, so it lives on as a draft and is continued from there.
+  const setAside = useCallback(() => {
+    const session = sessionRef.current
+    if (!session) {
+      return
+    }
+    sessionRef.current = null
+    if (session.phase === 'initializing') {
+      // Not uploading yet, so there is nothing to carry on with.
+      session.controller.abort()
+      return
+    }
+    if (session.phase === 'processing') {
+      // Not reachable from the UI today: the file is already in, so nothing is set aside; the waiting stops.
+      session.controller.abort()
+      return
+    }
+    if (session.phase === 'running') {
+      session.run.abort()
+    }
+    // Saving the plan may still be under way, so the answer is waited for before the user is told.
+    const planKept = plansKeptRef.current.get(session.upload.plan.fileTransferId) ?? Promise.resolve(false)
+    void planKept.then((kept) =>
+      kept
+        ? toast.info(i18n.t('page.upload_errors.set_aside_kept'))
+        : toast.warning(i18n.t('page.upload_errors.set_aside_lost')),
+    )
+  }, [])
+
   const start = useCallback(
     async (input: StartUploadInput) => {
-      // One upload at a time; another upload already holds the session.
-      if (sessionRef.current) {
-        return
-      }
+      setAside()
       const session: Initializing = {
         phase: 'initializing',
         controller: new AbortController(),
@@ -197,22 +236,36 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         return
       }
       const upload = { resourceId: input.resourceId, sender: input.sender, plan, file: input.file }
-      void keepPlan(plan, fingerprint)
+      const planKept = keepPlan(plan, fingerprint)
+      plansKeptRef.current.set(plan.fileTransferId, planKept)
+      void planKept.then((kept) => {
+        if (!kept) {
+          return
+        }
+        // The transfer can now be continued, and holds what was typed, so the next new transfer
+        // starts from an empty form. Until then a reload keeps the form, since the transfer it
+        // created can't be continued without its plan.
+        clearDraft(draftKey(input.resourceId, input.sender))
+        // Only the upload the plan belongs to is marked, in case another has taken its place meanwhile.
+        setActive((current) =>
+          current?.fileTransferId === plan.fileTransferId ? { ...current, planKept: true } : current,
+        )
+      })
+
       await run(upload, 0, session.paused)
     },
-    [run, show],
+    [run, setAside, show],
   )
 
   const resumeStored = useCallback(
     (upload: PlannedUpload, alreadySent: number) => {
-      // One upload at a time; another upload already holds the session.
-      if (sessionRef.current) {
-        return
-      }
-      show(newActiveUpload(upload, 'uploading'))
+      setAside()
+      // Continued from the plan the server holds.
+      plansKeptRef.current.set(upload.plan.fileTransferId, Promise.resolve(true))
+      show(newActiveUpload(upload, 'uploading', true))
       void run(upload, alreadySent)
     },
-    [run, show],
+    [run, setAside, show],
   )
 
   // Holds the upload rather than stopping it: aborting leaves the server holding uploads locked.
@@ -281,7 +334,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
     }
   }, [show])
 
-  const addUploadSuccessListener = useCallback((listener: UploadSuccessListener) => {
+  const addUploadFinishedListener = useCallback((listener: UploadFinishedListener) => {
     listenersRef.current.add(listener)
     return () => {
       listenersRef.current.delete(listener)
@@ -289,8 +342,8 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const actions = useMemo<UploadActions>(
-    () => ({ start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener }),
-    [start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadSuccessListener],
+    () => ({ start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadFinishedListener }),
+    [start, resumeStored, pause, resume, cancel, enterPage, markReceived, addUploadFinishedListener],
   )
 
   return (
@@ -317,31 +370,37 @@ async function fileReceived(plan: UploadPlan, run: UploadRun): Promise<void> {
   }
 }
 
+
 /**
  * Gives the server the plan, so the upload can be continued from another browser if it stops. The
- * upload runs either way, so a failure only costs that, and the user is told.
+ * upload runs either way, so a failure only costs that, and the user is told. Resolves to whether the
+ * plan was kept.
  */
-async function keepPlan(plan: UploadPlan, fingerprint: Promise<FileFingerprint | null>): Promise<void> {
+async function keepPlan(plan: UploadPlan, fingerprint: Promise<FileFingerprint | null>): Promise<boolean> {
+
   try {
     const taken = await fingerprint
     if (!taken) {
       throw new Error('The file could not be read for its fingerprint')
     }
     await saveUploadPlan(plan, taken)
+    return true
   } catch (error) {
     console.error('Could not save the upload plan', error)
     toast.warning(i18n.t('page.upload_errors.plan_not_saved'))
+    return false
   }
 }
-
 function newActiveUpload(
   { resourceId, sender, file, plan }: { resourceId: string; sender: string; file: File; plan?: UploadPlan },
   status: UploadStatus,
+  planKept = false,
 ): ActiveUpload {
   return {
     resourceId,
     sender,
     fileTransferId: plan?.fileTransferId ?? null,
+    planKept,
     fileName: file.name,
     fileSize: file.size,
     status,

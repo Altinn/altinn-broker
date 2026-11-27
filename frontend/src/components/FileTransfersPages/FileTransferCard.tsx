@@ -20,6 +20,8 @@ type FileTransferCardProps = {
   extendedStatusLabel?: string
   deadline?: DialogMetadataDueAtProps
   to: string
+  /** Router state handed to the page the card opens. */
+  linkState?: unknown
 }
 
 export function FileTransferCard({
@@ -32,6 +34,7 @@ export function FileTransferCard({
   extendedStatusLabel,
   deadline,
   to,
+  linkState,
 }: FileTransferCardProps) {
   const { t } = useTranslation()
   const otherRecipientCount = recipients.length - 1
@@ -45,7 +48,7 @@ export function FileTransferCard({
       })()
 
   return (
-    <Link to={to} className="file-transfer-card-link">
+    <Link to={to} state={linkState} className="file-transfer-card-link">
       <Card className="file-transfer-card">
         <div className="file-transfer-card__content">
           <div className="file-transfer-card__heading-row">
